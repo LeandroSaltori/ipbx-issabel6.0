@@ -10,7 +10,7 @@
   +----------------------------------------------------------------------+
   | The Initial Developer of the Original Code is PaloSanto Solutions    |
   +----------------------------------------------------------------------+
-  $Id: index.php,v 2.0 2026-08-17 Prisma Telecom $ */
+  $Id: index.php,v 3.0 2026-08-17 Prisma Telecom $ */
 
 require_once "modules/agent_console/libs/issabel2.lib.php";
 include_once "libs/paloSantoDB.class.php";
@@ -19,42 +19,33 @@ require_once "libs/misc.lib.php";
 
 function _moduleContent(&$smarty, $module_name)
 {
-    include_once "libs/paloSantoGrid.class.php";
-    include_once "libs/paloSantoForm.class.php";
     include_once "modules/$module_name/configs/default.conf.php";
     include_once "modules/$module_name/libs/paloSantoPesquisa.class.php";
 
     load_language_module($module_name);
     global $arrConf;
 
-    $base_dir = dirname($_SERVER['SCRIPT_FILENAME']);
-    $templates_dir = (isset($arrConf['templates_dir'])) ? $arrConf['templates_dir'] : 'themes';
-    $local_templates_dir = "$base_dir/modules/$module_name/" . $templates_dir . '/' . $arrConf['theme'];
-
     $pPesquisaObj = new paloSantoPesquisa();
-    $pDB = $pPesquisaObj->pdo;
 
-    // Stream / Download de Áudio de Gravação
+    // Handler de Áudio
     if (isset($_GET['action']) && ($_GET['action'] == 'stream_audio' || $_GET['action'] == 'download_audio')) {
         handleAudioPlayback();
         exit;
     }
 
-    // Exportação Excel
+    // Handler de Exportação Excel
     if (isset($_GET['action']) && $_GET['action'] == 'export_excel') {
         handleExportExcel($pPesquisaObj);
         exit;
     }
 
-    // Exportação PDF / Impressão
+    // Handler de Exportação PDF
     if (isset($_GET['action']) && $_GET['action'] == 'export_pdf') {
         handleExportPdf($pPesquisaObj);
         exit;
     }
 
-    $action = getAction();
-    $content = reportPesquisa($smarty, $module_name, $local_templates_dir, $pPesquisaObj, $arrConf);
-    return $content;
+    return renderFullExecutiveDashboard($pPesquisaObj, $module_name);
 }
 
 function handleAudioPlayback()
@@ -112,24 +103,20 @@ function handleAudioPlayback()
 
 function handleExportExcel($pPesquisa)
 {
-    $filter_field = isset($_GET['filter_field']) ? trim($_GET['filter_field']) : '';
-    $filter_value = isset($_GET['filter_value']) ? trim($_GET['filter_value']) : '';
-    $date_start   = isset($_GET['date_start']) ? trim($_GET['date_start']) : '';
-    $date_end     = isset($_GET['date_end']) ? trim($_GET['date_end']) : '';
-    $operador     = isset($_GET['operador']) ? trim($_GET['operador']) : '';
-    $avaliacao    = isset($_GET['avaliacao']) ? trim($_GET['avaliacao']) : '';
-    $solucao      = isset($_GET['solucao']) ? trim($_GET['solucao']) : '';
+    $date_start = isset($_REQUEST['date_start']) ? trim($_REQUEST['date_start']) : '';
+    $date_end   = isset($_REQUEST['date_end']) ? trim($_REQUEST['date_end']) : '';
+    $operador   = isset($_REQUEST['operador']) ? trim($_REQUEST['operador']) : '';
+    $avaliacao  = isset($_REQUEST['avaliacao']) ? trim($_REQUEST['avaliacao']) : '';
+    $solucao    = isset($_REQUEST['solucao']) ? trim($_REQUEST['solucao']) : '';
 
-    $total = $pPesquisa->getNumPesquisa($filter_field, $filter_value, $date_start, $date_end, $operador, $avaliacao, $solucao);
-    $arrResult = $pPesquisa->getPesquisa($total > 0 ? $total : 5000, 0, $filter_field, $filter_value, $date_start, $date_end, $operador, $avaliacao, $solucao);
+    $total = $pPesquisa->getNumPesquisa('', '', $date_start, $date_end, $operador, $avaliacao, $solucao);
+    $arrResult = $pPesquisa->getPesquisa($total > 0 ? $total : 5000, 0, '', '', $date_start, $date_end, $operador, $avaliacao, $solucao);
 
     header('Content-Type: text/csv; charset=utf-8');
     header('Content-Disposition: attachment; filename=Pesquisa_Satisfacao_' . date('Ymd_His') . '.csv');
 
     $output = fopen('php://output', 'w');
-    // BOM UTF-8 para Excel abrir acentos perfeitamente
     fprintf($output, chr(0xEF).chr(0xBB).chr(0xBF));
-
     fputcsv($output, array('Operador / Ramal', 'Fila', 'Data', 'Hora', 'Telefone', 'Avaliacao', 'Problema Resolvido'), ';');
 
     if (is_array($arrResult)) {
@@ -151,16 +138,14 @@ function handleExportExcel($pPesquisa)
 
 function handleExportPdf($pPesquisa)
 {
-    $filter_field = isset($_GET['filter_field']) ? trim($_GET['filter_field']) : '';
-    $filter_value = isset($_GET['filter_value']) ? trim($_GET['filter_value']) : '';
-    $date_start   = isset($_GET['date_start']) ? trim($_GET['date_start']) : '';
-    $date_end     = isset($_GET['date_end']) ? trim($_GET['date_end']) : '';
-    $operador     = isset($_GET['operador']) ? trim($_GET['operador']) : '';
-    $avaliacao    = isset($_GET['avaliacao']) ? trim($_GET['avaliacao']) : '';
-    $solucao      = isset($_GET['solucao']) ? trim($_GET['solucao']) : '';
+    $date_start = isset($_REQUEST['date_start']) ? trim($_REQUEST['date_start']) : '';
+    $date_end   = isset($_REQUEST['date_end']) ? trim($_REQUEST['date_end']) : '';
+    $operador   = isset($_REQUEST['operador']) ? trim($_REQUEST['operador']) : '';
+    $avaliacao  = isset($_REQUEST['avaliacao']) ? trim($_REQUEST['avaliacao']) : '';
+    $solucao    = isset($_REQUEST['solucao']) ? trim($_REQUEST['solucao']) : '';
 
-    $total = $pPesquisa->getNumPesquisa($filter_field, $filter_value, $date_start, $date_end, $operador, $avaliacao, $solucao);
-    $arrResult = $pPesquisa->getPesquisa($total > 0 ? $total : 5000, 0, $filter_field, $filter_value, $date_start, $date_end, $operador, $avaliacao, $solucao);
+    $total = $pPesquisa->getNumPesquisa('', '', $date_start, $date_end, $operador, $avaliacao, $solucao);
+    $arrResult = $pPesquisa->getPesquisa($total > 0 ? $total : 5000, 0, '', '', $date_start, $date_end, $operador, $avaliacao, $solucao);
 
     ?>
     <!DOCTYPE html>
@@ -169,21 +154,14 @@ function handleExportPdf($pPesquisa)
         <meta charset="UTF-8">
         <title>Relatório de Pesquisa de Satisfação - IPbx Prisma</title>
         <style>
-            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size:12px; color:#1e293b; padding:20px; }
+            body { font-family: 'Segoe UI', sans-serif; font-size:12px; color:#1e293b; padding:20px; }
             h2 { margin:0 0 5px 0; color:#0f172a; }
             p { margin:0 0 15px 0; color:#64748b; font-size:11px; }
             table { width:100%; border-collapse:collapse; margin-top:15px; }
-            th { background:#475569; color:#ffffff; padding:8px; text-align:left; font-size:11px; text-transform:uppercase; }
+            th { background:#334155; color:#ffffff; padding:8px; text-align:left; font-size:11px; text-transform:uppercase; }
             td { padding:8px; border-bottom:1px solid #e2e8f0; }
             tr:nth-child(even) { background:#f8fafc; }
-            .badge { padding:3px 8px; border-radius:10px; font-weight:bold; font-size:10px; color:#fff; display:inline-block; }
-            .green { background:#10b981; }
-            .blue { background:#3b82f6; }
-            .amber { background:#f59e0b; }
-            .red { background:#ef4444; }
-            @media print {
-                .no-print { display:none; }
-            }
+            @media print { .no-print { display:none; } }
         </style>
     </head>
     <body onload="window.print();">
@@ -225,189 +203,32 @@ function handleExportPdf($pPesquisa)
     exit;
 }
 
-function reportPesquisa($smarty, $module_name, $local_templates_dir, $pPesquisa, $arrConf)
+function renderFullExecutiveDashboard($pPesquisa, $module_name)
 {
-    // Parâmetros de Filtro
-    $filter_field = isset($_POST['filter_field']) ? trim($_POST['filter_field']) : (isset($_GET['filter_field']) ? trim($_GET['filter_field']) : '');
-    $filter_value = isset($_POST['filter_value']) ? trim($_POST['filter_value']) : (isset($_GET['filter_value']) ? trim($_GET['filter_value']) : '');
-    $date_start   = isset($_POST['date_start']) ? trim($_POST['date_start']) : (isset($_GET['date_start']) ? trim($_GET['date_start']) : '');
-    $date_end     = isset($_POST['date_end']) ? trim($_POST['date_end']) : (isset($_GET['date_end']) ? trim($_GET['date_end']) : '');
-    $operador     = isset($_POST['operador']) ? trim($_POST['operador']) : (isset($_GET['operador']) ? trim($_GET['operador']) : '');
-    $avaliacao    = isset($_POST['avaliacao']) ? trim($_POST['avaliacao']) : (isset($_GET['avaliacao']) ? trim($_GET['avaliacao']) : '');
-    $solucao      = isset($_POST['solucao']) ? trim($_POST['solucao']) : (isset($_GET['solucao']) ? trim($_GET['solucao']) : '');
+    // Captura Parâmetros de Filtro
+    $date_start = isset($_REQUEST['date_start']) ? trim($_REQUEST['date_start']) : '';
+    $date_end   = isset($_REQUEST['date_end']) ? trim($_REQUEST['date_end']) : '';
+    $operador   = isset($_REQUEST['operador']) ? trim($_REQUEST['operador']) : '';
+    $avaliacao  = isset($_REQUEST['avaliacao']) ? trim($_REQUEST['avaliacao']) : '';
+    $solucao    = isset($_REQUEST['solucao']) ? trim($_REQUEST['solucao']) : '';
 
-    // Estatísticas para os Cards Executivos e Gráficos
+    // Paginação
+    $page  = isset($_REQUEST['page']) ? max(1, (int)$_REQUEST['page']) : 1;
+    $limit = 20;
+    $offset = ($page - 1) * $limit;
+
+    // Estatísticas dos Cards e Gráficos
     $stats = $pPesquisa->getPesquisaStats($date_start, $date_end, $operador);
 
-    // Configuração do Grid do Issabel
-    $oGrid = new paloSantoGrid($smarty);
-    $oGrid->setTitle("📊 Painel de Pesquisa de Satisfação");
-    $oGrid->pagingShow(true);
-    $oGrid->enableExport();
-    $oGrid->setNameFile_Export("Pesquisa_Satisfacao_" . date('Ymd_His'));
+    // Registros Filtrados
+    $total = $pPesquisa->getNumPesquisa('', '', $date_start, $date_end, $operador, $avaliacao, $solucao);
+    $arrResult = $pPesquisa->getPesquisa($limit, $offset, '', '', $date_start, $date_end, $operador, $avaliacao, $solucao);
 
-    $url = array(
-        "menu"         => $module_name,
-        "filter_field" => $filter_field,
-        "filter_value" => $filter_value,
-        "date_start"   => $date_start,
-        "date_end"     => $date_end,
-        "operador"     => $operador,
-        "avaliacao"    => $avaliacao,
-        "solucao"      => $solucao
-    );
-    $oGrid->setURL($url);
+    $totalPages = max(1, ceil($total / $limit));
 
-    // Colunas (incluindo Gravação estilo Fila com Play e Baixar)
-    $arrColumns = array(
-        "Operador / Ramal",
-        "Fila",
-        "Data",
-        "Hora",
-        "Telefone",
-        "Avaliação do Atendimento",
-        "Problema Resolvido?",
-        "Gravação"
-    );
-    $oGrid->setColumns($arrColumns);
-
-    $total = $pPesquisa->getNumPesquisa($filter_field, $filter_value, $date_start, $date_end, $operador, $avaliacao, $solucao);
-    
-    // Se o filtro por data retornou 0, faz fallback automatico
-    if ($total == 0 && (!empty($date_start) || !empty($filter_value))) {
-        $total = $pPesquisa->getNumPesquisa('', '', '', '', '', '', '');
-        $date_start = '';
-        $date_end = '';
-    }
-
-    $arrData = array();
-
-    if ($oGrid->isExportAction()) {
-        $limit  = $total;
-        $offset = 0;
-    } else {
-        $limit  = 20;
-        $oGrid->setLimit($limit);
-        $oGrid->setTotal($total);
-        $offset = $oGrid->calculateOffset();
-    }
-
-    $arrResult = $pPesquisa->getPesquisa($limit, $offset, $filter_field, $filter_value, $date_start, $date_end, $operador, $avaliacao, $solucao);
-
-    if (is_array($arrResult) && count($arrResult) > 0) {
-        foreach ($arrResult as $key => $value) {
-            $arrTmp = array();
-
-            // Mapeamento dinâmico de colunas
-            $val_operador  = !empty($value['operador']) ? $value['operador'] : (!empty($value['ramal']) ? $value['ramal'] : '-');
-            $val_fila      = !empty($value['fila']) ? $value['fila'] : 'Atendimento';
-            $val_data      = !empty($value['data']) ? $value['data'] : '-';
-            $val_hora      = !empty($value['hora']) ? $value['hora'] : '-';
-            $val_telefone  = !empty($value['telefone']) ? $value['telefone'] : (!empty($value['numero']) ? $value['numero'] : '-');
-            $val_avaliacao = !empty($value['avaliacao']) ? $value['avaliacao'] : '-';
-            $val_solucao   = !empty($value['solucao']) ? $value['solucao'] : '-';
-
-            // 1. Operador
-            $arrTmp[0] = "<span style='background:#ede9fe; color:#6d28d9; padding:4px 10px; border-radius:6px; font-weight:600; font-size:12px;'>👤 $val_operador</span>";
-
-            // 2. Fila
-            $arrTmp[1] = "<span style='background:#f1f5f9; color:#475569; padding:3px 8px; border-radius:4px; font-size:11px;'>$val_fila</span>";
-
-            // 3. Data
-            $arrTmp[2] = "<span style='color:#334155; font-size:12px;'>📅 $val_data</span>";
-
-            // 4. Hora
-            $arrTmp[3] = "<span style='color:#64748b; font-size:12px;'>🕒 $val_hora</span>";
-
-            // 5. Telefone
-            $arrTmp[4] = "<span style='font-weight:600; color:#1e293b;'>📞 $val_telefone</span>";
-
-            // 6. Avaliação
-            $avUpper = strtoupper(trim($val_avaliacao));
-            switch ($avUpper) {
-                case 'EXCELENTE':
-                case 'OTIMO':
-                case 'ÓTIMO':
-                case '5':
-                    $arrTmp[5] = "<span style='background:#10b981; color:#ffffff; padding:4px 10px; border-radius:12px; font-weight:bold; font-size:11px; display:inline-block;'>⭐⭐⭐⭐⭐ $avUpper</span>";
-                    break;
-                case 'MUITO BOM':
-                case '4':
-                    $arrTmp[5] = "<span style='background:#3b82f6; color:#ffffff; padding:4px 10px; border-radius:12px; font-weight:bold; font-size:11px; display:inline-block;'>⭐⭐⭐⭐ MUITO BOM</span>";
-                    break;
-                case 'MEDIO':
-                case 'MÉDIO':
-                case 'REGULAR':
-                case 'BOM':
-                case '3':
-                    $arrTmp[5] = "<span style='background:#f59e0b; color:#ffffff; padding:4px 10px; border-radius:12px; font-weight:bold; font-size:11px; display:inline-block;'>⭐⭐⭐ $avUpper</span>";
-                    break;
-                case '2':
-                    $arrTmp[5] = "<span style='background:#f97316; color:#ffffff; padding:4px 10px; border-radius:12px; font-weight:bold; font-size:11px; display:inline-block;'>⭐⭐ BOM</span>";
-                    break;
-                case 'RUIM':
-                case 'PESSIMO':
-                case 'PÉSSIMO':
-                case '1':
-                    $arrTmp[5] = "<span style='background:#ef4444; color:#ffffff; padding:4px 10px; border-radius:12px; font-weight:bold; font-size:11px; display:inline-block;'>⭐ $avUpper</span>";
-                    break;
-                default:
-                    $arrTmp[5] = "<span style='background:#94a3b8; color:#ffffff; padding:4px 10px; border-radius:12px; font-weight:bold; font-size:11px; display:inline-block;'>$avUpper</span>";
-                    break;
-            }
-
-            // 7. Solução
-            $solUpper = strtoupper(trim($val_solucao));
-            if ($solUpper == 'SIM' || $solUpper == '1') {
-                $arrTmp[6] = "<span style='background:#dcfce7; color:#15803d; border:1px solid #86efac; padding:4px 10px; border-radius:8px; font-weight:bold; font-size:11px;'>✔ SIM</span>";
-            } elseif ($solUpper == 'NAO' || $solUpper == 'NÃO' || $solUpper == '2') {
-                $arrTmp[6] = "<span style='background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5; padding:4px 10px; border-radius:8px; font-weight:bold; font-size:11px;'>✖ NÃO</span>";
-            } else {
-                $arrTmp[6] = "<span style='background:#f1f5f9; color:#64748b; padding:4px 10px; border-radius:8px; font-size:11px;'>$solUpper</span>";
-            }
-
-            // 8. Gravação (Busca no Asterisk CDR / Monitor)
-            $recFile = $pPesquisa->findRecordingForCall($val_telefone, $val_data, $val_hora, $val_operador);
-            if (!empty($recFile)) {
-                $fileEnc = urlencode($recFile);
-                $arrTmp[7] = "<div style='display:flex; gap:6px; align-items:center;'>
-                    <button type='button' onclick=\"playPesquisaAudio('$fileEnc')\" style=\"background:#0284c7; color:#ffffff; border:none; padding:4px 10px; border-radius:14px; font-weight:700; font-size:11px; cursor:pointer;\">▶ Play</button>
-                    <a href=\"?menu=pesquisa&action=download_audio&file=$fileEnc\" target=\"_blank\" style=\"background:#16a34a; color:#ffffff; padding:4px 10px; border-radius:14px; font-weight:700; font-size:11px; text-decoration:none;\">Baixar</a>
-                </div>";
-            } else {
-                $arrTmp[7] = "<span style='color:#cbd5e1; font-size:11px;'>Sem áudio</span>";
-            }
-
-            $arrData[] = $arrTmp;
-        }
-    }
-    $oGrid->setData($arrData);
-
-    // Bloco Superior: Filtro Topo + Indicadores (Cards + Gráficos)
-    $htmlHeader = renderTopFilterAndDashboard($stats, $date_start, $date_end, $operador, $avaliacao, $solucao);
-
-    $content = $htmlHeader . $oGrid->fetchGrid();
-    return $content;
-}
-
-function renderTopFilterAndDashboard($stats, $date_start, $date_end, $operador, $avaliacao, $solucao)
-{
-    $total     = isset($stats['total']) ? $stats['total'] : 0;
-    $media     = isset($stats['media_estrelas']) ? $stats['media_estrelas'] : 0;
-    $resolucao = isset($stats['taxa_resolucao']) ? $stats['taxa_resolucao'] : 0;
-    $satisfacao = isset($stats['taxa_satisfacao']) ? $stats['taxa_satisfacao'] : 0;
-
-    $otimo = isset($stats['otimo']) ? (int)$stats['otimo'] : 0;
-    $muito_bom = isset($stats['muito_bom']) ? (int)$stats['muito_bom'] : 0;
-    $medio = isset($stats['medio']) ? (int)$stats['medio'] : 0;
-    $bom = isset($stats['bom']) ? (int)$stats['bom'] : 0;
-    $ruim = isset($stats['ruim']) ? (int)$stats['ruim'] : 0;
-    $sim = isset($stats['resolvido_sim']) ? (int)$stats['resolvido_sim'] : 0;
-    $nao = isset($stats['resolvido_nao']) ? (int)$stats['resolvido_nao'] : 0;
-
-    // URL com parâmetros de filtro atuais para exportação
-    $queryParams = http_build_query(array(
-        'menu' => 'pesquisa',
+    // URLs de Exportação
+    $exportParams = http_build_query(array(
+        'menu' => $module_name,
         'date_start' => $date_start,
         'date_end' => $date_end,
         'operador' => $operador,
@@ -415,213 +236,278 @@ function renderTopFilterAndDashboard($stats, $date_start, $date_end, $operador, 
         'solucao' => $solucao
     ));
 
+    $totalCount = isset($stats['total']) ? $stats['total'] : 0;
+    $media      = isset($stats['media_estrelas']) ? $stats['media_estrelas'] : 0;
+    $resolucao  = isset($stats['taxa_resolucao']) ? $stats['taxa_resolucao'] : 0;
+    $satisfacao = isset($stats['taxa_satisfacao']) ? $stats['taxa_satisfacao'] : 0;
+
+    $otimo     = isset($stats['otimo']) ? (int)$stats['otimo'] : 0;
+    $muito_bom = isset($stats['muito_bom']) ? (int)$stats['muito_bom'] : 0;
+    $medio     = isset($stats['medio']) ? (int)$stats['medio'] : 0;
+    $bom       = isset($stats['bom']) ? (int)$stats['bom'] : 0;
+    $ruim      = isset($stats['ruim']) ? (int)$stats['ruim'] : 0;
+    $sim       = isset($stats['resolvido_sim']) ? (int)$stats['resolvido_sim'] : 0;
+    $nao       = isset($stats['resolvido_nao']) ? (int)$stats['resolvido_nao'] : 0;
+
     ob_start();
     ?>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
     <style>
-        .header-action-bar {
+        .pesquisa-root {
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+            color: #1e293b;
+            padding: 10px 5px;
+        }
+
+        /* Top Header Action Bar */
+        .pesquisa-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin: 10px 0 15px 0;
+            margin-bottom: 16px;
         }
-        .header-title-box h3 {
+        .pesquisa-title h2 {
             margin: 0;
             font-size: 22px;
             font-weight: 800;
             color: #0f172a;
+            letter-spacing: -0.3px;
         }
-        .header-title-box p {
-            margin: 2px 0 0 0;
-            font-size: 12px;
+        .pesquisa-title p {
+            margin: 3px 0 0 0;
+            font-size: 13px;
             color: #64748b;
         }
-        .header-right-btns {
+        .pesquisa-top-btns {
             display: flex;
-            gap: 8px;
-            align-items: center;
+            gap: 10px;
         }
-        .btn-header-action {
-            padding: 7px 14px;
+        .btn-top {
+            padding: 8px 16px;
             border-radius: 8px;
             font-weight: 700;
-            font-size: 12px;
+            font-size: 13px;
             text-decoration: none;
             border: none;
             cursor: pointer;
             display: inline-flex;
             align-items: center;
             gap: 6px;
-            transition: transform 0.1s, opacity 0.2s;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            transition: all 0.2s;
         }
-        .btn-header-action:hover {
-            opacity: 0.9;
-            transform: translateY(-1px);
-        }
-        .btn-expand { background: #0d9488; color: #ffffff; }
-        .btn-manual { background: #0284c7; color: #ffffff; }
+        .btn-top:hover { transform: translateY(-1px); opacity: 0.95; }
+        .btn-top-manual { background: #0284c7; color: #ffffff; }
+        .btn-top-expand { background: #0d9488; color: #ffffff; }
 
-        .filter-top-bar {
+        /* Filter Card Box */
+        .filter-card-box {
             background: #ffffff;
-            border-radius: 10px;
-            padding: 16px 20px;
-            margin: 10px 0 15px 0;
-            box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
             border: 1px solid #e2e8f0;
         }
-        .filter-form-row {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 12px;
-            align-items: flex-end;
+        .filter-form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 14px;
+            align-items: end;
         }
-        .filter-group {
+        .filter-field-group {
             display: flex;
             flex-direction: column;
         }
-        .filter-group label {
+        .filter-field-group label {
             font-size: 11px;
             font-weight: 700;
             color: #475569;
             text-transform: uppercase;
-            letter-spacing: 0.3px;
-            margin-bottom: 4px;
+            letter-spacing: 0.4px;
+            margin-bottom: 5px;
         }
-        .filter-control {
-            padding: 6px 10px;
+        .filter-input {
+            padding: 8px 12px;
             border: 1px solid #cbd5e1;
-            border-radius: 6px;
+            border-radius: 8px;
             font-size: 13px;
-            color: #1e293b;
-            background: #fff;
+            color: #0f172a;
+            background: #ffffff;
             outline: none;
             transition: border-color 0.2s;
         }
-        .filter-control:focus {
-            border-color: #6366f1;
+        .filter-input:focus { border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1); }
+        .filter-btn-row {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
         }
-        .btn-filter-submit {
-            background: #4f46e5;
-            color: #ffffff;
+        .btn-action {
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-weight: 700;
+            font-size: 13px;
             border: none;
-            padding: 7px 16px;
-            border-radius: 6px;
-            font-weight: 600;
             cursor: pointer;
-            font-size: 13px;
-            transition: background 0.2s;
-        }
-        .btn-filter-submit:hover {
-            background: #4338ca;
-        }
-        .btn-excel {
-            background: #15803d;
-            color: #ffffff;
-            padding: 7px 14px;
-            border-radius: 6px;
-            font-size: 13px;
-            font-weight: 700;
             text-decoration: none;
-            display: inline-block;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            transition: all 0.2s;
         }
-        .btn-pdf {
-            background: #b91c1c;
-            color: #ffffff;
-            padding: 7px 14px;
-            border-radius: 6px;
-            font-size: 13px;
-            font-weight: 700;
-            text-decoration: none;
-            display: inline-block;
-        }
-        .btn-filter-clear {
-            background: #f1f5f9;
-            color: #475569;
-            text-decoration: none;
-            padding: 7px 14px;
-            border-radius: 6px;
-            font-size: 13px;
-            font-weight: 600;
-            border: 1px solid #cbd5e1;
-            display: inline-block;
-        }
+        .btn-action:hover { opacity: 0.9; }
+        .btn-search { background: #4f46e5; color: #ffffff; }
+        .btn-excel { background: #16a34a; color: #ffffff; }
+        .btn-pdf { background: #dc2626; color: #ffffff; }
+        .btn-reset { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
 
-        .pesquisa-dashboard {
+        /* KPI Cards Grid */
+        .kpi-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-            gap: 15px;
-            margin: 15px 0 20px 0;
+            gap: 16px;
+            margin-bottom: 24px;
         }
-        .kpi-card {
+        .kpi-card-item {
             background: #ffffff;
-            border-radius: 10px;
-            padding: 18px 20px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+            border: 1px solid #f1f5f9;
             border-left: 5px solid #6366f1;
             display: flex;
             flex-direction: column;
             justify-content: space-between;
         }
-        .kpi-card.green { border-left-color: #10b981; }
-        .kpi-card.purple { border-left-color: #8b5cf6; }
-        .kpi-card.amber { border-left-color: #f59e0b; }
-        .kpi-card.blue { border-left-color: #3b82f6; }
-        
-        .kpi-title {
-            font-size: 12px;
-            font-weight: 700;
+        .kpi-card-item.purple { border-left-color: #8b5cf6; }
+        .kpi-card-item.green { border-left-color: #10b981; }
+        .kpi-card-item.blue { border-left-color: #3b82f6; }
+        .kpi-card-item.amber { border-left-color: #f59e0b; }
+
+        .kpi-card-title {
+            font-size: 11px;
+            font-weight: 800;
             color: #64748b;
             text-transform: uppercase;
             letter-spacing: 0.5px;
-            margin-bottom: 6px;
+            margin-bottom: 8px;
         }
-        .kpi-value {
-            font-size: 26px;
+        .kpi-card-num {
+            font-size: 28px;
             font-weight: 800;
-            color: #1e293b;
+            color: #0f172a;
             line-height: 1;
         }
-        .kpi-sub {
+        .kpi-card-desc {
             font-size: 12px;
             color: #94a3b8;
-            margin-top: 6px;
+            margin-top: 8px;
         }
-        .charts-container {
+
+        /* Charts Grid */
+        .charts-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 20px;
-            margin-bottom: 25px;
+            margin-bottom: 24px;
         }
-        @media (max-width: 900px) {
-            .charts-container { grid-template-columns: 1fr; }
-        }
-        .chart-box {
+        @media (max-width: 900px) { .charts-grid { grid-template-columns: 1fr; } }
+
+        .chart-card-box {
             background: #ffffff;
-            border-radius: 10px;
+            border-radius: 12px;
             padding: 20px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.06);
+            box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+            border: 1px solid #f1f5f9;
             height: 280px;
             display: flex;
             flex-direction: column;
-            border: 1px solid #f1f5f9;
         }
-        .chart-box h4 {
-            margin: 0 0 15px 0;
+        .chart-card-box h4 {
+            margin: 0 0 12px 0;
             font-size: 14px;
+            font-weight: 800;
             color: #334155;
-            font-weight: 700;
+            text-transform: uppercase;
             border-bottom: 1px solid #f1f5f9;
             padding-bottom: 8px;
-            text-transform: uppercase;
         }
-        .chart-wrapper {
+        .chart-canvas-wrapper {
             position: relative;
             flex: 1;
             width: 100%;
             height: 100%;
         }
 
-        /* Modal Player de Audio */
+        /* Custom Modern Table */
+        .table-card-box {
+            background: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+            border: 1px solid #e2e8f0;
+            overflow: hidden;
+        }
+        .pesquisa-table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+        }
+        .pesquisa-table thead {
+            background: #334155;
+            color: #ffffff;
+        }
+        .pesquisa-table th {
+            padding: 12px 16px;
+            font-size: 11px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .pesquisa-table td {
+            padding: 12px 16px;
+            border-bottom: 1px solid #f1f5f9;
+            font-size: 13px;
+            vertical-align: middle;
+        }
+        .pesquisa-table tbody tr:hover {
+            background: #f8fafc;
+        }
+
+        /* Pagination Bar */
+        .pagination-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 20px;
+            background: #ffffff;
+            border-top: 1px solid #f1f5f9;
+        }
+        .pagination-info {
+            font-size: 13px;
+            color: #64748b;
+            font-weight: 600;
+        }
+        .pagination-btns {
+            display: flex;
+            gap: 6px;
+        }
+        .page-link-btn {
+            padding: 6px 12px;
+            border-radius: 6px;
+            background: #f1f5f9;
+            color: #334155;
+            font-size: 12px;
+            font-weight: 700;
+            text-decoration: none;
+            border: 1px solid #cbd5e1;
+            transition: background 0.2s;
+        }
+        .page-link-btn:hover { background: #e2e8f0; }
+        .page-link-btn.disabled { opacity: 0.5; pointer-events: none; }
+
+        /* Audio Modal */
         #audioModalPesquisa {
             display: none;
             position: fixed;
@@ -642,96 +528,235 @@ function renderTopFilterAndDashboard($stats, $date_start, $date_end, $operador, 
         }
     </style>
 
-    <div class="header-action-bar">
-        <div class="header-title-box">
-            <h3>Relatório de Pesquisa - IPbx Prisma</h3>
-            <p>Módulo Oficial de Satisfação pós-atendimento</p>
+    <div class="pesquisa-root">
+        <!-- Header Principal -->
+        <div class="pesquisa-header">
+            <div class="pesquisa-title">
+                <h2>Relatório de Pesquisa de Satisfação - IPbx Prisma</h2>
+                <p>Módulo Executivo Oficial de Pesquisa pós-atendimento</p>
+            </div>
+            <div class="pesquisa-top-btns">
+                <a href="modules/pesquisa/help/index.html" target="_blank" class="btn-top btn-top-manual">📖 Manual</a>
+                <button onclick="window.open(window.location.href, '_blank')" class="btn-top btn-top-expand">↗ Expandir Aba</button>
+            </div>
         </div>
-        <div class="header-right-btns">
-            <a href="modules/pesquisa/help/index.html" target="_blank" class="btn-header-action btn-manual">📖 Manual</a>
-            <button onclick="window.open(window.location.href, '_blank')" class="btn-header-action btn-expand">↗ Expandir Aba</button>
-        </div>
-    </div>
 
-    <form method="POST" action="?menu=pesquisa">
-        <div class="filter-top-bar">
-            <div class="filter-form-row">
-                <div class="filter-group">
-                    <label>📅 Data Inicial</label>
-                    <input type="date" name="date_start" value="<?php echo htmlspecialchars($date_start); ?>" class="filter-control" />
+        <!-- Card de Filtros -->
+        <div class="filter-card-box">
+            <form method="GET" action="index.php">
+                <input type="hidden" name="menu" value="<?php echo htmlspecialchars($module_name); ?>" />
+                <div class="filter-form-grid">
+                    <div class="filter-field-group">
+                        <label>📅 Data Inicial</label>
+                        <input type="date" name="date_start" value="<?php echo htmlspecialchars($date_start); ?>" class="filter-input" />
+                    </div>
+                    <div class="filter-field-group">
+                        <label>📅 Data Final</label>
+                        <input type="date" name="date_end" value="<?php echo htmlspecialchars($date_end); ?>" class="filter-input" />
+                    </div>
+                    <div class="filter-field-group">
+                        <label>👤 Operador / Ramal</label>
+                        <input type="text" name="operador" placeholder="Ex: 1001" value="<?php echo htmlspecialchars($operador); ?>" class="filter-input" />
+                    </div>
+                    <div class="filter-field-group">
+                        <label>⭐ Avaliação</label>
+                        <select name="avaliacao" class="filter-input">
+                            <option value="">-- Todas as Notas --</option>
+                            <option value="EXCELENTE" <?php if ($avaliacao == 'EXCELENTE') echo 'selected'; ?>>⭐⭐⭐⭐⭐ EXCELENTE</option>
+                            <option value="OTIMO" <?php if ($avaliacao == 'OTIMO') echo 'selected'; ?>>⭐⭐⭐⭐⭐ ÓTIMO</option>
+                            <option value="MUITO BOM" <?php if ($avaliacao == 'MUITO BOM') echo 'selected'; ?>>⭐⭐⭐⭐ MUITO BOM</option>
+                            <option value="BOM" <?php if ($avaliacao == 'BOM') echo 'selected'; ?>>⭐⭐⭐ BOM</option>
+                            <option value="MEDIO" <?php if ($avaliacao == 'MEDIO') echo 'selected'; ?>>⭐⭐⭐ MÉDIO / REGULAR</option>
+                            <option value="RUIM" <?php if ($avaliacao == 'RUIM') echo 'selected'; ?>>⭐ RUIM / PÉSSIMO</option>
+                        </select>
+                    </div>
+                    <div class="filter-field-group">
+                        <label>🎯 Resolução</label>
+                        <select name="solucao" class="filter-input">
+                            <option value="">-- Todas --</option>
+                            <option value="SIM" <?php if ($solucao == 'SIM') echo 'selected'; ?>>✔ SIM (Resolvido)</option>
+                            <option value="NAO" <?php if ($solucao == 'NAO') echo 'selected'; ?>>✖ NÃO (Não Resolvido)</option>
+                        </select>
+                    </div>
+                    <div class="filter-btn-row">
+                        <button type="submit" class="btn-action btn-search">🔍 Filtrar</button>
+                        <a href="?<?php echo $exportParams; ?>&action=export_excel" class="btn-action btn-excel">📊 Excel</a>
+                        <a href="?<?php echo $exportParams; ?>&action=export_pdf" target="_blank" class="btn-action btn-pdf">📄 PDF</a>
+                        <a href="?menu=<?php echo htmlspecialchars($module_name); ?>" class="btn-action btn-reset">🔄 Ver Todos</a>
+                    </div>
                 </div>
-                <div class="filter-group">
-                    <label>📅 Data Final</label>
-                    <input type="date" name="date_end" value="<?php echo htmlspecialchars($date_end); ?>" class="filter-control" />
+            </form>
+        </div>
+
+        <!-- Grid de Cards KPIs -->
+        <div class="kpi-grid">
+            <div class="kpi-card-item purple">
+                <div class="kpi-card-title">📋 Total de Avaliações</div>
+                <div class="kpi-card-num"><?php echo number_format($totalCount, 0, ',', '.'); ?></div>
+                <div class="kpi-card-desc">Pesquisas registradas</div>
+            </div>
+            <div class="kpi-card-item green">
+                <div class="kpi-card-title">⭐ Média de Satisfação</div>
+                <div class="kpi-card-num"><?php echo $media; ?> <span style="font-size:16px; color:#f59e0b;">/ 5.0</span></div>
+                <div class="kpi-card-desc">Índice Geral de Atendimento</div>
+            </div>
+            <div class="kpi-card-item blue">
+                <div class="kpi-card-title">🎯 Taxa de Resolução</div>
+                <div class="kpi-card-num"><?php echo $resolucao; ?>%</div>
+                <div class="kpi-card-desc"><?php echo $sim; ?> resolvidos de <?php echo ($sim + $nao); ?></div>
+            </div>
+            <div class="kpi-card-item amber">
+                <div class="kpi-card-title">🏆 Satisfação Positiva</div>
+                <div class="kpi-card-num"><?php echo $satisfacao; ?>%</div>
+                <div class="kpi-card-desc">Notas Excelente, Ótimo & Muito Bom</div>
+            </div>
+        </div>
+
+        <!-- Grid de Gráficos -->
+        <div class="charts-grid">
+            <div class="chart-card-box">
+                <h4>📊 Distribuição das Notas</h4>
+                <div class="chart-canvas-wrapper">
+                    <canvas id="chartNotasCustom"></canvas>
                 </div>
-                <div class="filter-group">
-                    <label>👤 Operador / Ramal</label>
-                    <input type="text" name="operador" placeholder="Ex: 1001" value="<?php echo htmlspecialchars($operador); ?>" class="filter-control" style="width:130px;" />
-                </div>
-                <div class="filter-group">
-                    <label>⭐ Avaliação</label>
-                    <select name="avaliacao" class="filter-control">
-                        <option value="">-- Todas as Notas --</option>
-                        <option value="EXCELENTE" <?php if ($avaliacao == 'EXCELENTE') echo 'selected'; ?>>⭐⭐⭐⭐⭐ EXCELENTE</option>
-                        <option value="OTIMO" <?php if ($avaliacao == 'OTIMO') echo 'selected'; ?>>⭐⭐⭐⭐⭐ ÓTIMO</option>
-                        <option value="MUITO BOM" <?php if ($avaliacao == 'MUITO BOM') echo 'selected'; ?>>⭐⭐⭐⭐ MUITO BOM</option>
-                        <option value="BOM" <?php if ($avaliacao == 'BOM') echo 'selected'; ?>>⭐⭐⭐ BOM</option>
-                        <option value="MEDIO" <?php if ($avaliacao == 'MEDIO') echo 'selected'; ?>>⭐⭐⭐ MÉDIO / REGULAR</option>
-                        <option value="RUIM" <?php if ($avaliacao == 'RUIM') echo 'selected'; ?>>⭐ RUIM / PÉSSIMO</option>
-                    </select>
-                </div>
-                <div class="filter-group">
-                    <label>🎯 Resolução</label>
-                    <select name="solucao" class="filter-control">
-                        <option value="">-- Todas --</option>
-                        <option value="SIM" <?php if ($solucao == 'SIM') echo 'selected'; ?>>✔ SIM (Resolvido)</option>
-                        <option value="NAO" <?php if ($solucao == 'NAO') echo 'selected'; ?>>✖ NÃO (Não Resolvido)</option>
-                    </select>
-                </div>
-                <div style="display:flex; gap:6px;">
-                    <input type="submit" name="show" value="🔍 Filtrar" class="btn-filter-submit" />
-                    <a href="?<?php echo $queryParams; ?>&action=export_excel" class="btn-excel">📊 Excel</a>
-                    <a href="?<?php echo $queryParams; ?>&action=export_pdf" target="_blank" class="btn-pdf">📄 PDF</a>
-                    <a href="?menu=pesquisa" class="btn-filter-clear">🔄 Ver Todos</a>
+            </div>
+            <div class="chart-card-box">
+                <h4>🎯 Resolução de Problemas</h4>
+                <div class="chart-canvas-wrapper">
+                    <canvas id="chartSolucaoCustom"></canvas>
                 </div>
             </div>
         </div>
-    </form>
 
-    <div class="pesquisa-dashboard">
-        <div class="kpi-card purple">
-            <div class="kpi-title">📋 Total de Avaliações</div>
-            <div class="kpi-value"><?php echo number_format($total, 0, ',', '.'); ?></div>
-            <div class="kpi-sub">Pesquisas registradas</div>
-        </div>
-        <div class="kpi-card green">
-            <div class="kpi-title">⭐ Média de Satisfação</div>
-            <div class="kpi-value"><?php echo $media; ?> <span style="font-size:16px; color:#f59e0b;">/ 5.0</span></div>
-            <div class="kpi-sub">Índice Geral de Atendimento</div>
-        </div>
-        <div class="kpi-card blue">
-            <div class="kpi-title">🎯 Taxa de Resolução</div>
-            <div class="kpi-value"><?php echo $resolucao; ?>%</div>
-            <div class="kpi-sub"><?php echo $sim; ?> resolvidos de <?php echo ($sim + $nao); ?></div>
-        </div>
-        <div class="kpi-card amber">
-            <div class="kpi-title">🏆 Satisfação Positiva</div>
-            <div class="kpi-value"><?php echo $satisfacao; ?>%</div>
-            <div class="kpi-sub">Notas Excelente, Ótimo & Muito Bom</div>
-        </div>
-    </div>
+        <!-- Tabela Customizada Moderna -->
+        <div class="table-card-box">
+            <table class="pesquisa-table">
+                <thead>
+                    <tr>
+                        <th>Operador / Ramal</th>
+                        <th>Fila</th>
+                        <th>Data</th>
+                        <th>Hora</th>
+                        <th>Telefone</th>
+                        <th>Avaliação do Atendimento</th>
+                        <th>Problema Resolvido?</th>
+                        <th>Gravação</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php if (is_array($arrResult) && count($arrResult) > 0): ?>
+                        <?php foreach ($arrResult as $row): ?>
+                            <?php
+                            $val_operador  = !empty($row['operador']) ? $row['operador'] : (!empty($row['ramal']) ? $row['ramal'] : '-');
+                            $val_fila      = !empty($row['fila']) ? $row['fila'] : 'Atendimento';
+                            $val_data      = !empty($row['data']) ? $row['data'] : '-';
+                            $val_hora      = !empty($row['hora']) ? $row['hora'] : '-';
+                            $val_telefone  = !empty($row['telefone']) ? $row['telefone'] : (!empty($row['numero']) ? $row['numero'] : '-');
+                            $val_avaliacao = !empty($row['avaliacao']) ? $row['avaliacao'] : '-';
+                            $val_solucao   = !empty($row['solucao']) ? $row['solucao'] : '-';
+                            $recFile       = $pPesquisa->findRecordingForCall($val_telefone, $val_data, $val_hora, $val_operador);
+                            ?>
+                            <tr>
+                                <td><span style='background:#ede9fe; color:#6d28d9; padding:4px 10px; border-radius:6px; font-weight:600; font-size:12px;'>👤 <?php echo htmlspecialchars($val_operador); ?></span></td>
+                                <td><span style='background:#f1f5f9; color:#475569; padding:3px 8px; border-radius:4px; font-size:11px;'><?php echo htmlspecialchars($val_fila); ?></span></td>
+                                <td><span style='color:#334155; font-size:12px;'>📅 <?php echo htmlspecialchars($val_data); ?></span></td>
+                                <td><span style='color:#64748b; font-size:12px;'>🕒 <?php echo htmlspecialchars($val_hora); ?></span></td>
+                                <td><span style='font-weight:600; color:#1e293b;'>📞 <?php echo htmlspecialchars($val_telefone); ?></span></td>
+                                <td>
+                                    <?php
+                                    $avUpper = strtoupper(trim($val_avaliacao));
+                                    switch ($avUpper) {
+                                        case 'EXCELENTE':
+                                        case 'OTIMO':
+                                        case 'ÓTIMO':
+                                        case '5':
+                                            echo "<span style='background:#10b981; color:#ffffff; padding:4px 10px; border-radius:12px; font-weight:bold; font-size:11px; display:inline-block;'>⭐⭐⭐⭐⭐ $avUpper</span>";
+                                            break;
+                                        case 'MUITO BOM':
+                                        case '4':
+                                            echo "<span style='background:#3b82f6; color:#ffffff; padding:4px 10px; border-radius:12px; font-weight:bold; font-size:11px; display:inline-block;'>⭐⭐⭐⭐ MUITO BOM</span>";
+                                            break;
+                                        case 'MEDIO':
+                                        case 'MÉDIO':
+                                        case 'REGULAR':
+                                        case 'BOM':
+                                        case '3':
+                                            echo "<span style='background:#f59e0b; color:#ffffff; padding:4px 10px; border-radius:12px; font-weight:bold; font-size:11px; display:inline-block;'>⭐⭐⭐ $avUpper</span>";
+                                            break;
+                                        case '2':
+                                            echo "<span style='background:#f97316; color:#ffffff; padding:4px 10px; border-radius:12px; font-weight:bold; font-size:11px; display:inline-block;'>⭐⭐ BOM</span>";
+                                            break;
+                                        case 'RUIM':
+                                        case 'PESSIMO':
+                                        case 'PÉSSIMO':
+                                        case '1':
+                                            echo "<span style='background:#ef4444; color:#ffffff; padding:4px 10px; border-radius:12px; font-weight:bold; font-size:11px; display:inline-block;'>⭐ $avUpper</span>";
+                                            break;
+                                        default:
+                                            echo "<span style='background:#94a3b8; color:#ffffff; padding:4px 10px; border-radius:12px; font-weight:bold; font-size:11px; display:inline-block;'>$avUpper</span>";
+                                            break;
+                                    }
+                                    ?>
+                                </td>
+                                <td>
+                                    <?php
+                                    $solUpper = strtoupper(trim($val_solucao));
+                                    if ($solUpper == 'SIM' || $solUpper == '1') {
+                                        echo "<span style='background:#dcfce7; color:#15803d; border:1px solid #86efac; padding:4px 10px; border-radius:8px; font-weight:bold; font-size:11px;'>✔ SIM</span>";
+                                    } elseif ($solUpper == 'NAO' || $solUpper == 'NÃO' || $solUpper == '2') {
+                                        echo "<span style='background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5; padding:4px 10px; border-radius:8px; font-weight:bold; font-size:11px;'>✖ NÃO</span>";
+                                    } else {
+                                        echo "<span style='background:#f1f5f9; color:#64748b; padding:4px 10px; border-radius:8px; font-size:11px;'>$solUpper</span>";
+                                    }
+                                    ?>
+                                </td>
+                                <td>
+                                    <?php if (!empty($recFile)): ?>
+                                        <?php $fileEnc = urlencode($recFile); ?>
+                                        <div style="display:flex; gap:6px; align-items:center;">
+                                            <button type="button" onclick="playPesquisaAudio('<?php echo $fileEnc; ?>')" style="background:#0284c7; color:#ffffff; border:none; padding:4px 12px; border-radius:14px; font-weight:700; font-size:11px; cursor:pointer;">▶ Play</button>
+                                            <a href="?menu=<?php echo htmlspecialchars($module_name); ?>&action=download_audio&file=<?php echo $fileEnc; ?>" target="_blank" style="background:#16a34a; color:#ffffff; padding:4px 12px; border-radius:14px; font-weight:700; font-size:11px; text-decoration:none;">Baixar</a>
+                                        </div>
+                                    <?php else: ?>
+                                        <span style="color:#cbd5e1; font-size:11px;">Sem áudio</span>
+                                    <?php endif; ?>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    <?php else: ?>
+                        <tr>
+                            <td colspan="8" style="text-align:center; padding:30px; color:#64748b;">
+                                🚀 Nenhum registro encontrado para os filtros selecionados.
+                            </td>
+                        </tr>
+                    <?php endif; ?>
+                </tbody>
+            </table>
 
-    <div class="charts-container">
-        <div class="chart-box">
-            <h4>📊 Distribuição das Notas</h4>
-            <div class="chart-wrapper">
-                <canvas id="chartNotas"></canvas>
-            </div>
-        </div>
-        <div class="chart-box">
-            <h4>🎯 Resolução de Problemas</h4>
-            <div class="chart-wrapper">
-                <canvas id="chartSolucao"></canvas>
+            <!-- Barra de Paginação -->
+            <div class="pagination-bar">
+                <div class="pagination-info">
+                    Exibindo <?php echo count($arrResult); ?> de <?php echo number_format($total, 0, ',', '.'); ?> avaliações (Página <?php echo $page; ?> de <?php echo $totalPages; ?>)
+                </div>
+                <div class="pagination-btns">
+                    <?php
+                    $navParams = array(
+                        'menu' => $module_name,
+                        'date_start' => $date_start,
+                        'date_end' => $date_end,
+                        'operador' => $operador,
+                        'avaliacao' => $avaliacao,
+                        'solucao' => $solucao
+                    );
+                    $prevPage = max(1, $page - 1);
+                    $nextPage = min($totalPages, $page + 1);
+
+                    $prevUrl = '?' . http_build_query(array_merge($navParams, array('page' => $prevPage)));
+                    $nextUrl = '?' . http_build_query(array_merge($navParams, array('page' => $nextPage)));
+                    ?>
+                    <a href="<?php echo $prevUrl; ?>" class="page-link-btn <?php if ($page <= 1) echo 'disabled'; ?>">◀ Anterior</a>
+                    <a href="<?php echo $nextUrl; ?>" class="page-link-btn <?php if ($page >= $totalPages) echo 'disabled'; ?>">Próxima ▶</a>
+                </div>
             </div>
         </div>
     </div>
@@ -739,9 +764,9 @@ function renderTopFilterAndDashboard($stats, $date_start, $date_end, $operador, 
     <!-- Modal Player de Audio -->
     <div id="audioModalPesquisa">
         <div class="audio-modal-content">
-            <h4 style="margin:0 0 12px 0; color:#1e293b;">🎧 Reproduzindo Gravação</h4>
+            <h4 style="margin:0 0 12px 0; color:#1e293b; font-size:16px;">🎧 Reproduzindo Gravação</h4>
             <audio id="pesquisaAudioElement" controls style="width:100%; margin-bottom:15px;"></audio>
-            <button onclick="closeAudioModal()" style="background:#64748b; color:#fff; border:none; padding:6px 16px; border-radius:6px; font-weight:bold; cursor:pointer;">Fechar</button>
+            <button onclick="closeAudioModal()" style="background:#64748b; color:#fff; border:none; padding:8px 20px; border-radius:6px; font-weight:bold; cursor:pointer;">Fechar</button>
         </div>
     </div>
 
@@ -749,7 +774,7 @@ function renderTopFilterAndDashboard($stats, $date_start, $date_end, $operador, 
     function playPesquisaAudio(fileEnc) {
         var modal = document.getElementById('audioModalPesquisa');
         var audio = document.getElementById('pesquisaAudioElement');
-        audio.src = '?menu=pesquisa&action=stream_audio&file=' + fileEnc;
+        audio.src = '?menu=<?php echo htmlspecialchars($module_name); ?>&action=stream_audio&file=' + fileEnc;
         modal.style.display = 'flex';
         audio.play();
     }
@@ -762,8 +787,7 @@ function renderTopFilterAndDashboard($stats, $date_start, $date_end, $operador, 
 
     document.addEventListener("DOMContentLoaded", function() {
         if (typeof Chart !== 'undefined') {
-            // Gráfico de Notas
-            var ctxNotas = document.getElementById('chartNotas').getContext('2d');
+            var ctxNotas = document.getElementById('chartNotasCustom').getContext('2d');
             new Chart(ctxNotas, {
                 type: 'doughnut',
                 data: {
@@ -778,14 +802,11 @@ function renderTopFilterAndDashboard($stats, $date_start, $date_end, $operador, 
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    plugins: {
-                        legend: { position: 'right' }
-                    }
+                    plugins: { legend: { position: 'right' } }
                 }
             });
 
-            // Gráfico de Solução
-            var ctxSolucao = document.getElementById('chartSolucao').getContext('2d');
+            var ctxSolucao = document.getElementById('chartSolucaoCustom').getContext('2d');
             new Chart(ctxSolucao, {
                 type: 'doughnut',
                 data: {
@@ -800,9 +821,7 @@ function renderTopFilterAndDashboard($stats, $date_start, $date_end, $operador, 
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    plugins: {
-                        legend: { position: 'right' }
-                    }
+                    plugins: { legend: { position: 'right' } }
                 }
             });
         }
