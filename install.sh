@@ -451,8 +451,15 @@ if [ -d "$REPO_DIR/src/modules/pesquisa" ]; then
         sqlite3 /var/www/db/menu.db "DELETE FROM menu WHERE id = 'pesquisa_ajuda' OR id = 'pesquisa_como_funciona' OR Link LIKE '%pesquisa_como_funciona%';" 2>/dev/null || true
         sqlite3 /var/www/db/acl.db "DELETE FROM acl_resource WHERE name = 'pesquisa_ajuda' OR name = 'pesquisa_como_funciona';" 2>/dev/null || true
 
-        # Configuração exata dos links do PBX
-        sqlite3 /var/www/db/menu.db "UPDATE menu SET Link = '/stats/' WHERE id = 'relatorio_geral' OR id = 'asternic_cdr' OR Link LIKE '%asternic%';" 2>/dev/null || true
+        # Configuração inteligente dos links do PBX (Detecta se a pasta /stats/ ou /asternic/ existe)
+        if [ -d /var/www/html/stats ]; then
+            ASTERNIC_PATH="/stats/"
+        elif [ -d /var/www/html/asternic ]; then
+            ASTERNIC_PATH="/asternic/"
+        else
+            ASTERNIC_PATH="/admin/config.php?display=asternic_log"
+        fi
+        sqlite3 /var/www/db/menu.db "UPDATE menu SET Link = '$ASTERNIC_PATH' WHERE id = 'relatorio_geral' OR id = 'asternic_cdr' OR Link LIKE '%asternic%';" 2>/dev/null || true
         sqlite3 /var/www/db/menu.db "UPDATE menu SET Link = '/nome_ramais/' WHERE id = 'nome_ramais' OR id = 'ramais' OR Link LIKE '%nome_ramais%';" 2>/dev/null || true
         sqlite3 /var/www/db/menu.db "UPDATE menu SET Link = '/admin/config.php?display=blacklist' WHERE id = 'blacklist' OR Link LIKE '%blacklist%';" 2>/dev/null || true
     fi
