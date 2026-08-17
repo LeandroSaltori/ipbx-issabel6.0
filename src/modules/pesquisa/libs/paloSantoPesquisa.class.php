@@ -10,7 +10,7 @@
   +----------------------------------------------------------------------+
   | The Initial Developer of the Original Code is PaloSanto Solutions    |
   +----------------------------------------------------------------------+
-  $Id: paloSantoPesquisa.class.php,v 2.9 2026-08-17 Prisma Telecom $ */
+  $Id: paloSantoPesquisa.class.php,v 3.0 2026-08-17 Prisma Telecom $ */
 
 class paloSantoPesquisa {
     var $_DB;
@@ -218,7 +218,6 @@ class paloSantoPesquisa {
                     $sec = (int)$row['duration'];
                     $info['duration_formatted'] = sprintf('%02d:%02d', floor($sec / 60), $sec % 60);
 
-                    // Extrai número da fila real a partir das colunas do CDR
                     $combined = $row['dstchannel'] . ' ' . $row['channel'] . ' ' . $row['userfield'] . ' ' . $row['dst'];
                     if (preg_match('/(?:Queue|Fila|q-)?([5-9]\d{3})/i', $combined, $mQ)) {
                         $info['fila'] = $mQ[1];
@@ -425,10 +424,10 @@ class paloSantoPesquisa {
             );
         }
 
-        // Cruzamento dinâmico com o CDR do Asterisk (para detectar total de chamadas enviadas à URA de Pesquisa)
+        // Cruzamento abrangente com a tabela CDR do Asterisk
         $cdrTotalPesquisa = 0;
         try {
-            $whereCdr = array("(dst = '8996' OR dst = '9000' OR dcontext = 'pesquisa' OR dstchannel LIKE '%pesquisa%')");
+            $whereCdr = array("(dst LIKE '%pesquisa%' OR dst = '8996' OR dst = '9000' OR dcontext LIKE '%pesquisa%' OR dstchannel LIKE '%pesquisa%' OR lastdata LIKE '%pesquisa%')");
             $paramsCdr = array();
             if (!empty($dsSql)) {
                 $whereCdr[] = "calldate >= ?";
