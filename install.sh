@@ -388,12 +388,12 @@ EOF
 fi
 
 # ==============================================================================
-# 15. RELATÓRIO QUEUE STATS E RAMAIS
+# 15. RELATÓRIO QUEUE STATS, ASTERNIC LITE E RAMAIS
 # ==============================================================================
-log_info "15/20 - Instalando Relatório de Filas e Ramais..."
+log_info "15/20 - Instalando Asternic Call Center Stats Lite, Relatório de Filas e Ramais..."
 QUEUE_SRC="$REPO_DIR/src/modules/relatorio_de_filas"
 
-# Criação do banco de dados qstatslite no MySQL / MariaDB
+# 1. Criação do banco de dados qstatslite no MySQL / MariaDB
 MYSQL_PWD=""
 if [ -f /etc/issabel.conf ]; then
     MYSQL_PWD=$(grep -i mysqlrootpwd /etc/issabel.conf 2>/dev/null | cut -d'=' -f2 | tr -d ' ')
@@ -442,6 +442,57 @@ CREATE TABLE IF NOT EXISTS `queue_stats` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 EOF
 
+# 2. Instalação do Asternic Call Center Stats Lite (parselog.php e /var/www/html/stats)
+if [ ! -f /usr/local/parselog/parselog.php ] || [ ! -d /var/www/html/stats ]; then
+    log_info "Baixando e configurando Asternic Stats Lite..."
+    TMP_ASTERNIC="/tmp/asternic-stats-install"
+    rm -rf "$TMP_ASTERNIC"
+    mkdir -p "$TMP_ASTERNIC"
+    
+    curl -sSL "http://download.asternic.net/asternic-stats-1.5.tar.gz" -o "$TMP_ASTERNIC/asternic-stats-1.5.tar.gz" 2>/dev/null || wget -q "http://download.asternic.net/asternic-stats-1.5.tar.gz" -O "$TMP_ASTERNIC/asternic-stats-1.5.tar.gz" 2>/dev/null || true
+    
+    if [ -f "$TMP_ASTERNIC/asternic-stats-1.5.tar.gz" ]; then
+        tar -xzf "$TMP_ASTERNIC/asternic-stats-1.5.tar.gz" -C "$TMP_ASTERNIC" 2>/dev/null || true
+        
+        # Cria pasta /usr/local/parselog
+        mkdir -p /usr/local/parselog
+        if [ -f "$TMP_ASTERNIC/asternic-stats/parselog.php" ]; then
+            cp -f "$TMP_ASTERNIC/asternic-stats/parselog.php" /usr/local/parselog/
+        elif [ -f "$TMP_ASTERNIC/asternic-stats/html/parselog.php" ]; then
+            cp -f "$TMP_ASTERNIC/asternic-stats/html/parselog.php" /usr/local/parselog/
+        fi
+        
+        # Configura credenciais no parselog.php
+        if [ -f /usr/local/parselog/parselog.php ]; then
+            sed -i "s/\$dbuser = .*/\$dbuser = 'root';/" /usr/local/parselog/parselog.php
+            sed -i "s/\$dbpass = .*/\$dbpass = '$MYSQL_PWD';/" /usr/local/parselog/parselog.php
+        fi
+        
+        # Copia pasta web do Asternic Lite para /var/www/html/stats
+        if [ -d "$TMP_ASTERNIC/asternic-stats/html" ]; then
+            mkdir -p /var/www/html/stats
+            cp -rf "$TMP_ASTERNIC/asternic-stats/html/"* /var/www/html/stats/
+            if [ -f /var/www/html/stats/config.php ]; then
+                sed -i "s/\$dbuser = .*/\$dbuser = 'root';/" /var/www/html/stats/config.php
+                sed -i "s/\$dbpass = .*/\$dbpass = '$MYSQL_PWD';/" /var/www/html/stats/config.php
+            fi
+            chown -R asterisk:asterisk /var/www/html/stats
+            chmod -R 755 /var/www/html/stats
+        fi
+        
+        # Agendamento no Crontab para processar logs de fila a cada minuto
+        if ! crontab -l 2>/dev/null | grep -q "parselog.php"; then
+            (crontab -l 2>/dev/null; echo "* * * * * php /usr/local/parselog/parselog.php > /dev/null 2>&1") | crontab -
+            log_success "Agendamento do parselog.php criado no crontab."
+        fi
+        
+        # Executa a primeira rodada do parselog
+        php /usr/local/parselog/parselog.php &>/dev/null || true
+    fi
+    rm -rf "$TMP_ASTERNIC"
+fi
+
+# 3. Implantação do Módulo Relatório de Filas Customizado
 if [ -d "$QUEUE_SRC" ]; then
     mkdir -p /var/www/html/modules/relatorio_de_filas /var/www/html/Relatorio_de_filas
     cp -rf "$QUEUE_SRC/"* /var/www/html/modules/relatorio_de_filas/
