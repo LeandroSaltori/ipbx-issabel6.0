@@ -10,7 +10,7 @@
   +----------------------------------------------------------------------+
   | The Initial Developer of the Original Code is PaloSanto Solutions    |
   +----------------------------------------------------------------------+
-  $Id: paloSantoPesquisa.class.php,v 2.5 2026-08-17 Prisma Telecom $ */
+  $Id: paloSantoPesquisa.class.php,v 2.6 2026-08-17 Prisma Telecom $ */
 
 class paloSantoPesquisa {
     var $_DB;
@@ -128,9 +128,10 @@ class paloSantoPesquisa {
         return array_unique($list);
     }
 
-    function findRecordingForCall($telefone, $data, $hora, $operador)
+    function findCdrInfoForCall($telefone, $data, $hora, $operador)
     {
-        if (!$this->pdo) return '';
+        $info = array('recordingfile' => '', 'duration' => 0, 'billsec' => 0, 'duration_formatted' => '00:00');
+        if (!$this->pdo) return $info;
 
         $dt = trim($data) . ' ' . trim($hora);
         $ts = strtotime($dt);
@@ -145,21 +146,24 @@ class paloSantoPesquisa {
             }
 
             try {
-                $sql = "SELECT recordingfile FROM cdr 
+                $sql = "SELECT recordingfile, duration, billsec FROM cdr 
                         WHERE calldate BETWEEN ? AND ? 
                         AND (src LIKE ? OR dst LIKE ? OR channel LIKE ? OR dstchannel LIKE ?) 
-                        AND recordingfile IS NOT NULL AND recordingfile != '' 
                         ORDER BY ABS(TIMESTAMPDIFF(SECOND, calldate, ?)) ASC LIMIT 1";
                 $stmt = $this->pdo->prepare($sql);
                 $stmt->execute(array($start, $end, "%$telClean%", "%$telClean%", "%$telClean%", "%$telClean%", $dt));
                 $row = $stmt->fetch();
-                if (!empty($row['recordingfile'])) {
-                    return $row['recordingfile'];
+                if ($row) {
+                    $info['recordingfile'] = !empty($row['recordingfile']) ? $row['recordingfile'] : '';
+                    $info['duration'] = (int)$row['duration'];
+                    $info['billsec'] = (int)$row['billsec'];
+                    $sec = (int)$row['duration'];
+                    $info['duration_formatted'] = sprintf('%02d:%02d', floor($sec / 60), $sec % 60);
                 }
             } catch (Exception $e) {}
         }
 
-        if (!empty($data) && !empty($telefone)) {
+        if (empty($info['recordingfile']) && !empty($data) && !empty($telefone)) {
             $yearMonthDay = str_replace('-', '/', $data);
             $telClean = preg_replace('/[^0-9]/', '', $telefone);
             if (strlen($telClean) > 4) $telClean = substr($telClean, -8);
@@ -168,12 +172,18 @@ class paloSantoPesquisa {
             if (is_dir($dir)) {
                 $files = glob("$dir/*$telClean*");
                 if (!empty($files)) {
-                    return basename($files[0]);
+                    $info['recordingfile'] = basename($files[0]);
                 }
             }
         }
 
-        return '';
+        return $info;
+    }
+
+    function findRecordingForCall($telefone, $data, $hora, $operador)
+    {
+        $info = $this->findCdrInfoForCall($telefone, $data, $hora, $operador);
+        return $info['recordingfile'];
     }
 
     function getNumPesquisa($filter_field = '', $filter_value = '', $date_start = '', $date_end = '', $operador = '', $avaliacao = '', $solucao = '')

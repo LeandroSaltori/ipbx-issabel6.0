@@ -10,7 +10,7 @@
   +----------------------------------------------------------------------+
   | The Initial Developer of the Original Code is PaloSanto Solutions    |
   +----------------------------------------------------------------------+
-  $Id: index.php,v 6.0 2026-08-17 Prisma Telecom $ */
+  $Id: index.php,v 7.0 2026-08-17 Prisma Telecom $ */
 
 require_once "modules/agent_console/libs/issabel2.lib.php";
 include_once "libs/paloSantoDB.class.php";
@@ -131,7 +131,7 @@ function handleExportExcel($pPesquisa)
 
     $output = fopen('php://output', 'w');
     fprintf($output, chr(0xEF).chr(0xBB).chr(0xBF));
-    fputcsv($output, array('Operador / Ramal', 'Fila', 'Data', 'Hora', 'Telefone', 'Avaliacao', 'Problema Resolvido'), ';');
+    fputcsv($output, array('Operador / Ramal', 'Fila', 'Data', 'Hora', 'Duracao', 'Telefone', 'Avaliacao', 'Problema Resolvido'), ';');
 
     if (is_array($arrResult)) {
         foreach ($arrResult as $row) {
@@ -143,7 +143,10 @@ function handleExportExcel($pPesquisa)
             $val_avaliacao = !empty($row['avaliacao']) ? $row['avaliacao'] : '-';
             $val_solucao   = !empty($row['solucao']) ? $row['solucao'] : '-';
 
-            fputcsv($output, array($val_operador, $val_fila, $val_data, $val_hora, $val_telefone, $val_avaliacao, $val_solucao), ';');
+            $cdrInfo = $pPesquisa->findCdrInfoForCall($val_telefone, $val_data, $val_hora, $val_operador);
+            $val_duracao = !empty($cdrInfo['duration_formatted']) ? $cdrInfo['duration_formatted'] : '-';
+
+            fputcsv($output, array($val_operador, $val_fila, $val_data, $val_hora, $val_duracao, $val_telefone, $val_avaliacao, $val_solucao), ';');
         }
     }
     fclose($output);
@@ -196,6 +199,7 @@ function handleExportPdf($pPesquisa)
                     <th>Fila</th>
                     <th>Data</th>
                     <th>Hora</th>
+                    <th>Duração</th>
                     <th>Telefone</th>
                     <th>Avaliação</th>
                     <th>Problema Resolvido?</th>
@@ -203,14 +207,26 @@ function handleExportPdf($pPesquisa)
             </thead>
             <tbody>
                 <?php foreach ($arrResult as $row): ?>
+                <?php
+                $val_operador  = !empty($row['operador']) ? $row['operador'] : (!empty($row['ramal']) ? $row['ramal'] : '-');
+                $val_fila      = !empty($row['fila']) ? $row['fila'] : 'Atendimento';
+                $val_data      = !empty($row['data']) ? $row['data'] : '-';
+                $val_hora      = !empty($row['hora']) ? $row['hora'] : '-';
+                $val_telefone  = !empty($row['telefone']) ? $row['telefone'] : (!empty($row['numero']) ? $row['numero'] : '-');
+                $val_avaliacao = !empty($row['avaliacao']) ? $row['avaliacao'] : '-';
+                $val_solucao   = !empty($row['solucao']) ? $row['solucao'] : '-';
+                $cdrInfo       = $pPesquisa->findCdrInfoForCall($val_telefone, $val_data, $val_hora, $val_operador);
+                $val_duracao   = !empty($cdrInfo['duration_formatted']) ? $cdrInfo['duration_formatted'] : '-';
+                ?>
                 <tr>
-                    <td><strong>👤 <?php echo htmlspecialchars(!empty($row['operador']) ? $row['operador'] : $row['ramal']); ?></strong></td>
-                    <td><?php echo htmlspecialchars(!empty($row['fila']) ? $row['fila'] : 'Atendimento'); ?></td>
-                    <td>📅 <?php echo htmlspecialchars($row['data']); ?></td>
-                    <td>🕒 <?php echo htmlspecialchars($row['hora']); ?></td>
-                    <td>📞 <?php echo htmlspecialchars(!empty($row['telefone']) ? $row['telefone'] : $row['numero']); ?></td>
-                    <td><?php echo htmlspecialchars($row['avaliacao']); ?></td>
-                    <td><?php echo htmlspecialchars($row['solucao']); ?></td>
+                    <td><strong>👤 <?php echo htmlspecialchars($val_operador); ?></strong></td>
+                    <td><?php echo htmlspecialchars($val_fila); ?></td>
+                    <td>📅 <?php echo htmlspecialchars($val_data); ?></td>
+                    <td>🕒 <?php echo htmlspecialchars($val_hora); ?></td>
+                    <td>⏱️ <?php echo htmlspecialchars($val_duracao); ?></td>
+                    <td>📞 <?php echo htmlspecialchars($val_telefone); ?></td>
+                    <td><?php echo htmlspecialchars($val_avaliacao); ?></td>
+                    <td><?php echo htmlspecialchars($val_solucao); ?></td>
                 </tr>
                 <?php endforeach; ?>
             </tbody>
@@ -680,6 +696,7 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
                         <th>Fila</th>
                         <th>Data</th>
                         <th>Hora</th>
+                        <th>Duração</th>
                         <th>Telefone</th>
                         <th>Avaliação do Atendimento</th>
                         <th>Problema Resolvido?</th>
@@ -697,13 +714,17 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
                             $val_telefone  = !empty($row['telefone']) ? $row['telefone'] : (!empty($row['numero']) ? $row['numero'] : '-');
                             $val_avaliacao = !empty($row['avaliacao']) ? $row['avaliacao'] : '-';
                             $val_solucao   = !empty($row['solucao']) ? $row['solucao'] : '-';
-                            $recFile       = $pPesquisa->findRecordingForCall($val_telefone, $val_data, $val_hora, $val_operador);
+
+                            $cdrInfo       = $pPesquisa->findCdrInfoForCall($val_telefone, $val_data, $val_hora, $val_operador);
+                            $val_duracao   = !empty($cdrInfo['duration_formatted']) ? $cdrInfo['duration_formatted'] : '-';
+                            $recFile       = !empty($cdrInfo['recordingfile']) ? $cdrInfo['recordingfile'] : '';
                             ?>
                             <tr>
                                 <td><span style='background:#ede9fe; color:#6d28d9; padding:3px 8px; border-radius:6px; font-weight:600; font-size:11px;'>👤 <?php echo htmlspecialchars($val_operador); ?></span></td>
                                 <td><span style='background:#f1f5f9; color:#475569; padding:2px 6px; border-radius:4px; font-size:11px;'><?php echo htmlspecialchars($val_fila); ?></span></td>
                                 <td><span style='color:#334155; font-size:11px;'>📅 <?php echo htmlspecialchars($val_data); ?></span></td>
                                 <td><span style='color:#64748b; font-size:11px;'>🕒 <?php echo htmlspecialchars($val_hora); ?></span></td>
+                                <td><span style='color:#0f172a; font-weight:600; font-size:11px;'>⏱️ <?php echo htmlspecialchars($val_duracao); ?></span></td>
                                 <td><span style='font-weight:600; color:#1e293b; font-size:12px;'>📞 <?php echo htmlspecialchars($val_telefone); ?></span></td>
                                 <td>
                                     <?php
@@ -776,7 +797,7 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
                         <?php endforeach; ?>
                     <?php else: ?>
                         <tr>
-                            <td colspan="8" style="text-align:center; padding:25px; color:#64748b;">
+                            <td colspan="9" style="text-align:center; padding:25px; color:#64748b;">
                                 🚀 Nenhum registro encontrado para os filtros selecionados.
                             </td>
                         </tr>
