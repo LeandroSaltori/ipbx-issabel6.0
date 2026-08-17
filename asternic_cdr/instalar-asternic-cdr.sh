@@ -94,19 +94,17 @@ chmod -R 755 "$TARGET_DIR"
 
 # 8. Habilitação do módulo no FreePBX / IssabelPBX CLI e recarregamento
 echo "[+] Habilitando módulo e recarregando configurações do PBX..."
-if command -v fwconsole &>/dev/null; then
-  fwconsole ma install asternic_cdr &>/dev/null || true
-  fwconsole ma enable asternic_cdr &>/dev/null || true
-  fwconsole reload &>/dev/null || true
-elif command -v amportal &>/dev/null; then
-  amportal a ma install asternic_cdr &>/dev/null || true
-  amportal a ma enable asternic_cdr &>/dev/null || true
-  amportal a r &>/dev/null || true
-fi
+amportal a ma install asternic_cdr 2>/dev/null || true
+amportal a ma enable asternic_cdr 2>/dev/null || true
+fwconsole ma install asternic_cdr 2>/dev/null || true
+fwconsole ma enable asternic_cdr 2>/dev/null || true
 
 if [ -f /var/lib/asterisk/bin/retrieve_conf ]; then
   php /var/lib/asterisk/bin/retrieve_conf &>/dev/null || true
 fi
+
+amportal a r 2>/dev/null || true
+fwconsole reload 2>/dev/null || true
 
 if command -v asterisk &>/dev/null; then
   asterisk -rx "module reload" &>/dev/null || true
