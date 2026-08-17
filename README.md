@@ -75,14 +75,14 @@ ipbx-issabel6.0/
 
 ## 🔍 Guia de Uso e Documentação por Módulo
 
-Para instruções específicas de configuração de módulos individuais, acesse a pasta [`docs/`](file:///c:/Users/USER/Documents/GitHub/ipbx-issabel6.0/docs/):
+Para instruções específicas de configuração de módulos individuais, acesse a pasta [`docs/`](./docs/):
 
-- 📊 [Asternic CDR - Relatórios de Chamadas](file:///c:/Users/USER/Documents/GitHub/ipbx-issabel6.0/docs/asternic_cdr.md)
-- 🎛️ [Painel IPbx - Monitoramento Visual de Ramais](file:///c:/Users/USER/Documents/GitHub/ipbx-issabel6.0/docs/painel_ipbx.md)
-- 📝 [Pesquisa de Satisfação WEB & URA](file:///c:/Users/USER/Documents/GitHub/ipbx-issabel6.0/docs/pesquisa_satisfacao_web.md)
-- 📲 [Monitoramento de Usuários via Telegram](file:///c:/Users/USER/Documents/GitHub/ipbx-issabel6.0/docs/telegram_monitor.md)
-- 🗂️ [Servidor LDAP para Telefones IP](file:///c:/Users/USER/Documents/GitHub/ipbx-issabel6.0/docs/ldap_directory.md)
-- 📞 [Instalação TFTP](file:///c:/Users/USER/Documents/GitHub/ipbx-issabel6.0/docs/tftp_install.md)
+- 📊 [Asternic CDR - Relatórios de Chamadas](./docs/asternic_cdr.md)
+- 🎛️ [Painel IPbx - Monitoramento Visual de Ramais](./docs/painel_ipbx.md)
+- 📝 [Pesquisa de Satisfação WEB & URA](./docs/pesquisa_satisfacao_web.md)
+- 📲 [Monitoramento de Usuários via Telegram](./docs/telegram_monitor.md)
+- 🗂️ [Servidor LDAP para Telefones IP](./docs/ldap_directory.md)
+- 📞 [Instalação TFTP](./docs/tftp_install.md)
 
 ---
 
