@@ -6,6 +6,8 @@
  */
 
 date_default_timezone_set('America/Sao_Paulo');
+ini_set('memory_limit', '512M');
+ini_set('max_execution_time', 300);
 
 // Garantir UTF-8 nos cabeçalhos HTTP e ambiente PHP
 ini_set('default_charset', 'UTF-8');
@@ -184,8 +186,9 @@ if (isset($_GET['action']) && in_array($_GET['action'], array('stream_audio', 'd
 }
 
 
-$hoje         = date('Y-m-d');
-$dataInicio   = isset($_GET['data_inicio'])   ? $_GET['data_inicio']   : $hoje;
+$hoje               = date('Y-m-d');
+$dataInicioDefault  = date('Y-m-01');
+$dataInicio   = isset($_GET['data_inicio'])   ? $_GET['data_inicio']   : $dataInicioDefault;
 $dataFim      = isset($_GET['data_fim'])      ? $_GET['data_fim']      : $hoje;
 $export       = isset($_GET['export'])        ? $_GET['export']        : '';
 $agenteFiltro = isset($_GET['agente_filtro']) ? trim($_GET['agente_filtro']) : '';
@@ -285,6 +288,8 @@ if ($rDevices) {
 
 // --- Lista de filas e agentes para o formulário --------------------------------------
 $filas = array();
+$knownQueueNums = array();
+
 $rFilas = mysqli_query($conn, "SELECT qname_id, queue FROM qname WHERE queue != 'NONE' ORDER BY queue");
 if ($rFilas) {
     while ($row = mysqli_fetch_assoc($rFilas)) {
@@ -292,6 +297,19 @@ if ($rFilas) {
         $row['queue_num'] = $qRaw;
         $row['queue_descr'] = getQueueDescription($qRaw, $queueDescrMap);
         $filas[] = $row;
+        $knownQueueNums[$qRaw] = true;
+    }
+}
+
+foreach ($queueDescrMap as $ext => $descr) {
+    if (!isset($knownQueueNums[$ext]) && $ext != '' && $ext != 'NONE') {
+        $filas[] = array(
+            'qname_id' => $ext,
+            'queue' => $ext,
+            'queue_num' => $ext,
+            'queue_descr' => getQueueDescription($ext, $queueDescrMap)
+        );
+        $knownQueueNums[$ext] = true;
     }
 }
 
@@ -301,13 +319,23 @@ if ($rAgentes) while ($row = mysqli_fetch_assoc($rAgentes)) $agentesLista[] = $r
 
 // --- Condição WHERE base ------------------------------------------------------------
 $whereCond  = "WHERE DATE(qs.datetime) BETWEEN '$dataInicioEsc' AND '$dataFimEsc'";
-$filasIn = array();
-foreach($filaFiltro as $f) {
-    $fClean = mysqli_real_escape_string($conn, $f);
-    if($fClean != '') $filasIn[] = "'$fClean'";
+
+$selectedQnameIds = array();
+if (count($filaFiltro) > 0) {
+    foreach ($filaFiltro as $f) {
+        $fClean = trim($f);
+        if ($fClean === '') continue;
+        foreach ($qnameMapRaw as $qId => $qNum) {
+            if (strval($qId) === $fClean || strval($qNum) === $fClean) {
+                $selectedQnameIds[] = intval($qId);
+            }
+        }
+    }
 }
-if (count($filasIn) > 0) {
-    $whereCond .= " AND qs.qname IN (" . implode(',', $filasIn) . ")";
+$selectedQnameIds = array_unique($selectedQnameIds);
+
+if (count($selectedQnameIds) > 0) {
+    $whereCond .= " AND qs.qname IN (" . implode(',', $selectedQnameIds) . ")";
 }
 
 // --- Nomes das filas para exibição no topo ----------------------------------------------------
@@ -326,7 +354,6 @@ $textoFilasTooltip  = count($descrsFilasSelecionadas) > 0 ? implode(' | ', $desc
 // --- QUERY PRINCIPAL - Detalhes de chamadas ----------------------------------------------
 $sqlDetalhe = "
 SELECT
-    qs.queue_stats_id,
     qs.uniqueid,
     qs.datetime,
     qs.qname   AS qname_id,
@@ -337,7 +364,8 @@ SELECT
     qs.info3
 FROM queue_stats qs
 $whereCond
-ORDER BY qs.datetime ASC, qs.uniqueid ASC, qs.queue_stats_id ASC
+ORDER BY qs.datetime DESC, qs.uniqueid DESC
+LIMIT 5000
 ";
 
 $rDetalhe = mysqli_query($conn, $sqlDetalhe);
@@ -1416,7 +1444,7 @@ var gridColor = '#eaeaea';
             labels: <?php echo $agLabelsJson; ?>,
             datasets: [
                 { label: 'Atendidas',     data: <?php echo $agAtendJson; ?>,    backgroundColor: '#3498db' },
-                { label: 'N&atilde;o Atendidas', data: <?php echo $agNaoAtendJson; ?>, backgroundColor: '#e74c3c' }
+                { label: 'N\u00e3o Atendidas', data: <?php echo $agNaoAtendJson; ?>, backgroundColor: '#e74c3c' }
             ]
         },
         options: {
