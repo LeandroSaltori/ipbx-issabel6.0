@@ -10,7 +10,7 @@
   +----------------------------------------------------------------------+
   | The Initial Developer of the Original Code is PaloSanto Solutions    |
   +----------------------------------------------------------------------+
-  $Id: paloSantoPesquisa.class.php,v 10.0 2026-08-17 Prisma Telecom $ */
+  $Id: paloSantoPesquisa.class.php,v 11.0 2026-08-17 Prisma Telecom $ */
 
 class paloSantoPesquisa {
     var $_DB;
@@ -167,6 +167,23 @@ class paloSantoPesquisa {
                 }
             } catch (Exception $e) {
             } catch (Throwable $t) {}
+
+            if (empty($map)) {
+                try {
+                    $stmt = $this->pdo->query("SELECT id as queue, data as name FROM asterisk.queues_details WHERE keyword='displayname' AND id IS NOT NULL AND id != ''");
+                    if ($stmt !== false) {
+                        $rows = $stmt->fetchAll();
+                        if (is_array($rows)) {
+                            foreach ($rows as $r) {
+                                if (!empty($r['queue'])) {
+                                    $map[trim($r['queue'])] = trim($r['name']);
+                                }
+                            }
+                        }
+                    }
+                } catch (Exception $e) {
+                } catch (Throwable $t) {}
+            }
         }
         return $map;
     }
@@ -192,6 +209,73 @@ class paloSantoPesquisa {
         return array_unique($list);
     }
 
+    function findQueueForCall($telefone, $dt, $knownQueueNums = array())
+    {
+        if (!$this->pdo || empty($dt)) return '';
+        $ts = strtotime($dt);
+        if (!$ts) return '';
+
+        $start = date('Y-m-d H:i:s', $ts - 600);
+        $end   = date('Y-m-d H:i:s', $ts + 120);
+
+        $telClean = preg_replace('/[^0-9]/', '', $telefone);
+        if (strlen($telClean) > 4) {
+            $telClean = substr($telClean, -8);
+        }
+
+        try {
+            $sql = "SELECT dst, dstchannel, channel, dcontext, accountcode, userfield FROM cdr 
+                    WHERE calldate BETWEEN ? AND ? 
+                    AND (src LIKE ? OR clid LIKE ? OR dst LIKE ? OR channel LIKE ? OR dstchannel LIKE ?) 
+                    ORDER BY calldate ASC";
+            $stmt = $this->pdo->prepare($sql);
+            if ($stmt !== false) {
+                $stmt->execute(array($start, $end, "%$telClean%", "%$telClean%", "%$telClean%", "%$telClean%", "%$telClean%"));
+                $rows = $stmt->fetchAll();
+                if (is_array($rows)) {
+                    // 1. Procura primeiro se accountcode tem uma fila conhecida
+                    foreach ($rows as $r) {
+                        $acc = trim($r['accountcode']);
+                        if (!empty($acc) && in_array($acc, $knownQueueNums)) {
+                            return $acc;
+                        }
+                    }
+
+                    // 2. Procura se dst é um número de fila cadastrado
+                    foreach ($rows as $r) {
+                        $dst = trim($r['dst']);
+                        if (!empty($dst) && in_array($dst, $knownQueueNums)) {
+                            return $dst;
+                        }
+                    }
+
+                    // 3. Procura por padrões ext-queues, q-NUM ou Queue/NUM em qualquer coluna
+                    foreach ($rows as $r) {
+                        $comb = $r['dst'] . ' ' . $r['dstchannel'] . ' ' . $r['channel'] . ' ' . $r['dcontext'] . ' ' . $r['userfield'];
+                        if (preg_match('/(?:ext-queues|from-queue|Queue\/|q-)(\d{3,5})/i', $comb, $m)) {
+                            if (empty($knownQueueNums) || in_array($m[1], $knownQueueNums)) {
+                                return $m[1];
+                            }
+                        }
+                    }
+
+                    // 4. Procura por qualquer número de fila conhecido dentro dos textos do CDR
+                    foreach ($rows as $r) {
+                        $comb = $r['dst'] . ' ' . $r['dstchannel'] . ' ' . $r['channel'] . ' ' . $r['dcontext'];
+                        foreach ($knownQueueNums as $qn) {
+                            if (strpos($comb, $qn) !== false) {
+                                return $qn;
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (Exception $e) {
+        } catch (Throwable $t) {}
+
+        return '';
+    }
+
     function findCdrInfoForCall($telefone, $data, $hora, $operador)
     {
         $info = array('recordingfile' => '', 'duration' => 0, 'billsec' => 0, 'duration_formatted' => '00:00', 'fila' => '');
@@ -201,7 +285,6 @@ class paloSantoPesquisa {
         $ts = strtotime($dt);
 
         if ($ts) {
-            // Janela precisa ao redor da pesquisa (5min antes a 2min depois)
             $start = date('Y-m-d H:i:s', $ts - 300);
             $end   = date('Y-m-d H:i:s', $ts + 120);
 
@@ -210,13 +293,12 @@ class paloSantoPesquisa {
                 $telClean = substr($telClean, -8);
             }
 
-            // Mapa de Filas cadastradas no Asterisk
             $queueMap = $this->getQueueNamesMap();
             $knownQueueNums = array_keys($queueMap);
 
             try {
-                // 1. Busca primeiro o registro da chamada de atendimento que gerou gravação de áudio
-                $sql = "SELECT recordingfile, duration, billsec, dst, dstchannel, channel FROM cdr 
+                // 1. Busca o registro da chamada que possui o arquivo de áudio de gravação
+                $sql = "SELECT recordingfile, duration, billsec, dst, dstchannel, channel, accountcode FROM cdr 
                         WHERE calldate BETWEEN ? AND ? 
                         AND (src LIKE ? OR dst LIKE ? OR channel LIKE ? OR dstchannel LIKE ?) 
                         ORDER BY (CASE WHEN recordingfile IS NOT NULL AND recordingfile != '' THEN 1 ELSE 0 END) DESC, 
@@ -232,37 +314,24 @@ class paloSantoPesquisa {
                         $sec = (int)$row['duration'];
                         $info['duration_formatted'] = sprintf('%02d:%02d', floor($sec / 60), $sec % 60);
 
-                        $combined = (isset($row['dstchannel']) ? $row['dstchannel'] : '') . ' ' . (isset($row['channel']) ? $row['channel'] : '') . ' ' . (isset($row['dst']) ? $row['dst'] : '');
-                        foreach ($knownQueueNums as $qn) {
-                            if (strpos($combined, $qn) !== false) {
-                                $info['fila'] = $qn;
-                                break;
-                            }
-                        }
-                    }
-                }
-
-                // 2. Se a Fila não foi encontrada no registro principal, faz match na chamada de entrada do CDR (ext-queues)
-                if (empty($info['fila'])) {
-                    $sqlQ = "SELECT dst, dstchannel, channel, dcontext FROM cdr 
-                             WHERE calldate BETWEEN ? AND ? 
-                             AND (src LIKE ? OR clid LIKE ?) 
-                             AND (dcontext LIKE '%queue%' OR dstchannel LIKE '%queue%' OR dcontext LIKE '%ext-queues%') 
-                             ORDER BY calldate DESC LIMIT 1";
-                    $stmtQ = $this->pdo->prepare($sqlQ);
-                    if ($stmtQ !== false) {
-                        $stmtQ->execute(array($start, $end, "%$telClean%", "%$telClean%"));
-                        $rowQ = $stmtQ->fetch();
-                        if ($rowQ) {
-                            $combQ = $rowQ['dst'] . ' ' . $rowQ['dstchannel'] . ' ' . $rowQ['channel'] . ' ' . $rowQ['dcontext'];
+                        $acc = trim($row['accountcode']);
+                        if (!empty($acc) && in_array($acc, $knownQueueNums)) {
+                            $info['fila'] = $acc;
+                        } else {
+                            $combined = (isset($row['dstchannel']) ? $row['dstchannel'] : '') . ' ' . (isset($row['channel']) ? $row['channel'] : '') . ' ' . (isset($row['dst']) ? $row['dst'] : '');
                             foreach ($knownQueueNums as $qn) {
-                                if (strpos($combQ, $qn) !== false) {
+                                if (strpos($combined, $qn) !== false) {
                                     $info['fila'] = $qn;
                                     break;
                                 }
                             }
                         }
                     }
+                }
+
+                // 2. Se a Fila ainda não foi identificada, realiza busca profunda de Fila de Entrada por (data, hora, telefone)
+                if (empty($info['fila'])) {
+                    $info['fila'] = $this->findQueueForCall($telefone, $dt, $knownQueueNums);
                 }
 
             } catch (Exception $e) {
