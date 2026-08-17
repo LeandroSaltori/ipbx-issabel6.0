@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <title>Pesquisa de Satisfação - Como Funciona</title>
+    <title>Pesquisa de Satisfação - Guia Completo e Dashboard</title>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -12,7 +12,7 @@
             line-height: 1.6;
         }
         .container {
-            max-width: 900px;
+            max-width: 950px;
             margin: 0 auto;
             background: #ffffff;
             border-radius: 12px;
@@ -29,14 +29,42 @@
         h2 {
             color: #1e293b;
             font-size: 18px;
-            margin-top: 25px;
+            margin-top: 30px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
         .card {
             background: #f1f5f9;
             border-left: 4px solid #4f46e5;
-            padding: 15px 20px;
-            border-radius: 6px;
+            padding: 16px 20px;
+            border-radius: 8px;
             margin: 20px 0;
+        }
+        .grid-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .kpi-sample {
+            background: #faf5ff;
+            border: 1px solid #e9d5ff;
+            border-radius: 8px;
+            padding: 15px;
+            text-align: center;
+        }
+        .kpi-sample h3 {
+            margin: 0;
+            font-size: 13px;
+            color: #6b21a8;
+            text-transform: uppercase;
+        }
+        .kpi-sample p {
+            margin: 8px 0 0 0;
+            font-size: 22px;
+            font-weight: bold;
+            color: #581c87;
         }
         table {
             width: 100%;
@@ -55,32 +83,65 @@
         }
         .badge {
             display: inline-block;
-            padding: 4px 8px;
-            border-radius: 4px;
+            padding: 4px 10px;
+            border-radius: 6px;
             font-size: 12px;
             font-weight: 600;
-            background: #e0e7ff;
-            color: #4338ca;
         }
-        ul {
-            padding-left: 20px;
-        }
-        li {
-            margin-bottom: 8px;
+        .badge-purple { background: #e0e7ff; color: #4338ca; }
+        .badge-green { background: #dcfce7; color: #15803d; }
+        .badge-blue { background: #dbeafe; color: #1d4ed8; }
+        .badge-orange { background: #ffedd5; color: #c2410c; }
+        .badge-red { background: #fee2e2; color: #b91c1c; }
+        ul { padding-left: 20px; }
+        li { margin-bottom: 8px; }
+        code {
+            background: #e2e8f0;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 13px;
+            color: #0f172a;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>📊 Pesquisa de Satisfação - Guia de Funcionamento</h1>
+        <h1>📊 Pesquisa de Satisfação - Guia do Sistema & Painel Executivo</h1>
         
-        <p>A <strong>Pesquisa de Satisfação</strong> do IPbx Prisma Telecom permite avaliar a qualidade do atendimento prestado pelos operadores através de uma URA interativa automática pós-atendimento.</p>
+        <p>A <strong>Pesquisa de Satisfação</strong> do IPbx Prisma Telecom é uma solução completa para aferição da qualidade do atendimento e satisfação do cliente em tempo real, integrando URA Asterisk inteligente com um Dashboard Executivo visual.</p>
 
         <div class="card">
-            <strong>📞 Ramal de Teste e Transferência:</strong> Disque ou transfira a chamada para o número <span class="badge">8996</span>.
+            <strong>🎯 Ramal de Teste e Transferência:</strong> Disque ou transfira para o número <span class="badge badge-purple">8996</span>.<br>
+            <strong>🔗 Custom Destination no PBX:</strong> <code>pesquisa-satisfação,8996,1</code>
         </div>
 
-        <h2>🎙️ Fluxo da URA de Avaliação</h2>
+        <h2>📈 1. Novo Painel Executivo (Dashboard)</h2>
+        <p>A tela de relatórios (<strong>Reports ➔ Pesquisa</strong>) conta com:</p>
+        <div class="grid-cards">
+            <div class="kpi-sample">
+                <h3>📋 Total de Pesquisas</h3>
+                <p>Respondidas</p>
+            </div>
+            <div class="kpi-sample" style="background:#f0fdf4; border-color:#bbf7d0;">
+                <h3 style="color:#166534;">⭐ Média de Satisfação</h3>
+                <p style="color:#14532d;">4.8 / 5.0</p>
+            </div>
+            <div class="kpi-sample" style="background:#eff6ff; border-color:#bfdbfe;">
+                <h3 style="color:#1e40af;">🎯 Taxa de Resolução</h3>
+                <p style="color:#1e3a8a;">95% SIM</p>
+            </div>
+            <div class="kpi-sample" style="background:#fffbeb; border-color:#fde68a;">
+                <h3 style="color:#92400e;">🏆 Satisfação Positiva</h3>
+                <p style="color:#78350f;">Ótimo & Muito Bom</p>
+            </div>
+        </div>
+        <ul>
+            <li><strong>Gráficos Interativos (Chart.js):</strong> Distribuição percentual das notas de atendimento e proporção de resolução de problemas (SIM vs NÃO).</li>
+            <li><strong>Filtros Avançados:</strong> Filtragem instantânea por <em>Data Inicial / Final</em>, <em>Operador/Ramal</em>, <em>Nota de Avaliação</em> e <em>Status de Resolução</em>.</li>
+            <li><strong>Exportação de Dados:</strong> Exportação rápida para Excel (CSV) e impressão/PDF.</li>
+        </ul>
+
+        <h2>🎙️ 2. Fluxo da URA de Avaliação</h2>
         <table>
             <thead>
                 <tr>
@@ -96,22 +157,22 @@
                     <td>Início automático da pesquisa.</td>
                 </tr>
                 <tr>
-                    <td><strong>2. Avaliação do Atendimento</strong></td>
+                    <td><strong>2. Avaliação Geral</strong></td>
                     <td><code>audio2.wav</code></td>
                     <td>
-                        <strong>1:</strong> RUIM &nbsp;|&nbsp;
-                        <strong>2:</strong> BOM &nbsp;|&nbsp;
-                        <strong>3:</strong> MÉDIO &nbsp;|&nbsp;
-                        <strong>4:</strong> MUITO BOM &nbsp;|&nbsp;
-                        <strong>5:</strong> ÓTIMO
+                        <span class="badge badge-green">5: ÓTIMO</span>
+                        <span class="badge badge-blue">4: MUITO BOM</span>
+                        <span class="badge badge-purple">3: MÉDIO</span>
+                        <span class="badge badge-orange">2: BOM</span>
+                        <span class="badge badge-red">1: RUIM</span>
                     </td>
                 </tr>
                 <tr>
-                    <td><strong>3. Resolução do Problema</strong></td>
+                    <td><strong>3. Resolução da Demanda</strong></td>
                     <td><code>audio3.wav</code></td>
                     <td>
-                        <strong>1:</strong> SIM &nbsp;|&nbsp;
-                        <strong>2:</strong> NÃO
+                        <span class="badge badge-green">1: SIM (Resolvido)</span> &nbsp;
+                        <span class="badge badge-red">2: NÃO (Não Resolvido)</span>
                     </td>
                 </tr>
                 <tr>
@@ -122,15 +183,23 @@
             </tbody>
         </table>
 
-        <h2>⚙️ Como Transferir a Chamada para a Pesquisa</h2>
+        <h2>📞 3. Como Transferir para a Pesquisa</h2>
         <ul>
-            <li>Durante uma chamada ativa com o cliente, o operador pressiona a tecla de transferência (ex: <code>*2</code> ou <code>##</code>).</li>
-            <li>Digita o ramal da pesquisa: <strong>8996</strong>.</li>
-            <li>O operador desliga e o cliente responde às perguntas da pesquisa pelo teclado do telefone.</li>
+            <li><strong>Transferência Cega:</strong> Pressione <code>##</code> (ou tecla Flash), disque <code>8996</code> e desligue imediatamente.</li>
+            <li><strong>Transferência Assistida:</strong> Pressione <code>*2</code>, disque <code>8996</code>, aguarde a URA atender e desligue.</li>
+            <li><strong>Fila Automática / URA:</strong> Configure o <em>Custom Destination</em> <code>pesquisa-satisfação,8996,1</code> no FreePBX como destino pós-atendimento.</li>
         </ul>
 
-        <h2>💾 Armazenamento e Relatórios</h2>
-        <p>Todas as respostas são gravadas automaticamente no banco de dados do sistema e podem ser visualizadas, filtradas e exportadas em tempo real na aba <strong>Reports ➔ Pesquisa</strong>.</p>
+        <h2>💾 4. Armazenamento e Banco de Dados</h2>
+        <p>Os dados são gravados no banco SQLite <code>/var/www/db/pesquisa.db</code> com a estrutura:</p>
+        <ul>
+            <li><code>operador</code>: Ramal ou identificação do atendente que realizou o atendimento.</li>
+            <li><code>fila</code>: Fila de atendimento de origem.</li>
+            <li><code>data</code> e <code>hora</code>: Timestamp exato da resposta.</li>
+            <li><code>telefone</code>: Número do cliente que avaliou.</li>
+            <li><code>avaliacao</code>: Nota atribuída (ÓTIMO, MUITO BOM, MÉDIO, BOM, RUIM).</li>
+            <li><code>solucao</code>: Status de resolução (SIM ou NÃO).</li>
+        </ul>
     </div>
 </body>
 </html>

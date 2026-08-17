@@ -44,55 +44,177 @@ class paloSantoPesquisa{
         }
     }
 
-    /*HERE YOUR FUNCTIONS*/
-
-    function getNumPesquisa($filter_field, $filter_value)
+    function getNumPesquisa($date_start = null, $date_end = null, $operador = null, $avaliacao = null, $solucao = null)
     {
-        $where    = "";
-        $arrParam = null;
-        if(isset($filter_field) & $filter_field !=""){
-            $where    = "where $filter_field like ?";
-            $arrParam = array("$filter_value%");
+        $where = array();
+        $params = array();
+
+        if (!empty($date_start)) {
+            $where[] = "data >= ?";
+            $params[] = $date_start;
+        }
+        if (!empty($date_end)) {
+            $where[] = "data <= ?";
+            $params[] = $date_end;
+        }
+        if (!empty($operador)) {
+            $where[] = "operador LIKE ?";
+            $params[] = "%$operador%";
+        }
+        if (!empty($avaliacao)) {
+            $where[] = "avaliacao = ?";
+            $params[] = $avaliacao;
+        }
+        if (!empty($solucao)) {
+            $where[] = "solucao = ?";
+            $params[] = $solucao;
         }
 
-        $query   = "SELECT COUNT(*) FROM pesquisa $where";
+        $strWhere = !empty($where) ? "WHERE " . implode(" AND ", $where) : "";
+        $query = "SELECT COUNT(*) FROM pesquisa $strWhere";
 
-        $result=$this->_DB->getFirstRowQuery($query, false, $arrParam);
-
-        if($result==FALSE){
+        $result = $this->_DB->getFirstRowQuery($query, false, $params);
+        if ($result === false) {
             $this->errMsg = $this->_DB->errMsg;
             return 0;
         }
-        return $result[0];
+        return (int)$result[0];
     }
 
-    function getPesquisa($limit, $offset, $filter_field, $filter_value)
+    function getPesquisa($limit, $offset, $date_start = null, $date_end = null, $operador = null, $avaliacao = null, $solucao = null)
     {
-        $where    = "";
-        $arrParam = null;
-        if(isset($filter_field) & $filter_field !=""){
-            $where    = "where $filter_field like ?";
-            $arrParam = array("$filter_value%");
+        $where = array();
+        $params = array();
+
+        if (!empty($date_start)) {
+            $where[] = "data >= ?";
+            $params[] = $date_start;
+        }
+        if (!empty($date_end)) {
+            $where[] = "data <= ?";
+            $params[] = $date_end;
+        }
+        if (!empty($operador)) {
+            $where[] = "operador LIKE ?";
+            $params[] = "%$operador%";
+        }
+        if (!empty($avaliacao)) {
+            $where[] = "avaliacao = ?";
+            $params[] = $avaliacao;
+        }
+        if (!empty($solucao)) {
+            $where[] = "solucao = ?";
+            $params[] = $solucao;
         }
 
-        $query   = "SELECT * FROM pesquisa $where LIMIT $limit OFFSET $offset";
+        $strWhere = !empty($where) ? "WHERE " . implode(" AND ", $where) : "";
+        $query = "SELECT * FROM pesquisa $strWhere ORDER BY id DESC LIMIT $limit OFFSET $offset";
 
-        $result=$this->_DB->fetchTable($query, true, $arrParam);
-
-        if($result==FALSE){
+        $result = $this->_DB->fetchTable($query, true, $params);
+        if ($result === false) {
             $this->errMsg = $this->_DB->errMsg;
             return array();
         }
         return $result;
     }
 
+    function getPesquisaStats($date_start = null, $date_end = null, $operador = null)
+    {
+        $where = array();
+        $params = array();
+
+        if (!empty($date_start)) {
+            $where[] = "data >= ?";
+            $params[] = $date_start;
+        }
+        if (!empty($date_end)) {
+            $where[] = "data <= ?";
+            $params[] = $date_end;
+        }
+        if (!empty($operador)) {
+            $where[] = "operador LIKE ?";
+            $params[] = "%$operador%";
+        }
+
+        $strWhere = !empty($where) ? "WHERE " . implode(" AND ", $where) : "";
+
+        // Total e contagem de notas
+        $query = "SELECT 
+            COUNT(*) as total,
+            SUM(CASE WHEN UPPER(avaliacao) = 'OTIMO' OR UPPER(avaliacao) = 'ÓTIMO' THEN 1 ELSE 0 END) as otimo,
+            SUM(CASE WHEN UPPER(avaliacao) = 'MUITO BOM' THEN 1 ELSE 0 END) as muito_bom,
+            SUM(CASE WHEN UPPER(avaliacao) = 'MEDIO' OR UPPER(avaliacao) = 'MÉDIO' THEN 1 ELSE 0 END) as medio,
+            SUM(CASE WHEN UPPER(avaliacao) = 'BOM' THEN 1 ELSE 0 END) as bom,
+            SUM(CASE WHEN UPPER(avaliacao) = 'RUIM' THEN 1 ELSE 0 END) as ruim,
+            SUM(CASE WHEN UPPER(solucao) = 'SIM' THEN 1 ELSE 0 END) as resolvido_sim,
+            SUM(CASE WHEN UPPER(solucao) = 'NAO' OR UPPER(solucao) = 'NÃO' THEN 1 ELSE 0 END) as resolvido_nao
+            FROM pesquisa $strWhere";
+
+        $stats = $this->_DB->getFirstRowQuery($query, true, $params);
+        if (!$stats || empty($stats['total'])) {
+            return array(
+                'total' => 0,
+                'otimo' => 0,
+                'muito_bom' => 0,
+                'medio' => 0,
+                'bom' => 0,
+                'ruim' => 0,
+                'resolvido_sim' => 0,
+                'resolvido_nao' => 0,
+                'media_estrelas' => 0,
+                'taxa_resolucao' => 0,
+                'taxa_satisfacao' => 0,
+                'operadores' => array()
+            );
+        }
+
+        $total = (int)$stats['total'];
+        $otimo = (int)$stats['otimo'];
+        $muito_bom = (int)$stats['muito_bom'];
+        $medio = (int)$stats['medio'];
+        $bom = (int)$stats['bom'];
+        $ruim = (int)$stats['ruim'];
+        $sim = (int)$stats['resolvido_sim'];
+        $nao = (int)$stats['resolvido_nao'];
+
+        // Peso das notas: Ótimo=5, Muito Bom=4, Médio=3, Bom=2, Ruim=1
+        $somaPontos = ($otimo * 5) + ($muito_bom * 4) + ($medio * 3) + ($bom * 2) + ($ruim * 1);
+        $mediaEstrelas = $total > 0 ? round($somaPontos / $total, 1) : 0;
+        $taxaResolucao = ($sim + $nao) > 0 ? round(($sim / ($sim + $nao)) * 100, 1) : 0;
+        $taxaSatisfacao = $total > 0 ? round((($otimo + $muito_bom) / $total) * 100, 1) : 0;
+
+        // Ranking por operador
+        $queryOp = "SELECT operador, COUNT(*) as qtd,
+            SUM(CASE WHEN UPPER(avaliacao) IN ('OTIMO', 'ÓTIMO', 'MUITO BOM') THEN 1 ELSE 0 END) as positivos,
+            SUM(CASE WHEN UPPER(solucao) = 'SIM' THEN 1 ELSE 0 END) as resolvidos
+            FROM pesquisa $strWhere
+            GROUP BY operador
+            ORDER BY qtd DESC
+            LIMIT 10";
+        $operadores = $this->_DB->fetchTable($queryOp, true, $params);
+        if (!$operadores) $operadores = array();
+
+        return array(
+            'total' => $total,
+            'otimo' => $otimo,
+            'muito_bom' => $muito_bom,
+            'medio' => $medio,
+            'bom' => $bom,
+            'ruim' => $ruim,
+            'resolvido_sim' => $sim,
+            'resolvido_nao' => $nao,
+            'media_estrelas' => $mediaEstrelas,
+            'taxa_resolucao' => $taxaResolucao,
+            'taxa_satisfacao' => $taxaSatisfacao,
+            'operadores' => $operadores
+        );
+    }
+
     function getPesquisaById($id)
     {
         $query = "SELECT * FROM pesquisa WHERE id=?";
-
-        $result=$this->_DB->getFirstRowQuery($query, true, array("$id"));
-
-        if($result==FALSE){
+        $result = $this->_DB->getFirstRowQuery($query, true, array("$id"));
+        if ($result === false) {
             $this->errMsg = $this->_DB->errMsg;
             return null;
         }

@@ -1,70 +1,46 @@
 <?php
-  /* vim: set expandtab tabstop=4 softtabstop=4 shiftwidth=4:
+/* vim: set expandtab tabstop=4 softtabstop=4 shiftwidth=4:
   Codificación: UTF-8
   +----------------------------------------------------------------------+
-  | Issabel version {ISSBEL_VERSION}                                               |
+  | Issabel version {ISSBEL_VERSION}                                     |
   | http://www.issabel.org                                               |
   +----------------------------------------------------------------------+
   | Copyright (c) 2017 Issabel Foundation                                |
   | Copyright (c) 2006 Palosanto Solutions S. A.                         |
   +----------------------------------------------------------------------+
-  | The contents of this file are subject to the General Public License  |
-  | (GPL) Version 2 (the "License"); you may not use this file except in |
-  | compliance with the License. You may obtain a copy of the License at |
-  | http://www.opensource.org/licenses/gpl-license.php                   |
-  |                                                                      |
-  | Software distributed under the License is distributed on an "AS IS"  |
-  | basis, WITHOUT WARRANTY OF ANY KIND, either express or implied. See  |
-  | the License for the specific language governing rights and           |
-  | limitations under the License.                                       |
-  +----------------------------------------------------------------------+
   | The Initial Developer of the Original Code is PaloSanto Solutions    |
   +----------------------------------------------------------------------+
-  $Id: index.php,v 1.1 2025-07-12 11:07:03 Prisma suporte@prismatelecom.com Exp $ */
-//include issabel framework
-include_once "libs/paloSantoGrid.class.php";
-include_once "libs/paloSantoForm.class.php";
+  $Id: index.php,v 1.2 2026-08-17 Prisma Telecom $ */
+
+require_once "modules/agent_console/libs/issabel2.lib.php";
 
 function _moduleContent(&$smarty, $module_name)
 {
-    //include module files
+    // include issabel framework
+    include_once "libs/paloSantoGrid.class.php";
+    include_once "libs/paloSantoForm.class.php";
+
+    // include module files
     include_once "modules/$module_name/configs/default.conf.php";
     include_once "modules/$module_name/libs/paloSantoPesquisa.class.php";
 
-    //include file language agree to issabel configuration
-    //if file language not exists, then include language by default (en)
-    $lang=get_language();
-    $base_dir=dirname($_SERVER['SCRIPT_FILENAME']);
-    $lang_file="modules/$module_name/lang/$lang.lang";
-    if (file_exists("$base_dir/$lang_file")) include_once "$lang_file";
-    else include_once "modules/$module_name/lang/en.lang";
+    load_language_module($module_name);
 
-    //global variables
     global $arrConf;
-    global $arrConfModule;
-    global $arrLang;
-    global $arrLangModule;
-    $arrConf = array_merge($arrConf,$arrConfModule);
-    $arrLang = array_merge($arrLang,$arrLangModule);
 
-    //folder path for custom templates
-    $templates_dir=(isset($arrConf['templates_dir']))?$arrConf['templates_dir']:'themes';
-    $local_templates_dir="$base_dir/modules/$module_name/".$templates_dir.'/'.$arrConf['theme'];
+    // folder path for custom templates
+    $base_dir = dirname($_SERVER['SCRIPT_FILENAME']);
+    $templates_dir = (isset($arrConf['templates_dir'])) ? $arrConf['templates_dir'] : 'themes';
+    $local_templates_dir = "$base_dir/modules/$module_name/" . $templates_dir . '/' . $arrConf['theme'];
 
-    //conexion resource
-    //$pDB = new paloDB($arrConf['dsn_conn_database']);
-    //$pDB = "";
+    // Conexão com banco SQLite pesquisa.db
+    $dsn = "sqlite3:////var/www/db/pesquisa.db";
+    $pDB = new paloDB($dsn);
 
-include_once "/var/www/html/libs/paloSantoDB.class.php";
-$dsn = "mysql://root:ls251289@localhost/asteriskcdrdb";
-$pDB = new paloDB($dsn);
-
-
-    //actions
     $action = getAction();
     $content = "";
 
-    switch($action){
+    switch ($action) {
         default:
             $content = reportPesquisa($smarty, $module_name, $local_templates_dir, $pDB, $arrConf);
             break;
@@ -75,113 +51,375 @@ $pDB = new paloDB($dsn);
 function reportPesquisa($smarty, $module_name, $local_templates_dir, &$pDB, $arrConf)
 {
     $pPesquisa = new paloSantoPesquisa($pDB);
-    $filter_field = getParameter("filter_field");
-    $filter_value = getParameter("filter_value");
 
-    //begin grid parameters
-    $oGrid  = new paloSantoGrid($smarty);
-    $oGrid->setTitle(_tr("Pesquisa"));
-    $oGrid->pagingShow(true); // show paging section.
+    // Parâmetros de Filtro
+    $date_start = isset($_POST['date_start']) ? trim($_POST['date_start']) : (isset($_GET['date_start']) ? trim($_GET['date_start']) : date('Y-m-01'));
+    $date_end   = isset($_POST['date_end']) ? trim($_POST['date_end']) : (isset($_GET['date_end']) ? trim($_GET['date_end']) : date('Y-m-d'));
+    $operador   = isset($_POST['operador']) ? trim($_POST['operador']) : (isset($_GET['operador']) ? trim($_GET['operador']) : '');
+    $avaliacao  = isset($_POST['avaliacao']) ? trim($_POST['avaliacao']) : (isset($_GET['avaliacao']) ? trim($_GET['avaliacao']) : '');
+    $solucao    = isset($_POST['solucao']) ? trim($_POST['solucao']) : (isset($_GET['solucao']) ? trim($_GET['solucao']) : '');
 
-    $oGrid->enableExport();   // enable export.
-    $oGrid->setNameFile_Export(_tr("Pesquisa"));
+    // Estatísticas para os Cards Executivos e Gráficos
+    $stats = $pPesquisa->getPesquisaStats($date_start, $date_end, $operador);
+
+    // Configuração do Grid do Issabel
+    $oGrid = new paloSantoGrid($smarty);
+    $oGrid->setTitle("📊 Painel Executivo de Pesquisa de Satisfação");
+    $oGrid->pagingShow(true);
+    $oGrid->enableExport();
+    $oGrid->setNameFile_Export("Pesquisa_Satisfacao_" . date('Ymd_His'));
 
     $url = array(
-        "menu"         =>  $module_name,
-        "filter_field" =>  $filter_field,
-        "filter_value" =>  $filter_value);
+        "menu"        => $module_name,
+        "date_start"  => $date_start,
+        "date_end"    => $date_end,
+        "operador"    => $operador,
+        "avaliacao"   => $avaliacao,
+        "solucao"     => $solucao
+    );
     $oGrid->setURL($url);
 
-    $arrColumns = array(_tr("Operador"),_tr("Fila"),_tr("Data"),_tr("Hora"),_tr("Telefone"),_tr("Avaliacao"),_tr("Solucao"),);
+    $arrColumns = array(
+        "Data & Hora",
+        "Operador / Ramal",
+        "Fila",
+        "Telefone Cliente",
+        "Avaliação do Atendimento",
+        "Problema Resolvido?"
+    );
     $oGrid->setColumns($arrColumns);
 
-    $total   = $pPesquisa->getNumPesquisa($filter_field, $filter_value);
-    $arrData = null;
-    if($oGrid->isExportAction()){
-        $limit  = $total; // max number of rows.
-        $offset = 0;      // since the start.
-    }
-    else{
+    $total = $pPesquisa->getNumPesquisa($date_start, $date_end, $operador, $avaliacao, $solucao);
+    $arrData = array();
+
+    if ($oGrid->isExportAction()) {
+        $limit  = $total;
+        $offset = 0;
+    } else {
         $limit  = 20;
         $oGrid->setLimit($limit);
         $oGrid->setTotal($total);
         $offset = $oGrid->calculateOffset();
     }
 
-    $arrResult =$pPesquisa->getPesquisa($limit, $offset, $filter_field, $filter_value);
+    $arrResult = $pPesquisa->getPesquisa($limit, $offset, $date_start, $date_end, $operador, $avaliacao, $solucao);
 
-    if(is_array($arrResult) && $total>0){
-        foreach($arrResult as $key => $value){ 
-	    $arrTmp[0] = $value['operador'];
-	    $arrTmp[1] = $value['fila'];
-	    $arrTmp[2] = $value['data'];
-	    $arrTmp[3] = $value['hora'];
-	    $arrTmp[4] = $value['telefone'];
-	    $arrTmp[5] = $value['avaliacao'];
-	    $arrTmp[6] = $value['solucao'];
+    if (is_array($arrResult) && $total > 0) {
+        foreach ($arrResult as $key => $value) {
+            $arrTmp = array();
+
+            // 1. Data e Hora
+            $d = !empty($value['data']) ? $value['data'] : '-';
+            $h = !empty($value['hora']) ? $value['hora'] : '-';
+            $arrTmp[0] = "<span style='font-size:12px; color:#475569;'><i class='fa fa-calendar'></i> $d &nbsp; <i class='fa fa-clock-o'></i> $h</span>";
+
+            // 2. Operador / Ramal
+            $op = !empty($value['operador']) ? $value['operador'] : 'Geral';
+            $arrTmp[1] = "<span style='background:#ede9fe; color:#6d28d9; padding:4px 10px; border-radius:6px; font-weight:600; font-size:12px;'>👤 $op</span>";
+
+            // 3. Fila
+            $fila = !empty($value['fila']) ? $value['fila'] : 'Atendimento';
+            $arrTmp[2] = "<span style='background:#f1f5f9; color:#475569; padding:3px 8px; border-radius:4px; font-size:11px;'>$fila</span>";
+
+            // 4. Telefone
+            $tel = !empty($value['telefone']) ? $value['telefone'] : 'Anônimo';
+            $arrTmp[3] = "<span style='font-weight:600; color:#1e293b;'><i class='fa fa-phone'></i> $tel</span>";
+
+            // 5. Avaliação com Badges Modernas e Estrelas
+            $avUpper = strtoupper(trim($value['avaliacao']));
+            switch ($avUpper) {
+                case 'OTIMO':
+                case 'ÓTIMO':
+                case '5':
+                    $arrTmp[4] = "<span style='background:#10b981; color:#ffffff; padding:4px 10px; border-radius:12px; font-weight:bold; font-size:11px; display:inline-block;'>⭐⭐⭐⭐⭐ ÓTIMO</span>";
+                    break;
+                case 'MUITO BOM':
+                case '4':
+                    $arrTmp[4] = "<span style='background:#3b82f6; color:#ffffff; padding:4px 10px; border-radius:12px; font-weight:bold; font-size:11px; display:inline-block;'>⭐⭐⭐⭐ MUITO BOM</span>";
+                    break;
+                case 'MEDIO':
+                case 'MÉDIO':
+                case '3':
+                    $arrTmp[4] = "<span style='background:#f59e0b; color:#ffffff; padding:4px 10px; border-radius:12px; font-weight:bold; font-size:11px; display:inline-block;'>⭐⭐⭐ MÉDIO</span>";
+                    break;
+                case 'BOM':
+                case '2':
+                    $arrTmp[4] = "<span style='background:#f97316; color:#ffffff; padding:4px 10px; border-radius:12px; font-weight:bold; font-size:11px; display:inline-block;'>⭐⭐ BOM</span>";
+                    break;
+                case 'RUIM':
+                case '1':
+                    $arrTmp[4] = "<span style='background:#ef4444; color:#ffffff; padding:4px 10px; border-radius:12px; font-weight:bold; font-size:11px; display:inline-block;'>⭐ RUIM</span>";
+                    break;
+                default:
+                    $arrTmp[4] = "<span style='background:#94a3b8; color:#ffffff; padding:4px 10px; border-radius:12px; font-weight:bold; font-size:11px; display:inline-block;'>$avUpper</span>";
+                    break;
+            }
+
+            // 6. Solução
+            $solUpper = strtoupper(trim($value['solucao']));
+            if ($solUpper == 'SIM' || $solUpper == '1') {
+                $arrTmp[5] = "<span style='background:#dcfce7; color:#15803d; border:1px solid #86efac; padding:4px 10px; border-radius:8px; font-weight:bold; font-size:11px;'>✔ SIM</span>";
+            } elseif ($solUpper == 'NAO' || $solUpper == 'NÃO' || $solUpper == '2') {
+                $arrTmp[5] = "<span style='background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5; padding:4px 10px; border-radius:8px; font-weight:bold; font-size:11px;'>✖ NÃO</span>";
+            } else {
+                $arrTmp[5] = "<span style='background:#f1f5f9; color:#64748b; padding:4px 10px; border-radius:8px; font-size:11px;'>$solUpper</span>";
+            }
+
             $arrData[] = $arrTmp;
         }
     }
     $oGrid->setData($arrData);
 
-    //begin section filter
-    $oFilterForm = new paloForm($smarty, createFieldFilter());
-    $smarty->assign("SHOW", _tr("Show"));
-    $htmlFilter  = $oFilterForm->fetchForm("$local_templates_dir/filter.tpl","",$_POST);
-    //end section filter
-
+    // Seção de Filtro Personalizado
+    $htmlFilter = renderCustomFilter($date_start, $date_end, $operador, $avaliacao, $solucao);
     $oGrid->showFilter(trim($htmlFilter));
-    $content = $oGrid->fetchGrid();
-    //end grid parameters
 
+    // Bloco Executivo de Indicadores (Cards + Gráficos)
+    $htmlDashboard = renderExecutiveCardsAndCharts($stats);
+
+    $content = $htmlDashboard . $oGrid->fetchGrid();
     return $content;
 }
 
+function renderExecutiveCardsAndCharts($stats)
+{
+    $total     = isset($stats['total']) ? $stats['total'] : 0;
+    $media     = isset($stats['media_estrelas']) ? $stats['media_estrelas'] : 0;
+    $resolucao = isset($stats['taxa_resolucao']) ? $stats['taxa_resolucao'] : 0;
+    $satisfacao = isset($stats['taxa_satisfacao']) ? $stats['taxa_satisfacao'] : 0;
 
-function createFieldFilter(){
-    $arrFilter = array(
-	    "operador" => _tr("Operador"),
-	    "fila" => _tr("Fila"),
-	    "data" => _tr("Data"),
-	    "hora" => _tr("Hora"),
-	    "telefone" => _tr("Telefone"),
-	    "avaliacao" => _tr("Avaliacao"),
-	    "solucao" => _tr("Solucao"),
-                    );
+    $otimo = isset($stats['otimo']) ? (int)$stats['otimo'] : 0;
+    $muito_bom = isset($stats['muito_bom']) ? (int)$stats['muito_bom'] : 0;
+    $medio = isset($stats['medio']) ? (int)$stats['medio'] : 0;
+    $bom = isset($stats['bom']) ? (int)$stats['bom'] : 0;
+    $ruim = isset($stats['ruim']) ? (int)$stats['ruim'] : 0;
+    $sim = isset($stats['resolvido_sim']) ? (int)$stats['resolvido_sim'] : 0;
+    $nao = isset($stats['resolvido_nao']) ? (int)$stats['resolvido_nao'] : 0;
 
-    $arrFormElements = array(
-            "filter_field" => array("LABEL"                  => _tr("Search"),
-                                    "REQUIRED"               => "no",
-                                    "INPUT_TYPE"             => "SELECT",
-                                    "INPUT_EXTRA_PARAM"      => $arrFilter,
-                                    "VALIDATION_TYPE"        => "text",
-                                    "VALIDATION_EXTRA_PARAM" => ""),
-            "filter_value" => array("LABEL"                  => "",
-                                    "REQUIRED"               => "no",
-                                    "INPUT_TYPE"             => "TEXT",
-                                    "INPUT_EXTRA_PARAM"      => "",
-                                    "VALIDATION_TYPE"        => "text",
-                                    "VALIDATION_EXTRA_PARAM" => ""),
-                    );
-    return $arrFormElements;
+    ob_start();
+    ?>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    <style>
+        .pesquisa-dashboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 15px;
+            margin: 15px 0 20px 0;
+        }
+        .kpi-card {
+            background: #ffffff;
+            border-radius: 10px;
+            padding: 18px 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+            border-left: 5px solid #6366f1;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+        .kpi-card.green { border-left-color: #10b981; }
+        .kpi-card.purple { border-left-color: #8b5cf6; }
+        .kpi-card.amber { border-left-color: #f59e0b; }
+        .kpi-card.blue { border-left-color: #3b82f6; }
+        
+        .kpi-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+        .kpi-value {
+            font-size: 28px;
+            font-weight: 700;
+            color: #1e293b;
+            line-height: 1;
+        }
+        .kpi-sub {
+            font-size: 12px;
+            color: #94a3b8;
+            margin-top: 6px;
+        }
+        .charts-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 25px;
+        }
+        @media (max-width: 900px) {
+            .charts-container { grid-template-columns: 1fr; }
+        }
+        .chart-box {
+            background: #ffffff;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.06);
+            height: 280px;
+            display: flex;
+            flex-direction: column;
+        }
+        .chart-box h4 {
+            margin: 0 0 15px 0;
+            font-size: 15px;
+            color: #334155;
+            font-weight: 600;
+            border-bottom: 1px solid #f1f5f9;
+            padding-bottom: 8px;
+        }
+        .chart-wrapper {
+            position: relative;
+            flex: 1;
+            width: 100%;
+            height: 100%;
+        }
+    </style>
+
+    <div class="pesquisa-dashboard">
+        <div class="kpi-card purple">
+            <div class="kpi-title">📋 Total de Avaliações</div>
+            <div class="kpi-value"><?php echo number_format($total, 0, ',', '.'); ?></div>
+            <div class="kpi-sub">Pesquisas respondidas</div>
+        </div>
+        <div class="kpi-card green">
+            <div class="kpi-title">⭐ Média de Satisfação</div>
+            <div class="kpi-value"><?php echo $media; ?> <span style="font-size:16px; color:#f59e0b;">/ 5.0</span></div>
+            <div class="kpi-sub">Índice Geral de Atendimento</div>
+        </div>
+        <div class="kpi-card blue">
+            <div class="kpi-title">🎯 Taxa de Resolução</div>
+            <div class="kpi-value"><?php echo $resolucao; ?>%</div>
+            <div class="kpi-sub"><?php echo $sim; ?> resolvidos de <?php echo ($sim + $nao); ?></div>
+        </div>
+        <div class="kpi-card amber">
+            <div class="kpi-title">🏆 Satisfação Positiva</div>
+            <div class="kpi-value"><?php echo $satisfacao; ?>%</div>
+            <div class="kpi-sub">Notas Ótimo & Muito Bom</div>
+        </div>
+    </div>
+
+    <div class="charts-container">
+        <div class="chart-box">
+            <h4>📊 Distribuição das Notas de Avaliação</h4>
+            <div class="chart-wrapper">
+                <canvas id="chartNotas"></canvas>
+            </div>
+        </div>
+        <div class="chart-box">
+            <h4>🎯 Resolução de Problemas no Atendimento</h4>
+            <div class="chart-wrapper">
+                <canvas id="chartSolucao"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    document.addEventListener("DOMContentLoaded", function() {
+        if (typeof Chart !== 'undefined') {
+            // Gráfico de Notas
+            var ctxNotas = document.getElementById('chartNotas').getContext('2d');
+            new Chart(ctxNotas, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Ótimo (5)', 'Muito Bom (4)', 'Médio (3)', 'Bom (2)', 'Ruim (1)'],
+                    datasets: [{
+                        data: [<?php echo "$otimo, $muito_bom, $medio, $bom, $ruim"; ?>],
+                        backgroundColor: ['#10b981', '#3b82f6', '#f59e0b', '#f97316', '#ef4444'],
+                        borderWidth: 2,
+                        borderColor: '#ffffff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'right' }
+                    }
+                }
+            });
+
+            // Gráfico de Solução
+            var ctxSolucao = document.getElementById('chartSolucao').getContext('2d');
+            new Chart(ctxSolucao, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Sim (Resolvido)', 'Não (Não Resolvido)'],
+                    datasets: [{
+                        data: [<?php echo "$sim, $nao"; ?>],
+                        backgroundColor: ['#10b981', '#ef4444'],
+                        borderWidth: 2,
+                        borderColor: '#ffffff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'right' }
+                    }
+                }
+            });
+        }
+    });
+    </script>
+    <?php
+    return ob_get_clean();
 }
 
+function renderCustomFilter($date_start, $date_end, $operador, $avaliacao, $solucao)
+{
+    ob_start();
+    ?>
+    <div style="background:#ffffff; border-radius:8px; padding:15px 20px; margin-bottom:15px; box-shadow:0 1px 3px rgba(0,0,0,0.05); border:1px solid #e2e8f0;">
+        <div style="display:flex; flex-wrap:wrap; gap:15px; align-items:flex-end;">
+            <div>
+                <label style="display:block; font-size:12px; font-weight:600; color:#475569; margin-bottom:4px;">📅 Data Inicial:</label>
+                <input type="date" name="date_start" value="<?php echo htmlspecialchars($date_start); ?>" style="padding:6px 10px; border:1px solid #cbd5e1; border-radius:6px; font-size:13px;" />
+            </div>
+            <div>
+                <label style="display:block; font-size:12px; font-weight:600; color:#475569; margin-bottom:4px;">📅 Data Final:</label>
+                <input type="date" name="date_end" value="<?php echo htmlspecialchars($date_end); ?>" style="padding:6px 10px; border:1px solid #cbd5e1; border-radius:6px; font-size:13px;" />
+            </div>
+            <div>
+                <label style="display:block; font-size:12px; font-weight:600; color:#475569; margin-bottom:4px;">👤 Operador / Ramal:</label>
+                <input type="text" name="operador" placeholder="Ex: 1001 ou Maria" value="<?php echo htmlspecialchars($operador); ?>" style="padding:6px 10px; border:1px solid #cbd5e1; border-radius:6px; font-size:13px; width:140px;" />
+            </div>
+            <div>
+                <label style="display:block; font-size:12px; font-weight:600; color:#475569; margin-bottom:4px;">⭐ Avaliação:</label>
+                <select name="avaliacao" style="padding:6px 10px; border:1px solid #cbd5e1; border-radius:6px; font-size:13px;">
+                    <option value="">-- Todas as Notas --</option>
+                    <option value="OTIMO" <?php if ($avaliacao == 'OTIMO') echo 'selected'; ?>>⭐⭐⭐⭐⭐ ÓTIMO</option>
+                    <option value="MUITO BOM" <?php if ($avaliacao == 'MUITO BOM') echo 'selected'; ?>>⭐⭐⭐⭐ MUITO BOM</option>
+                    <option value="MEDIO" <?php if ($avaliacao == 'MEDIO') echo 'selected'; ?>>⭐⭐⭐ MÉDIO</option>
+                    <option value="BOM" <?php if ($avaliacao == 'BOM') echo 'selected'; ?>>⭐⭐ BOM</option>
+                    <option value="RUIM" <?php if ($avaliacao == 'RUIM') echo 'selected'; ?>>⭐ RUIM</option>
+                </select>
+            </div>
+            <div>
+                <label style="display:block; font-size:12px; font-weight:600; color:#475569; margin-bottom:4px;">🎯 Resolução:</label>
+                <select name="solucao" style="padding:6px 10px; border:1px solid #cbd5e1; border-radius:6px; font-size:13px;">
+                    <option value="">-- Todas --</option>
+                    <option value="SIM" <?php if ($solucao == 'SIM') echo 'selected'; ?>>✔ SIM (Resolvido)</option>
+                    <option value="NAO" <?php if ($solucao == 'NAO') echo 'selected'; ?>>✖ NÃO (Não Resolvido)</option>
+                </select>
+            </div>
+            <div>
+                <input type="submit" name="show" value="🔍 Filtrar Resultados" style="background:#4f46e5; color:#ffffff; border:none; padding:7px 16px; border-radius:6px; font-weight:600; cursor:pointer; font-size:13px;" />
+                <a href="?menu=pesquisa" style="background:#f1f5f9; color:#475569; text-decoration:none; padding:7px 14px; border-radius:6px; font-size:13px; font-weight:600; margin-left:6px; border:1px solid #cbd5e1; display:inline-block;">🔄 Limpar</a>
+            </div>
+        </div>
+    </div>
+    <?php
+    return ob_get_clean();
+}
 
 function getAction()
 {
-    if(getParameter("save_new")) //Get parameter by POST (submit)
-        return "save_new";
-    else if(getParameter("save_edit"))
-        return "save_edit";
-    else if(getParameter("delete")) 
-        return "delete";
-    else if(getParameter("new_open")) 
-        return "view_form";
-    else if(getParameter("action")=="view")      //Get parameter by GET (command pattern, links)
-        return "view_form";
-    else if(getParameter("action")=="view_edit")
-        return "view_form";
-    else
-        return "report"; //cancel
+    if (getParameter("save_new")) return "save_new";
+    else if (getParameter("save_edit")) return "save_edit";
+    else if (getParameter("delete")) return "delete";
+    else if (getParameter("new_open")) return "view_form";
+    else if (getParameter("action") == "view") return "view_form";
+    else if (getParameter("action") == "view_edit") return "view_form";
+    else return "report";
 }
 ?>
