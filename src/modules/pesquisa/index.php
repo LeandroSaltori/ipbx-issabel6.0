@@ -10,7 +10,7 @@
   +----------------------------------------------------------------------+
   | The Initial Developer of the Original Code is PaloSanto Solutions    |
   +----------------------------------------------------------------------+
-  $Id: index.php,v 11.0 2026-08-17 Prisma Telecom $ */
+  $Id: index.php,v 12.0 2026-08-17 Prisma Telecom $ */
 
 require_once "modules/agent_console/libs/issabel2.lib.php";
 include_once "libs/paloSantoDB.class.php";
@@ -172,8 +172,8 @@ function handleExportExcel($pPesquisa)
             $val_hora      = !empty($row['hora']) ? $row['hora'] : '-';
             $raw_tel       = !empty($row['telefone']) ? $row['telefone'] : (!empty($row['numero']) ? $row['numero'] : '-');
             $val_telefone  = formatPhoneBr($raw_tel);
-            $val_avaliacao = !empty($row['avaliacao']) ? $row['avaliacao'] : '-';
-            $val_solucao   = !empty($row['solucao']) ? $row['solucao'] : '-';
+            $val_avaliacao = !empty($row['avaliacao']) ? $row['avaliacao'] : 'NÃO AVALIOU';
+            $val_solucao   = !empty($row['solucao']) ? $row['solucao'] : 'NÃO AVALIOU';
 
             $cdrInfo     = $pPesquisa->findCdrInfoForCall($raw_tel, !empty($row['data']) ? $row['data'] : '', $val_hora, $val_operador);
             $val_duracao = !empty($cdrInfo['duration_formatted']) ? $cdrInfo['duration_formatted'] : '-';
@@ -181,6 +181,8 @@ function handleExportExcel($pPesquisa)
             $rawFila = !empty($row['fila']) ? trim($row['fila']) : (!empty($cdrInfo['fila']) ? trim($cdrInfo['fila']) : '');
             if (!empty($rawFila) && isset($queueNamesMap[$rawFila])) {
                 $val_fila = "$rawFila - " . $queueNamesMap[$rawFila];
+            } elseif (!empty($rawFila) && is_numeric($rawFila) && strlen($rawFila) >= 3 && $rawFila != '7940') {
+                $val_fila = "Fila $rawFila";
             } else {
                 $val_fila = '-';
             }
@@ -256,8 +258,8 @@ function handleExportPdf($pPesquisa)
                 $val_hora      = !empty($row['hora']) ? $row['hora'] : '-';
                 $raw_tel       = !empty($row['telefone']) ? $row['telefone'] : (!empty($row['numero']) ? $row['numero'] : '-');
                 $val_telefone  = formatPhoneBr($raw_tel);
-                $val_avaliacao = !empty($row['avaliacao']) ? $row['avaliacao'] : '-';
-                $val_solucao   = !empty($row['solucao']) ? $row['solucao'] : '-';
+                $val_avaliacao = !empty($row['avaliacao']) ? $row['avaliacao'] : 'NÃO AVALIOU';
+                $val_solucao   = !empty($row['solucao']) ? $row['solucao'] : 'NÃO AVALIOU';
 
                 $cdrInfo       = $pPesquisa->findCdrInfoForCall($raw_tel, !empty($row['data']) ? $row['data'] : '', $val_hora, $val_operador);
                 $val_duracao   = !empty($cdrInfo['duration_formatted']) ? $cdrInfo['duration_formatted'] : '-';
@@ -265,6 +267,8 @@ function handleExportPdf($pPesquisa)
                 $rawFila = !empty($row['fila']) ? trim($row['fila']) : (!empty($cdrInfo['fila']) ? trim($cdrInfo['fila']) : '');
                 if (!empty($rawFila) && isset($queueNamesMap[$rawFila])) {
                     $val_fila = "$rawFila - " . $queueNamesMap[$rawFila];
+                } elseif (!empty($rawFila) && is_numeric($rawFila) && strlen($rawFila) >= 3 && $rawFila != '7940') {
+                    $val_fila = "Fila $rawFila";
                 } else {
                     $val_fila = '-';
                 }
@@ -771,8 +775,8 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
                             $val_hora      = !empty($row['hora']) ? $row['hora'] : '-';
                             $raw_tel       = !empty($row['telefone']) ? $row['telefone'] : (!empty($row['numero']) ? $row['numero'] : '-');
                             $val_telefone  = formatPhoneBr($raw_tel);
-                            $val_avaliacao = !empty($row['avaliacao']) ? $row['avaliacao'] : '-';
-                            $val_solucao   = !empty($row['solucao']) ? $row['solucao'] : '-';
+                            $val_avaliacao = !empty($row['avaliacao']) ? $row['avaliacao'] : 'NÃO AVALIOU';
+                            $val_solucao   = !empty($row['solucao']) ? $row['solucao'] : 'NÃO AVALIOU';
 
                             $cdrInfo       = $pPesquisa->findCdrInfoForCall($raw_tel, !empty($row['data']) ? $row['data'] : '', $val_hora, $val_operador);
                             $val_duracao   = !empty($cdrInfo['duration_formatted']) ? $cdrInfo['duration_formatted'] : '-';
@@ -781,6 +785,8 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
                             $rawFila = !empty($row['fila']) ? trim($row['fila']) : (!empty($cdrInfo['fila']) ? trim($cdrInfo['fila']) : '');
                             if (!empty($rawFila) && isset($queueNamesMap[$rawFila])) {
                                 $val_fila = "$rawFila - " . $queueNamesMap[$rawFila];
+                            } elseif (!empty($rawFila) && is_numeric($rawFila) && strlen($rawFila) >= 3 && $rawFila != '7940') {
+                                $val_fila = "Fila $rawFila";
                             } else {
                                 $val_fila = '-';
                             }
@@ -800,7 +806,7 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
                                         case 'OTIMO':
                                         case 'ÓTIMO':
                                         case '5':
-                                            echo "<span style='background:#10b981; color:#ffffff; padding:3px 8px; border-radius:10px; font-weight:bold; font-size:10px; display:inline-block;'>⭐⭐⭐⭐⭐ $avUpper</span>";
+                                            echo "<span style='background:#10b981; color:#ffffff; padding:3px 8px; border-radius:10px; font-weight:bold; font-size:10px; display:inline-block;'>⭐⭐⭐⭐⭐ EXCELENTE</span>";
                                             break;
                                         case 'MUITO BOM':
                                         case '4':
@@ -828,6 +834,7 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
                                         case 'SEM RESPOSTA':
                                         case 'DESISTIU':
                                         case '0':
+                                        case '':
                                             echo "<span style='background:#64748b; color:#ffffff; padding:3px 8px; border-radius:10px; font-weight:bold; font-size:10px; display:inline-block;'>📵 NÃO AVALIOU</span>";
                                             break;
                                         default:
@@ -843,6 +850,8 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
                                         echo "<span style='background:#dcfce7; color:#15803d; border:1px solid #86efac; padding:3px 8px; border-radius:6px; font-weight:bold; font-size:10px;'>✔ SIM</span>";
                                     } elseif ($solUpper == 'NAO' || $solUpper == 'NÃO' || $solUpper == '2') {
                                         echo "<span style='background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5; padding:3px 8px; border-radius:6px; font-weight:bold; font-size:10px;'>✖ NÃO</span>";
+                                    } elseif (in_array($solUpper, array('NAO AVALIOU', 'NÃO AVALIOU', '0', '', '-'))) {
+                                        echo "<span style='background:#f1f5f9; color:#64748b; padding:3px 8px; border-radius:6px; font-weight:bold; font-size:10px;'>📵 NÃO AVALIOU</span>";
                                     } else {
                                         echo "<span style='background:#f1f5f9; color:#64748b; padding:3px 8px; border-radius:6px; font-size:10px;'>$solUpper</span>";
                                     }
