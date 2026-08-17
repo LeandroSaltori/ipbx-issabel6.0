@@ -10,7 +10,7 @@
   +----------------------------------------------------------------------+
   | The Initial Developer of the Original Code is PaloSanto Solutions    |
   +----------------------------------------------------------------------+
-  $Id: paloSantoPesquisa.class.php,v 2.8 2026-08-17 Prisma Telecom $ */
+  $Id: paloSantoPesquisa.class.php,v 2.9 2026-08-17 Prisma Telecom $ */
 
 class paloSantoPesquisa {
     var $_DB;
@@ -145,6 +145,27 @@ class paloSantoPesquisa {
         return $map;
     }
 
+    function getQueueNamesMap()
+    {
+        $map = array();
+        if ($this->pdo) {
+            try {
+                $stmt = $this->pdo->query("SELECT extension as queue, descr as name FROM asterisk.queues_config WHERE extension IS NOT NULL AND extension != ''");
+                if ($stmt) {
+                    $rows = $stmt->fetchAll();
+                    if (is_array($rows)) {
+                        foreach ($rows as $r) {
+                            if (!empty($r['queue'])) {
+                                $map[trim($r['queue'])] = trim($r['name']);
+                            }
+                        }
+                    }
+                }
+            } catch (Exception $e) {}
+        }
+        return $map;
+    }
+
     function getOperadoresList()
     {
         $list = array();
@@ -167,7 +188,7 @@ class paloSantoPesquisa {
 
     function findCdrInfoForCall($telefone, $data, $hora, $operador)
     {
-        $info = array('recordingfile' => '', 'duration' => 0, 'billsec' => 0, 'duration_formatted' => '00:00');
+        $info = array('recordingfile' => '', 'duration' => 0, 'billsec' => 0, 'duration_formatted' => '00:00', 'fila' => '');
         if (!$this->pdo) return $info;
 
         $dt = trim($data) . ' ' . trim($hora);
@@ -183,7 +204,7 @@ class paloSantoPesquisa {
             }
 
             try {
-                $sql = "SELECT recordingfile, duration, billsec FROM cdr 
+                $sql = "SELECT recordingfile, duration, billsec, dst, dstchannel, channel, userfield FROM cdr 
                         WHERE calldate BETWEEN ? AND ? 
                         AND (src LIKE ? OR dst LIKE ? OR channel LIKE ? OR dstchannel LIKE ?) 
                         ORDER BY ABS(TIMESTAMPDIFF(SECOND, calldate, ?)) ASC LIMIT 1";
@@ -196,6 +217,12 @@ class paloSantoPesquisa {
                     $info['billsec'] = (int)$row['billsec'];
                     $sec = (int)$row['duration'];
                     $info['duration_formatted'] = sprintf('%02d:%02d', floor($sec / 60), $sec % 60);
+
+                    // Extrai número da fila real a partir das colunas do CDR
+                    $combined = $row['dstchannel'] . ' ' . $row['channel'] . ' ' . $row['userfield'] . ' ' . $row['dst'];
+                    if (preg_match('/(?:Queue|Fila|q-)?([5-9]\d{3})/i', $combined, $mQ)) {
+                        $info['fila'] = $mQ[1];
+                    }
                 }
             } catch (Exception $e) {}
         }
@@ -427,7 +454,6 @@ class paloSantoPesquisa {
         $sim = (int)$stats['resolvido_sim'];
         $nao = (int)$stats['resolvido_nao'];
 
-        // Se o CDR do Asterisk registrou mais chamadas enviadas à Pesquisa do que a tabela pesquisa, a diferença são chamadas onde o cliente desligou no meio da URA
         $total = max($totalDB, $cdrTotalPesquisa);
         $nao_avaliou = max($nao_avaliou_db, $total - ($otimo + $muito_bom + $medio + $bom + $ruim));
 

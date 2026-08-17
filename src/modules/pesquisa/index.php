@@ -10,7 +10,7 @@
   +----------------------------------------------------------------------+
   | The Initial Developer of the Original Code is PaloSanto Solutions    |
   +----------------------------------------------------------------------+
-  $Id: index.php,v 8.0 2026-08-17 Prisma Telecom $ */
+  $Id: index.php,v 9.0 2026-08-17 Prisma Telecom $ */
 
 require_once "modules/agent_console/libs/issabel2.lib.php";
 include_once "libs/paloSantoDB.class.php";
@@ -125,7 +125,8 @@ function handleExportExcel($pPesquisa)
 
     $total = $pPesquisa->getNumPesquisa('', '', $date_start, $date_end, $operador, $avaliacao, $solucao);
     $arrResult = $pPesquisa->getPesquisa($total > 0 ? $total : 5000, 0, '', '', $date_start, $date_end, $operador, $avaliacao, $solucao);
-    $extNamesMap = $pPesquisa->getExtensionNamesMap();
+    $extNamesMap   = $pPesquisa->getExtensionNamesMap();
+    $queueNamesMap = $pPesquisa->getQueueNamesMap();
 
     header('Content-Type: text/csv; charset=utf-8');
     header('Content-Disposition: attachment; filename=Pesquisa_Satisfacao_' . date('Ymd_His') . '.csv');
@@ -138,15 +139,22 @@ function handleExportExcel($pPesquisa)
         foreach ($arrResult as $row) {
             $val_operador  = !empty($row['operador']) ? $row['operador'] : (!empty($row['ramal']) ? $row['ramal'] : '-');
             $val_nome      = isset($extNamesMap[$val_operador]) ? $extNamesMap[$val_operador] : '-';
-            $val_fila      = !empty($row['fila']) ? $row['fila'] : 'Atendimento';
             $val_data      = !empty($row['data']) ? $row['data'] : '-';
             $val_hora      = !empty($row['hora']) ? $row['hora'] : '-';
             $val_telefone  = !empty($row['telefone']) ? $row['telefone'] : (!empty($row['numero']) ? $row['numero'] : '-');
             $val_avaliacao = !empty($row['avaliacao']) ? $row['avaliacao'] : '-';
             $val_solucao   = !empty($row['solucao']) ? $row['solucao'] : '-';
 
-            $cdrInfo = $pPesquisa->findCdrInfoForCall($val_telefone, $val_data, $val_hora, $val_operador);
+            $cdrInfo     = $pPesquisa->findCdrInfoForCall($val_telefone, $val_data, $val_hora, $val_operador);
             $val_duracao = !empty($cdrInfo['duration_formatted']) ? $cdrInfo['duration_formatted'] : '-';
+
+            $rawFila = !empty($row['fila']) ? trim($row['fila']) : (!empty($cdrInfo['fila']) ? trim($cdrInfo['fila']) : '');
+            if (!empty($rawFila) && $rawFila != 'Atendimento') {
+                $qName = isset($queueNamesMap[$rawFila]) ? $queueNamesMap[$rawFila] : '';
+                $val_fila = !empty($qName) ? "$rawFila - $qName" : $rawFila;
+            } else {
+                $val_fila = '-';
+            }
 
             fputcsv($output, array($val_operador, $val_nome, $val_fila, $val_data, $val_hora, $val_duracao, $val_telefone, $val_avaliacao, $val_solucao), ';');
         }
@@ -169,7 +177,8 @@ function handleExportPdf($pPesquisa)
 
     $total = $pPesquisa->getNumPesquisa('', '', $date_start, $date_end, $operador, $avaliacao, $solucao);
     $arrResult = $pPesquisa->getPesquisa($total > 0 ? $total : 5000, 0, '', '', $date_start, $date_end, $operador, $avaliacao, $solucao);
-    $extNamesMap = $pPesquisa->getExtensionNamesMap();
+    $extNamesMap   = $pPesquisa->getExtensionNamesMap();
+    $queueNamesMap = $pPesquisa->getQueueNamesMap();
 
     ?>
     <!DOCTYPE html>
@@ -214,18 +223,26 @@ function handleExportPdf($pPesquisa)
                 $val_operador  = !empty($row['operador']) ? $row['operador'] : (!empty($row['ramal']) ? $row['ramal'] : '-');
                 $val_nome      = isset($extNamesMap[$val_operador]) ? $extNamesMap[$val_operador] : '';
                 $val_disp_op   = !empty($val_nome) ? "$val_operador - $val_nome" : $val_operador;
-                $val_fila      = !empty($row['fila']) ? $row['fila'] : 'Atendimento';
                 $val_data      = !empty($row['data']) ? $row['data'] : '-';
                 $val_hora      = !empty($row['hora']) ? $row['hora'] : '-';
                 $val_telefone  = !empty($row['telefone']) ? $row['telefone'] : (!empty($row['numero']) ? $row['numero'] : '-');
                 $val_avaliacao = !empty($row['avaliacao']) ? $row['avaliacao'] : '-';
                 $val_solucao   = !empty($row['solucao']) ? $row['solucao'] : '-';
+
                 $cdrInfo       = $pPesquisa->findCdrInfoForCall($val_telefone, $val_data, $val_hora, $val_operador);
                 $val_duracao   = !empty($cdrInfo['duration_formatted']) ? $cdrInfo['duration_formatted'] : '-';
+
+                $rawFila = !empty($row['fila']) ? trim($row['fila']) : (!empty($cdrInfo['fila']) ? trim($cdrInfo['fila']) : '');
+                if (!empty($rawFila) && $rawFila != 'Atendimento') {
+                    $qName = isset($queueNamesMap[$rawFila]) ? $queueNamesMap[$rawFila] : '';
+                    $val_fila = !empty($qName) ? "$rawFila - $qName" : $rawFila;
+                } else {
+                    $val_fila = '-';
+                }
                 ?>
                 <tr>
                     <td><strong>👤 <?php echo htmlspecialchars($val_disp_op); ?></strong></td>
-                    <td><?php echo htmlspecialchars($val_fila); ?></td>
+                    <td>🏢 <?php echo htmlspecialchars($val_fila); ?></td>
                     <td>📅 <?php echo htmlspecialchars($val_data); ?></td>
                     <td>🕒 <?php echo htmlspecialchars($val_hora); ?></td>
                     <td>⏱️ <?php echo htmlspecialchars($val_duracao); ?></td>
@@ -259,9 +276,10 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
     // Estatísticas dos Cards e Gráficos
     $stats = $pPesquisa->getPesquisaStats($date_start, $date_end, $operador);
 
-    // Lista de Operadores Únicos & Mapa de Nomes dos Ramais
+    // Lista de Operadores Únicos & Mapas de Nomes
     $operadoresList = $pPesquisa->getOperadoresList();
     $extNamesMap    = $pPesquisa->getExtensionNamesMap();
+    $queueNamesMap  = $pPesquisa->getQueueNamesMap();
 
     // Registros Filtrados
     $total = $pPesquisa->getNumPesquisa('', '', $date_start, $date_end, $operador, $avaliacao, $solucao);
@@ -720,7 +738,6 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
                             $val_operador  = !empty($row['operador']) ? $row['operador'] : (!empty($row['ramal']) ? $row['ramal'] : '-');
                             $val_nome      = isset($extNamesMap[$val_operador]) ? $extNamesMap[$val_operador] : '';
                             $val_disp_op   = !empty($val_nome) ? "$val_operador - $val_nome" : $val_operador;
-                            $val_fila      = !empty($row['fila']) ? $row['fila'] : 'Atendimento';
                             $val_data      = !empty($row['data']) ? $row['data'] : '-';
                             $val_hora      = !empty($row['hora']) ? $row['hora'] : '-';
                             $val_telefone  = !empty($row['telefone']) ? $row['telefone'] : (!empty($row['numero']) ? $row['numero'] : '-');
@@ -730,6 +747,14 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
                             $cdrInfo       = $pPesquisa->findCdrInfoForCall($val_telefone, $val_data, $val_hora, $val_operador);
                             $val_duracao   = !empty($cdrInfo['duration_formatted']) ? $cdrInfo['duration_formatted'] : '-';
                             $recFile       = !empty($cdrInfo['recordingfile']) ? $cdrInfo['recordingfile'] : '';
+
+                            $rawFila = !empty($row['fila']) ? trim($row['fila']) : (!empty($cdrInfo['fila']) ? trim($cdrInfo['fila']) : '');
+                            if (!empty($rawFila) && $rawFila != 'Atendimento') {
+                                $qName = isset($queueNamesMap[$rawFila]) ? $queueNamesMap[$rawFila] : '';
+                                $val_fila = !empty($qName) ? "$rawFila - $qName" : $rawFila;
+                            } else {
+                                $val_fila = '-';
+                            }
                             ?>
                             <tr>
                                 <td><span style='background:#ede9fe; color:#6d28d9; padding:3px 8px; border-radius:6px; font-weight:600; font-size:11px;'>👤 <?php echo htmlspecialchars($val_disp_op); ?></span></td>
