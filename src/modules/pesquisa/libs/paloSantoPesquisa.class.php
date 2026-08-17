@@ -21,8 +21,14 @@ class paloSantoPesquisa {
         if (is_object($pDB) && isset($pDB->connStatus) && $pDB->connStatus) {
             $this->_DB = $pDB;
         } else {
-            $dsn = "sqlite3:////var/www/db/pesquisa.db";
-            $this->_DB = new paloDB($dsn);
+            if (function_exists('generarDSNSistema')) {
+                $dsn = generarDSNSistema('asteriskuser', 'asteriskcdrdb');
+                $this->_DB = new paloDB($dsn);
+            }
+            if (!isset($this->_DB) || !$this->_DB || !$this->_DB->connStatus) {
+                $dsn = "sqlite3:////var/www/db/pesquisa.db";
+                $this->_DB = new paloDB($dsn);
+            }
         }
     }
 

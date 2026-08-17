@@ -10,9 +10,10 @@
   +----------------------------------------------------------------------+
   | The Initial Developer of the Original Code is PaloSanto Solutions    |
   +----------------------------------------------------------------------+
-  $Id: index.php,v 1.5 2026-08-17 Prisma Telecom $ */
+  $Id: index.php,v 1.6 2026-08-17 Prisma Telecom $ */
 
 require_once "modules/agent_console/libs/issabel2.lib.php";
+require_once "libs/misc.lib.php";
 
 function _moduleContent(&$smarty, $module_name)
 {
@@ -33,7 +34,7 @@ function _moduleContent(&$smarty, $module_name)
     $templates_dir = (isset($arrConf['templates_dir'])) ? $arrConf['templates_dir'] : 'themes';
     $local_templates_dir = "$base_dir/modules/$module_name/" . $templates_dir . '/' . $arrConf['theme'];
 
-    // Obtém conexão universal inteligente (MySQL asteriskcdrdb com fallback SQLite)
+    // Obtém conexão universal oficial do Issabel (MySQL asteriskcdrdb com fallback SQLite)
     $pDB = getPesquisaDatabaseConnection();
 
     $action = getAction();
@@ -49,6 +50,19 @@ function _moduleContent(&$smarty, $module_name)
 
 function getPesquisaDatabaseConnection()
 {
+    // 1. Conexão oficial do Issabel ao MySQL asteriskcdrdb (onde estão os 463 registros do cliente)
+    if (function_exists('generarDSNSistema')) {
+        $dsn = generarDSNSistema('asteriskuser', 'asteriskcdrdb');
+        $pDB = new paloDB($dsn);
+        if ($pDB->connStatus) {
+            $test = $pDB->getFirstRowQuery("SELECT count(*) FROM pesquisa", false);
+            if ($test !== false) {
+                return $pDB;
+            }
+        }
+    }
+
+    // 2. Tenta com root e senha do /etc/issabel.conf
     $mysqlpwd = "";
     if (file_exists("/etc/issabel.conf")) {
         $lines = @file("/etc/issabel.conf");
@@ -61,29 +75,7 @@ function getPesquisaDatabaseConnection()
             }
         }
     }
-    if (empty($mysqlpwd) && file_exists("/etc/amportal.conf")) {
-        $lines = @file("/etc/amportal.conf");
-        if (is_array($lines)) {
-            foreach ($lines as $line) {
-                if (preg_match('/^AMPDBPASS\s*=\s*(.*)$/i', trim($line), $m)) {
-                    $mysqlpwd = trim($m[1]);
-                    break;
-                }
-            }
-        }
-    }
-
-    // 1. Tenta MySQL banco asteriskcdrdb (onde estão os 463 registros do cliente)
     $pDB = new paloDB("mysql://root:$mysqlpwd@localhost/asteriskcdrdb");
-    if ($pDB->connStatus) {
-        $test = $pDB->getFirstRowQuery("SELECT count(*) FROM pesquisa", false);
-        if ($test !== false) {
-            return $pDB;
-        }
-    }
-
-    // 2. Tenta MySQL banco asterisk
-    $pDB = new paloDB("mysql://root:$mysqlpwd@localhost/asterisk");
     if ($pDB->connStatus) {
         $test = $pDB->getFirstRowQuery("SELECT count(*) FROM pesquisa", false);
         if ($test !== false) {
