@@ -441,7 +441,13 @@ fi
 
 mysql -u root -p"$MYSQL_PWD" -e "CREATE DATABASE IF NOT EXISTS qstatslite DEFAULT CHARACTER SET utf8 COLLATE utf8_general_ci;" 2>/dev/null || mysql -u root -e "CREATE DATABASE IF NOT EXISTS qstatslite DEFAULT CHARACTER SET utf8 COLLATE utf8_general_ci;" 2>/dev/null || true
 
-mysql -u root -p"$MYSQL_PWD" qstatslite 2>/dev/null << 'EOF' || mysql -u root qstatslite 2>/dev/null << 'EOF' || true
+if [ -n "$MYSQL_PWD" ]; then
+    MYSQL_CMD="mysql -u root -p$MYSQL_PWD qstatslite"
+else
+    MYSQL_CMD="mysql -u root qstatslite"
+fi
+
+$MYSQL_CMD 2>/dev/null << 'EOF' || true
 CREATE TABLE IF NOT EXISTS `qname` (
   `qname_id` int(11) NOT NULL AUTO_INCREMENT,
   `queue` varchar(50) NOT NULL DEFAULT '',
@@ -620,13 +626,7 @@ if command -v yum &>/dev/null; then
     if ! command -v sngrep &>/dev/null; then
         yum install -y epel-release 2>/dev/null || true
         if ! yum install -y sngrep 2>/dev/null; then
-            cat << 'EOF' > /etc/yum.repos.d/irontec.repo
-[irontec]
-name=Irontec RPMs repository
-baseurl=http://packages.irontec.com/centos/$releasever/$basearch/
-gpgcheck=0
-enabled=1
-EOF
+            printf "[irontec]\nname=Irontec RPMs repository\nbaseurl=http://packages.irontec.com/centos/\$releasever/\$basearch/\ngpgcheck=0\nenabled=1\n" > /etc/yum.repos.d/irontec.repo
             yum install -y sngrep 2>/dev/null || true
         fi
     fi
