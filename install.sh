@@ -422,6 +422,7 @@ if [ -d "$REPO_DIR/src/modules/pesquisa" ]; then
     /bin/cp -rf "$REPO_DIR/src/modules/pesquisa/"* /var/www/html/modules/pesquisa/
     chown -R asterisk:asterisk /var/www/html/modules/pesquisa
     chmod -R 755 /var/www/html/modules/pesquisa
+    systemctl reload httpd 2>/dev/null || systemctl restart httpd 2>/dev/null || true
     
     if command -v sqlite3 &>/dev/null; then
         # Cria a tabela no banco pesquisa.db (SQLite)
