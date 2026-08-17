@@ -10,7 +10,7 @@
   +----------------------------------------------------------------------+
   | The Initial Developer of the Original Code is PaloSanto Solutions    |
   +----------------------------------------------------------------------+
-  $Id: paloSantoPesquisa.class.php,v 8.0 2026-08-17 Prisma Telecom $ */
+  $Id: paloSantoPesquisa.class.php,v 9.0 2026-08-17 Prisma Telecom $ */
 
 class paloSantoPesquisa {
     var $_DB;
@@ -201,8 +201,9 @@ class paloSantoPesquisa {
         $ts = strtotime($dt);
 
         if ($ts) {
-            $start = date('Y-m-d H:i:s', $ts - 3600);
-            $end   = date('Y-m-d H:i:s', $ts + 1200);
+            // Janela de tempo ajustada ao redor do horário exato da pesquisa (5min antes a 2min depois)
+            $start = date('Y-m-d H:i:s', $ts - 300);
+            $end   = date('Y-m-d H:i:s', $ts + 120);
 
             $telClean = preg_replace('/[^0-9]/', '', $telefone);
             if (strlen($telClean) > 4) {
@@ -210,14 +211,15 @@ class paloSantoPesquisa {
             }
 
             try {
-                // Ordena por maior duração para capturar a chamada completa (atendimento + URA) e o áudio da gravação
+                // Prioriza chamadas que possuem arquivo de gravação E que pertencem àquele momento exato
                 $sql = "SELECT recordingfile, duration, billsec, dst, dstchannel, channel FROM cdr 
                         WHERE calldate BETWEEN ? AND ? 
                         AND (src LIKE ? OR dst LIKE ? OR channel LIKE ? OR dstchannel LIKE ?) 
-                        ORDER BY duration DESC LIMIT 1";
+                        ORDER BY (CASE WHEN recordingfile IS NOT NULL AND recordingfile != '' THEN 1 ELSE 0 END) DESC, 
+                                 ABS(TIMESTAMPDIFF(SECOND, calldate, ?)) ASC LIMIT 1";
                 $stmt = $this->pdo->prepare($sql);
                 if ($stmt !== false) {
-                    $stmt->execute(array($start, $end, "%$telClean%", "%$telClean%", "%$telClean%", "%$telClean%"));
+                    $stmt->execute(array($start, $end, "%$telClean%", "%$telClean%", "%$telClean%", "%$telClean%", $dt));
                     $row = $stmt->fetch();
                     if ($row) {
                         $info['recordingfile'] = !empty($row['recordingfile']) ? $row['recordingfile'] : '';
@@ -449,10 +451,10 @@ class paloSantoPesquisa {
             );
         }
 
-        // Busca em todos os números/contextos de extensão de pesquisa históricos (incluindo 9000 e 8996)
+        // Busca estrita de transferências reais de pesquisa no CDR (destinos 9000 ou 8996)
         $cdrTotalPesquisa = 0;
         try {
-            $whereCdr = array("(dst IN ('9000', '8996', '9999', '8888', '7000', '6000') OR dst LIKE '%pesquisa%' OR dcontext LIKE '%pesquisa%' OR dstchannel LIKE '%pesquisa%' OR dstchannel LIKE '%9000%' OR dstchannel LIKE '%8996%')");
+            $whereCdr = array("(dst = '9000' OR dst = '8996' OR (dcontext LIKE '%pesquisa%' AND dstchannel LIKE '%pesquisa%'))");
             $paramsCdr = array();
             if (!empty($dsSql)) {
                 $whereCdr[] = "calldate >= ?";
@@ -481,8 +483,14 @@ class paloSantoPesquisa {
         $sim = (int)$stats['resolvido_sim'];
         $nao = (int)$stats['resolvido_nao'];
 
-        $total = max($totalDB, $cdrTotalPesquisa);
-        $nao_avaliou = max($nao_avaliou_db, $total - ($otimo + $muito_bom + $medio + $bom + $ruim));
+        // Se a busca estrita no CDR retornar valor válido maior que o DB, usa a diferença; senão, usa a contagem exata da tabela pesquisa
+        if ($cdrTotalPesquisa > $totalDB && $cdrTotalPesquisa < ($totalDB * 3)) {
+            $total = $cdrTotalPesquisa;
+            $nao_avaliou = max($nao_avaliou_db, $total - ($otimo + $muito_bom + $medio + $bom + $ruim));
+        } else {
+            $total = $totalDB;
+            $nao_avaliou = $nao_avaliou_db;
+        }
 
         $avaliadosTotal = $total - $nao_avaliou;
         $somaPontos = ($otimo * 5) + ($muito_bom * 4) + ($medio * 3) + ($bom * 2) + ($ruim * 1);
