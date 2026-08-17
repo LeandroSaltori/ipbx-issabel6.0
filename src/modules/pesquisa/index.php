@@ -10,7 +10,7 @@
   +----------------------------------------------------------------------+
   | The Initial Developer of the Original Code is PaloSanto Solutions    |
   +----------------------------------------------------------------------+
-  $Id: index.php,v 1.2 2026-08-17 Prisma Telecom $ */
+  $Id: index.php,v 1.3 2026-08-17 Prisma Telecom $ */
 
 require_once "modules/agent_console/libs/issabel2.lib.php";
 
@@ -34,7 +34,6 @@ function _moduleContent(&$smarty, $module_name)
     $local_templates_dir = "$base_dir/modules/$module_name/" . $templates_dir . '/' . $arrConf['theme'];
 
     // Conexão com banco SQLite pesquisa.db com fallback
-    global $arrConf;
     $dbPath = !empty($arrConf['issabel_dbdir']) ? "$arrConf[issabel_dbdir]/pesquisa.db" : "/var/www/db/pesquisa.db";
     $dsn = "sqlite3:///$dbPath";
     $pDB = new paloDB($dsn);
@@ -57,7 +56,7 @@ function reportPesquisa($smarty, $module_name, $local_templates_dir, &$pDB, $arr
 {
     $pPesquisa = new paloSantoPesquisa($pDB);
 
-    // Parâmetros de Filtro (por padrão vazio para trazer todos os registros existentes)
+    // Parâmetros de Filtro (somente aplica se o usuário explicitamente preencher)
     $date_start = isset($_POST['date_start']) ? trim($_POST['date_start']) : (isset($_GET['date_start']) ? trim($_GET['date_start']) : '');
     $date_end   = isset($_POST['date_end']) ? trim($_POST['date_end']) : (isset($_GET['date_end']) ? trim($_GET['date_end']) : '');
     $operador   = isset($_POST['operador']) ? trim($_POST['operador']) : (isset($_GET['operador']) ? trim($_GET['operador']) : '');
@@ -101,7 +100,7 @@ function reportPesquisa($smarty, $module_name, $local_templates_dir, &$pDB, $arr
         $limit  = $total;
         $offset = 0;
     } else {
-        $limit  = 20;
+        $limit  = 25;
         $oGrid->setLimit($limit);
         $oGrid->setTotal($total);
         $offset = $oGrid->calculateOffset();
@@ -109,7 +108,7 @@ function reportPesquisa($smarty, $module_name, $local_templates_dir, &$pDB, $arr
 
     $arrResult = $pPesquisa->getPesquisa($limit, $offset, $date_start, $date_end, $operador, $avaliacao, $solucao);
 
-    if (is_array($arrResult) && $total > 0) {
+    if (is_array($arrResult) && count($arrResult) > 0) {
         foreach ($arrResult as $key => $value) {
             $arrTmp = array();
 
@@ -179,18 +178,14 @@ function reportPesquisa($smarty, $module_name, $local_templates_dir, &$pDB, $arr
     }
     $oGrid->setData($arrData);
 
-    // Seção de Filtro Personalizado
-    $htmlFilter = renderCustomFilter($date_start, $date_end, $operador, $avaliacao, $solucao);
-    $oGrid->showFilter(trim($htmlFilter));
+    // Bloco Superior: Filtro Topo + Indicadores (Cards + Gráficos)
+    $htmlHeader = renderTopFilterAndDashboard($stats, $date_start, $date_end, $operador, $avaliacao, $solucao);
 
-    // Bloco Executivo de Indicadores (Cards + Gráficos)
-    $htmlDashboard = renderExecutiveCardsAndCharts($stats);
-
-    $content = $htmlDashboard . $oGrid->fetchGrid();
+    $content = $htmlHeader . $oGrid->fetchGrid();
     return $content;
 }
 
-function renderExecutiveCardsAndCharts($stats)
+function renderTopFilterAndDashboard($stats, $date_start, $date_end, $operador, $avaliacao, $solucao)
 {
     $total     = isset($stats['total']) ? $stats['total'] : 0;
     $media     = isset($stats['media_estrelas']) ? $stats['media_estrelas'] : 0;
@@ -209,6 +204,75 @@ function renderExecutiveCardsAndCharts($stats)
     ?>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
     <style>
+        .filter-top-bar {
+            background: #ffffff;
+            border-radius: 10px;
+            padding: 16px 20px;
+            margin: 10px 0 15px 0;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+            border: 1px solid #e2e8f0;
+        }
+        .filter-form-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: flex-end;
+        }
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+        }
+        .filter-group label {
+            font-size: 11px;
+            font-weight: 700;
+            color: #475569;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            margin-bottom: 4px;
+        }
+        .filter-control {
+            padding: 6px 10px;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            font-size: 13px;
+            color: #1e293b;
+            background: #fff;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .filter-control:focus {
+            border-color: #6366f1;
+        }
+        .btn-filter-submit {
+            background: #4f46e5;
+            color: #ffffff;
+            border: none;
+            padding: 7px 16px;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 13px;
+            transition: background 0.2s;
+        }
+        .btn-filter-submit:hover {
+            background: #4338ca;
+        }
+        .btn-filter-clear {
+            background: #f1f5f9;
+            color: #475569;
+            text-decoration: none;
+            padding: 7px 14px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            border: 1px solid #cbd5e1;
+            display: inline-block;
+            transition: background 0.2s;
+        }
+        .btn-filter-clear:hover {
+            background: #e2e8f0;
+        }
+
         .pesquisa-dashboard {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -231,16 +295,16 @@ function renderExecutiveCardsAndCharts($stats)
         .kpi-card.blue { border-left-color: #3b82f6; }
         
         .kpi-title {
-            font-size: 13px;
-            font-weight: 600;
+            font-size: 12px;
+            font-weight: 700;
             color: #64748b;
             text-transform: uppercase;
             letter-spacing: 0.5px;
-            margin-bottom: 8px;
+            margin-bottom: 6px;
         }
         .kpi-value {
-            font-size: 28px;
-            font-weight: 700;
+            font-size: 26px;
+            font-weight: 800;
             color: #1e293b;
             line-height: 1;
         }
@@ -266,14 +330,16 @@ function renderExecutiveCardsAndCharts($stats)
             height: 280px;
             display: flex;
             flex-direction: column;
+            border: 1px solid #f1f5f9;
         }
         .chart-box h4 {
             margin: 0 0 15px 0;
-            font-size: 15px;
+            font-size: 14px;
             color: #334155;
-            font-weight: 600;
+            font-weight: 700;
             border-bottom: 1px solid #f1f5f9;
             padding-bottom: 8px;
+            text-transform: uppercase;
         }
         .chart-wrapper {
             position: relative;
@@ -283,11 +349,53 @@ function renderExecutiveCardsAndCharts($stats)
         }
     </style>
 
+    <form method="POST" action="?menu=pesquisa">
+        <div class="filter-top-bar">
+            <div class="filter-form-row">
+                <div class="filter-group">
+                    <label>📅 Data Inicial</label>
+                    <input type="date" name="date_start" value="<?php echo htmlspecialchars($date_start); ?>" class="filter-control" />
+                </div>
+                <div class="filter-group">
+                    <label>📅 Data Final</label>
+                    <input type="date" name="date_end" value="<?php echo htmlspecialchars($date_end); ?>" class="filter-control" />
+                </div>
+                <div class="filter-group">
+                    <label>👤 Operador / Ramal</label>
+                    <input type="text" name="operador" placeholder="Ex: 1001" value="<?php echo htmlspecialchars($operador); ?>" class="filter-control" style="width:130px;" />
+                </div>
+                <div class="filter-group">
+                    <label>⭐ Avaliação</label>
+                    <select name="avaliacao" class="filter-control">
+                        <option value="">-- Todas as Notas --</option>
+                        <option value="OTIMO" <?php if ($avaliacao == 'OTIMO') echo 'selected'; ?>>⭐⭐⭐⭐⭐ ÓTIMO</option>
+                        <option value="MUITO BOM" <?php if ($avaliacao == 'MUITO BOM') echo 'selected'; ?>>⭐⭐⭐⭐ MUITO BOM</option>
+                        <option value="MEDIO" <?php if ($avaliacao == 'MEDIO') echo 'selected'; ?>>⭐⭐⭐ MÉDIO</option>
+                        <option value="BOM" <?php if ($avaliacao == 'BOM') echo 'selected'; ?>>⭐⭐ BOM</option>
+                        <option value="RUIM" <?php if ($avaliacao == 'RUIM') echo 'selected'; ?>>⭐ RUIM</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>🎯 Resolução</label>
+                    <select name="solucao" class="filter-control">
+                        <option value="">-- Todas --</option>
+                        <option value="SIM" <?php if ($solucao == 'SIM') echo 'selected'; ?>>✔ SIM (Resolvido)</option>
+                        <option value="NAO" <?php if ($solucao == 'NAO') echo 'selected'; ?>>✖ NÃO (Não Resolvido)</option>
+                    </select>
+                </div>
+                <div>
+                    <input type="submit" name="show" value="🔍 Filtrar" class="btn-filter-submit" />
+                    <a href="?menu=pesquisa" class="btn-filter-clear">🔄 Ver Todos</a>
+                </div>
+            </div>
+        </div>
+    </form>
+
     <div class="pesquisa-dashboard">
         <div class="kpi-card purple">
             <div class="kpi-title">📋 Total de Avaliações</div>
             <div class="kpi-value"><?php echo number_format($total, 0, ',', '.'); ?></div>
-            <div class="kpi-sub">Pesquisas respondidas</div>
+            <div class="kpi-sub">Pesquisas registradas</div>
         </div>
         <div class="kpi-card green">
             <div class="kpi-title">⭐ Média de Satisfação</div>
@@ -308,13 +416,13 @@ function renderExecutiveCardsAndCharts($stats)
 
     <div class="charts-container">
         <div class="chart-box">
-            <h4>📊 Distribuição das Notas de Avaliação</h4>
+            <h4>📊 Distribuição das Notas</h4>
             <div class="chart-wrapper">
                 <canvas id="chartNotas"></canvas>
             </div>
         </div>
         <div class="chart-box">
-            <h4>🎯 Resolução de Problemas no Atendimento</h4>
+            <h4>🎯 Resolução de Problemas</h4>
             <div class="chart-wrapper">
                 <canvas id="chartSolucao"></canvas>
             </div>
@@ -370,53 +478,6 @@ function renderExecutiveCardsAndCharts($stats)
         }
     });
     </script>
-    <?php
-    return ob_get_clean();
-}
-
-function renderCustomFilter($date_start, $date_end, $operador, $avaliacao, $solucao)
-{
-    ob_start();
-    ?>
-    <div style="background:#ffffff; border-radius:8px; padding:15px 20px; margin-bottom:15px; box-shadow:0 1px 3px rgba(0,0,0,0.05); border:1px solid #e2e8f0;">
-        <div style="display:flex; flex-wrap:wrap; gap:15px; align-items:flex-end;">
-            <div>
-                <label style="display:block; font-size:12px; font-weight:600; color:#475569; margin-bottom:4px;">📅 Data Inicial:</label>
-                <input type="date" name="date_start" value="<?php echo htmlspecialchars($date_start); ?>" style="padding:6px 10px; border:1px solid #cbd5e1; border-radius:6px; font-size:13px;" />
-            </div>
-            <div>
-                <label style="display:block; font-size:12px; font-weight:600; color:#475569; margin-bottom:4px;">📅 Data Final:</label>
-                <input type="date" name="date_end" value="<?php echo htmlspecialchars($date_end); ?>" style="padding:6px 10px; border:1px solid #cbd5e1; border-radius:6px; font-size:13px;" />
-            </div>
-            <div>
-                <label style="display:block; font-size:12px; font-weight:600; color:#475569; margin-bottom:4px;">👤 Operador / Ramal:</label>
-                <input type="text" name="operador" placeholder="Ex: 1001 ou Maria" value="<?php echo htmlspecialchars($operador); ?>" style="padding:6px 10px; border:1px solid #cbd5e1; border-radius:6px; font-size:13px; width:140px;" />
-            </div>
-            <div>
-                <label style="display:block; font-size:12px; font-weight:600; color:#475569; margin-bottom:4px;">⭐ Avaliação:</label>
-                <select name="avaliacao" style="padding:6px 10px; border:1px solid #cbd5e1; border-radius:6px; font-size:13px;">
-                    <option value="">-- Todas as Notas --</option>
-                    <option value="OTIMO" <?php if ($avaliacao == 'OTIMO') echo 'selected'; ?>>⭐⭐⭐⭐⭐ ÓTIMO</option>
-                    <option value="MUITO BOM" <?php if ($avaliacao == 'MUITO BOM') echo 'selected'; ?>>⭐⭐⭐⭐ MUITO BOM</option>
-                    <option value="MEDIO" <?php if ($avaliacao == 'MEDIO') echo 'selected'; ?>>⭐⭐⭐ MÉDIO</option>
-                    <option value="BOM" <?php if ($avaliacao == 'BOM') echo 'selected'; ?>>⭐⭐ BOM</option>
-                    <option value="RUIM" <?php if ($avaliacao == 'RUIM') echo 'selected'; ?>>⭐ RUIM</option>
-                </select>
-            </div>
-            <div>
-                <label style="display:block; font-size:12px; font-weight:600; color:#475569; margin-bottom:4px;">🎯 Resolução:</label>
-                <select name="solucao" style="padding:6px 10px; border:1px solid #cbd5e1; border-radius:6px; font-size:13px;">
-                    <option value="">-- Todas --</option>
-                    <option value="SIM" <?php if ($solucao == 'SIM') echo 'selected'; ?>>✔ SIM (Resolvido)</option>
-                    <option value="NAO" <?php if ($solucao == 'NAO') echo 'selected'; ?>>✖ NÃO (Não Resolvido)</option>
-                </select>
-            </div>
-            <div>
-                <input type="submit" name="show" value="🔍 Filtrar Resultados" style="background:#4f46e5; color:#ffffff; border:none; padding:7px 16px; border-radius:6px; font-weight:600; cursor:pointer; font-size:13px;" />
-                <a href="?menu=pesquisa" style="background:#f1f5f9; color:#475569; text-decoration:none; padding:7px 14px; border-radius:6px; font-size:13px; font-weight:600; margin-left:6px; border:1px solid #cbd5e1; display:inline-block;">🔄 Limpar</a>
-            </div>
-        </div>
-    </div>
     <?php
     return ob_get_clean();
 }

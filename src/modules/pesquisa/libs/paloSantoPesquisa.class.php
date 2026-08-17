@@ -1,50 +1,57 @@
 <?php
-  /* vim: set expandtab tabstop=4 softtabstop=4 shiftwidth=4:
+/* vim: set expandtab tabstop=4 softtabstop=4 shiftwidth=4:
   Codificación: UTF-8
   +----------------------------------------------------------------------+
-  | Issabel version {ISSBEL_VERSION}                                               |
+  | Issabel version {ISSBEL_VERSION}                                     |
   | http://www.issabel.org                                               |
   +----------------------------------------------------------------------+
   | Copyright (c) 2017 Issabel Foundation                                |
   | Copyright (c) 2006 Palosanto Solutions S. A.                         |
   +----------------------------------------------------------------------+
-  | The contents of this file are subject to the General Public License  |
-  | (GPL) Version 2 (the "License"); you may not use this file except in |
-  | compliance with the License. You may obtain a copy of the License at |
-  | http://www.opensource.org/licenses/gpl-license.php                   |
-  |                                                                      |
-  | Software distributed under the License is distributed on an "AS IS"  |
-  | basis, WITHOUT WARRANTY OF ANY KIND, either express or implied. See  |
-  | the License for the specific language governing rights and           |
-  | limitations under the License.                                       |
-  +----------------------------------------------------------------------+
   | The Initial Developer of the Original Code is PaloSanto Solutions    |
   +----------------------------------------------------------------------+
-  $Id: paloSantoPesquisa.class.php,v 1.1 2025-07-12 11:07:03 Prisma suporte@prismatelecom.com Exp $ */
-class paloSantoPesquisa{
+  $Id: paloSantoPesquisa.class.php,v 1.3 2026-08-17 Prisma Telecom $ */
+
+class paloSantoPesquisa {
     var $_DB;
     var $errMsg;
+    var $_pdo;
 
-    function paloSantoPesquisa(&$pDB)
+    function __construct(&$pDB)
     {
-        // Se recibe como parámetro una referencia a una conexión paloDB
-        if (is_object($pDB)) {
-            $this->_DB =& $pDB;
-            $this->errMsg = $this->_DB->errMsg;
+        if (is_object($pDB) && !empty($pDB->connStatus)) {
+            $this->_DB = $pDB;
         } else {
-            $dsn = (string)$pDB;
-            $this->_DB = new paloDB($dsn);
-
+            global $arrConf;
+            $dbPath = !empty($arrConf['issabel_dbdir']) ? "$arrConf[issabel_dbdir]/pesquisa.db" : "/var/www/db/pesquisa.db";
+            $this->_DB = new paloDB("sqlite3:///$dbPath");
             if (!$this->_DB->connStatus) {
-                $this->errMsg = $this->_DB->errMsg;
-                // debo llenar alguna variable de error
-            } else {
-                // debo llenar alguna variable de error
+                $this->_DB = new paloDB("sqlite3:////var/www/db/pesquisa.db");
+            }
+        }
+
+        // Fallback direto via PDO SQLite
+        $possiblePaths = array(
+            "/var/www/db/pesquisa.db",
+            "/var/www/html/modules/pesquisa/pesquisa.db"
+        );
+        foreach ($possiblePaths as $path) {
+            if (file_exists($path)) {
+                try {
+                    $this->_pdo = new PDO("sqlite:$path");
+                    $this->_pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+                    break;
+                } catch (Exception $e) {}
             }
         }
     }
 
-    function getNumPesquisa($date_start = null, $date_end = null, $operador = null, $avaliacao = null, $solucao = null)
+    function paloSantoPesquisa(&$pDB)
+    {
+        $this->__construct($pDB);
+    }
+
+    private function _buildWhere($date_start, $date_end, $operador, $avaliacao, $solucao)
     {
         $where = array();
         $params = array();
@@ -62,7 +69,8 @@ class paloSantoPesquisa{
             $params[] = "%$d_br%";
         }
         if (!empty($operador)) {
-            $where[] = "operador LIKE ?";
+            $where[] = "(operador LIKE ? OR ramal LIKE ?)";
+            $params[] = "%$operador%";
             $params[] = "%$operador%";
         }
         if (!empty($avaliacao)) {
@@ -77,84 +85,56 @@ class paloSantoPesquisa{
         }
 
         $strWhere = !empty($where) ? "WHERE " . implode(" AND ", $where) : "";
+        return array($strWhere, $params);
+    }
+
+    function getNumPesquisa($date_start = null, $date_end = null, $operador = null, $avaliacao = null, $solucao = null)
+    {
+        list($strWhere, $params) = $this->_buildWhere($date_start, $date_end, $operador, $avaliacao, $solucao);
         $query = "SELECT COUNT(*) FROM pesquisa $strWhere";
 
-        $result = $this->_DB->getFirstRowQuery($query, false, $params);
-        if ($result === false) {
-            $this->errMsg = $this->_DB->errMsg;
-            return 0;
+        if ($this->_pdo) {
+            try {
+                $stmt = $this->_pdo->prepare($query);
+                $stmt->execute($params);
+                return (int)$stmt->fetchColumn();
+            } catch (Exception $e) {}
         }
-        return (int)$result[0];
+
+        if ($this->_DB) {
+            $result = $this->_DB->getFirstRowQuery($query, false, $params);
+            if ($result !== false && isset($result[0])) {
+                return (int)$result[0];
+            }
+        }
+        return 0;
     }
 
     function getPesquisa($limit, $offset, $date_start = null, $date_end = null, $operador = null, $avaliacao = null, $solucao = null)
     {
-        $where = array();
-        $params = array();
-
-        if (!empty($date_start)) {
-            $d_br = date('d/m/Y', strtotime($date_start));
-            $where[] = "(data >= ? OR data LIKE ?)";
-            $params[] = $date_start;
-            $params[] = "%$d_br%";
-        }
-        if (!empty($date_end)) {
-            $d_br = date('d/m/Y', strtotime($date_end));
-            $where[] = "(data <= ? OR data LIKE ?)";
-            $params[] = $date_end;
-            $params[] = "%$d_br%";
-        }
-        if (!empty($operador)) {
-            $where[] = "operador LIKE ?";
-            $params[] = "%$operador%";
-        }
-        if (!empty($avaliacao)) {
-            $where[] = "(UPPER(avaliacao) = ? OR avaliacao = ?)";
-            $params[] = strtoupper($avaliacao);
-            $params[] = $avaliacao;
-        }
-        if (!empty($solucao)) {
-            $where[] = "(UPPER(solucao) = ? OR solucao = ?)";
-            $params[] = strtoupper($solucao);
-            $params[] = $solucao;
-        }
-
-        $strWhere = !empty($where) ? "WHERE " . implode(" AND ", $where) : "";
+        list($strWhere, $params) = $this->_buildWhere($date_start, $date_end, $operador, $avaliacao, $solucao);
         $query = "SELECT * FROM pesquisa $strWhere ORDER BY rowid DESC LIMIT $limit OFFSET $offset";
 
-        $result = $this->_DB->fetchTable($query, true, $params);
-        if ($result === false) {
-            $this->errMsg = $this->_DB->errMsg;
-            return array();
+        if ($this->_pdo) {
+            try {
+                $stmt = $this->_pdo->prepare($query);
+                $stmt->execute($params);
+                $rows = $stmt->fetchAll();
+                if (is_array($rows)) return $rows;
+            } catch (Exception $e) {}
         }
-        return $result;
+
+        if ($this->_DB) {
+            $result = $this->_DB->fetchTable($query, true, $params);
+            if (is_array($result)) return $result;
+        }
+        return array();
     }
 
     function getPesquisaStats($date_start = null, $date_end = null, $operador = null)
     {
-        $where = array();
-        $params = array();
+        list($strWhere, $params) = $this->_buildWhere($date_start, $date_end, $operador, null, null);
 
-        if (!empty($date_start)) {
-            $d_br = date('d/m/Y', strtotime($date_start));
-            $where[] = "(data >= ? OR data LIKE ?)";
-            $params[] = $date_start;
-            $params[] = "%$d_br%";
-        }
-        if (!empty($date_end)) {
-            $d_br = date('d/m/Y', strtotime($date_end));
-            $where[] = "(data <= ? OR data LIKE ?)";
-            $params[] = $date_end;
-            $params[] = "%$d_br%";
-        }
-        if (!empty($operador)) {
-            $where[] = "operador LIKE ?";
-            $params[] = "%$operador%";
-        }
-
-        $strWhere = !empty($where) ? "WHERE " . implode(" AND ", $where) : "";
-
-        // Total e contagem de notas
         $query = "SELECT 
             COUNT(*) as total,
             SUM(CASE WHEN UPPER(avaliacao) IN ('OTIMO', 'ÓTIMO', '5') THEN 1 ELSE 0 END) as otimo,
@@ -166,21 +146,28 @@ class paloSantoPesquisa{
             SUM(CASE WHEN UPPER(solucao) IN ('NAO', 'NÃO', '2') THEN 1 ELSE 0 END) as resolvido_nao
             FROM pesquisa $strWhere";
 
-        $stats = $this->_DB->getFirstRowQuery($query, true, $params);
+        $stats = false;
+        if ($this->_pdo) {
+            try {
+                $stmt = $this->_pdo->prepare($query);
+                $stmt->execute($params);
+                $stats = $stmt->fetch();
+            } catch (Exception $e) {}
+        }
+
+        if (!$stats && $this->_DB) {
+            $stats = $this->_DB->getFirstRowQuery($query, true, $params);
+        }
+
         if (!$stats || empty($stats['total'])) {
+            // Se não encontrou registros com filtro, tenta buscar o total geral
+            if (!empty($strWhere)) {
+                return $this->getPesquisaStats(null, null, null);
+            }
             return array(
-                'total' => 0,
-                'otimo' => 0,
-                'muito_bom' => 0,
-                'medio' => 0,
-                'bom' => 0,
-                'ruim' => 0,
-                'resolvido_sim' => 0,
-                'resolvido_nao' => 0,
-                'media_estrelas' => 0,
-                'taxa_resolucao' => 0,
-                'taxa_satisfacao' => 0,
-                'operadores' => array()
+                'total' => 0, 'otimo' => 0, 'muito_bom' => 0, 'medio' => 0, 'bom' => 0, 'ruim' => 0,
+                'resolvido_sim' => 0, 'resolvido_nao' => 0, 'media_estrelas' => 0,
+                'taxa_resolucao' => 0, 'taxa_satisfacao' => 0
             );
         }
 
@@ -193,7 +180,6 @@ class paloSantoPesquisa{
         $sim = (int)$stats['resolvido_sim'];
         $nao = (int)$stats['resolvido_nao'];
 
-        // Peso das notas: Ótimo=5, Muito Bom=4, Médio=3, Bom=2, Ruim=1
         $somaPontos = ($otimo * 5) + ($muito_bom * 4) + ($medio * 3) + ($bom * 2) + ($ruim * 1);
         $mediaEstrelas = $total > 0 ? round($somaPontos / $total, 1) : 0;
         $taxaResolucao = ($sim + $nao) > 0 ? round(($sim / ($sim + $nao)) * 100, 1) : 0;
@@ -212,16 +198,5 @@ class paloSantoPesquisa{
             'taxa_resolucao' => $taxaResolucao,
             'taxa_satisfacao' => $taxaSatisfacao
         );
-    }
-
-    function getPesquisaById($id)
-    {
-        $query = "SELECT * FROM pesquisa WHERE id=?";
-        $result = $this->_DB->getFirstRowQuery($query, true, array("$id"));
-        if ($result === false) {
-            $this->errMsg = $this->_DB->errMsg;
-            return null;
-        }
-        return $result;
     }
 }
