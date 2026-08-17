@@ -10,7 +10,7 @@
   +----------------------------------------------------------------------+
   | The Initial Developer of the Original Code is PaloSanto Solutions    |
   +----------------------------------------------------------------------+
-  $Id: index.php,v 14.0 2026-08-17 Prisma Telecom $ */
+  $Id: index.php,v 15.0 2026-08-17 Prisma Telecom $ */
 
 require_once "modules/agent_console/libs/issabel2.lib.php";
 include_once "libs/paloSantoDB.class.php";
@@ -158,7 +158,7 @@ function handleExportExcel($pPesquisa)
 
     $output = fopen('php://output', 'w');
     fprintf($output, chr(0xEF).chr(0xBB).chr(0xBF));
-    fputcsv($output, array('Operador / Ramal', 'Nome do Atendente', 'Fila', 'Data', 'Hora', 'Duracao', 'Telefone', 'Avaliacao', 'Problema Resolvido'), ';');
+    fputcsv($output, array('Operador / Ramal', 'Nome do Atendente', 'Fila', 'Data', 'Hora', 'Duracao', 'Telefone', 'Avaliacao', 'Problema Resolvido', 'Status Avaliacao'), ';');
 
     if (is_array($arrResult)) {
         foreach ($arrResult as $row) {
@@ -170,6 +170,10 @@ function handleExportExcel($pPesquisa)
             $val_telefone  = formatPhoneBr($raw_tel);
             $val_avaliacao = !empty($row['avaliacao']) ? $row['avaliacao'] : 'NÃO AVALIOU';
             $val_solucao   = !empty($row['solucao']) ? $row['solucao'] : 'NÃO AVALIOU';
+
+            $avUpper = strtoupper(trim($val_avaliacao));
+            $isEvaluated = !in_array($avUpper, array('NAO AVALIOU', 'NÃO AVALIOU', 'ABANDONOU', 'SEM RESPOSTA', 'DESISTIU', '0', ''));
+            $val_status_str = $isEvaluated ? 'AVALIADO' : 'NÃO AVALIOU';
 
             $cdrInfo     = $pPesquisa->findCdrInfoForCall($raw_tel, !empty($row['data']) ? $row['data'] : '', $val_hora, $val_operador);
             $val_duracao = !empty($cdrInfo['duration_formatted']) ? $cdrInfo['duration_formatted'] : '-';
@@ -183,7 +187,7 @@ function handleExportExcel($pPesquisa)
                 $val_fila = '-';
             }
 
-            fputcsv($output, array($val_operador, $val_nome, $val_fila, $val_data, $val_hora, $val_duracao, $val_telefone, $val_avaliacao, $val_solucao), ';');
+            fputcsv($output, array($val_operador, $val_nome, $val_fila, $val_data, $val_hora, $val_duracao, $val_telefone, $val_avaliacao, $val_solucao, $val_status_str), ';');
         }
     }
     fclose($output);
@@ -242,6 +246,7 @@ function handleExportPdf($pPesquisa)
                     <th>Telefone</th>
                     <th>Avaliação</th>
                     <th>Problema Resolvido?</th>
+                    <th>Status</th>
                 </tr>
             </thead>
             <tbody>
@@ -256,6 +261,9 @@ function handleExportPdf($pPesquisa)
                 $val_telefone  = formatPhoneBr($raw_tel);
                 $val_avaliacao = !empty($row['avaliacao']) ? $row['avaliacao'] : 'NÃO AVALIOU';
                 $val_solucao   = !empty($row['solucao']) ? $row['solucao'] : 'NÃO AVALIOU';
+
+                $avUpper = strtoupper(trim($val_avaliacao));
+                $isEvaluated = !in_array($avUpper, array('NAO AVALIOU', 'NÃO AVALIOU', 'ABANDONOU', 'SEM RESPOSTA', 'DESISTIU', '0', ''));
 
                 $cdrInfo       = $pPesquisa->findCdrInfoForCall($raw_tel, !empty($row['data']) ? $row['data'] : '', $val_hora, $val_operador);
                 $val_duracao   = !empty($cdrInfo['duration_formatted']) ? $cdrInfo['duration_formatted'] : '-';
@@ -278,6 +286,7 @@ function handleExportPdf($pPesquisa)
                     <td>📞 <?php echo htmlspecialchars($val_telefone); ?></td>
                     <td><?php echo htmlspecialchars($val_avaliacao); ?></td>
                     <td><?php echo htmlspecialchars($val_solucao); ?></td>
+                    <td><?php echo $isEvaluated ? '✅ Avaliado' : '📵 Não Avaliou'; ?></td>
                 </tr>
                 <?php endforeach; ?>
             </tbody>
@@ -632,6 +641,31 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
             color: #0f172a;
             border-color: #cbd5e1;
         }
+
+        .status-badge-evaluated {
+            background: #dcfce7;
+            color: #15803d;
+            border: 1px solid #86efac;
+            padding: 3px 8px;
+            border-radius: 6px;
+            font-weight: 700;
+            font-size: 10px;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .status-badge-abandoned {
+            background: #f1f5f9;
+            color: #64748b;
+            border: 1px solid #cbd5e1;
+            padding: 3px 8px;
+            border-radius: 6px;
+            font-weight: 700;
+            font-size: 10px;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
     </style>
 
     <div class="pesquisa-root">
@@ -764,6 +798,7 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
                         <th>Telefone</th>
                         <th>Avaliação do Atendimento</th>
                         <th>Problema Resolvido?</th>
+                        <th>Status</th>
                         <th>Gravação</th>
                     </tr>
                 </thead>
@@ -780,6 +815,9 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
                             $val_telefone  = formatPhoneBr($raw_tel);
                             $val_avaliacao = !empty($row['avaliacao']) ? $row['avaliacao'] : 'NÃO AVALIOU';
                             $val_solucao   = !empty($row['solucao']) ? $row['solucao'] : 'NÃO AVALIOU';
+
+                            $avUpper = strtoupper(trim($val_avaliacao));
+                            $isEvaluated = !in_array($avUpper, array('NAO AVALIOU', 'NÃO AVALIOU', 'ABANDONOU', 'SEM RESPOSTA', 'DESISTIU', '0', ''));
 
                             $cdrInfo       = $pPesquisa->findCdrInfoForCall($raw_tel, !empty($row['data']) ? $row['data'] : '', $val_hora, $val_operador);
                             $val_duracao   = !empty($cdrInfo['duration_formatted']) ? $cdrInfo['duration_formatted'] : '-';
@@ -804,33 +842,32 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
                                 <td><span style='font-weight:600; color:#1e293b; font-size:12px;'>📞 <?php echo htmlspecialchars($val_telefone); ?></span></td>
                                 <td>
                                     <?php
-                                    $avUpper = strtoupper(trim($val_avaliacao));
                                     switch ($avUpper) {
                                         case 'EXCELENTE':
                                         case 'OTIMO':
                                         case 'ÓTIMO':
                                         case '5':
-                                            echo "<span style='background:#10b981; color:#ffffff; padding:4px 10px; border-radius:12px; font-weight:bold; font-size:11px; display:inline-flex; align-items:center; gap:6px;'><span style='font-size:12px;'>✅</span> <span style='letter-spacing:2px;'>⭐⭐⭐⭐⭐</span> EXCELENTE</span>";
+                                            echo "<span style='background:#10b981; color:#ffffff; padding:4px 10px; border-radius:12px; font-weight:bold; font-size:11px; display:inline-block;'><span style='letter-spacing:2px;'>⭐⭐⭐⭐⭐</span> EXCELENTE</span>";
                                             break;
                                         case 'MUITO BOM':
                                         case '4':
-                                            echo "<span style='background:#3b82f6; color:#ffffff; padding:4px 10px; border-radius:12px; font-weight:bold; font-size:11px; display:inline-flex; align-items:center; gap:6px;'><span style='font-size:12px;'>✅</span> <span style='letter-spacing:2px;'>⭐⭐⭐⭐</span> MUITO BOM</span>";
+                                            echo "<span style='background:#3b82f6; color:#ffffff; padding:4px 10px; border-radius:12px; font-weight:bold; font-size:11px; display:inline-block;'><span style='letter-spacing:2px;'>⭐⭐⭐⭐</span> MUITO BOM</span>";
                                             break;
                                         case 'MEDIO':
                                         case 'MÉDIO':
                                         case 'REGULAR':
                                         case 'BOM':
                                         case '3':
-                                            echo "<span style='background:#f59e0b; color:#ffffff; padding:4px 10px; border-radius:12px; font-weight:bold; font-size:11px; display:inline-flex; align-items:center; gap:6px;'><span style='font-size:12px;'>✅</span> <span style='letter-spacing:2px;'>⭐⭐⭐</span> $avUpper</span>";
+                                            echo "<span style='background:#f59e0b; color:#ffffff; padding:4px 10px; border-radius:12px; font-weight:bold; font-size:11px; display:inline-block;'><span style='letter-spacing:2px;'>⭐⭐⭐</span> $avUpper</span>";
                                             break;
                                         case '2':
-                                            echo "<span style='background:#f97316; color:#ffffff; padding:4px 10px; border-radius:12px; font-weight:bold; font-size:11px; display:inline-flex; align-items:center; gap:6px;'><span style='font-size:12px;'>✅</span> <span style='letter-spacing:2px;'>⭐⭐</span> BOM</span>";
+                                            echo "<span style='background:#f97316; color:#ffffff; padding:4px 10px; border-radius:12px; font-weight:bold; font-size:11px; display:inline-block;'><span style='letter-spacing:2px;'>⭐⭐</span> BOM</span>";
                                             break;
                                         case 'RUIM':
                                         case 'PESSIMO':
                                         case 'PÉSSIMO':
                                         case '1':
-                                            echo "<span style='background:#ef4444; color:#ffffff; padding:4px 10px; border-radius:12px; font-weight:bold; font-size:11px; display:inline-flex; align-items:center; gap:6px;'><span style='font-size:12px;'>❌</span> <span style='letter-spacing:2px;'>⭐</span> $avUpper</span>";
+                                            echo "<span style='background:#ef4444; color:#ffffff; padding:4px 10px; border-radius:12px; font-weight:bold; font-size:11px; display:inline-block;'><span style='letter-spacing:2px;'>⭐</span> $avUpper</span>";
                                             break;
                                         case 'NAO AVALIOU':
                                         case 'NÃO AVALIOU':
@@ -839,10 +876,10 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
                                         case 'DESISTIU':
                                         case '0':
                                         case '':
-                                            echo "<span style='background:#64748b; color:#ffffff; padding:4px 10px; border-radius:12px; font-weight:bold; font-size:11px; display:inline-flex; align-items:center; gap:6px;'><span style='font-size:12px;'>📵</span> NÃO AVALIOU</span>";
+                                            echo "<span style='background:#64748b; color:#ffffff; padding:4px 10px; border-radius:12px; font-weight:bold; font-size:11px; display:inline-block;'>📵 NÃO AVALIOU</span>";
                                             break;
                                         default:
-                                            echo "<span style='background:#94a3b8; color:#ffffff; padding:4px 10px; border-radius:12px; font-weight:bold; font-size:11px; display:inline-flex; align-items:center; gap:6px;'><span style='font-size:12px;'>✅</span> $avUpper</span>";
+                                            echo "<span style='background:#94a3b8; color:#ffffff; padding:4px 10px; border-radius:12px; font-weight:bold; font-size:11px; display:inline-block;'>$avUpper</span>";
                                             break;
                                     }
                                     ?>
@@ -862,6 +899,13 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
                                     ?>
                                 </td>
                                 <td>
+                                    <?php if ($isEvaluated): ?>
+                                        <span class="status-badge-evaluated">✅ Avaliado</span>
+                                    <?php else: ?>
+                                        <span class="status-badge-abandoned">📵 Não Avaliou</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td>
                                     <?php if (!empty($recFile)): ?>
                                         <?php $fileEnc = urlencode($recFile); ?>
                                         <div style="display:flex; gap:4px; align-items:center;">
@@ -876,7 +920,7 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
                         <?php endforeach; ?>
                     <?php else: ?>
                         <tr>
-                            <td colspan="9" style="text-align:center; padding:25px; color:#64748b;">
+                            <td colspan="10" style="text-align:center; padding:25px; color:#64748b;">
                                 🚀 Nenhum registro encontrado para os filtros selecionados.
                             </td>
                         </tr>
