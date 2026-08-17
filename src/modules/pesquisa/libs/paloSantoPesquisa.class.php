@@ -10,7 +10,7 @@
   +----------------------------------------------------------------------+
   | The Initial Developer of the Original Code is PaloSanto Solutions    |
   +----------------------------------------------------------------------+
-  $Id: paloSantoPesquisa.class.php,v 2.1 2026-08-17 Prisma Telecom $ */
+  $Id: paloSantoPesquisa.class.php,v 2.2 2026-08-17 Prisma Telecom $ */
 
 class paloSantoPesquisa {
     var $_DB;
@@ -27,6 +27,22 @@ class paloSantoPesquisa {
         $this->__construct($pDB);
     }
 
+    function formatDateForSql($d)
+    {
+        if (empty($d)) return '';
+        $d = trim($d);
+        // Formato d/m/Y (ex: 01/01/2026) -> Y-m-d (2026-01-01)
+        if (preg_match('/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/', $d, $m)) {
+            return sprintf('%04d-%02d-%02d', $m[3], $m[2], $m[1]);
+        }
+        // Formato Y-m-d
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $d)) {
+            return $d;
+        }
+        $ts = strtotime($d);
+        return $ts ? date('Y-m-d', $ts) : '';
+    }
+
     function connectDatabase()
     {
         $passwords = array();
@@ -41,14 +57,14 @@ class paloSantoPesquisa {
                         $key = strtolower(trim($parts[0]));
                         $val = trim(trim($parts[1]), " '\"\r\n");
                         if (in_array($key, array('mysqlrootpwd', 'mysqlrootpass', 'amiadminpwd'))) {
-                            if (!empty($val)) $passwords[] = $val;
+                            if ($val !== '') $passwords[] = $val;
                         }
                     }
                 }
             }
         }
 
-        // 2. Obtem senha do /etc/amportal.conf
+        // 2. Obtem senha do /etc/amportal.conf (mesma do phpMyAdmin)
         if (file_exists('/etc/amportal.conf')) {
             $lines = @file('/etc/amportal.conf');
             if (is_array($lines)) {
@@ -58,7 +74,7 @@ class paloSantoPesquisa {
                         $key = strtolower(trim($parts[0]));
                         $val = trim(trim($parts[1]), " '\"\r\n");
                         if (in_array($key, array('ampdbpass', 'cdrdbpass'))) {
-                            if (!empty($val)) $passwords[] = $val;
+                            if ($val !== '') $passwords[] = $val;
                         }
                     }
                 }
@@ -72,7 +88,7 @@ class paloSantoPesquisa {
 
         $users = array('root', 'asteriskuser', 'asterisk');
 
-        // 3. Tenta conexao PDO direta no MySQL asteriskcdrdb (463 registros do cliente)
+        // 3. Tenta conexao PDO direta no MySQL asteriskcdrdb (1414 registros do cliente)
         foreach ($users as $u) {
             foreach ($passwords as $p) {
                 try {
@@ -105,17 +121,20 @@ class paloSantoPesquisa {
         $where = array();
         $params = array();
 
+        $dsSql = $this->formatDateForSql($date_start);
+        $deSql = $this->formatDateForSql($date_end);
+
         if (!empty($filter_field) && !empty($filter_value)) {
             $where[] = "$filter_field LIKE ?";
             $params[] = "%$filter_value%";
         }
-        if (!empty($date_start)) {
+        if (!empty($dsSql)) {
             $where[] = "data >= ?";
-            $params[] = $date_start;
+            $params[] = $dsSql;
         }
-        if (!empty($date_end)) {
+        if (!empty($deSql)) {
             $where[] = "data <= ?";
-            $params[] = $date_end;
+            $params[] = $deSql;
         }
         if (!empty($operador)) {
             $where[] = "operador LIKE ?";
@@ -151,17 +170,20 @@ class paloSantoPesquisa {
         $where = array();
         $params = array();
 
+        $dsSql = $this->formatDateForSql($date_start);
+        $deSql = $this->formatDateForSql($date_end);
+
         if (!empty($filter_field) && !empty($filter_value)) {
             $where[] = "$filter_field LIKE ?";
             $params[] = "%$filter_value%";
         }
-        if (!empty($date_start)) {
+        if (!empty($dsSql)) {
             $where[] = "data >= ?";
-            $params[] = $date_start;
+            $params[] = $dsSql;
         }
-        if (!empty($date_end)) {
+        if (!empty($deSql)) {
             $where[] = "data <= ?";
-            $params[] = $date_end;
+            $params[] = $deSql;
         }
         if (!empty($operador)) {
             $where[] = "operador LIKE ?";
@@ -204,13 +226,16 @@ class paloSantoPesquisa {
         $where = array();
         $params = array();
 
-        if (!empty($date_start)) {
+        $dsSql = $this->formatDateForSql($date_start);
+        $deSql = $this->formatDateForSql($date_end);
+
+        if (!empty($dsSql)) {
             $where[] = "data >= ?";
-            $params[] = $date_start;
+            $params[] = $dsSql;
         }
-        if (!empty($date_end)) {
+        if (!empty($deSql)) {
             $where[] = "data <= ?";
-            $params[] = $date_end;
+            $params[] = $deSql;
         }
         if (!empty($operador)) {
             $where[] = "operador LIKE ?";
@@ -239,8 +264,18 @@ class paloSantoPesquisa {
         }
 
         if (!$stats || empty($stats['total'])) {
-            if (!empty($strWhere)) {
-                $sqlAll = "SELECT 
+            $sqlAll = "SELECT 
+                COUNT(*) as total,
+                SUM(CASE WHEN UPPER(avaliacao) IN ('EXCELENTE', 'OTIMO', 'ÓTIMO', '5') THEN 1 ELSE 0 END) as otimo,
+                SUM(CASE WHEN UPPER(avaliacao) IN ('MUITO BOM', '4') THEN 1 ELSE 0 END) as muito_bom,
+                SUM(CASE WHEN UPPER(avaliacao) IN ('BOM', 'MEDIO', 'MÉDIO', 'REGULAR', '3') THEN 1 ELSE 0 END) as medio,
+                SUM(CASE WHEN UPPER(avaliacao) IN ('RUIM', '2') THEN 1 ELSE 0 END) as bom,
+                SUM(CASE WHEN UPPER(avaliacao) IN ('PESSIMO', 'PÉSSIMO', '1') THEN 1 ELSE 0 END) as ruim,
+                SUM(CASE WHEN UPPER(solucao) IN ('SIM', '1') THEN 1 ELSE 0 END) as resolvido_sim,
+                SUM(CASE WHEN UPPER(solucao) IN ('NAO', 'NÃO', '2') Técnico END) as resolvido_nao
+                FROM pesquisa";
+            try {
+                $stmtAll = $this->pdo->query("SELECT 
                     COUNT(*) as total,
                     SUM(CASE WHEN UPPER(avaliacao) IN ('EXCELENTE', 'OTIMO', 'ÓTIMO', '5') THEN 1 ELSE 0 END) as otimo,
                     SUM(CASE WHEN UPPER(avaliacao) IN ('MUITO BOM', '4') THEN 1 ELSE 0 END) as muito_bom,
@@ -249,12 +284,9 @@ class paloSantoPesquisa {
                     SUM(CASE WHEN UPPER(avaliacao) IN ('PESSIMO', 'PÉSSIMO', '1') THEN 1 ELSE 0 END) as ruim,
                     SUM(CASE WHEN UPPER(solucao) IN ('SIM', '1') THEN 1 ELSE 0 END) as resolvido_sim,
                     SUM(CASE WHEN UPPER(solucao) IN ('NAO', 'NÃO', '2') THEN 1 ELSE 0 END) as resolvido_nao
-                    FROM pesquisa";
-                try {
-                    $stmtAll = $this->pdo->query($sqlAll);
-                    $stats = $stmtAll->fetch();
-                } catch (Exception $e) {}
-            }
+                    FROM pesquisa");
+                $stats = $stmtAll->fetch();
+            } catch (Exception $e) {}
         }
 
         if (!$stats || empty($stats['total'])) {
