@@ -40,9 +40,23 @@ REPO_DIR="$SCRIPT_DIR"
 # Se o script foi executado fora do repositório clonado, baixa a cópia atualizada
 if [ ! -f "$REPO_DIR/install.sh" ] || [ ! -d "$REPO_DIR/src" ]; then
     TMP_REPO="/tmp/ipbx-issabel-repo"
-    log_info "Baixando o repositório completo para $TMP_REPO..."
+    log_info "Preparando download do repositório em $TMP_REPO..."
     rm -rf "$TMP_REPO"
-    git clone --depth 1 https://github.com/LeandroSaltori/ipbx-issabel6.0.git "$TMP_REPO"
+    mkdir -p "$TMP_REPO"
+
+    # Garante que git esteja instalado no CentOS / Rocky Linux
+    if ! command -v git &>/dev/null; then
+        log_info "Instalando pacote git no servidor..."
+        yum install -y git 2>/dev/null || dnf install -y git 2>/dev/null || true
+    fi
+
+    if command -v git &>/dev/null; then
+        log_info "Baixando o repositório completo via git..."
+        git clone --depth 1 https://github.com/LeandroSaltori/ipbx-issabel6.0.git "$TMP_REPO"
+    else
+        log_info "Baixando repositório compactado via curl..."
+        curl -sSL "https://github.com/LeandroSaltori/ipbx-issabel6.0/archive/refs/heads/main.tar.gz" | tar -xz -C "$TMP_REPO" --strip-components=1
+    fi
     REPO_DIR="$TMP_REPO"
 fi
 
