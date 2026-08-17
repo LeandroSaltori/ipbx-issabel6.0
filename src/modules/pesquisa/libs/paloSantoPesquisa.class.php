@@ -10,7 +10,7 @@
   +----------------------------------------------------------------------+
   | The Initial Developer of the Original Code is PaloSanto Solutions    |
   +----------------------------------------------------------------------+
-  $Id: paloSantoPesquisa.class.php,v 1.7 2026-08-17 Prisma Telecom $ */
+  $Id: paloSantoPesquisa.class.php,v 1.8 2026-08-17 Prisma Telecom $ */
 
 class paloSantoPesquisa {
     var $_DB;
@@ -32,26 +32,45 @@ class paloSantoPesquisa {
 
     function connectBestDatabase()
     {
-        $mysqlpwd = "";
-        if (file_exists("/etc/issabel.conf")) {
-            $lines = @file("/etc/issabel.conf");
-            if (is_array($lines)) {
-                foreach ($lines as $line) {
-                    if (preg_match('/^mysqlrootpwd\s*=\s*(.*)$/i', trim($line), $m)) {
-                        $mysqlpwd = trim($m[1]);
-                        break;
-                    }
+        // 1. Tenta conexao nativa do Issabel framework
+        if (function_exists('generarDSNSistema')) {
+            $dsn = @generarDSNSistema('asteriskuser', 'asteriskcdrdb');
+            if (!empty($dsn)) {
+                $pDB = new paloDB($dsn);
+                if ($pDB && $pDB->connStatus) {
+                    $test = $pDB->getFirstRowQuery("SELECT count(*) FROM pesquisa", false);
+                    if ($test !== false) return $pDB;
                 }
             }
         }
 
-        // 1. MySQL asteriskcdrdb com root
-        $pDB = new paloDB("mysql://root:$mysqlpwd@localhost/asteriskcdrdb");
-        if ($pDB && $pDB->connStatus) return $pDB;
+        // 2. Extrai senhas do amportal.conf e issabel.conf
+        $passwords = array('', 'asterisk', 'asteriskuser');
+        if (file_exists('/etc/issabel.conf')) {
+            $c = @file_get_contents('/etc/issabel.conf');
+            if (preg_match('/mysqlrootpwd\s*=\s*(.*)/i', $c, $m)) $passwords[] = trim($m[1]);
+        }
+        if (file_exists('/etc/amportal.conf')) {
+            $c = @file_get_contents('/etc/amportal.conf');
+            if (preg_match('/AMPDBPASS\s*=\s*(.*)/i', $c, $m)) $passwords[] = trim($m[1]);
+            if (preg_match('/CDRDBPASS\s*=\s*(.*)/i', $c, $m)) $passwords[] = trim($m[1]);
+        }
+        if (file_exists('/etc/asterisk/cdr_mysql.conf')) {
+            $c = @file_get_contents('/etc/asterisk/cdr_mysql.conf');
+            if (preg_match('/password\s*=\s*(.*)/i', $c, $m)) $passwords[] = trim($m[1]);
+        }
 
-        // 2. MySQL asteriskcdrdb sem senha
-        $pDB = new paloDB("mysql://root:@localhost/asteriskcdrdb");
-        if ($pDB && $pDB->connStatus) return $pDB;
+        $users = array('root', 'asteriskuser', 'asterisk');
+        foreach ($users as $u) {
+            foreach ($passwords as $p) {
+                $dsn = "mysql://$u:$p@localhost/asteriskcdrdb";
+                $pDB = new paloDB($dsn);
+                if ($pDB && $pDB->connStatus) {
+                    $test = $pDB->getFirstRowQuery("SELECT count(*) FROM pesquisa", false);
+                    if ($test !== false) return $pDB;
+                }
+            }
+        }
 
         // 3. Fallback SQLite
         return new paloDB("sqlite3:////var/www/db/pesquisa.db");
@@ -135,7 +154,6 @@ class paloSantoPesquisa {
         }
 
         $strWhere = !empty($where) ? "WHERE " . implode(" AND ", $where) : "";
-        // Ordena por data e hora decrescente compatível com MySQL e SQLite
         $query = "SELECT * FROM pesquisa $strWhere ORDER BY data DESC, hora DESC LIMIT $limit OFFSET $offset";
 
         if ($this->_DB) {
