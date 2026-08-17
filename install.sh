@@ -12,6 +12,12 @@
 
 set -e
 
+# Desativa aliases do root (como cp -i, mv -i, rm -i) para rodar sem perguntas
+unalias cp 2>/dev/null || true
+unalias mv 2>/dev/null || true
+unalias rm 2>/dev/null || true
+shopt -s expand_aliases 2>/dev/null || true
+
 # --- CORES PARA LOGS ---
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -79,7 +85,7 @@ backup_and_deploy() {
     fi
 
     log_info "Implantando: $src -> $dest"
-    cp -rf "$src" "$dest"
+    /bin/cp -rf "$src" "$dest"
 }
 
 # ==============================================================================
@@ -121,7 +127,7 @@ fi
 log_info "4/20 - Instalando Webphone..."
 if [ -d "$REPO_DIR/src/webphone" ]; then
     mkdir -p /var/www/html/webphone
-    cp -rf "$REPO_DIR/src/webphone/"* /var/www/html/webphone/
+    /bin/cp -rf "$REPO_DIR/src/webphone/"* /var/www/html/webphone/
     chown -R asterisk:asterisk /var/www/html/webphone
     chmod -R 755 /var/www/html/webphone
     log_success "Webphone instalado em /var/www/html/webphone."
@@ -151,7 +157,7 @@ if [ -d "$REPO_DIR/src/modules/asternic_cdr" ]; then
             rm -rf "$ASTERNIC_DEST"
         fi
     fi
-    cp -rf "$REPO_DIR/src/modules/asternic_cdr" "$ASTERNIC_DEST"
+    /bin/cp -rf "$REPO_DIR/src/modules/asternic_cdr" "$ASTERNIC_DEST"
     chown -R asterisk:asterisk "$ASTERNIC_DEST"
     chmod -R 755 "$ASTERNIC_DEST"
     
@@ -271,9 +277,9 @@ fi
 if [ -d "$REPO_DIR/src/modules" ]; then
     if [ -d "/var/www/html/modules" ] && [ ! -d "/var/www/html/modules_old" ]; then
         log_info "Backup criado: /var/www/html/modules -> /var/www/html/modules_old"
-        cp -rf /var/www/html/modules /var/www/html/modules_old
+        /bin/cp -rf /var/www/html/modules /var/www/html/modules_old
     fi
-    cp -rf "$REPO_DIR/src/modules/"* /var/www/html/modules/
+    /bin/cp -rf "$REPO_DIR/src/modules/"* /var/www/html/modules/
     chown -R asterisk:asterisk /var/www/html/modules
     log_success "Módulos sincronizados em /var/www/html/modules."
 fi
@@ -285,7 +291,7 @@ log_info "11/20 - Atualizando Músicas de Espera (MOH)..."
 MOH_DEST="/var/lib/asterisk/moh"
 if [ -d "$REPO_DIR/src/sounds/moh" ]; then
     mkdir -p "$MOH_DEST"
-    cp -rn "$REPO_DIR/src/sounds/moh/"*.wav "$MOH_DEST/" 2>/dev/null || cp -rf "$REPO_DIR/src/sounds/moh/"*.wav "$MOH_DEST/" 2>/dev/null || true
+    cp -rn "$REPO_DIR/src/sounds/moh/"*.wav "$MOH_DEST/" 2>/dev/null || /bin/cp -rf "$REPO_DIR/src/sounds/moh/"*.wav "$MOH_DEST/" 2>/dev/null || true
     chown -R asterisk:asterisk "$MOH_DEST"
     chmod 644 "$MOH_DEST"/*.wav 2>/dev/null || true
     log_success "Músicas de espera atualizadas em $MOH_DEST."
@@ -314,7 +320,7 @@ fi
 log_info "13/20 - Instalando Painel IPbx..."
 PANEL_SRC="$REPO_DIR/src/modules/control_panel"
 if [ -d "$PANEL_SRC" ]; then
-    cp -rf "$PANEL_SRC" /var/www/html/modules/control_panel
+    /bin/cp -rf "$PANEL_SRC" /var/www/html/modules/control_panel
     chown -R asterisk:asterisk /var/www/html/modules/control_panel
     
     if command -v sqlite3 &>/dev/null; then
@@ -398,7 +404,7 @@ fi
 # Implantação do Módulo Web da Pesquisa de Satisfação
 if [ -d "$REPO_DIR/src/modules/pesquisa" ]; then
     mkdir -p /var/www/html/modules/pesquisa
-    cp -rf "$REPO_DIR/src/modules/pesquisa/"* /var/www/html/modules/pesquisa/
+    /bin/cp -rf "$REPO_DIR/src/modules/pesquisa/"* /var/www/html/modules/pesquisa/
     chown -R asterisk:asterisk /var/www/html/modules/pesquisa
     chmod -R 755 /var/www/html/modules/pesquisa
     
@@ -435,7 +441,7 @@ fi
 # 2. Copia os módulos atualizados do Call Center
 for CC_MOD in agent_console agents callcenter_config campaign_in campaign_monitoring campaign_out dont_call_list eccp_users form_designer form_list hold_time ingoings_calls_success login_logout rep_agent_information rep_agents_monitoring rep_incoming_calls_monitoring rep_trunks_used_per_hour reports_break; do
     if [ -d "$REPO_DIR/src/modules/$CC_MOD" ]; then
-        cp -rf "$REPO_DIR/src/modules/$CC_MOD" /var/www/html/modules/
+        /bin/cp -rf "$REPO_DIR/src/modules/$CC_MOD" /var/www/html/modules/
         chown -R asterisk:asterisk "/var/www/html/modules/$CC_MOD"
         chmod -R 755 "/var/www/html/modules/$CC_MOD"
     fi
@@ -536,7 +542,7 @@ if [ ! -f /usr/local/parselog/parselog.php ] || [ ! -d /var/www/html/stats ]; th
         # Copia pasta web do Asternic Lite para /var/www/html/stats
         if [ -d "$TMP_ASTERNIC/asternic-stats/html" ]; then
             mkdir -p /var/www/html/stats
-            cp -rf "$TMP_ASTERNIC/asternic-stats/html/"* /var/www/html/stats/
+            /bin/cp -rf "$TMP_ASTERNIC/asternic-stats/html/"* /var/www/html/stats/
             if [ -f /var/www/html/stats/config.php ]; then
                 sed -i "s/\$dbuser = .*/\$dbuser = 'root';/" /var/www/html/stats/config.php
                 sed -i "s/\$dbpass = .*/\$dbpass = '$MYSQL_PWD';/" /var/www/html/stats/config.php
@@ -560,10 +566,10 @@ fi
 # 3. Implantação do seu Relatório de Filas Melhorado (Interface Customizada)
 if [ -d "$QUEUE_SRC" ]; then
     mkdir -p /var/www/html/modules/relatorio_de_filas /var/www/html/Relatorio_de_filas /var/www/html/relatorio_de_filas /var/www/html/stats
-    cp -rf "$QUEUE_SRC/"* /var/www/html/modules/relatorio_de_filas/
-    cp -rf "$QUEUE_SRC/"* /var/www/html/Relatorio_de_filas/ 2>/dev/null || true
-    cp -rf "$QUEUE_SRC/"* /var/www/html/relatorio_de_filas/ 2>/dev/null || true
-    cp -rf "$QUEUE_SRC/"* /var/www/html/stats/ 2>/dev/null || true
+    /bin/cp -rf "$QUEUE_SRC/"* /var/www/html/modules/relatorio_de_filas/
+    /bin/cp -rf "$QUEUE_SRC/"* /var/www/html/Relatorio_de_filas/ 2>/dev/null || true
+    /bin/cp -rf "$QUEUE_SRC/"* /var/www/html/relatorio_de_filas/ 2>/dev/null || true
+    /bin/cp -rf "$QUEUE_SRC/"* /var/www/html/stats/ 2>/dev/null || true
     chown -R asterisk:asterisk /var/www/html/modules/relatorio_de_filas /var/www/html/Relatorio_de_filas /var/www/html/relatorio_de_filas /var/www/html/stats
     chmod -R 755 /var/www/html/modules/relatorio_de_filas /var/www/html/Relatorio_de_filas /var/www/html/relatorio_de_filas /var/www/html/stats
     
@@ -577,7 +583,7 @@ fi
 
 if [ -d "$REPO_DIR/src/ramais" ]; then
     mkdir -p /var/www/html/ramais
-    cp -rf "$REPO_DIR/src/ramais/"* /var/www/html/ramais/
+    /bin/cp -rf "$REPO_DIR/src/ramais/"* /var/www/html/ramais/
     chown -R asterisk:asterisk /var/www/html/ramais
     log_success "Módulo Ramais e Relatório de Filas configurados."
 fi
@@ -603,7 +609,7 @@ fi
 for MOD in build_module delete_module language_admin; do
     if [ -d "$REPO_DIR/src/modules/$MOD" ]; then
         rm -rf "/var/www/html/modules/$MOD"
-        cp -rf "$REPO_DIR/src/modules/$MOD" /var/www/html/modules/
+        /bin/cp -rf "$REPO_DIR/src/modules/$MOD" /var/www/html/modules/
         chown -R asterisk:asterisk "/var/www/html/modules/$MOD"
         chmod -R 755 "/var/www/html/modules/$MOD"
     fi
@@ -622,7 +628,7 @@ if [ -f "$REPO_DIR/src/favicon.ico" ]; then
 fi
 
 if [ -d "$REPO_DIR/src/themes/prisma_v5" ]; then
-    cp -rf "$REPO_DIR/src/themes/prisma_v5" /var/www/html/themes/
+    /bin/cp -rf "$REPO_DIR/src/themes/prisma_v5" /var/www/html/themes/
     chown -R asterisk:asterisk /var/www/html/themes
     log_success "Tema Prisma v5 e Favicon aplicados."
 fi
