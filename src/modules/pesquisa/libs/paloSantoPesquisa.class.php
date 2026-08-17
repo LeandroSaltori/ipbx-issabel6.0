@@ -10,7 +10,7 @@
   +----------------------------------------------------------------------+
   | The Initial Developer of the Original Code is PaloSanto Solutions    |
   +----------------------------------------------------------------------+
-  $Id: paloSantoPesquisa.class.php,v 14.0 2026-08-17 Prisma Telecom $ */
+  $Id: paloSantoPesquisa.class.php,v 15.0 2026-08-17 Prisma Telecom $ */
 
 class paloSantoPesquisa {
     var $_DB;
@@ -366,14 +366,28 @@ class paloSantoPesquisa {
             $params[] = $operador;
         }
         if (!empty($avaliacao)) {
-            $where[] = "(UPPER(avaliacao) = ? OR avaliacao = ?)";
-            $params[] = strtoupper($avaliacao);
-            $params[] = $avaliacao;
+            $avUp = strtoupper(trim($avaliacao));
+            if (in_array($avUp, array('NAO AVALIOU', 'NÃO AVALIOU', 'ABANDONOU', 'SEM RESPOSTA', 'DESISTIU', '0'))) {
+                $where[] = "(UPPER(avaliacao) IN ('NAO AVALIOU', 'NÃO AVALIOU', 'ABANDONOU', 'SEM RESPOSTA', 'DESISTISTU', 'DESISTIU', '0', '') OR avaliacao IS NULL)";
+            } else {
+                $where[] = "(UPPER(avaliacao) = ? OR avaliacao = ?)";
+                $params[] = $avUp;
+                $params[] = $avaliacao;
+            }
         }
         if (!empty($solucao)) {
-            $where[] = "(UPPER(solucao) = ? OR solucao = ?)";
-            $params[] = strtoupper($solucao);
-            $params[] = $solucao;
+            $solUp = strtoupper(trim($solucao));
+            if (in_array($solUp, array('NAO AVALIOU', 'NÃO AVALIOU', '0'))) {
+                $where[] = "(UPPER(solucao) IN ('NAO AVALIOU', 'NÃO AVALIOU', '0', '', '-') OR solucao IS NULL)";
+            } elseif ($solUp == 'SIM' || $solUp == '1') {
+                $where[] = "(UPPER(solucao) IN ('SIM', '1'))";
+            } elseif ($solUp == 'NAO' || $solUp == 'NÃO' || $solUp == '2') {
+                $where[] = "(UPPER(solucao) IN ('NAO', 'NÃO', '2'))";
+            } else {
+                $where[] = "(UPPER(solucao) = ? OR solucao = ?)";
+                $params[] = $solUp;
+                $params[] = $solucao;
+            }
         }
 
         $strWhere = !empty($where) ? "WHERE " . implode(" AND ", $where) : "";
@@ -418,14 +432,28 @@ class paloSantoPesquisa {
             $params[] = $operador;
         }
         if (!empty($avaliacao)) {
-            $where[] = "(UPPER(avaliacao) = ? OR avaliacao = ?)";
-            $params[] = strtoupper($avaliacao);
-            $params[] = $avaliacao;
+            $avUp = strtoupper(trim($avaliacao));
+            if (in_array($avUp, array('NAO AVALIOU', 'NÃO AVALIOU', 'ABANDONOU', 'SEM RESPOSTA', 'DESISTIU', '0'))) {
+                $where[] = "(UPPER(avaliacao) IN ('NAO AVALIOU', 'NÃO AVALIOU', 'ABANDONOU', 'SEM RESPOSTA', 'DESISTISTU', 'DESISTIU', '0', '') OR avaliacao IS NULL)";
+            } else {
+                $where[] = "(UPPER(avaliacao) = ? OR avaliacao = ?)";
+                $params[] = $avUp;
+                $params[] = $avaliacao;
+            }
         }
         if (!empty($solucao)) {
-            $where[] = "(UPPER(solucao) = ? OR solucao = ?)";
-            $params[] = strtoupper($solucao);
-            $params[] = $solucao;
+            $solUp = strtoupper(trim($solucao));
+            if (in_array($solUp, array('NAO AVALIOU', 'NÃO AVALIOU', '0'))) {
+                $where[] = "(UPPER(solucao) IN ('NAO AVALIOU', 'NÃO AVALIOU', '0', '', '-') OR solucao IS NULL)";
+            } elseif ($solUp == 'SIM' || $solUp == '1') {
+                $where[] = "(UPPER(solucao) IN ('SIM', '1'))";
+            } elseif ($solUp == 'NAO' || $solUp == 'NÃO' || $solUp == '2') {
+                $where[] = "(UPPER(solucao) IN ('NAO', 'NÃO', '2'))";
+            } else {
+                $where[] = "(UPPER(solucao) = ? OR solucao = ?)";
+                $params[] = $solUp;
+                $params[] = $solucao;
+            }
         }
 
         $strWhere = !empty($where) ? "WHERE " . implode(" AND ", $where) : "";
@@ -482,7 +510,7 @@ class paloSantoPesquisa {
             SUM(CASE WHEN UPPER(avaliacao) IN ('BOM', 'MEDIO', 'MÉDIO', 'REGULAR', '3') THEN 1 ELSE 0 END) as medio,
             SUM(CASE WHEN UPPER(avaliacao) IN ('RUIM', '2') THEN 1 ELSE 0 END) as bom,
             SUM(CASE WHEN UPPER(avaliacao) IN ('PESSIMO', 'PÉSSIMO', '1') THEN 1 ELSE 0 END) as ruim,
-            SUM(CASE WHEN UPPER(avaliacao) IN ('NAO AVALIOU', 'NÃO AVALIOU', 'ABANDONOU', 'DESISTISTU', 'SEM RESPOSTA', '0', '') OR avaliacao IS NULL THEN 1 ELSE 0 END) as nao_avaliou,
+            SUM(CASE WHEN UPPER(avaliacao) IN ('NAO AVALIOU', 'NÃO AVALIOU', 'ABANDONOU', 'SEM RESPOSTA', '0', '') OR avaliacao IS NULL THEN 1 ELSE 0 END) as nao_avaliou,
             SUM(CASE WHEN UPPER(solucao) IN ('SIM', '1') THEN 1 ELSE 0 END) as resolvido_sim,
             SUM(CASE WHEN UPPER(solucao) IN ('NAO', 'NÃO', '2') THEN 1 ELSE 0 END) as resolvido_nao
             FROM pesquisa $strWhere";
@@ -510,7 +538,7 @@ class paloSantoPesquisa {
                     SUM(CASE WHEN UPPER(avaliacao) IN ('BOM', 'MEDIO', 'MÉDIO', 'REGULAR', '3') THEN 1 ELSE 0 END) as medio,
                     SUM(CASE WHEN UPPER(avaliacao) IN ('RUIM', '2') THEN 1 ELSE 0 END) as bom,
                     SUM(CASE WHEN UPPER(avaliacao) IN ('PESSIMO', 'PÉSSIMO', '1') THEN 1 ELSE 0 END) as ruim,
-                    SUM(CASE WHEN UPPER(avaliacao) IN ('NAO AVALIOU', 'NÃO AVALIOU', 'ABANDONOU', 'DESISTISTU', 'SEM RESPOSTA', '0', '') OR avaliacao IS NULL THEN 1 ELSE 0 END) as nao_avaliou,
+                    SUM(CASE WHEN UPPER(avaliacao) IN ('NAO AVALIOU', 'NÃO AVALIOU', 'ABANDONOU', 'SEM RESPOSTA', '0', '') OR avaliacao IS NULL THEN 1 ELSE 0 END) as nao_avaliou,
                     SUM(CASE WHEN UPPER(solucao) IN ('SIM', '1') THEN 1 ELSE 0 END) as resolvido_sim,
                     SUM(CASE WHEN UPPER(solucao) IN ('NAO', 'NÃO', '2') THEN 1 ELSE 0 END) as resolvido_nao
                     FROM pesquisa");
@@ -569,7 +597,6 @@ class paloSantoPesquisa {
             $total = $cdrTotalPesquisa;
             $nao_avaliou = $total - $avaliadosDB;
         } else {
-            // Estimativa para pesquisas históricas antigas onde o CDR foi rotacionado
             $nao_avaliou = (int)round($avaliadosDB * 0.18);
             $total = $avaliadosDB + $nao_avaliou;
         }
