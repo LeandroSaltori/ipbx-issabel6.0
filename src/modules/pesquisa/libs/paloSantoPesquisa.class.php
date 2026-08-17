@@ -10,7 +10,7 @@
   +----------------------------------------------------------------------+
   | The Initial Developer of the Original Code is PaloSanto Solutions    |
   +----------------------------------------------------------------------+
-  $Id: paloSantoPesquisa.class.php,v 7.0 2026-08-17 Prisma Telecom $ */
+  $Id: paloSantoPesquisa.class.php,v 8.0 2026-08-17 Prisma Telecom $ */
 
 class paloSantoPesquisa {
     var $_DB;
@@ -201,7 +201,7 @@ class paloSantoPesquisa {
         $ts = strtotime($dt);
 
         if ($ts) {
-            $start = date('Y-m-d H:i:s', $ts - 1200);
+            $start = date('Y-m-d H:i:s', $ts - 3600);
             $end   = date('Y-m-d H:i:s', $ts + 1200);
 
             $telClean = preg_replace('/[^0-9]/', '', $telefone);
@@ -210,13 +210,14 @@ class paloSantoPesquisa {
             }
 
             try {
+                // Ordena por maior duração para capturar a chamada completa (atendimento + URA) e o áudio da gravação
                 $sql = "SELECT recordingfile, duration, billsec, dst, dstchannel, channel FROM cdr 
                         WHERE calldate BETWEEN ? AND ? 
                         AND (src LIKE ? OR dst LIKE ? OR channel LIKE ? OR dstchannel LIKE ?) 
-                        ORDER BY ABS(TIMESTAMPDIFF(SECOND, calldate, ?)) ASC LIMIT 1";
+                        ORDER BY duration DESC LIMIT 1";
                 $stmt = $this->pdo->prepare($sql);
                 if ($stmt !== false) {
-                    $stmt->execute(array($start, $end, "%$telClean%", "%$telClean%", "%$telClean%", "%$telClean%", $dt));
+                    $stmt->execute(array($start, $end, "%$telClean%", "%$telClean%", "%$telClean%", "%$telClean%"));
                     $row = $stmt->fetch();
                     if ($row) {
                         $info['recordingfile'] = !empty($row['recordingfile']) ? $row['recordingfile'] : '';
