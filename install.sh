@@ -503,7 +503,8 @@ if [ -d "$QUEUE_SRC" ]; then
     
     if command -v sqlite3 &>/dev/null; then
         sqlite3 /var/www/db/acl.db "INSERT OR IGNORE INTO acl_resource (name, description) VALUES ('relatorio_de_filas', 'Relatório de Filas');" 2>/dev/null || true
-        sqlite3 /var/www/db/menu.db "INSERT OR IGNORE INTO menu (id, IdParent, Link, Name, Type, order_no) VALUES ('relatorio_de_filas', 'reports', '', 'Relatório de Filas', 'module', 9);" 2>/dev/null || true
+        sqlite3 /var/www/db/menu.db "DELETE FROM menu WHERE id = 'relatorio_de_filas';" 2>/dev/null || true
+        sqlite3 /var/www/db/menu.db "INSERT INTO menu (id, IdParent, Link, Name, Type, order_no) VALUES ('relatorio_de_filas', 'reports', 'Relatorio_de_filas/', 'Relatório de Filas', 'framed', 9);" 2>/dev/null || true
         sqlite3 /var/www/db/acl.db "INSERT OR IGNORE INTO acl_group_permission (id_action, id_group, id_resource) SELECT 1, 1, id FROM acl_resource WHERE name = 'relatorio_de_filas';" 2>/dev/null || true
     fi
 fi
@@ -520,9 +521,10 @@ fi
 # ==============================================================================
 log_info "16/20 - Instalando Módulos Web Developer..."
 if command -v sqlite3 &>/dev/null; then
-    sqlite3 /var/www/db/acl.db "INSERT OR IGNORE INTO acl_resource (name, description) VALUES ('web_developer', 'Web Developer');" 2>/dev/null || true
-    sqlite3 /var/www/db/menu.db "INSERT OR IGNORE INTO menu (id, IdParent, Link, Name, Type, order_no) VALUES ('web_developer', 'system', '', 'Web Developer', 'framed', 15);" 2>/dev/null || true
-    sqlite3 /var/www/db/acl.db "INSERT OR IGNORE INTO acl_group_permission (id_action, id_group, id_resource) SELECT 1, 1, id FROM acl_resource WHERE name = 'web_developer';" 2>/dev/null || true
+    sqlite3 /var/www/db/acl.db "INSERT OR IGNORE INTO acl_resource (name, description) VALUES ('developer', 'Developer');" 2>/dev/null || true
+    sqlite3 /var/www/db/menu.db "DELETE FROM menu WHERE id = 'developer' OR id = 'web_developer';" 2>/dev/null || true
+    sqlite3 /var/www/db/menu.db "INSERT INTO menu (id, IdParent, Link, Name, Type, order_no) VALUES ('developer', '', '', 'Developer', 'framed', 99);" 2>/dev/null || true
+    sqlite3 /var/www/db/acl.db "INSERT OR IGNORE INTO acl_group_permission (id_action, id_group, id_resource) SELECT 1, 1, id FROM acl_resource WHERE name = 'developer';" 2>/dev/null || true
 fi
 
 for MOD in build_module delete_module language_admin; do
@@ -532,7 +534,8 @@ for MOD in build_module delete_module language_admin; do
         
         if command -v sqlite3 &>/dev/null; then
             sqlite3 /var/www/db/acl.db "INSERT OR IGNORE INTO acl_resource (name, description) VALUES ('$MOD', '$MOD');" 2>/dev/null || true
-            sqlite3 /var/www/db/menu.db "INSERT OR IGNORE INTO menu (id, IdParent, Link, Name, Type, order_no) VALUES ('$MOD', 'web_developer', '', '$MOD', 'module', 1);" 2>/dev/null || true
+            sqlite3 /var/www/db/menu.db "DELETE FROM menu WHERE id = '$MOD';" 2>/dev/null || true
+            sqlite3 /var/www/db/menu.db "INSERT INTO menu (id, IdParent, Link, Name, Type, order_no) VALUES ('$MOD', 'developer', '', '$MOD', 'module', 1);" 2>/dev/null || true
             sqlite3 /var/www/db/acl.db "INSERT OR IGNORE INTO acl_group_permission (id_action, id_group, id_resource) SELECT 1, 1, id FROM acl_resource WHERE name = '$MOD';" 2>/dev/null || true
         fi
     fi
