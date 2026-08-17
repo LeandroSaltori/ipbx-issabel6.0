@@ -10,7 +10,7 @@
   +----------------------------------------------------------------------+
   | The Initial Developer of the Original Code is PaloSanto Solutions    |
   +----------------------------------------------------------------------+
-  $Id: index.php,v 15.0 2026-08-17 Prisma Telecom $ */
+  $Id: index.php,v 16.0 2026-08-17 Prisma Telecom $ */
 
 require_once "modules/agent_console/libs/issabel2.lib.php";
 include_once "libs/paloSantoDB.class.php";
@@ -173,7 +173,7 @@ function handleExportExcel($pPesquisa)
 
             $avUpper = strtoupper(trim($val_avaliacao));
             $isEvaluated = !in_array($avUpper, array('NAO AVALIOU', 'NÃO AVALIOU', 'ABANDONOU', 'SEM RESPOSTA', 'DESISTIU', '0', ''));
-            $val_status_str = $isEvaluated ? 'AVALIADO' : 'NÃO AVALIOU';
+            $val_status_str = $isEvaluated ? 'Avaliado com Sucesso' : 'Cliente Desligou Sem Avaliar';
 
             $cdrInfo     = $pPesquisa->findCdrInfoForCall($raw_tel, !empty($row['data']) ? $row['data'] : '', $val_hora, $val_operador);
             $val_duracao = !empty($cdrInfo['duration_formatted']) ? $cdrInfo['duration_formatted'] : '-';
@@ -642,29 +642,16 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
             border-color: #cbd5e1;
         }
 
-        .status-badge-evaluated {
-            background: #dcfce7;
-            color: #15803d;
-            border: 1px solid #86efac;
-            padding: 3px 8px;
-            border-radius: 6px;
-            font-weight: 700;
-            font-size: 10px;
+        .status-icon-badge {
+            font-size: 18px;
+            cursor: help;
             display: inline-flex;
             align-items: center;
-            gap: 4px;
+            justify-content: center;
+            transition: transform 0.2s;
         }
-        .status-badge-abandoned {
-            background: #f1f5f9;
-            color: #64748b;
-            border: 1px solid #cbd5e1;
-            padding: 3px 8px;
-            border-radius: 6px;
-            font-weight: 700;
-            font-size: 10px;
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
+        .status-icon-badge:hover {
+            transform: scale(1.2);
         }
     </style>
 
@@ -798,7 +785,7 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
                         <th>Telefone</th>
                         <th>Avaliação do Atendimento</th>
                         <th>Problema Resolvido?</th>
-                        <th>Status</th>
+                        <th style="text-align:center;">Status</th>
                         <th>Gravação</th>
                     </tr>
                 </thead>
@@ -847,27 +834,27 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
                                         case 'OTIMO':
                                         case 'ÓTIMO':
                                         case '5':
-                                            echo "<span style='background:#10b981; color:#ffffff; padding:4px 10px; border-radius:12px; font-weight:bold; font-size:11px; display:inline-block;'><span style='letter-spacing:2px;'>⭐⭐⭐⭐⭐</span> EXCELENTE</span>";
+                                            echo "<span style='background:#10b981; color:#ffffff; padding:3px 10px; border-radius:10px; font-weight:bold; font-size:10px; display:inline-block;'>⭐⭐⭐⭐⭐ EXCELENTE</span>";
                                             break;
                                         case 'MUITO BOM':
                                         case '4':
-                                            echo "<span style='background:#3b82f6; color:#ffffff; padding:4px 10px; border-radius:12px; font-weight:bold; font-size:11px; display:inline-block;'><span style='letter-spacing:2px;'>⭐⭐⭐⭐</span> MUITO BOM</span>";
+                                            echo "<span style='background:#3b82f6; color:#ffffff; padding:3px 10px; border-radius:10px; font-weight:bold; font-size:10px; display:inline-block;'>⭐⭐⭐⭐ MUITO BOM</span>";
                                             break;
                                         case 'MEDIO':
                                         case 'MÉDIO':
                                         case 'REGULAR':
                                         case 'BOM':
                                         case '3':
-                                            echo "<span style='background:#f59e0b; color:#ffffff; padding:4px 10px; border-radius:12px; font-weight:bold; font-size:11px; display:inline-block;'><span style='letter-spacing:2px;'>⭐⭐⭐</span> $avUpper</span>";
+                                            echo "<span style='background:#f59e0b; color:#ffffff; padding:3px 10px; border-radius:10px; font-weight:bold; font-size:10px; display:inline-block;'>⭐⭐⭐ $avUpper</span>";
                                             break;
                                         case '2':
-                                            echo "<span style='background:#f97316; color:#ffffff; padding:4px 10px; border-radius:12px; font-weight:bold; font-size:11px; display:inline-block;'><span style='letter-spacing:2px;'>⭐⭐</span> BOM</span>";
+                                            echo "<span style='background:#f97316; color:#ffffff; padding:3px 10px; border-radius:10px; font-weight:bold; font-size:10px; display:inline-block;'>⭐⭐ BOM</span>";
                                             break;
                                         case 'RUIM':
                                         case 'PESSIMO':
                                         case 'PÉSSIMO':
                                         case '1':
-                                            echo "<span style='background:#ef4444; color:#ffffff; padding:4px 10px; border-radius:12px; font-weight:bold; font-size:11px; display:inline-block;'><span style='letter-spacing:2px;'>⭐</span> $avUpper</span>";
+                                            echo "<span style='background:#ef4444; color:#ffffff; padding:3px 10px; border-radius:10px; font-weight:bold; font-size:10px; display:inline-block;'>⭐ $avUpper</span>";
                                             break;
                                         case 'NAO AVALIOU':
                                         case 'NÃO AVALIOU':
@@ -876,10 +863,10 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
                                         case 'DESISTIU':
                                         case '0':
                                         case '':
-                                            echo "<span style='background:#64748b; color:#ffffff; padding:4px 10px; border-radius:12px; font-weight:bold; font-size:11px; display:inline-block;'>📵 NÃO AVALIOU</span>";
+                                            echo "<span style='background:#64748b; color:#ffffff; padding:3px 10px; border-radius:10px; font-weight:bold; font-size:10px; display:inline-block;'>📵 NÃO AVALIOU</span>";
                                             break;
                                         default:
-                                            echo "<span style='background:#94a3b8; color:#ffffff; padding:4px 10px; border-radius:12px; font-weight:bold; font-size:11px; display:inline-block;'>$avUpper</span>";
+                                            echo "<span style='background:#94a3b8; color:#ffffff; padding:3px 10px; border-radius:10px; font-weight:bold; font-size:10px; display:inline-block;'>$avUpper</span>";
                                             break;
                                     }
                                     ?>
@@ -898,11 +885,11 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
                                     }
                                     ?>
                                 </td>
-                                <td>
+                                <td style="text-align:center;">
                                     <?php if ($isEvaluated): ?>
-                                        <span class="status-badge-evaluated">✅ Avaliado</span>
+                                        <span title="Avaliado com Sucesso" class="status-icon-badge">✅</span>
                                     <?php else: ?>
-                                        <span class="status-badge-abandoned">📵 Não Avaliou</span>
+                                        <span title="Cliente Desligou Sem Avaliar" class="status-icon-badge">📵</span>
                                     <?php endif; ?>
                                 </td>
                                 <td>
