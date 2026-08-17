@@ -11,7 +11,7 @@ Com este repositório, você não precisa realizar nenhuma alteração manual ap
 Conecte-se ao seu servidor Issabel via **SSH como `root`** e execute o comando abaixo:
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/LeandroSaltori/ipbx-issabel5/main/install.sh | bash
+curl -sSL https://raw.githubusercontent.com/LeandroSaltori/ipbx-issabel6.0/main/install.sh | bash
 ```
 
 > **Nota:** Caso já tenha clonado o repositório no servidor, você também pode executar localmente:
@@ -102,4 +102,4 @@ Para instruções específicas de configuração de módulos individuais, acesse
 ## 🛠️ Suporte & Desenvolvimento
 
 - **Autor:** Leandro Saltori - Prisma Telecom
-- **Repositório:** [LeandroSaltori/ipbx-issabel5](https://github.com/LeandroSaltori/ipbx-issabel5)
+- **Repositório:** [LeandroSaltori/ipbx-issabel6.0](https://github.com/LeandroSaltori/ipbx-issabel6.0)

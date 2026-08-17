@@ -42,7 +42,7 @@ if [ ! -f "$REPO_DIR/install.sh" ] || [ ! -d "$REPO_DIR/src" ]; then
     TMP_REPO="/tmp/ipbx-issabel-repo"
     log_info "Baixando o repositório completo para $TMP_REPO..."
     rm -rf "$TMP_REPO"
-    git clone --depth 1 https://github.com/LeandroSaltori/ipbx-issabel5.git "$TMP_REPO"
+    git clone --depth 1 https://github.com/LeandroSaltori/ipbx-issabel6.0.git "$TMP_REPO"
     REPO_DIR="$TMP_REPO"
 fi
 
