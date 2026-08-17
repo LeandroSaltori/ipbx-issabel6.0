@@ -10,7 +10,7 @@
   +----------------------------------------------------------------------+
   | The Initial Developer of the Original Code is PaloSanto Solutions    |
   +----------------------------------------------------------------------+
-  $Id: index.php,v 7.0 2026-08-17 Prisma Telecom $ */
+  $Id: index.php,v 8.0 2026-08-17 Prisma Telecom $ */
 
 require_once "modules/agent_console/libs/issabel2.lib.php";
 include_once "libs/paloSantoDB.class.php";
@@ -125,17 +125,19 @@ function handleExportExcel($pPesquisa)
 
     $total = $pPesquisa->getNumPesquisa('', '', $date_start, $date_end, $operador, $avaliacao, $solucao);
     $arrResult = $pPesquisa->getPesquisa($total > 0 ? $total : 5000, 0, '', '', $date_start, $date_end, $operador, $avaliacao, $solucao);
+    $extNamesMap = $pPesquisa->getExtensionNamesMap();
 
     header('Content-Type: text/csv; charset=utf-8');
     header('Content-Disposition: attachment; filename=Pesquisa_Satisfacao_' . date('Ymd_His') . '.csv');
 
     $output = fopen('php://output', 'w');
     fprintf($output, chr(0xEF).chr(0xBB).chr(0xBF));
-    fputcsv($output, array('Operador / Ramal', 'Fila', 'Data', 'Hora', 'Duracao', 'Telefone', 'Avaliacao', 'Problema Resolvido'), ';');
+    fputcsv($output, array('Operador / Ramal', 'Nome do Atendente', 'Fila', 'Data', 'Hora', 'Duracao', 'Telefone', 'Avaliacao', 'Problema Resolvido'), ';');
 
     if (is_array($arrResult)) {
         foreach ($arrResult as $row) {
             $val_operador  = !empty($row['operador']) ? $row['operador'] : (!empty($row['ramal']) ? $row['ramal'] : '-');
+            $val_nome      = isset($extNamesMap[$val_operador]) ? $extNamesMap[$val_operador] : '-';
             $val_fila      = !empty($row['fila']) ? $row['fila'] : 'Atendimento';
             $val_data      = !empty($row['data']) ? $row['data'] : '-';
             $val_hora      = !empty($row['hora']) ? $row['hora'] : '-';
@@ -146,7 +148,7 @@ function handleExportExcel($pPesquisa)
             $cdrInfo = $pPesquisa->findCdrInfoForCall($val_telefone, $val_data, $val_hora, $val_operador);
             $val_duracao = !empty($cdrInfo['duration_formatted']) ? $cdrInfo['duration_formatted'] : '-';
 
-            fputcsv($output, array($val_operador, $val_fila, $val_data, $val_hora, $val_duracao, $val_telefone, $val_avaliacao, $val_solucao), ';');
+            fputcsv($output, array($val_operador, $val_nome, $val_fila, $val_data, $val_hora, $val_duracao, $val_telefone, $val_avaliacao, $val_solucao), ';');
         }
     }
     fclose($output);
@@ -167,6 +169,7 @@ function handleExportPdf($pPesquisa)
 
     $total = $pPesquisa->getNumPesquisa('', '', $date_start, $date_end, $operador, $avaliacao, $solucao);
     $arrResult = $pPesquisa->getPesquisa($total > 0 ? $total : 5000, 0, '', '', $date_start, $date_end, $operador, $avaliacao, $solucao);
+    $extNamesMap = $pPesquisa->getExtensionNamesMap();
 
     ?>
     <!DOCTYPE html>
@@ -209,6 +212,8 @@ function handleExportPdf($pPesquisa)
                 <?php foreach ($arrResult as $row): ?>
                 <?php
                 $val_operador  = !empty($row['operador']) ? $row['operador'] : (!empty($row['ramal']) ? $row['ramal'] : '-');
+                $val_nome      = isset($extNamesMap[$val_operador]) ? $extNamesMap[$val_operador] : '';
+                $val_disp_op   = !empty($val_nome) ? "$val_operador - $val_nome" : $val_operador;
                 $val_fila      = !empty($row['fila']) ? $row['fila'] : 'Atendimento';
                 $val_data      = !empty($row['data']) ? $row['data'] : '-';
                 $val_hora      = !empty($row['hora']) ? $row['hora'] : '-';
@@ -219,7 +224,7 @@ function handleExportPdf($pPesquisa)
                 $val_duracao   = !empty($cdrInfo['duration_formatted']) ? $cdrInfo['duration_formatted'] : '-';
                 ?>
                 <tr>
-                    <td><strong>👤 <?php echo htmlspecialchars($val_operador); ?></strong></td>
+                    <td><strong>👤 <?php echo htmlspecialchars($val_disp_op); ?></strong></td>
                     <td><?php echo htmlspecialchars($val_fila); ?></td>
                     <td>📅 <?php echo htmlspecialchars($val_data); ?></td>
                     <td>🕒 <?php echo htmlspecialchars($val_hora); ?></td>
@@ -254,8 +259,9 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
     // Estatísticas dos Cards e Gráficos
     $stats = $pPesquisa->getPesquisaStats($date_start, $date_end, $operador);
 
-    // Lista de Operadores Únicos
+    // Lista de Operadores Únicos & Mapa de Nomes dos Ramais
     $operadoresList = $pPesquisa->getOperadoresList();
+    $extNamesMap    = $pPesquisa->getExtensionNamesMap();
 
     // Registros Filtrados
     $total = $pPesquisa->getNumPesquisa('', '', $date_start, $date_end, $operador, $avaliacao, $solucao);
@@ -606,7 +612,11 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
                             <option value="">-- Todos os Operadores --</option>
                             <?php if (is_array($operadoresList)): ?>
                                 <?php foreach ($operadoresList as $op): ?>
-                                    <option value="<?php echo htmlspecialchars($op); ?>" <?php if ($operador == $op) echo 'selected'; ?>>👤 Ramal / Agent <?php echo htmlspecialchars($op); ?></option>
+                                    <?php
+                                    $opName = isset($extNamesMap[$op]) ? $extNamesMap[$op] : '';
+                                    $opLabel = !empty($opName) ? "$op - $opName" : "Ramal $op";
+                                    ?>
+                                    <option value="<?php echo htmlspecialchars($op); ?>" <?php if ($operador == $op) echo 'selected'; ?>>👤 <?php echo htmlspecialchars($opLabel); ?></option>
                                 <?php endforeach; ?>
                             <?php endif; ?>
                         </select>
@@ -708,6 +718,8 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
                         <?php foreach ($arrResult as $row): ?>
                             <?php
                             $val_operador  = !empty($row['operador']) ? $row['operador'] : (!empty($row['ramal']) ? $row['ramal'] : '-');
+                            $val_nome      = isset($extNamesMap[$val_operador]) ? $extNamesMap[$val_operador] : '';
+                            $val_disp_op   = !empty($val_nome) ? "$val_operador - $val_nome" : $val_operador;
                             $val_fila      = !empty($row['fila']) ? $row['fila'] : 'Atendimento';
                             $val_data      = !empty($row['data']) ? $row['data'] : '-';
                             $val_hora      = !empty($row['hora']) ? $row['hora'] : '-';
@@ -720,7 +732,7 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
                             $recFile       = !empty($cdrInfo['recordingfile']) ? $cdrInfo['recordingfile'] : '';
                             ?>
                             <tr>
-                                <td><span style='background:#ede9fe; color:#6d28d9; padding:3px 8px; border-radius:6px; font-weight:600; font-size:11px;'>👤 <?php echo htmlspecialchars($val_operador); ?></span></td>
+                                <td><span style='background:#ede9fe; color:#6d28d9; padding:3px 8px; border-radius:6px; font-weight:600; font-size:11px;'>👤 <?php echo htmlspecialchars($val_disp_op); ?></span></td>
                                 <td><span style='background:#f1f5f9; color:#475569; padding:2px 6px; border-radius:4px; font-size:11px;'><?php echo htmlspecialchars($val_fila); ?></span></td>
                                 <td><span style='color:#334155; font-size:11px;'>📅 <?php echo htmlspecialchars($val_data); ?></span></td>
                                 <td><span style='color:#64748b; font-size:11px;'>🕒 <?php echo htmlspecialchars($val_hora); ?></span></td>

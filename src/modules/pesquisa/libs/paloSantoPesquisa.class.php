@@ -10,7 +10,7 @@
   +----------------------------------------------------------------------+
   | The Initial Developer of the Original Code is PaloSanto Solutions    |
   +----------------------------------------------------------------------+
-  $Id: paloSantoPesquisa.class.php,v 2.6 2026-08-17 Prisma Telecom $ */
+  $Id: paloSantoPesquisa.class.php,v 2.7 2026-08-17 Prisma Telecom $ */
 
 class paloSantoPesquisa {
     var $_DB;
@@ -106,6 +106,43 @@ class paloSantoPesquisa {
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC
             ));
         } catch (Exception $e) {}
+    }
+
+    function getExtensionNamesMap()
+    {
+        $map = array();
+        if ($this->pdo) {
+            try {
+                $stmt = $this->pdo->query("SELECT extension, name FROM asterisk.users WHERE extension IS NOT NULL AND extension != ''");
+                if ($stmt) {
+                    $rows = $stmt->fetchAll();
+                    if (is_array($rows)) {
+                        foreach ($rows as $r) {
+                            if (!empty($r['extension'])) {
+                                $map[trim($r['extension'])] = trim($r['name']);
+                            }
+                        }
+                    }
+                }
+            } catch (Exception $e) {}
+
+            if (empty($map)) {
+                try {
+                    $stmt = $this->pdo->query("SELECT id as extension, description as name FROM asterisk.devices WHERE id IS NOT NULL AND id != ''");
+                    if ($stmt) {
+                        $rows = $stmt->fetchAll();
+                        if (is_array($rows)) {
+                            foreach ($rows as $r) {
+                                if (!empty($r['extension']) && empty($map[trim($r['extension'])])) {
+                                    $map[trim($r['extension'])] = trim($r['name']);
+                                }
+                            }
+                        }
+                    }
+                } catch (Exception $e) {}
+            }
+        }
+        return $map;
     }
 
     function getOperadoresList()
