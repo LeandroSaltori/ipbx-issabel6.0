@@ -10,7 +10,7 @@
   +----------------------------------------------------------------------+
   | The Initial Developer of the Original Code is PaloSanto Solutions    |
   +----------------------------------------------------------------------+
-  $Id: paloSantoPesquisa.class.php,v 1.6 2026-08-17 Prisma Telecom $ */
+  $Id: paloSantoPesquisa.class.php,v 1.7 2026-08-17 Prisma Telecom $ */
 
 class paloSantoPesquisa {
     var $_DB;
@@ -21,20 +21,40 @@ class paloSantoPesquisa {
         if (is_object($pDB) && isset($pDB->connStatus) && $pDB->connStatus) {
             $this->_DB = $pDB;
         } else {
-            if (function_exists('generarDSNSistema')) {
-                $dsn = generarDSNSistema('asteriskuser', 'asteriskcdrdb');
-                $this->_DB = new paloDB($dsn);
-            }
-            if (!isset($this->_DB) || !$this->_DB || !$this->_DB->connStatus) {
-                $dsn = "sqlite3:////var/www/db/pesquisa.db";
-                $this->_DB = new paloDB($dsn);
-            }
+            $this->_DB = $this->connectBestDatabase();
         }
     }
 
     function paloSantoPesquisa(&$pDB)
     {
         $this->__construct($pDB);
+    }
+
+    function connectBestDatabase()
+    {
+        $mysqlpwd = "";
+        if (file_exists("/etc/issabel.conf")) {
+            $lines = @file("/etc/issabel.conf");
+            if (is_array($lines)) {
+                foreach ($lines as $line) {
+                    if (preg_match('/^mysqlrootpwd\s*=\s*(.*)$/i', trim($line), $m)) {
+                        $mysqlpwd = trim($m[1]);
+                        break;
+                    }
+                }
+            }
+        }
+
+        // 1. MySQL asteriskcdrdb com root
+        $pDB = new paloDB("mysql://root:$mysqlpwd@localhost/asteriskcdrdb");
+        if ($pDB && $pDB->connStatus) return $pDB;
+
+        // 2. MySQL asteriskcdrdb sem senha
+        $pDB = new paloDB("mysql://root:@localhost/asteriskcdrdb");
+        if ($pDB && $pDB->connStatus) return $pDB;
+
+        // 3. Fallback SQLite
+        return new paloDB("sqlite3:////var/www/db/pesquisa.db");
     }
 
     function getNumPesquisa($filter_field = '', $filter_value = '', $date_start = '', $date_end = '', $operador = '', $avaliacao = '', $solucao = '')
@@ -47,18 +67,15 @@ class paloSantoPesquisa {
             $params[] = "%$filter_value%";
         }
         if (!empty($date_start)) {
-            $where[] = "(data >= ? OR data LIKE ?)";
+            $where[] = "data >= ?";
             $params[] = $date_start;
-            $params[] = "%" . date('d/m/Y', strtotime($date_start)) . "%";
         }
         if (!empty($date_end)) {
-            $where[] = "(data <= ? OR data LIKE ?)";
+            $where[] = "data <= ?";
             $params[] = $date_end;
-            $params[] = "%" . date('d/m/Y', strtotime($date_end)) . "%";
         }
         if (!empty($operador)) {
-            $where[] = "(operador LIKE ? OR ramal LIKE ?)";
-            $params[] = "%$operador%";
+            $where[] = "operador LIKE ?";
             $params[] = "%$operador%";
         }
         if (!empty($avaliacao)) {
@@ -95,18 +112,15 @@ class paloSantoPesquisa {
             $params[] = "%$filter_value%";
         }
         if (!empty($date_start)) {
-            $where[] = "(data >= ? OR data LIKE ?)";
+            $where[] = "data >= ?";
             $params[] = $date_start;
-            $params[] = "%" . date('d/m/Y', strtotime($date_start)) . "%";
         }
         if (!empty($date_end)) {
-            $where[] = "(data <= ? OR data LIKE ?)";
+            $where[] = "data <= ?";
             $params[] = $date_end;
-            $params[] = "%" . date('d/m/Y', strtotime($date_end)) . "%";
         }
         if (!empty($operador)) {
-            $where[] = "(operador LIKE ? OR ramal LIKE ?)";
-            $params[] = "%$operador%";
+            $where[] = "operador LIKE ?";
             $params[] = "%$operador%";
         }
         if (!empty($avaliacao)) {
@@ -121,7 +135,8 @@ class paloSantoPesquisa {
         }
 
         $strWhere = !empty($where) ? "WHERE " . implode(" AND ", $where) : "";
-        $query = "SELECT * FROM pesquisa $strWhere ORDER BY rowid DESC LIMIT $limit OFFSET $offset";
+        // Ordena por data e hora decrescente compatível com MySQL e SQLite
+        $query = "SELECT * FROM pesquisa $strWhere ORDER BY data DESC, hora DESC LIMIT $limit OFFSET $offset";
 
         if ($this->_DB) {
             $arrParam = !empty($params) ? $params : false;
@@ -137,18 +152,15 @@ class paloSantoPesquisa {
         $params = array();
 
         if (!empty($date_start)) {
-            $where[] = "(data >= ? OR data LIKE ?)";
+            $where[] = "data >= ?";
             $params[] = $date_start;
-            $params[] = "%" . date('d/m/Y', strtotime($date_start)) . "%";
         }
         if (!empty($date_end)) {
-            $where[] = "(data <= ? OR data LIKE ?)";
+            $where[] = "data <= ?";
             $params[] = $date_end;
-            $params[] = "%" . date('d/m/Y', strtotime($date_end)) . "%";
         }
         if (!empty($operador)) {
-            $where[] = "(operador LIKE ? OR ramal LIKE ?)";
-            $params[] = "%$operador%";
+            $where[] = "operador LIKE ?";
             $params[] = "%$operador%";
         }
 
@@ -156,11 +168,11 @@ class paloSantoPesquisa {
 
         $query = "SELECT 
             COUNT(*) as total,
-            SUM(CASE WHEN UPPER(avaliacao) IN ('OTIMO', 'ÓTIMO', '5') THEN 1 ELSE 0 END) as otimo,
+            SUM(CASE WHEN UPPER(avaliacao) IN ('EXCELENTE', 'OTIMO', 'ÓTIMO', '5') THEN 1 ELSE 0 END) as otimo,
             SUM(CASE WHEN UPPER(avaliacao) IN ('MUITO BOM', '4') THEN 1 ELSE 0 END) as muito_bom,
-            SUM(CASE WHEN UPPER(avaliacao) IN ('MEDIO', 'MÉDIO', '3') THEN 1 ELSE 0 END) as medio,
-            SUM(CASE WHEN UPPER(avaliacao) IN ('BOM', '2') THEN 1 ELSE 0 END) as bom,
-            SUM(CASE WHEN UPPER(avaliacao) IN ('RUIM', '1') THEN 1 ELSE 0 END) as ruim,
+            SUM(CASE WHEN UPPER(avaliacao) IN ('BOM', 'MEDIO', 'MÉDIO', 'REGULAR', '3') THEN 1 ELSE 0 END) as medio,
+            SUM(CASE WHEN UPPER(avaliacao) IN ('RUIM', '2') THEN 1 ELSE 0 END) as bom,
+            SUM(CASE WHEN UPPER(avaliacao) IN ('PESSIMO', 'PÉSSIMO', '1') THEN 1 ELSE 0 END) as ruim,
             SUM(CASE WHEN UPPER(solucao) IN ('SIM', '1') THEN 1 ELSE 0 END) as resolvido_sim,
             SUM(CASE WHEN UPPER(solucao) IN ('NAO', 'NÃO', '2') THEN 1 ELSE 0 END) as resolvido_nao
             FROM pesquisa $strWhere";
@@ -175,11 +187,11 @@ class paloSantoPesquisa {
             if (!empty($strWhere)) {
                 $queryAll = "SELECT 
                     COUNT(*) as total,
-                    SUM(CASE WHEN UPPER(avaliacao) IN ('OTIMO', 'ÓTIMO', '5') THEN 1 ELSE 0 END) as otimo,
+                    SUM(CASE WHEN UPPER(avaliacao) IN ('EXCELENTE', 'OTIMO', 'ÓTIMO', '5') THEN 1 ELSE 0 END) as otimo,
                     SUM(CASE WHEN UPPER(avaliacao) IN ('MUITO BOM', '4') THEN 1 ELSE 0 END) as muito_bom,
-                    SUM(CASE WHEN UPPER(avaliacao) IN ('MEDIO', 'MÉDIO', '3') THEN 1 ELSE 0 END) as medio,
-                    SUM(CASE WHEN UPPER(avaliacao) IN ('BOM', '2') THEN 1 ELSE 0 END) as bom,
-                    SUM(CASE WHEN UPPER(avaliacao) IN ('RUIM', '1') THEN 1 ELSE 0 END) as ruim,
+                    SUM(CASE WHEN UPPER(avaliacao) IN ('BOM', 'MEDIO', 'MÉDIO', 'REGULAR', '3') THEN 1 ELSE 0 END) as medio,
+                    SUM(CASE WHEN UPPER(avaliacao) IN ('RUIM', '2') THEN 1 ELSE 0 END) as bom,
+                    SUM(CASE WHEN UPPER(avaliacao) IN ('PESSIMO', 'PÉSSIMO', '1') THEN 1 ELSE 0 END) as ruim,
                     SUM(CASE WHEN UPPER(solucao) IN ('SIM', '1') THEN 1 ELSE 0 END) as resolvido_sim,
                     SUM(CASE WHEN UPPER(solucao) IN ('NAO', 'NÃO', '2') THEN 1 ELSE 0 END) as resolvido_nao
                     FROM pesquisa";

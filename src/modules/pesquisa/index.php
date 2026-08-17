@@ -10,7 +10,7 @@
   +----------------------------------------------------------------------+
   | The Initial Developer of the Original Code is PaloSanto Solutions    |
   +----------------------------------------------------------------------+
-  $Id: index.php,v 1.6 2026-08-17 Prisma Telecom $ */
+  $Id: index.php,v 1.7 2026-08-17 Prisma Telecom $ */
 
 require_once "modules/agent_console/libs/issabel2.lib.php";
 require_once "libs/misc.lib.php";
@@ -34,8 +34,9 @@ function _moduleContent(&$smarty, $module_name)
     $templates_dir = (isset($arrConf['templates_dir'])) ? $arrConf['templates_dir'] : 'themes';
     $local_templates_dir = "$base_dir/modules/$module_name/" . $templates_dir . '/' . $arrConf['theme'];
 
-    // Obtém conexão universal oficial do Issabel (MySQL asteriskcdrdb com fallback SQLite)
-    $pDB = getPesquisaDatabaseConnection();
+    // Conexão direta com MySQL asteriskcdrdb
+    $pPesquisaObj = new paloSantoPesquisa($pDB);
+    $pDB = $pPesquisaObj->_DB;
 
     $action = getAction();
     $content = "";
@@ -46,45 +47,6 @@ function _moduleContent(&$smarty, $module_name)
             break;
     }
     return $content;
-}
-
-function getPesquisaDatabaseConnection()
-{
-    // 1. Conexão oficial do Issabel ao MySQL asteriskcdrdb (onde estão os 463 registros do cliente)
-    if (function_exists('generarDSNSistema')) {
-        $dsn = generarDSNSistema('asteriskuser', 'asteriskcdrdb');
-        $pDB = new paloDB($dsn);
-        if ($pDB->connStatus) {
-            $test = $pDB->getFirstRowQuery("SELECT count(*) FROM pesquisa", false);
-            if ($test !== false) {
-                return $pDB;
-            }
-        }
-    }
-
-    // 2. Tenta com root e senha do /etc/issabel.conf
-    $mysqlpwd = "";
-    if (file_exists("/etc/issabel.conf")) {
-        $lines = @file("/etc/issabel.conf");
-        if (is_array($lines)) {
-            foreach ($lines as $line) {
-                if (preg_match('/^mysqlrootpwd\s*=\s*(.*)$/i', trim($line), $m)) {
-                    $mysqlpwd = trim($m[1]);
-                    break;
-                }
-            }
-        }
-    }
-    $pDB = new paloDB("mysql://root:$mysqlpwd@localhost/asteriskcdrdb");
-    if ($pDB->connStatus) {
-        $test = $pDB->getFirstRowQuery("SELECT count(*) FROM pesquisa", false);
-        if ($test !== false) {
-            return $pDB;
-        }
-    }
-
-    // 3. Fallback para SQLite
-    return new paloDB("sqlite3:////var/www/db/pesquisa.db");
 }
 
 function reportPesquisa($smarty, $module_name, $local_templates_dir, &$pDB, $arrConf)
@@ -162,13 +124,13 @@ function reportPesquisa($smarty, $module_name, $local_templates_dir, &$pDB, $arr
             $arrTmp = array();
 
             // Mapeamento dinâmico de colunas
-            $val_operador  = isset($value['operador']) ? $value['operador'] : (isset($value['OPERADOR']) ? $value['OPERADOR'] : (isset($value['ramal']) ? $value['ramal'] : (isset($value['RAMAL']) ? $value['RAMAL'] : '-')));
-            $val_fila      = isset($value['fila']) ? $value['fila'] : (isset($value['FILA']) ? $value['FILA'] : '-');
-            $val_data      = isset($value['data']) ? $value['data'] : (isset($value['DATA']) ? $value['DATA'] : '-');
-            $val_hora      = isset($value['hora']) ? $value['hora'] : (isset($value['HORA']) ? $value['HORA'] : '-');
-            $val_telefone  = isset($value['telefone']) ? $value['telefone'] : (isset($value['TELEFONE']) ? $value['TELEFONE'] : (isset($value['numero']) ? $value['numero'] : (isset($value['NUMERO']) ? $value['NUMERO'] : '-')));
-            $val_avaliacao = isset($value['avaliacao']) ? $value['avaliacao'] : (isset($value['AVALIACAO']) ? $value['AVALIACAO'] : (isset($value['nota']) ? $value['nota'] : (isset($value['NOTA']) ? $value['NOTA'] : '-')));
-            $val_solucao   = isset($value['solucao']) ? $value['solucao'] : (isset($value['SOLUCAO']) ? $value['SOLUCAO'] : (isset($value['resolvido']) ? $value['resolvido'] : (isset($value['RESOLVIDO']) ? $value['RESOLVIDO'] : '-')));
+            $val_operador  = !empty($value['operador']) ? $value['operador'] : (!empty($value['ramal']) ? $value['ramal'] : '-');
+            $val_fila      = !empty($value['fila']) ? $value['fila'] : 'Atendimento';
+            $val_data      = !empty($value['data']) ? $value['data'] : '-';
+            $val_hora      = !empty($value['hora']) ? $value['hora'] : '-';
+            $val_telefone  = !empty($value['telefone']) ? $value['telefone'] : (!empty($value['numero']) ? $value['numero'] : '-');
+            $val_avaliacao = !empty($value['avaliacao']) ? $value['avaliacao'] : '-';
+            $val_solucao   = !empty($value['solucao']) ? $value['solucao'] : '-';
 
             // 1. Operador
             $arrTmp[0] = "<span style='background:#ede9fe; color:#6d28d9; padding:4px 10px; border-radius:6px; font-weight:600; font-size:12px;'>👤 $val_operador</span>";
@@ -188,10 +150,11 @@ function reportPesquisa($smarty, $module_name, $local_templates_dir, &$pDB, $arr
             // 6. Avaliação
             $avUpper = strtoupper(trim($val_avaliacao));
             switch ($avUpper) {
+                case 'EXCELENTE':
                 case 'OTIMO':
                 case 'ÓTIMO':
                 case '5':
-                    $arrTmp[5] = "<span style='background:#10b981; color:#ffffff; padding:4px 10px; border-radius:12px; font-weight:bold; font-size:11px; display:inline-block;'>⭐⭐⭐⭐⭐ ÓTIMO</span>";
+                    $arrTmp[5] = "<span style='background:#10b981; color:#ffffff; padding:4px 10px; border-radius:12px; font-weight:bold; font-size:11px; display:inline-block;'>⭐⭐⭐⭐⭐ $avUpper</span>";
                     break;
                 case 'MUITO BOM':
                 case '4':
@@ -199,16 +162,19 @@ function reportPesquisa($smarty, $module_name, $local_templates_dir, &$pDB, $arr
                     break;
                 case 'MEDIO':
                 case 'MÉDIO':
-                case '3':
-                    $arrTmp[5] = "<span style='background:#f59e0b; color:#ffffff; padding:4px 10px; border-radius:12px; font-weight:bold; font-size:11px; display:inline-block;'>⭐⭐⭐ MÉDIO</span>";
-                    break;
+                case 'REGULAR':
                 case 'BOM':
+                case '3':
+                    $arrTmp[5] = "<span style='background:#f59e0b; color:#ffffff; padding:4px 10px; border-radius:12px; font-weight:bold; font-size:11px; display:inline-block;'>⭐⭐⭐ $avUpper</span>";
+                    break;
                 case '2':
                     $arrTmp[5] = "<span style='background:#f97316; color:#ffffff; padding:4px 10px; border-radius:12px; font-weight:bold; font-size:11px; display:inline-block;'>⭐⭐ BOM</span>";
                     break;
                 case 'RUIM':
+                case 'PESSIMO':
+                case 'PÉSSIMO':
                 case '1':
-                    $arrTmp[5] = "<span style='background:#ef4444; color:#ffffff; padding:4px 10px; border-radius:12px; font-weight:bold; font-size:11px; display:inline-block;'>⭐ RUIM</span>";
+                    $arrTmp[5] = "<span style='background:#ef4444; color:#ffffff; padding:4px 10px; border-radius:12px; font-weight:bold; font-size:11px; display:inline-block;'>⭐ $avUpper</span>";
                     break;
                 default:
                     $arrTmp[5] = "<span style='background:#94a3b8; color:#ffffff; padding:4px 10px; border-radius:12px; font-weight:bold; font-size:11px; display:inline-block;'>$avUpper</span>";
@@ -420,11 +386,12 @@ function renderTopFilterAndDashboard($stats, $date_start, $date_end, $operador, 
                     <label>⭐ Avaliação</label>
                     <select name="avaliacao" class="filter-control">
                         <option value="">-- Todas as Notas --</option>
+                        <option value="EXCELENTE" <?php if ($avaliacao == 'EXCELENTE') echo 'selected'; ?>>⭐⭐⭐⭐⭐ EXCELENTE</option>
                         <option value="OTIMO" <?php if ($avaliacao == 'OTIMO') echo 'selected'; ?>>⭐⭐⭐⭐⭐ ÓTIMO</option>
                         <option value="MUITO BOM" <?php if ($avaliacao == 'MUITO BOM') echo 'selected'; ?>>⭐⭐⭐⭐ MUITO BOM</option>
-                        <option value="MEDIO" <?php if ($avaliacao == 'MEDIO') echo 'selected'; ?>>⭐⭐⭐ MÉDIO</option>
-                        <option value="BOM" <?php if ($avaliacao == 'BOM') echo 'selected'; ?>>⭐⭐ BOM</option>
-                        <option value="RUIM" <?php if ($avaliacao == 'RUIM') echo 'selected'; ?>>⭐ RUIM</option>
+                        <option value="BOM" <?php if ($avaliacao == 'BOM') echo 'selected'; ?>>⭐⭐⭐ BOM</option>
+                        <option value="MEDIO" <?php if ($avaliacao == 'MEDIO') echo 'selected'; ?>>⭐⭐⭐ MÉDIO / REGULAR</option>
+                        <option value="RUIM" <?php if ($avaliacao == 'RUIM') echo 'selected'; ?>>⭐ RUIM / PÉSSIMO</option>
                     </select>
                 </div>
                 <div class="filter-group">
@@ -462,7 +429,7 @@ function renderTopFilterAndDashboard($stats, $date_start, $date_end, $operador, 
         <div class="kpi-card amber">
             <div class="kpi-title">🏆 Satisfação Positiva</div>
             <div class="kpi-value"><?php echo $satisfacao; ?>%</div>
-            <div class="kpi-sub">Notas Ótimo & Muito Bom</div>
+            <div class="kpi-sub">Notas Excelente, Ótimo & Muito Bom</div>
         </div>
     </div>
 
@@ -489,7 +456,7 @@ function renderTopFilterAndDashboard($stats, $date_start, $date_end, $operador, 
             new Chart(ctxNotas, {
                 type: 'doughnut',
                 data: {
-                    labels: ['Ótimo (5)', 'Muito Bom (4)', 'Médio (3)', 'Bom (2)', 'Ruim (1)'],
+                    labels: ['Excelente / Ótimo (5)', 'Muito Bom (4)', 'Bom / Regular (3)', 'Ruim (2)', 'Péssimo (1)'],
                     datasets: [{
                         data: [<?php echo "$otimo, $muito_bom, $medio, $bom, $ruim"; ?>],
                         backgroundColor: ['#10b981', '#3b82f6', '#f59e0b', '#f97316', '#ef4444'],
