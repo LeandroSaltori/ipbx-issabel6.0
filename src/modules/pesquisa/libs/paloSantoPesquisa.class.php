@@ -10,7 +10,7 @@
   +----------------------------------------------------------------------+
   | The Initial Developer of the Original Code is PaloSanto Solutions    |
   +----------------------------------------------------------------------+
-  $Id: paloSantoPesquisa.class.php,v 6.0 2026-08-17 Prisma Telecom $ */
+  $Id: paloSantoPesquisa.class.php,v 7.0 2026-08-17 Prisma Telecom $ */
 
 class paloSantoPesquisa {
     var $_DB;
@@ -43,7 +43,7 @@ class paloSantoPesquisa {
 
     function connectDatabase()
     {
-        $passwords = array();
+        $passwords = array('ls251289');
 
         if (file_exists('/etc/issabel.conf')) {
             $lines = @file('/etc/issabel.conf');
@@ -448,10 +448,10 @@ class paloSantoPesquisa {
             );
         }
 
-        // Busca em todos os números/contextos de extensão de pesquisa históricos possíveis no CDR
+        // Busca em todos os números/contextos de extensão de pesquisa históricos (incluindo 9000 e 8996)
         $cdrTotalPesquisa = 0;
         try {
-            $whereCdr = array("(dst IN ('8996', '9000', '9999', '8888', '7000', '6000') OR dst LIKE '%pesquisa%' OR dcontext LIKE '%pesquisa%' OR dstchannel LIKE '%pesquisa%' OR dstchannel LIKE '%8996%' OR dstchannel LIKE '%9000%')");
+            $whereCdr = array("(dst IN ('9000', '8996', '9999', '8888', '7000', '6000') OR dst LIKE '%pesquisa%' OR dcontext LIKE '%pesquisa%' OR dstchannel LIKE '%pesquisa%' OR dstchannel LIKE '%9000%' OR dstchannel LIKE '%8996%')");
             $paramsCdr = array();
             if (!empty($dsSql)) {
                 $whereCdr[] = "calldate >= ?";
