@@ -111,8 +111,8 @@
         <p>A <strong>Pesquisa de Satisfação</strong> do IPbx Prisma Telecom é uma solução completa para aferição da qualidade do atendimento e satisfação do cliente em tempo real, integrando URA Asterisk inteligente com um Dashboard Executivo visual.</p>
 
         <div class="card">
-            <strong>🎯 Ramal de Teste e Transferência:</strong> Disque ou transfira para o número <span class="badge badge-purple">8996</span>.<br>
-            <strong>🔗 Custom Destination no PBX:</strong> <code>pesquisa-satisfação,8996,1</code>
+            <strong>🎯 Ramais de Teste e Transferência:</strong> Disque ou transfira para o número <span class="badge badge-purple">9000</span> (ou atalho <span class="badge badge-purple">8996</span>).<br>
+            <strong>🔗 Custom Destination no PBX:</strong> <code>pesquisa satisfação,9000,1</code>
         </div>
 
         <h2>📈 1. Novo Painel Executivo (Dashboard)</h2>
@@ -185,13 +185,13 @@
 
         <h2>📞 3. Como Transferir para a Pesquisa</h2>
         <ul>
-            <li><strong>Transferência Cega:</strong> Pressione <code>##</code> (ou tecla Flash), disque <code>8996</code> e desligue imediatamente.</li>
-            <li><strong>Transferência Assistida:</strong> Pressione <code>*2</code>, disque <code>8996</code>, aguarde a URA atender e desligue.</li>
-            <li><strong>Fila Automática / URA:</strong> Configure o <em>Custom Destination</em> <code>pesquisa-satisfação,8996,1</code> no FreePBX como destino pós-atendimento.</li>
+            <li><strong>Transferência Cega:</strong> Pressione <code>##</code> (ou tecla Flash), disque <code>9000</code> (ou <code>8996</code>) e desligue imediatamente.</li>
+            <li><strong>Transferência Assistida:</strong> Pressione <code>*2</code>, disque <code>9000</code> (ou <code>8996</code>), aguarde a URA atender e desligue.</li>
+            <li><strong>Fila Automática / URA:</strong> Configure o <em>Custom Destination</em> <code>pesquisa satisfação,9000,1</code> no FreePBX como destino pós-atendimento.</li>
         </ul>
 
         <h2>💾 4. Armazenamento e Banco de Dados</h2>
-        <p>Os dados são gravados no banco SQLite <code>/var/www/db/pesquisa.db</code> com a estrutura:</p>
+        <p>Os dados são gravados no banco MySQL <code>asteriskcdrdb.pesquisa</code> com a estrutura:</p>
         <ul>
             <li><code>operador</code>: Ramal ou identificação do atendente que realizou o atendimento.</li>
             <li><code>fila</code>: Fila de atendimento de origem.</li>
