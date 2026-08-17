@@ -424,19 +424,24 @@ if [ -d "$REPO_DIR/src/modules/pesquisa" ]; then
     chmod -R 755 /var/www/html/modules/pesquisa
     
     if command -v sqlite3 &>/dev/null; then
-        # Cria a tabela no banco pesquisa.db
-        sqlite3 /var/www/db/pesquisa.db "CREATE TABLE IF NOT EXISTS pesquisa (id INTEGER PRIMARY KEY AUTOINCREMENT, data DATETIME DEFAULT CURRENT_TIMESTAMP, ramal VARCHAR(20), numero VARCHAR(30), avaliacao VARCHAR(50), solucao VARCHAR(10));" 2>/dev/null || true
+        # Cria a tabela no banco pesquisa.db (SQLite)
+        sqlite3 /var/www/db/pesquisa.db "CREATE TABLE IF NOT EXISTS pesquisa (id INTEGER PRIMARY KEY AUTOINCREMENT, operador VARCHAR(50), fila VARCHAR(50), data DATE, hora TIME, telefone VARCHAR(50), avaliacao VARCHAR(50), solucao VARCHAR(50));" 2>/dev/null || true
         chown asterisk:asterisk /var/www/db/pesquisa.db 2>/dev/null || true
         chmod 666 /var/www/db/pesquisa.db 2>/dev/null || true
         
-        sqlite3 /var/www/db/acl.db "INSERT OR IGNORE INTO acl_resource (name, description) VALUES ('pesquisa', 'Pesquisa');" 2>/dev/null || true
-        sqlite3 /var/www/db/acl.db "INSERT OR IGNORE INTO acl_resource (name, description) VALUES ('pesquisa_ajuda', 'Pesquisa - Como Funciona?');" 2>/dev/null || true
-        
+        # Cria a tabela no MySQL (asteriskcdrdb)
+        MYSQL_PASS=$(grep -i mysqlrootpwd /etc/issabel.conf 2>/dev/null | cut -d'=' -f2 | tr -d ' ')
+        mysql -u root -p"$MYSQL_PASS" -e "CREATE DATABASE IF NOT EXISTS asteriskcdrdb; USE asteriskcdrdb; CREATE TABLE IF NOT EXISTS pesquisa (id INT AUTO_INCREMENT PRIMARY KEY, operador VARCHAR(50), fila VARCHAR(50), data DATE, hora TIME, telefone VARCHAR(50), avaliacao VARCHAR(50), solucao VARCHAR(50));" 2>/dev/null || \
+        mysql -u root -e "CREATE DATABASE IF NOT EXISTS asteriskcdrdb; USE asteriskcdrdb; CREATE TABLE IF NOT EXISTS pesquisa (id INT AUTO_INCREMENT PRIMARY KEY, operador VARCHAR(50), fila VARCHAR(50), data DATE, hora TIME, telefone VARCHAR(50), avaliacao VARCHAR(50), solucao VARCHAR(50));" 2>/dev/null || true
+
+        # Registra no menu do Issabel apenas 'Pesquisa de Satisfação' no menu lateral
         sqlite3 /var/www/db/menu.db "DELETE FROM menu WHERE id = 'pesquisa' OR id = 'pesquisa_ajuda';" 2>/dev/null || true
-        sqlite3 /var/www/db/menu.db "INSERT INTO menu (id, IdParent, Link, Name, Type, order_no) VALUES ('pesquisa', 'reports', '', 'Pesquisa', 'module', 11);" 2>/dev/null || true
-        sqlite3 /var/www/db/menu.db "INSERT INTO menu (id, IdParent, Link, Name, Type, order_no) VALUES ('pesquisa_ajuda', 'reports', 'modules/pesquisa/help/index.html', 'Pesquisa - Como Funciona?', 'framed', 12);" 2>/dev/null || true
+        sqlite3 /var/www/db/menu.db "INSERT INTO menu (id, IdParent, Link, Name, Type, order_no) VALUES ('pesquisa', 'reports', '', 'Pesquisa de Satisfação', 'module', 11);" 2>/dev/null || true
         
-        sqlite3 /var/www/db/acl.db "INSERT OR IGNORE INTO acl_group_permission (id_action, id_group, id_resource) SELECT 1, 1, id FROM acl_resource WHERE name IN ('pesquisa', 'pesquisa_ajuda');" 2>/dev/null || true
+        sqlite3 /var/www/db/acl.db "DELETE FROM acl_resource WHERE name = 'pesquisa_ajuda';" 2>/dev/null || true
+        sqlite3 /var/www/db/acl.db "INSERT OR IGNORE INTO acl_resource (name, description) VALUES ('pesquisa', 'Pesquisa de Satisfação');" 2>/dev/null || true
+        
+        sqlite3 /var/www/db/acl.db "INSERT OR IGNORE INTO acl_group_permission (id_action, id_group, id_resource) SELECT 1, 1, id FROM acl_resource WHERE name = 'pesquisa';" 2>/dev/null || true
     fi
     log_success "Módulo Web da Pesquisa de Satisfação registrado no menu Relatórios."
 fi

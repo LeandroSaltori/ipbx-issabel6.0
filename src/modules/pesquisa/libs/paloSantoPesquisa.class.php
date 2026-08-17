@@ -10,7 +10,7 @@
   +----------------------------------------------------------------------+
   | The Initial Developer of the Original Code is PaloSanto Solutions    |
   +----------------------------------------------------------------------+
-  $Id: paloSantoPesquisa.class.php,v 2.2 2026-08-17 Prisma Telecom $ */
+  $Id: paloSantoPesquisa.class.php,v 2.3 2026-08-17 Prisma Telecom $ */
 
 class paloSantoPesquisa {
     var $_DB;
@@ -31,11 +31,9 @@ class paloSantoPesquisa {
     {
         if (empty($d)) return '';
         $d = trim($d);
-        // Formato d/m/Y (ex: 01/01/2026) -> Y-m-d (2026-01-01)
         if (preg_match('/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/', $d, $m)) {
             return sprintf('%04d-%02d-%02d', $m[3], $m[2], $m[1]);
         }
-        // Formato Y-m-d
         if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $d)) {
             return $d;
         }
@@ -47,7 +45,6 @@ class paloSantoPesquisa {
     {
         $passwords = array();
 
-        // 1. Obtem senha do /etc/issabel.conf
         if (file_exists('/etc/issabel.conf')) {
             $lines = @file('/etc/issabel.conf');
             if (is_array($lines)) {
@@ -64,7 +61,6 @@ class paloSantoPesquisa {
             }
         }
 
-        // 2. Obtem senha do /etc/amportal.conf (mesma do phpMyAdmin)
         if (file_exists('/etc/amportal.conf')) {
             $lines = @file('/etc/amportal.conf');
             if (is_array($lines)) {
@@ -88,7 +84,6 @@ class paloSantoPesquisa {
 
         $users = array('root', 'asteriskuser', 'asterisk');
 
-        // 3. Tenta conexao PDO direta no MySQL asteriskcdrdb (1414 registros do cliente)
         foreach ($users as $u) {
             foreach ($passwords as $p) {
                 try {
@@ -105,13 +100,61 @@ class paloSantoPesquisa {
             }
         }
 
-        // 4. Fallback PDO SQLite
         try {
             $this->pdo = new PDO("sqlite:/var/www/db/pesquisa.db", null, null, array(
                 PDO::ATTR_ERRMODE => PDO::ERRMODE_SILENT,
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC
             ));
         } catch (Exception $e) {}
+    }
+
+    function findRecordingForCall($telefone, $data, $hora, $operador)
+    {
+        if (!$this->pdo) return '';
+
+        $dt = trim($data) . ' ' . trim($hora);
+        $ts = strtotime($dt);
+
+        if ($ts) {
+            $start = date('Y-m-d H:i:s', $ts - 1200); // 20 min antes
+            $end   = date('Y-m-d H:i:s', $ts + 1200); // 20 min depois
+
+            $telClean = preg_replace('/[^0-9]/', '', $telefone);
+            if (strlen($telClean) > 4) {
+                $telClean = substr($telClean, -8);
+            }
+
+            try {
+                $sql = "SELECT recordingfile FROM cdr 
+                        WHERE calldate BETWEEN ? AND ? 
+                        AND (src LIKE ? OR dst LIKE ? OR channel LIKE ? OR dstchannel LIKE ?) 
+                        AND recordingfile IS NOT NULL AND recordingfile != '' 
+                        ORDER BY ABS(TIMESTAMPDIFF(SECOND, calldate, ?)) ASC LIMIT 1";
+                $stmt = $this->pdo->prepare($sql);
+                $stmt->execute(array($start, $end, "%$telClean%", "%$telClean%", "%$telClean%", "%$telClean%", $dt));
+                $row = $stmt->fetch();
+                if (!empty($row['recordingfile'])) {
+                    return $row['recordingfile'];
+                }
+            } catch (Exception $e) {}
+        }
+
+        // Fallback no sistema de arquivos do monitor do Asterisk
+        if (!empty($data) && !empty($telefone)) {
+            $yearMonthDay = str_replace('-', '/', $data);
+            $telClean = preg_replace('/[^0-9]/', '', $telefone);
+            if (strlen($telClean) > 4) $telClean = substr($telClean, -8);
+
+            $dir = "/var/spool/asterisk/monitor/" . $yearMonthDay;
+            if (is_dir($dir)) {
+                $files = glob("$dir/*$telClean*");
+                if (!empty($files)) {
+                    return basename($files[0]);
+                }
+            }
+        }
+
+        return '';
     }
 
     function getNumPesquisa($filter_field = '', $filter_value = '', $date_start = '', $date_end = '', $operador = '', $avaliacao = '', $solucao = '')
@@ -264,16 +307,6 @@ class paloSantoPesquisa {
         }
 
         if (!$stats || empty($stats['total'])) {
-            $sqlAll = "SELECT 
-                COUNT(*) as total,
-                SUM(CASE WHEN UPPER(avaliacao) IN ('EXCELENTE', 'OTIMO', 'ÓTIMO', '5') THEN 1 ELSE 0 END) as otimo,
-                SUM(CASE WHEN UPPER(avaliacao) IN ('MUITO BOM', '4') THEN 1 ELSE 0 END) as muito_bom,
-                SUM(CASE WHEN UPPER(avaliacao) IN ('BOM', 'MEDIO', 'MÉDIO', 'REGULAR', '3') THEN 1 ELSE 0 END) as medio,
-                SUM(CASE WHEN UPPER(avaliacao) IN ('RUIM', '2') THEN 1 ELSE 0 END) as bom,
-                SUM(CASE WHEN UPPER(avaliacao) IN ('PESSIMO', 'PÉSSIMO', '1') THEN 1 ELSE 0 END) as ruim,
-                SUM(CASE WHEN UPPER(solucao) IN ('SIM', '1') THEN 1 ELSE 0 END) as resolvido_sim,
-                SUM(CASE WHEN UPPER(solucao) IN ('NAO', 'NÃO', '2') Técnico END) as resolvido_nao
-                FROM pesquisa";
             try {
                 $stmtAll = $this->pdo->query("SELECT 
                     COUNT(*) as total,

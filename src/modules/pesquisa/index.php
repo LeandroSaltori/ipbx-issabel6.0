@@ -10,7 +10,7 @@
   +----------------------------------------------------------------------+
   | The Initial Developer of the Original Code is PaloSanto Solutions    |
   +----------------------------------------------------------------------+
-  $Id: index.php,v 1.8 2026-08-17 Prisma Telecom $ */
+  $Id: index.php,v 2.0 2026-08-17 Prisma Telecom $ */
 
 require_once "modules/agent_console/libs/issabel2.lib.php";
 include_once "libs/paloSantoDB.class.php";
@@ -19,42 +19,214 @@ require_once "libs/misc.lib.php";
 
 function _moduleContent(&$smarty, $module_name)
 {
-    // include issabel framework
     include_once "libs/paloSantoGrid.class.php";
     include_once "libs/paloSantoForm.class.php";
-
-    // include module files
     include_once "modules/$module_name/configs/default.conf.php";
     include_once "modules/$module_name/libs/paloSantoPesquisa.class.php";
 
     load_language_module($module_name);
-
     global $arrConf;
 
-    // folder path for custom templates
     $base_dir = dirname($_SERVER['SCRIPT_FILENAME']);
     $templates_dir = (isset($arrConf['templates_dir'])) ? $arrConf['templates_dir'] : 'themes';
     $local_templates_dir = "$base_dir/modules/$module_name/" . $templates_dir . '/' . $arrConf['theme'];
 
-    // Conexão direta com MySQL asteriskcdrdb
-    $pPesquisaObj = new paloSantoPesquisa($pDB);
-    $pDB = $pPesquisaObj->_DB;
+    $pPesquisaObj = new paloSantoPesquisa();
+    $pDB = $pPesquisaObj->pdo;
+
+    // Stream / Download de Áudio de Gravação
+    if (isset($_GET['action']) && ($_GET['action'] == 'stream_audio' || $_GET['action'] == 'download_audio')) {
+        handleAudioPlayback();
+        exit;
+    }
+
+    // Exportação Excel
+    if (isset($_GET['action']) && $_GET['action'] == 'export_excel') {
+        handleExportExcel($pPesquisaObj);
+        exit;
+    }
+
+    // Exportação PDF / Impressão
+    if (isset($_GET['action']) && $_GET['action'] == 'export_pdf') {
+        handleExportPdf($pPesquisaObj);
+        exit;
+    }
 
     $action = getAction();
-    $content = "";
-
-    switch ($action) {
-        default:
-            $content = reportPesquisa($smarty, $module_name, $local_templates_dir, $pDB, $arrConf);
-            break;
-    }
+    $content = reportPesquisa($smarty, $module_name, $local_templates_dir, $pPesquisaObj, $arrConf);
     return $content;
 }
 
-function reportPesquisa($smarty, $module_name, $local_templates_dir, &$pDB, $arrConf)
+function handleAudioPlayback()
 {
-    $pPesquisa = new paloSantoPesquisa($pDB);
+    $file = isset($_GET['file']) ? urldecode($_GET['file']) : '';
+    $file = basename($file);
+    if (empty($file)) {
+        header("HTTP/1.1 404 Not Found");
+        echo "Arquivo não especificado.";
+        exit;
+    }
 
+    $possiblePaths = array(
+        "/var/spool/asterisk/monitor/$file",
+        "/var/spool/asterisk/monitor/" . date('Y/m/d/') . $file,
+        "/var/spool/asterisk/monitor/" . date('Y/m/') . $file
+    );
+
+    $filePath = '';
+    foreach ($possiblePaths as $p) {
+        if (file_exists($p)) {
+            $filePath = $p;
+            break;
+        }
+    }
+
+    if (empty($filePath)) {
+        $find = shell_exec("find /var/spool/asterisk/monitor/ -name " . escapeshellarg($file) . " 2>/dev/null | head -n 1");
+        $filePath = trim($find);
+    }
+
+    if (!empty($filePath) && file_exists($filePath)) {
+        if ($_GET['action'] == 'download_audio') {
+            header('Content-Description: File Transfer');
+            header('Content-Type: application/octet-stream');
+            header('Content-Disposition: attachment; filename="' . basename($filePath) . '"');
+            header('Expires: 0');
+            header('Cache-Control: must-revalidate');
+            header('Pragma: public');
+            header('Content-Length: ' . filesize($filePath));
+            readfile($filePath);
+            exit;
+        } else {
+            header('Content-Type: audio/wav');
+            header('Content-Length: ' . filesize($filePath));
+            readfile($filePath);
+            exit;
+        }
+    } else {
+        header("HTTP/1.1 404 Not Found");
+        echo "Áudio não encontrado no servidor.";
+        exit;
+    }
+}
+
+function handleExportExcel($pPesquisa)
+{
+    $filter_field = isset($_GET['filter_field']) ? trim($_GET['filter_field']) : '';
+    $filter_value = isset($_GET['filter_value']) ? trim($_GET['filter_value']) : '';
+    $date_start   = isset($_GET['date_start']) ? trim($_GET['date_start']) : '';
+    $date_end     = isset($_GET['date_end']) ? trim($_GET['date_end']) : '';
+    $operador     = isset($_GET['operador']) ? trim($_GET['operador']) : '';
+    $avaliacao    = isset($_GET['avaliacao']) ? trim($_GET['avaliacao']) : '';
+    $solucao      = isset($_GET['solucao']) ? trim($_GET['solucao']) : '';
+
+    $total = $pPesquisa->getNumPesquisa($filter_field, $filter_value, $date_start, $date_end, $operador, $avaliacao, $solucao);
+    $arrResult = $pPesquisa->getPesquisa($total > 0 ? $total : 5000, 0, $filter_field, $filter_value, $date_start, $date_end, $operador, $avaliacao, $solucao);
+
+    header('Content-Type: text/csv; charset=utf-8');
+    header('Content-Disposition: attachment; filename=Pesquisa_Satisfacao_' . date('Ymd_His') . '.csv');
+
+    $output = fopen('php://output', 'w');
+    // BOM UTF-8 para Excel abrir acentos perfeitamente
+    fprintf($output, chr(0xEF).chr(0xBB).chr(0xBF));
+
+    fputcsv($output, array('Operador / Ramal', 'Fila', 'Data', 'Hora', 'Telefone', 'Avaliacao', 'Problema Resolvido'), ';');
+
+    if (is_array($arrResult)) {
+        foreach ($arrResult as $row) {
+            $val_operador  = !empty($row['operador']) ? $row['operador'] : (!empty($row['ramal']) ? $row['ramal'] : '-');
+            $val_fila      = !empty($row['fila']) ? $row['fila'] : 'Atendimento';
+            $val_data      = !empty($row['data']) ? $row['data'] : '-';
+            $val_hora      = !empty($row['hora']) ? $row['hora'] : '-';
+            $val_telefone  = !empty($row['telefone']) ? $row['telefone'] : (!empty($row['numero']) ? $row['numero'] : '-');
+            $val_avaliacao = !empty($row['avaliacao']) ? $row['avaliacao'] : '-';
+            $val_solucao   = !empty($row['solucao']) ? $row['solucao'] : '-';
+
+            fputcsv($output, array($val_operador, $val_fila, $val_data, $val_hora, $val_telefone, $val_avaliacao, $val_solucao), ';');
+        }
+    }
+    fclose($output);
+    exit;
+}
+
+function handleExportPdf($pPesquisa)
+{
+    $filter_field = isset($_GET['filter_field']) ? trim($_GET['filter_field']) : '';
+    $filter_value = isset($_GET['filter_value']) ? trim($_GET['filter_value']) : '';
+    $date_start   = isset($_GET['date_start']) ? trim($_GET['date_start']) : '';
+    $date_end     = isset($_GET['date_end']) ? trim($_GET['date_end']) : '';
+    $operador     = isset($_GET['operador']) ? trim($_GET['operador']) : '';
+    $avaliacao    = isset($_GET['avaliacao']) ? trim($_GET['avaliacao']) : '';
+    $solucao      = isset($_GET['solucao']) ? trim($_GET['solucao']) : '';
+
+    $total = $pPesquisa->getNumPesquisa($filter_field, $filter_value, $date_start, $date_end, $operador, $avaliacao, $solucao);
+    $arrResult = $pPesquisa->getPesquisa($total > 0 ? $total : 5000, 0, $filter_field, $filter_value, $date_start, $date_end, $operador, $avaliacao, $solucao);
+
+    ?>
+    <!DOCTYPE html>
+    <html lang="pt-BR">
+    <head>
+        <meta charset="UTF-8">
+        <title>Relatório de Pesquisa de Satisfação - IPbx Prisma</title>
+        <style>
+            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size:12px; color:#1e293b; padding:20px; }
+            h2 { margin:0 0 5px 0; color:#0f172a; }
+            p { margin:0 0 15px 0; color:#64748b; font-size:11px; }
+            table { width:100%; border-collapse:collapse; margin-top:15px; }
+            th { background:#475569; color:#ffffff; padding:8px; text-align:left; font-size:11px; text-transform:uppercase; }
+            td { padding:8px; border-bottom:1px solid #e2e8f0; }
+            tr:nth-child(even) { background:#f8fafc; }
+            .badge { padding:3px 8px; border-radius:10px; font-weight:bold; font-size:10px; color:#fff; display:inline-block; }
+            .green { background:#10b981; }
+            .blue { background:#3b82f6; }
+            .amber { background:#f59e0b; }
+            .red { background:#ef4444; }
+            @media print {
+                .no-print { display:none; }
+            }
+        </style>
+    </head>
+    <body onload="window.print();">
+        <div class="no-print" style="margin-bottom:15px;">
+            <button onclick="window.print();" style="background:#0284c7; color:#fff; border:none; padding:8px 16px; border-radius:6px; font-weight:bold; cursor:pointer;">🖨️ Imprimir / Salvar PDF</button>
+        </div>
+        <h2>📊 Relatório de Pesquisa de Satisfação - IPbx Prisma</h2>
+        <p>Gerado em <?php echo date('d/m/Y H:i:s'); ?> | Total: <?php echo count($arrResult); ?> avaliações</p>
+        
+        <table>
+            <thead>
+                <tr>
+                    <th>Operador / Ramal</th>
+                    <th>Fila</th>
+                    <th>Data</th>
+                    <th>Hora</th>
+                    <th>Telefone</th>
+                    <th>Avaliação</th>
+                    <th>Problema Resolvido?</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php foreach ($arrResult as $row): ?>
+                <tr>
+                    <td><strong>👤 <?php echo htmlspecialchars(!empty($row['operador']) ? $row['operador'] : $row['ramal']); ?></strong></td>
+                    <td><?php echo htmlspecialchars(!empty($row['fila']) ? $row['fila'] : 'Atendimento'); ?></td>
+                    <td>📅 <?php echo htmlspecialchars($row['data']); ?></td>
+                    <td>🕒 <?php echo htmlspecialchars($row['hora']); ?></td>
+                    <td>📞 <?php echo htmlspecialchars(!empty($row['telefone']) ? $row['telefone'] : $row['numero']); ?></td>
+                    <td><?php echo htmlspecialchars($row['avaliacao']); ?></td>
+                    <td><?php echo htmlspecialchars($row['solucao']); ?></td>
+                </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+    </body>
+    </html>
+    <?php
+    exit;
+}
+
+function reportPesquisa($smarty, $module_name, $local_templates_dir, $pPesquisa, $arrConf)
+{
     // Parâmetros de Filtro
     $filter_field = isset($_POST['filter_field']) ? trim($_POST['filter_field']) : (isset($_GET['filter_field']) ? trim($_GET['filter_field']) : '');
     $filter_value = isset($_POST['filter_value']) ? trim($_POST['filter_value']) : (isset($_GET['filter_value']) ? trim($_GET['filter_value']) : '');
@@ -86,7 +258,7 @@ function reportPesquisa($smarty, $module_name, $local_templates_dir, &$pDB, $arr
     );
     $oGrid->setURL($url);
 
-    // Colunas padrão tradicionais (Operador, Fila, Data, Hora, Telefone, Avaliação, Solução)
+    // Colunas (incluindo Gravação estilo Fila com Play e Baixar)
     $arrColumns = array(
         "Operador / Ramal",
         "Fila",
@@ -94,13 +266,14 @@ function reportPesquisa($smarty, $module_name, $local_templates_dir, &$pDB, $arr
         "Hora",
         "Telefone",
         "Avaliação do Atendimento",
-        "Problema Resolvido?"
+        "Problema Resolvido?",
+        "Gravação"
     );
     $oGrid->setColumns($arrColumns);
 
     $total = $pPesquisa->getNumPesquisa($filter_field, $filter_value, $date_start, $date_end, $operador, $avaliacao, $solucao);
     
-    // Se o filtro retornou 0 mas o banco tem dados, faz fallback para trazer tudo
+    // Se o filtro por data retornou 0, faz fallback automatico
     if ($total == 0 && (!empty($date_start) || !empty($filter_value))) {
         $total = $pPesquisa->getNumPesquisa('', '', '', '', '', '', '');
         $date_start = '';
@@ -193,6 +366,18 @@ function reportPesquisa($smarty, $module_name, $local_templates_dir, &$pDB, $arr
                 $arrTmp[6] = "<span style='background:#f1f5f9; color:#64748b; padding:4px 10px; border-radius:8px; font-size:11px;'>$solUpper</span>";
             }
 
+            // 8. Gravação (Busca no Asterisk CDR / Monitor)
+            $recFile = $pPesquisa->findRecordingForCall($val_telefone, $val_data, $val_hora, $val_operador);
+            if (!empty($recFile)) {
+                $fileEnc = urlencode($recFile);
+                $arrTmp[7] = "<div style='display:flex; gap:6px; align-items:center;'>
+                    <button type='button' onclick=\"playPesquisaAudio('$fileEnc')\" style=\"background:#0284c7; color:#ffffff; border:none; padding:4px 10px; border-radius:14px; font-weight:700; font-size:11px; cursor:pointer;\">▶ Play</button>
+                    <a href=\"?menu=pesquisa&action=download_audio&file=$fileEnc\" target=\"_blank\" style=\"background:#16a34a; color:#ffffff; padding:4px 10px; border-radius:14px; font-weight:700; font-size:11px; text-decoration:none;\">Baixar</a>
+                </div>";
+            } else {
+                $arrTmp[7] = "<span style='color:#cbd5e1; font-size:11px;'>Sem áudio</span>";
+            }
+
             $arrData[] = $arrTmp;
         }
     }
@@ -220,10 +405,62 @@ function renderTopFilterAndDashboard($stats, $date_start, $date_end, $operador, 
     $sim = isset($stats['resolvido_sim']) ? (int)$stats['resolvido_sim'] : 0;
     $nao = isset($stats['resolvido_nao']) ? (int)$stats['resolvido_nao'] : 0;
 
+    // URL com parâmetros de filtro atuais para exportação
+    $queryParams = http_build_query(array(
+        'menu' => 'pesquisa',
+        'date_start' => $date_start,
+        'date_end' => $date_end,
+        'operador' => $operador,
+        'avaliacao' => $avaliacao,
+        'solucao' => $solucao
+    ));
+
     ob_start();
     ?>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
     <style>
+        .header-action-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 10px 0 15px 0;
+        }
+        .header-title-box h3 {
+            margin: 0;
+            font-size: 22px;
+            font-weight: 800;
+            color: #0f172a;
+        }
+        .header-title-box p {
+            margin: 2px 0 0 0;
+            font-size: 12px;
+            color: #64748b;
+        }
+        .header-right-btns {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        .btn-header-action {
+            padding: 7px 14px;
+            border-radius: 8px;
+            font-weight: 700;
+            font-size: 12px;
+            text-decoration: none;
+            border: none;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: transform 0.1s, opacity 0.2s;
+        }
+        .btn-header-action:hover {
+            opacity: 0.9;
+            transform: translateY(-1px);
+        }
+        .btn-expand { background: #0d9488; color: #ffffff; }
+        .btn-manual { background: #0284c7; color: #ffffff; }
+
         .filter-top-bar {
             background: #ffffff;
             border-radius: 10px;
@@ -277,6 +514,26 @@ function renderTopFilterAndDashboard($stats, $date_start, $date_end, $operador, 
         .btn-filter-submit:hover {
             background: #4338ca;
         }
+        .btn-excel {
+            background: #15803d;
+            color: #ffffff;
+            padding: 7px 14px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 700;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .btn-pdf {
+            background: #b91c1c;
+            color: #ffffff;
+            padding: 7px 14px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 700;
+            text-decoration: none;
+            display: inline-block;
+        }
         .btn-filter-clear {
             background: #f1f5f9;
             color: #475569;
@@ -287,10 +544,6 @@ function renderTopFilterAndDashboard($stats, $date_start, $date_end, $operador, 
             font-weight: 600;
             border: 1px solid #cbd5e1;
             display: inline-block;
-            transition: background 0.2s;
-        }
-        .btn-filter-clear:hover {
-            background: #e2e8f0;
         }
 
         .pesquisa-dashboard {
@@ -367,7 +620,38 @@ function renderTopFilterAndDashboard($stats, $date_start, $date_end, $operador, 
             width: 100%;
             height: 100%;
         }
+
+        /* Modal Player de Audio */
+        #audioModalPesquisa {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(4px);
+            z-index: 99999;
+            align-items: center;
+            justify-content: center;
+        }
+        .audio-modal-content {
+            background: #ffffff;
+            border-radius: 12px;
+            padding: 24px;
+            width: 380px;
+            box-shadow: 0 20px 25px -5px rgba(0,0,0,0.2);
+            text-align: center;
+        }
     </style>
+
+    <div class="header-action-bar">
+        <div class="header-title-box">
+            <h3>Relatório de Pesquisa - IPbx Prisma</h3>
+            <p>Módulo Oficial de Satisfação pós-atendimento</p>
+        </div>
+        <div class="header-right-btns">
+            <a href="modules/pesquisa/help/index.html" target="_blank" class="btn-header-action btn-manual">📖 Manual</a>
+            <button onclick="window.open(window.location.href, '_blank')" class="btn-header-action btn-expand">↗ Expandir Aba</button>
+        </div>
+    </div>
 
     <form method="POST" action="?menu=pesquisa">
         <div class="filter-top-bar">
@@ -404,8 +688,10 @@ function renderTopFilterAndDashboard($stats, $date_start, $date_end, $operador, 
                         <option value="NAO" <?php if ($solucao == 'NAO') echo 'selected'; ?>>✖ NÃO (Não Resolvido)</option>
                     </select>
                 </div>
-                <div>
+                <div style="display:flex; gap:6px;">
                     <input type="submit" name="show" value="🔍 Filtrar" class="btn-filter-submit" />
+                    <a href="?<?php echo $queryParams; ?>&action=export_excel" class="btn-excel">📊 Excel</a>
+                    <a href="?<?php echo $queryParams; ?>&action=export_pdf" target="_blank" class="btn-pdf">📄 PDF</a>
                     <a href="?menu=pesquisa" class="btn-filter-clear">🔄 Ver Todos</a>
                 </div>
             </div>
@@ -450,7 +736,30 @@ function renderTopFilterAndDashboard($stats, $date_start, $date_end, $operador, 
         </div>
     </div>
 
+    <!-- Modal Player de Audio -->
+    <div id="audioModalPesquisa">
+        <div class="audio-modal-content">
+            <h4 style="margin:0 0 12px 0; color:#1e293b;">🎧 Reproduzindo Gravação</h4>
+            <audio id="pesquisaAudioElement" controls style="width:100%; margin-bottom:15px;"></audio>
+            <button onclick="closeAudioModal()" style="background:#64748b; color:#fff; border:none; padding:6px 16px; border-radius:6px; font-weight:bold; cursor:pointer;">Fechar</button>
+        </div>
+    </div>
+
     <script>
+    function playPesquisaAudio(fileEnc) {
+        var modal = document.getElementById('audioModalPesquisa');
+        var audio = document.getElementById('pesquisaAudioElement');
+        audio.src = '?menu=pesquisa&action=stream_audio&file=' + fileEnc;
+        modal.style.display = 'flex';
+        audio.play();
+    }
+    function closeAudioModal() {
+        var modal = document.getElementById('audioModalPesquisa');
+        var audio = document.getElementById('pesquisaAudioElement');
+        audio.pause();
+        modal.style.display = 'none';
+    }
+
     document.addEventListener("DOMContentLoaded", function() {
         if (typeof Chart !== 'undefined') {
             // Gráfico de Notas
