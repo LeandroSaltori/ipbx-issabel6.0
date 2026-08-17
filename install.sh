@@ -421,19 +421,38 @@ if [ -d "$REPO_DIR/src/modules/pesquisa" ]; then
 fi
 
 # ==============================================================================
-# 15. RELATÓRIO QUEUE STATS, ASTERNIC LITE, CALLCENTER E RAMAIS
+# 15. CALL CENTER OFICIAL DO ISSABEL
 # ==============================================================================
-log_info "15/20 - Instalando Asternic Call Center Stats Lite, Relatório de Filas e CallCenter..."
-QUEUE_SRC="$REPO_DIR/src/modules/relatorio_de_filas"
+log_info "15/20 - Instalando e Configurando Módulo Call Center..."
 
-# 1. Instala o módulo oficial de Call Center do Issabel
-if command -v dnf &>/dev/null; then
-    dnf install -y issabel-callcenter 2>/dev/null || true
-elif command -v yum &>/dev/null; then
-    yum install -y issabel-callcenter 2>/dev/null || true
+# 1. Instala/Reinstala o pacote oficial issabel-callcenter
+if command -v yum &>/dev/null; then
+    yum reinstall -y issabel-callcenter 2>/dev/null || yum install -y issabel-callcenter 2>/dev/null || true
+elif command -v dnf &>/dev/null; then
+    dnf reinstall -y issabel-callcenter 2>/dev/null || dnf install -y issabel-callcenter 2>/dev/null || true
 fi
 
-# 2. Criação do banco de dados qstatslite no MySQL / MariaDB
+# 2. Copia os módulos atualizados do Call Center
+for CC_MOD in agent_console agents callcenter_config campaign_in campaign_monitoring campaign_out dont_call_list eccp_users form_designer form_list hold_time ingoings_calls_success login_logout rep_agent_information rep_agents_monitoring rep_incoming_calls_monitoring rep_trunks_used_per_hour reports_break; do
+    if [ -d "$REPO_DIR/src/modules/$CC_MOD" ]; then
+        cp -rf "$REPO_DIR/src/modules/$CC_MOD" /var/www/html/modules/
+        chown -R asterisk:asterisk "/var/www/html/modules/$CC_MOD"
+        chmod -R 755 "/var/www/html/modules/$CC_MOD"
+    fi
+done
+
+# 3. Inicia e habilita o serviço do discador do Call Center
+systemctl enable issabelcallcenter 2>/dev/null || true
+systemctl restart issabelcallcenter 2>/dev/null || true
+log_success "Módulo Call Center instalado e ativado."
+
+# ==============================================================================
+# 16. ASTERNIC STATS LITE, RELATÓRIO DE FILAS E RAMAIS
+# ==============================================================================
+log_info "16/20 - Instalando Asternic Call Center Stats Lite e Relatório de Filas..."
+QUEUE_SRC="$REPO_DIR/src/modules/relatorio_de_filas"
+
+# 1. Criação do banco de dados qstatslite no MySQL / MariaDB
 MYSQL_PWD=""
 if [ -f /etc/issabel.conf ]; then
     MYSQL_PWD=$(grep -i mysqlrootpwd /etc/issabel.conf 2>/dev/null | cut -d'=' -f2 | tr -d ' ')
@@ -488,7 +507,7 @@ CREATE TABLE IF NOT EXISTS `queue_stats` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 EOF
 
-# 3. Instalação do Asternic Call Center Stats Lite (parselog.php e /var/www/html/stats)
+# 2. Instalação do Asternic Call Center Stats Lite (parselog.php e /var/www/html/stats)
 if [ ! -f /usr/local/parselog/parselog.php ] || [ ! -d /var/www/html/stats ]; then
     log_info "Baixando e configurando Asternic Stats Lite..."
     TMP_ASTERNIC="/tmp/asternic-stats-install"
@@ -538,7 +557,7 @@ if [ ! -f /usr/local/parselog/parselog.php ] || [ ! -d /var/www/html/stats ]; th
     rm -rf "$TMP_ASTERNIC"
 fi
 
-# 4. Implantação do seu Relatório de Filas Melhorado (Interface Customizada)
+# 3. Implantação do seu Relatório de Filas Melhorado (Interface Customizada)
 if [ -d "$QUEUE_SRC" ]; then
     mkdir -p /var/www/html/modules/relatorio_de_filas /var/www/html/Relatorio_de_filas /var/www/html/relatorio_de_filas /var/www/html/stats
     cp -rf "$QUEUE_SRC/"* /var/www/html/modules/relatorio_de_filas/
@@ -564,41 +583,32 @@ if [ -d "$REPO_DIR/src/ramais" ]; then
 fi
 
 # ==============================================================================
-# 16. MÓDULOS WEB DEVELOPER
+# 17. MÓDULOS WEB DEVELOPER
 # ==============================================================================
-log_info "16/20 - Instalando Módulos Web Developer..."
+log_info "17/20 - Instalando Módulos Web Developer..."
 
-# 1. Instala o pacote base do issabel-developer via yum/dnf
-if command -v dnf &>/dev/null; then
-    dnf install -y issabel-developer 2>/dev/null || true
-elif command -v yum &>/dev/null; then
-    yum install -y issabel-developer 2>/dev/null || true
-fi
-
-# 2. Registra o menu nativo e submenus no banco SQLite
+# 1. Limpa entradas duplicadas e reinstala o pacote oficial
 if command -v sqlite3 &>/dev/null; then
-    sqlite3 /var/www/db/acl.db "INSERT OR IGNORE INTO acl_resource (name, description) VALUES ('developer', 'Developer');" 2>/dev/null || true
-    sqlite3 /var/www/db/menu.db "DELETE FROM menu WHERE id = 'developer' OR id = 'web_developer';" 2>/dev/null || true
-    sqlite3 /var/www/db/menu.db "INSERT INTO menu (id, IdParent, Link, Name, Type, order_no) VALUES ('developer', '', '', 'Developer', 'module', 99);" 2>/dev/null || true
-    sqlite3 /var/www/db/acl.db "INSERT OR IGNORE INTO acl_group_permission (id_action, id_group, id_resource) SELECT 1, 1, id FROM acl_resource WHERE name = 'developer';" 2>/dev/null || true
+    sqlite3 /var/www/db/menu.db "DELETE FROM menu WHERE id IN ('developer', 'build_module', 'delete_module', 'language_admin', 'web_developer');" 2>/dev/null || true
+    sqlite3 /var/www/db/acl.db "DELETE FROM acl_resource WHERE name IN ('developer', 'build_module', 'delete_module', 'language_admin', 'web_developer');" 2>/dev/null || true
 fi
 
-# 3. Sobrescreve com os arquivos corrigidos (build_module, delete_module, language_admin)
+if command -v yum &>/dev/null; then
+    yum reinstall -y issabel-developer 2>/dev/null || yum install -y issabel-developer 2>/dev/null || true
+elif command -v dnf &>/dev/null; then
+    dnf reinstall -y issabel-developer 2>/dev/null || dnf install -y issabel-developer 2>/dev/null || true
+fi
+
+# 2. Copia exatamente os arquivos corrigidos para /var/www/html/modules/
 for MOD in build_module delete_module language_admin; do
     if [ -d "$REPO_DIR/src/modules/$MOD" ]; then
+        rm -rf "/var/www/html/modules/$MOD"
         cp -rf "$REPO_DIR/src/modules/$MOD" /var/www/html/modules/
         chown -R asterisk:asterisk "/var/www/html/modules/$MOD"
         chmod -R 755 "/var/www/html/modules/$MOD"
-        
-        if command -v sqlite3 &>/dev/null; then
-            sqlite3 /var/www/db/acl.db "INSERT OR IGNORE INTO acl_resource (name, description) VALUES ('$MOD', '$MOD');" 2>/dev/null || true
-            sqlite3 /var/www/db/menu.db "DELETE FROM menu WHERE id = '$MOD';" 2>/dev/null || true
-            sqlite3 /var/www/db/menu.db "INSERT INTO menu (id, IdParent, Link, Name, Type, order_no) VALUES ('$MOD', 'developer', '', '$MOD', 'module', 1);" 2>/dev/null || true
-            sqlite3 /var/www/db/acl.db "INSERT OR IGNORE INTO acl_group_permission (id_action, id_group, id_resource) SELECT 1, 1, id FROM acl_resource WHERE name = '$MOD';" 2>/dev/null || true
-        fi
     fi
 done
-log_success "Ferramentas Web Developer instaladas e corrigidas."
+log_success "Ferramentas Web Developer instaladas com os arquivos corrigidos."
 
 # ==============================================================================
 # 17. FAVICON E TEMAS (prisma_v5)

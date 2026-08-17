@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Pesquisa de Satisfação - Como Funciona</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: #f8fafc;
+            color: #1e293b;
+            padding: 30px;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: #ffffff;
+            border-radius: 12px;
+            padding: 40px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+        h1 {
+            color: #4f46e5;
+            font-size: 26px;
+            margin-top: 0;
+            border-bottom: 2px solid #e2e8f0;
+            padding-bottom: 15px;
+        }
+        h2 {
+            color: #1e293b;
+            font-size: 18px;
+            margin-top: 25px;
+        }
+        .card {
+            background: #f1f5f9;
+            border-left: 4px solid #4f46e5;
+            padding: 15px 20px;
+            border-radius: 6px;
+            margin: 20px 0;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        th {
+            background-color: #f8fafc;
+            color: #475569;
+            font-weight: 600;
+        }
+        .badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+            background: #e0e7ff;
+            color: #4338ca;
+        }
+        ul {
+            padding-left: 20px;
+        }
+        li {
+            margin-bottom: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📊 Pesquisa de Satisfação - Guia de Funcionamento</h1>
+        
+        <p>A <strong>Pesquisa de Satisfação</strong> do IPbx Prisma Telecom permite avaliar a qualidade do atendimento prestado pelos operadores através de uma URA interativa automática pós-atendimento.</p>
+
+        <div class="card">
+            <strong>📞 Ramal de Teste e Transferência:</strong> Disque ou transfira a chamada para o número <span class="badge">8996</span>.
+        </div>
+
+        <h2>🎙️ Fluxo da URA de Avaliação</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Etapa</th>
+                    <th>Áudio Tocado</th>
+                    <th>Opções do Cliente</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>1. Saudação</strong></td>
+                    <td><code>audio1.wav</code></td>
+                    <td>Início automático da pesquisa.</td>
+                </tr>
+                <tr>
+                    <td><strong>2. Avaliação do Atendimento</strong></td>
+                    <td><code>audio2.wav</code></td>
+                    <td>
+                        <strong>1:</strong> RUIM &nbsp;|&nbsp;
+                        <strong>2:</strong> BOM &nbsp;|&nbsp;
+                        <strong>3:</strong> MÉDIO &nbsp;|&nbsp;
+                        <strong>4:</strong> MUITO BOM &nbsp;|&nbsp;
+                        <strong>5:</strong> ÓTIMO
+                    </td>
+                </tr>
+                <tr>
+                    <td><strong>3. Resolução do Problema</strong></td>
+                    <td><code>audio3.wav</code></td>
+                    <td>
+                        <strong>1:</strong> SIM &nbsp;|&nbsp;
+                        <strong>2:</strong> NÃO
+                    </td>
+                </tr>
+                <tr>
+                    <td><strong>4. Encerramento</strong></td>
+                    <td><code>agradecimento.wav</code></td>
+                    <td>Agradecimento e desligamento automático.</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>⚙️ Como Transferir a Chamada para a Pesquisa</h2>
+        <ul>
+            <li>Durante uma chamada ativa com o cliente, o operador pressiona a tecla de transferência (ex: <code>*2</code> ou <code>##</code>).</li>
+            <li>Digita o ramal da pesquisa: <strong>8996</strong>.</li>
+            <li>O operador desliga e o cliente responde às perguntas da pesquisa pelo teclado do telefone.</li>
+        </ul>
+
+        <h2>💾 Armazenamento e Relatórios</h2>
+        <p>Todas as respostas são gravadas automaticamente no banco de dados do sistema e podem ser visualizadas, filtradas e exportadas em tempo real na aba <strong>Reports ➔ Pesquisa</strong>.</p>
+    </div>
+</body>
+</html>
