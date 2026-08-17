@@ -10,7 +10,7 @@
   +----------------------------------------------------------------------+
   | The Initial Developer of the Original Code is PaloSanto Solutions    |
   +----------------------------------------------------------------------+
-  $Id: index.php,v 5.0 2026-08-17 Prisma Telecom $ */
+  $Id: index.php,v 6.0 2026-08-17 Prisma Telecom $ */
 
 require_once "modules/agent_console/libs/issabel2.lib.php";
 include_once "libs/paloSantoDB.class.php";
@@ -50,7 +50,6 @@ function _moduleContent(&$smarty, $module_name)
 
 function handleAudioPlayback()
 {
-    // Limpa qualquer output buffer anterior do Issabel para não corromper o binário do áudio
     while (ob_get_level()) {
         ob_end_clean();
     }
@@ -259,10 +258,11 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
         'solucao' => $solucao
     ));
 
-    $totalCount = isset($stats['total']) ? $stats['total'] : 0;
-    $media      = isset($stats['media_estrelas']) ? $stats['media_estrelas'] : 0;
-    $resolucao  = isset($stats['taxa_resolucao']) ? $stats['taxa_resolucao'] : 0;
-    $satisfacao = isset($stats['taxa_satisfacao']) ? $stats['taxa_satisfacao'] : 0;
+    $totalCount  = isset($stats['total']) ? $stats['total'] : 0;
+    $media       = isset($stats['media_estrelas']) ? $stats['media_estrelas'] : 0;
+    $resolucao   = isset($stats['taxa_resolucao']) ? $stats['taxa_resolucao'] : 0;
+    $satisfacao  = isset($stats['taxa_satisfacao']) ? $stats['taxa_satisfacao'] : 0;
+    $nao_avaliou = isset($stats['nao_avaliou']) ? (int)$stats['nao_avaliou'] : 0;
 
     $otimo     = isset($stats['otimo']) ? (int)$stats['otimo'] : 0;
     $muito_bom = isset($stats['muito_bom']) ? (int)$stats['muito_bom'] : 0;
@@ -392,10 +392,10 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
         .btn-pdf { background: #dc2626; color: #ffffff; }
         .btn-reset { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
 
-        /* KPI Cards Grid */
+        /* KPI Cards Grid (5 Cards) */
         .kpi-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
             gap: 12px;
             margin-bottom: 15px;
         }
@@ -414,6 +414,7 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
         .kpi-card-item.green { border-left-color: #10b981; }
         .kpi-card-item.blue { border-left-color: #3b82f6; }
         .kpi-card-item.amber { border-left-color: #f59e0b; }
+        .kpi-card-item.slate { border-left-color: #64748b; }
 
         .kpi-card-title {
             font-size: 10px;
@@ -604,6 +605,7 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
                             <option value="BOM" <?php if ($avaliacao == 'BOM') echo 'selected'; ?>>⭐⭐⭐ BOM</option>
                             <option value="MEDIO" <?php if ($avaliacao == 'MEDIO') echo 'selected'; ?>>⭐⭐⭐ MÉDIO / REGULAR</option>
                             <option value="RUIM" <?php if ($avaliacao == 'RUIM') echo 'selected'; ?>>⭐ RUIM / PÉSSIMO</option>
+                            <option value="NAO AVALIOU" <?php if ($avaliacao == 'NAO AVALIOU') echo 'selected'; ?>>📵 NÃO AVALIOU / DESISTIU</option>
                         </select>
                     </div>
                     <div class="filter-field-group">
@@ -624,17 +626,17 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
             </form>
         </div>
 
-        <!-- Grid de Cards KPIs -->
+        <!-- Grid de 5 Cards KPIs Executivos -->
         <div class="kpi-grid">
             <div class="kpi-card-item purple">
-                <div class="kpi-card-title">📋 Total de Avaliações</div>
+                <div class="kpi-card-title">📋 Total de Chamadas</div>
                 <div class="kpi-card-num"><?php echo number_format($totalCount, 0, ',', '.'); ?></div>
-                <div class="kpi-card-desc">Pesquisas registradas</div>
+                <div class="kpi-card-desc">Transferidas para Pesquisa</div>
             </div>
             <div class="kpi-card-item green">
                 <div class="kpi-card-title">⭐ Média de Satisfação</div>
                 <div class="kpi-card-num"><?php echo $media; ?> <span style="font-size:14px; color:#f59e0b;">/ 5.0</span></div>
-                <div class="kpi-card-desc">Índice Geral de Atendimento</div>
+                <div class="kpi-card-desc">Índice dos Avaliados</div>
             </div>
             <div class="kpi-card-item blue">
                 <div class="kpi-card-title">🎯 Taxa de Resolução</div>
@@ -645,6 +647,11 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
                 <div class="kpi-card-title">🏆 Satisfação Positiva</div>
                 <div class="kpi-card-num"><?php echo $satisfacao; ?>%</div>
                 <div class="kpi-card-desc">Notas Excelente, Ótimo & Muito Bom</div>
+            </div>
+            <div class="kpi-card-item slate">
+                <div class="kpi-card-title">📵 Desligou sem Avaliar</div>
+                <div class="kpi-card-num"><?php echo number_format($nao_avaliou, 0, ',', '.'); ?></div>
+                <div class="kpi-card-desc"><?php echo $totalCount > 0 ? round(($nao_avaliou / $totalCount) * 100, 1) : 0; ?>% das chamadas</div>
             </div>
         </div>
 
@@ -727,6 +734,14 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
                                         case 'PÉSSIMO':
                                         case '1':
                                             echo "<span style='background:#ef4444; color:#ffffff; padding:3px 8px; border-radius:10px; font-weight:bold; font-size:10px; display:inline-block;'>⭐ $avUpper</span>";
+                                            break;
+                                        case 'NAO AVALIOU':
+                                        case 'NÃO AVALIOU':
+                                        case 'ABANDONOU':
+                                        case 'SEM RESPOSTA':
+                                        case 'DESISTIU':
+                                        case '0':
+                                            echo "<span style='background:#64748b; color:#ffffff; padding:3px 8px; border-radius:10px; font-weight:bold; font-size:10px; display:inline-block;'>📵 NÃO AVALIOU</span>";
                                             break;
                                         default:
                                             echo "<span style='background:#94a3b8; color:#ffffff; padding:3px 8px; border-radius:10px; font-weight:bold; font-size:10px; display:inline-block;'>$avUpper</span>";
@@ -827,10 +842,10 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
             new Chart(ctxNotas, {
                 type: 'doughnut',
                 data: {
-                    labels: ['Excelente / Ótimo (5)', 'Muito Bom (4)', 'Bom / Regular (3)', 'Ruim (2)', 'Péssimo (1)'],
+                    labels: ['Excelente / Ótimo (5)', 'Muito Bom (4)', 'Bom / Regular (3)', 'Ruim (2)', 'Péssimo (1)', 'Não Avaliou (0)'],
                     datasets: [{
-                        data: [<?php echo "$otimo, $muito_bom, $medio, $bom, $ruim"; ?>],
-                        backgroundColor: ['#10b981', '#3b82f6', '#f59e0b', '#f97316', '#ef4444'],
+                        data: [<?php echo "$otimo, $muito_bom, $medio, $bom, $ruim, $nao_avaliou"; ?>],
+                        backgroundColor: ['#10b981', '#3b82f6', '#f59e0b', '#f97316', '#ef4444', '#64748b'],
                         borderWidth: 2,
                         borderColor: '#ffffff'
                     }]

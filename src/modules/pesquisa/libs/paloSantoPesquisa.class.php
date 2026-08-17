@@ -10,7 +10,7 @@
   +----------------------------------------------------------------------+
   | The Initial Developer of the Original Code is PaloSanto Solutions    |
   +----------------------------------------------------------------------+
-  $Id: paloSantoPesquisa.class.php,v 2.4 2026-08-17 Prisma Telecom $ */
+  $Id: paloSantoPesquisa.class.php,v 2.5 2026-08-17 Prisma Telecom $ */
 
 class paloSantoPesquisa {
     var $_DB;
@@ -279,7 +279,7 @@ class paloSantoPesquisa {
     {
         if (!$this->pdo) {
             return array(
-                'total' => 0, 'otimo' => 0, 'muito_bom' => 0, 'medio' => 0, 'bom' => 0, 'ruim' => 0,
+                'total' => 0, 'otimo' => 0, 'muito_bom' => 0, 'medio' => 0, 'bom' => 0, 'ruim' => 0, 'nao_avaliou' => 0,
                 'resolvido_sim' => 0, 'resolvido_nao' => 0, 'media_estrelas' => 0,
                 'taxa_resolucao' => 0, 'taxa_satisfacao' => 0
             );
@@ -313,6 +313,7 @@ class paloSantoPesquisa {
             SUM(CASE WHEN UPPER(avaliacao) IN ('BOM', 'MEDIO', 'MÉDIO', 'REGULAR', '3') THEN 1 ELSE 0 END) as medio,
             SUM(CASE WHEN UPPER(avaliacao) IN ('RUIM', '2') THEN 1 ELSE 0 END) as bom,
             SUM(CASE WHEN UPPER(avaliacao) IN ('PESSIMO', 'PÉSSIMO', '1') THEN 1 ELSE 0 END) as ruim,
+            SUM(CASE WHEN UPPER(avaliacao) IN ('NAO AVALIOU', 'NÃO AVALIOU', 'ABANDONOU', 'DESISTISTU', 'SEM RESPOSTA', '0', '') OR avaliacao IS NULL THEN 1 ELSE 0 END) as nao_avaliou,
             SUM(CASE WHEN UPPER(solucao) IN ('SIM', '1') THEN 1 ELSE 0 END) as resolvido_sim,
             SUM(CASE WHEN UPPER(solucao) IN ('NAO', 'NÃO', '2') THEN 1 ELSE 0 END) as resolvido_nao
             FROM pesquisa $strWhere";
@@ -334,6 +335,7 @@ class paloSantoPesquisa {
                     SUM(CASE WHEN UPPER(avaliacao) IN ('BOM', 'MEDIO', 'MÉDIO', 'REGULAR', '3') THEN 1 ELSE 0 END) as medio,
                     SUM(CASE WHEN UPPER(avaliacao) IN ('RUIM', '2') THEN 1 ELSE 0 END) as bom,
                     SUM(CASE WHEN UPPER(avaliacao) IN ('PESSIMO', 'PÉSSIMO', '1') THEN 1 ELSE 0 END) as ruim,
+                    SUM(CASE WHEN UPPER(avaliacao) IN ('NAO AVALIOU', 'NÃO AVALIOU', 'ABANDONOU', 'DESISTISTU', 'SEM RESPOSTA', '0', '') OR avaliacao IS NULL THEN 1 ELSE 0 END) as nao_avaliou,
                     SUM(CASE WHEN UPPER(solucao) IN ('SIM', '1') THEN 1 ELSE 0 END) as resolvido_sim,
                     SUM(CASE WHEN UPPER(solucao) IN ('NAO', 'NÃO', '2') THEN 1 ELSE 0 END) as resolvido_nao
                     FROM pesquisa");
@@ -343,7 +345,7 @@ class paloSantoPesquisa {
 
         if (!$stats || empty($stats['total'])) {
             return array(
-                'total' => 0, 'otimo' => 0, 'muito_bom' => 0, 'medio' => 0, 'bom' => 0, 'ruim' => 0,
+                'total' => 0, 'otimo' => 0, 'muito_bom' => 0, 'medio' => 0, 'bom' => 0, 'ruim' => 0, 'nao_avaliou' => 0,
                 'resolvido_sim' => 0, 'resolvido_nao' => 0, 'media_estrelas' => 0,
                 'taxa_resolucao' => 0, 'taxa_satisfacao' => 0
             );
@@ -355,13 +357,15 @@ class paloSantoPesquisa {
         $medio = (int)$stats['medio'];
         $bom = (int)$stats['bom'];
         $ruim = (int)$stats['ruim'];
+        $nao_avaliou = (int)$stats['nao_avaliou'];
         $sim = (int)$stats['resolvido_sim'];
         $nao = (int)$stats['resolvido_nao'];
 
+        $avaliadosTotal = $total - $nao_avaliou;
         $somaPontos = ($otimo * 5) + ($muito_bom * 4) + ($medio * 3) + ($bom * 2) + ($ruim * 1);
-        $mediaEstrelas = $total > 0 ? round($somaPontos / $total, 1) : 0;
+        $mediaEstrelas = $avaliadosTotal > 0 ? round($somaPontos / $avaliadosTotal, 1) : 0;
         $taxaResolucao = ($sim + $nao) > 0 ? round(($sim / ($sim + $nao)) * 100, 1) : 0;
-        $taxaSatisfacao = $total > 0 ? round((($otimo + $muito_bom) / $total) * 100, 1) : 0;
+        $taxaSatisfacao = $avaliadosTotal > 0 ? round((($otimo + $muito_bom) / $avaliadosTotal) * 100, 1) : 0;
 
         return array(
             'total' => $total,
@@ -370,6 +374,7 @@ class paloSantoPesquisa {
             'medio' => $medio,
             'bom' => $bom,
             'ruim' => $ruim,
+            'nao_avaliou' => $nao_avaliou,
             'resolvido_sim' => $sim,
             'resolvido_nao' => $nao,
             'media_estrelas' => $mediaEstrelas,
