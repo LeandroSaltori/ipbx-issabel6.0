@@ -10,7 +10,7 @@
   +----------------------------------------------------------------------+
   | The Initial Developer of the Original Code is PaloSanto Solutions    |
   +----------------------------------------------------------------------+
-  $Id: index.php,v 4.0 2026-08-17 Prisma Telecom $ */
+  $Id: index.php,v 5.0 2026-08-17 Prisma Telecom $ */
 
 require_once "modules/agent_console/libs/issabel2.lib.php";
 include_once "libs/paloSantoDB.class.php";
@@ -27,7 +27,7 @@ function _moduleContent(&$smarty, $module_name)
 
     $pPesquisaObj = new paloSantoPesquisa();
 
-    // Handler de Áudio
+    // Handler de Áudio (Stream / Download)
     if (isset($_GET['action']) && ($_GET['action'] == 'stream_audio' || $_GET['action'] == 'download_audio')) {
         handleAudioPlayback();
         exit;
@@ -50,6 +50,11 @@ function _moduleContent(&$smarty, $module_name)
 
 function handleAudioPlayback()
 {
+    // Limpa qualquer output buffer anterior do Issabel para não corromper o binário do áudio
+    while (ob_get_level()) {
+        ob_end_clean();
+    }
+
     $file = isset($_GET['file']) ? urldecode($_GET['file']) : '';
     $file = basename($file);
     if (empty($file)) {
@@ -78,6 +83,11 @@ function handleAudioPlayback()
     }
 
     if (!empty($filePath) && file_exists($filePath)) {
+        $ext = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
+        $mime = 'audio/wav';
+        if ($ext == 'mp3') $mime = 'audio/mpeg';
+        if ($ext == 'gsm') $mime = 'audio/x-gsm';
+
         if ($_GET['action'] == 'download_audio') {
             header('Content-Description: File Transfer');
             header('Content-Type: application/octet-stream');
@@ -89,8 +99,9 @@ function handleAudioPlayback()
             readfile($filePath);
             exit;
         } else {
-            header('Content-Type: audio/wav');
+            header('Content-Type: ' . $mime);
             header('Content-Length: ' . filesize($filePath));
+            header('Accept-Ranges: bytes');
             readfile($filePath);
             exit;
         }
@@ -103,6 +114,10 @@ function handleAudioPlayback()
 
 function handleExportExcel($pPesquisa)
 {
+    while (ob_get_level()) {
+        ob_end_clean();
+    }
+
     $date_start = isset($_REQUEST['date_start']) ? trim($_REQUEST['date_start']) : '';
     $date_end   = isset($_REQUEST['date_end']) ? trim($_REQUEST['date_end']) : '';
     $operador   = isset($_REQUEST['operador']) ? trim($_REQUEST['operador']) : '';
@@ -138,6 +153,10 @@ function handleExportExcel($pPesquisa)
 
 function handleExportPdf($pPesquisa)
 {
+    while (ob_get_level()) {
+        ob_end_clean();
+    }
+
     $date_start = isset($_REQUEST['date_start']) ? trim($_REQUEST['date_start']) : '';
     $date_end   = isset($_REQUEST['date_end']) ? trim($_REQUEST['date_end']) : '';
     $operador   = isset($_REQUEST['operador']) ? trim($_REQUEST['operador']) : '';
@@ -232,6 +251,7 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
     // URLs de Exportação
     $exportParams = http_build_query(array(
         'menu' => $module_name,
+        'rawmode' => 'yes',
         'date_start' => $date_start,
         'date_end' => $date_end,
         'operador' => $operador,
@@ -731,7 +751,7 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
                                         <?php $fileEnc = urlencode($recFile); ?>
                                         <div style="display:flex; gap:4px; align-items:center;">
                                             <button type="button" onclick="playPesquisaAudio('<?php echo $fileEnc; ?>')" style="background:#0284c7; color:#ffffff; border:none; padding:3px 10px; border-radius:12px; font-weight:700; font-size:10px; cursor:pointer;">▶ Play</button>
-                                            <a href="?menu=<?php echo htmlspecialchars($module_name); ?>&action=download_audio&file=<?php echo $fileEnc; ?>" target="_blank" style="background:#16a34a; color:#ffffff; padding:3px 10px; border-radius:12px; font-weight:700; font-size:10px; text-decoration:none;">Baixar</a>
+                                            <a href="?menu=<?php echo htmlspecialchars($module_name); ?>&rawmode=yes&action=download_audio&file=<?php echo $fileEnc; ?>" target="_blank" style="background:#16a34a; color:#ffffff; padding:3px 10px; border-radius:12px; font-weight:700; font-size:10px; text-decoration:none;">Baixar</a>
                                         </div>
                                     <?php else: ?>
                                         <span style="color:#cbd5e1; font-size:10px;">Sem áudio</span>
@@ -790,7 +810,7 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
     function playPesquisaAudio(fileEnc) {
         var modal = document.getElementById('audioModalPesquisa');
         var audio = document.getElementById('pesquisaAudioElement');
-        audio.src = '?menu=<?php echo htmlspecialchars($module_name); ?>&action=stream_audio&file=' + fileEnc;
+        audio.src = '?menu=<?php echo htmlspecialchars($module_name); ?>&rawmode=yes&action=stream_audio&file=' + fileEnc;
         modal.style.display = 'flex';
         audio.play();
     }
