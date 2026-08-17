@@ -10,7 +10,7 @@
   +----------------------------------------------------------------------+
   | The Initial Developer of the Original Code is PaloSanto Solutions    |
   +----------------------------------------------------------------------+
-  $Id: paloSantoPesquisa.class.php,v 9.0 2026-08-17 Prisma Telecom $ */
+  $Id: paloSantoPesquisa.class.php,v 10.0 2026-08-17 Prisma Telecom $ */
 
 class paloSantoPesquisa {
     var $_DB;
@@ -201,7 +201,7 @@ class paloSantoPesquisa {
         $ts = strtotime($dt);
 
         if ($ts) {
-            // Janela de tempo ajustada ao redor do horário exato da pesquisa (5min antes a 2min depois)
+            // Janela precisa ao redor da pesquisa (5min antes a 2min depois)
             $start = date('Y-m-d H:i:s', $ts - 300);
             $end   = date('Y-m-d H:i:s', $ts + 120);
 
@@ -210,8 +210,12 @@ class paloSantoPesquisa {
                 $telClean = substr($telClean, -8);
             }
 
+            // Mapa de Filas cadastradas no Asterisk
+            $queueMap = $this->getQueueNamesMap();
+            $knownQueueNums = array_keys($queueMap);
+
             try {
-                // Prioriza chamadas que possuem arquivo de gravação E que pertencem àquele momento exato
+                // 1. Busca primeiro o registro da chamada de atendimento que gerou gravação de áudio
                 $sql = "SELECT recordingfile, duration, billsec, dst, dstchannel, channel FROM cdr 
                         WHERE calldate BETWEEN ? AND ? 
                         AND (src LIKE ? OR dst LIKE ? OR channel LIKE ? OR dstchannel LIKE ?) 
@@ -229,11 +233,38 @@ class paloSantoPesquisa {
                         $info['duration_formatted'] = sprintf('%02d:%02d', floor($sec / 60), $sec % 60);
 
                         $combined = (isset($row['dstchannel']) ? $row['dstchannel'] : '') . ' ' . (isset($row['channel']) ? $row['channel'] : '') . ' ' . (isset($row['dst']) ? $row['dst'] : '');
-                        if (preg_match('/(?:Queue|Fila|q-)?([5-9]\d{3})/i', $combined, $mQ)) {
-                            $info['fila'] = $mQ[1];
+                        foreach ($knownQueueNums as $qn) {
+                            if (strpos($combined, $qn) !== false) {
+                                $info['fila'] = $qn;
+                                break;
+                            }
                         }
                     }
                 }
+
+                // 2. Se a Fila não foi encontrada no registro principal, faz match na chamada de entrada do CDR (ext-queues)
+                if (empty($info['fila'])) {
+                    $sqlQ = "SELECT dst, dstchannel, channel, dcontext FROM cdr 
+                             WHERE calldate BETWEEN ? AND ? 
+                             AND (src LIKE ? OR clid LIKE ?) 
+                             AND (dcontext LIKE '%queue%' OR dstchannel LIKE '%queue%' OR dcontext LIKE '%ext-queues%') 
+                             ORDER BY calldate DESC LIMIT 1";
+                    $stmtQ = $this->pdo->prepare($sqlQ);
+                    if ($stmtQ !== false) {
+                        $stmtQ->execute(array($start, $end, "%$telClean%", "%$telClean%"));
+                        $rowQ = $stmtQ->fetch();
+                        if ($rowQ) {
+                            $combQ = $rowQ['dst'] . ' ' . $rowQ['dstchannel'] . ' ' . $rowQ['channel'] . ' ' . $rowQ['dcontext'];
+                            foreach ($knownQueueNums as $qn) {
+                                if (strpos($combQ, $qn) !== false) {
+                                    $info['fila'] = $qn;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+
             } catch (Exception $e) {
             } catch (Throwable $t) {}
         }
@@ -451,7 +482,6 @@ class paloSantoPesquisa {
             );
         }
 
-        // Busca estrita de transferências reais de pesquisa no CDR (destinos 9000 ou 8996)
         $cdrTotalPesquisa = 0;
         try {
             $whereCdr = array("(dst = '9000' OR dst = '8996' OR (dcontext LIKE '%pesquisa%' AND dstchannel LIKE '%pesquisa%'))");
@@ -483,7 +513,6 @@ class paloSantoPesquisa {
         $sim = (int)$stats['resolvido_sim'];
         $nao = (int)$stats['resolvido_nao'];
 
-        // Se a busca estrita no CDR retornar valor válido maior que o DB, usa a diferença; senão, usa a contagem exata da tabela pesquisa
         if ($cdrTotalPesquisa > $totalDB && $cdrTotalPesquisa < ($totalDB * 3)) {
             $total = $cdrTotalPesquisa;
             $nao_avaliou = max($nao_avaliou_db, $total - ($otimo + $muito_bom + $medio + $bom + $ruim));
