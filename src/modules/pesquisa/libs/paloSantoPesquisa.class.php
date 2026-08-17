@@ -10,7 +10,7 @@
   +----------------------------------------------------------------------+
   | The Initial Developer of the Original Code is PaloSanto Solutions    |
   +----------------------------------------------------------------------+
-  $Id: paloSantoPesquisa.class.php,v 5.0 2026-08-17 Prisma Telecom $ */
+  $Id: paloSantoPesquisa.class.php,v 6.0 2026-08-17 Prisma Telecom $ */
 
 class paloSantoPesquisa {
     var $_DB;
@@ -448,10 +448,10 @@ class paloSantoPesquisa {
             );
         }
 
-        // Cruzamento dinâmico expandido com a tabela CDR do Asterisk (suporta 8996, 9000 e pesquisa)
+        // Busca em todos os números/contextos de extensão de pesquisa históricos possíveis no CDR
         $cdrTotalPesquisa = 0;
         try {
-            $whereCdr = array("(dst = '8996' OR dst = '9000' OR dst LIKE '%pesquisa%' OR dcontext LIKE '%pesquisa%' OR dstchannel LIKE '%pesquisa%' OR dstchannel LIKE '%8996%')");
+            $whereCdr = array("(dst IN ('8996', '9000', '9999', '8888', '7000', '6000') OR dst LIKE '%pesquisa%' OR dcontext LIKE '%pesquisa%' OR dstchannel LIKE '%pesquisa%' OR dstchannel LIKE '%8996%' OR dstchannel LIKE '%9000%')");
             $paramsCdr = array();
             if (!empty($dsSql)) {
                 $whereCdr[] = "calldate >= ?";
