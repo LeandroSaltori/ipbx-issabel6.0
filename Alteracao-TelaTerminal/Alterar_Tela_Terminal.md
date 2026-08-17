@@ -3,6 +3,7 @@
 
 Acesse:  /usr/local/sbin/motd.sh
 
+*Alterar as permissões
 
 Site pra gerar:
 https://patorjk.com/software/taag/#p=display&f=Small&t=Prisma%20Telecom
