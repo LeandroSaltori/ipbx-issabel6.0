@@ -1,25 +1,127 @@
-## Install Report CDR ##
+# Guia Completo de Instalação do Asternic CDR no Issabel PBX
 
-  https://www.youtube.com/watch?v=6OVUhVTcm5I
-  
+Este documento descreve o processo passo a passo de instalação e atualização do módulo de relatórios de chamadas **Asternic CDR Report** (Versão 1.6.6) para os servidores **Issabel PBX** (versões 4 e 5).
 
-# Fazer download do arquivo:
- https://www.asternic.net/cdrreports/download.php
-    - Clica com o botão direito, salvar.
+---
 
-  Entrar em:
-  - Admin -> Administrador de Modulos
-  - Faça upload da pasta "asternic_cdr-1.6.6tgz
-  - Após upload do arquivo, atualizar a pagina de modulos, vai aparecer "Asternic CDR Reports", faça a instalação.
-  
-  Novo painel de relatorios, irá aparecer em:
-    Reports -> Asternic CDR Reports
+## 📋 Pré-requisitos
+- Servidor **Issabel PBX** instalado e em funcionamento (Asterisk + MariaDB/MySQL).
+- Acesso como usuário **root** via terminal SSH.
+- Conectividade de rede para download dos pacotes (caso utilize a instalação automática).
 
-Update dos arquivos após instalado:
-    Os arquivos se encontram na pasta:
-      - var/www/html/admin/modules/asternic_cdr
+---
 
-    - Renomei a pasta asternic_cdr_OLD
-    - Envie as pastas com as alterações "asternic_cdr" para:
-      
-  
+## 🚀 Método 1: Instalação Automatizada (Recomendado)
+
+O repositório possui um script automatizado que realiza todo o processo de download, backup da versão anterior, cópia dos arquivos customizados, registro no banco de dados e ajuste de permissões.
+
+### Opção A: Comando Direto em Linha Única (via SSH)
+Conecte-se ao seu servidor Issabel por SSH como `root` e execute o comando abaixo:
+
+```bash
+curl -sSL https://raw.githubusercontent.com/LeandroSaltori/ipbx-issabel5/main/asternic_cdr/instalar-asternic-cdr.sh | bash
+```
+
+### Opção B: Execução Local após Clonar o Repositório
+Caso você já tenha clonado o repositório no servidor:
+
+```bash
+cd /caminho/do/repositorio/ipbx-issabel5/asternic_cdr
+chmod +x instalar-asternic-cdr.sh
+./instalar-asternic-cdr.sh
+```
+
+---
+
+## 🛠️ Método 2: Instalação Manual (Interface Web + CLI)
+
+Caso prefira realizar a instalação manualmente via painel web do IssabelPBX e substituir os arquivos customizados no servidor, siga as etapas abaixo:
+
+### Passo 1: Habilitar o Acesso Direto ao IssabelPBX
+1. Acesse a interface web do Issabel (`https://<IP_DO_SEU_SERVIDOR>`).
+2. No menu lateral, acesse **Segurança** (*Security*) > **Configurações Avançadas** (*Advanced Settings*).
+3. Ative a opção **Acesso Direto ao IssabelPBX** (*Enable Direct Access*).
+4. Clique em **Salvar** (*Save*).
+
+### Passo 2: Upload do Módulo Base
+1. Acesse o painel de administração do IssabelPBX pelo navegador:
+   `https://<IP_DO_SEU_SERVIDOR>/admin`
+2. No menu superior ou lateral, acesse **Configuração PBX** > **Administração** > **Administrador de Módulos** (*Module Admin*).
+3. Clique na opção de **Upload de Módulo** (*Upload Module*).
+4. Selecione o arquivo `asternic_cdr-1.6.6.tgz` (localizado na pasta `asternic_cdr/_Instalador/` deste repositório ou baixado de [asternic.net](https://www.asternic.net/cdrreports/download.php)).
+5. Clique em **Enviar** (*Submit*).
+
+### Passo 3: Ativação do Módulo no PBX
+1. Na lista de módulos do **Module Admin**, localize **Asternic CDR Report**.
+2. Clique na ação **Instalar** (*Install*).
+3. Clique em **Processar** (*Process*) e confirme a instalação.
+4. Clique no botão vermelho **Aplicar Alterações** (*Apply Config*) no topo da página.
+
+### Passo 4: Substituição e Atualização das Pastas Customizadas (`asternic_cdr_OLD`)
+Após a instalação do pacote base via interface web, é necessário aplicar as personalizações do seu repositório:
+
+1. Acesse o servidor via terminal SSH como `root`.
+2. **Renomeie a pasta da instalação padrão** para guardar o backup da versão original:
+   ```bash
+   mv /var/www/html/admin/modules/asternic_cdr /var/www/html/admin/modules/asternic_cdr_OLD
+   ```
+3. **Puxe/Copie a pasta `asternic_cdr` com as suas alterações** para o local da instalação:
+   - *Se você tem o repositório clonado localmente no servidor:*
+     ```bash
+     cp -rf /caminho/do/repositorio/ipbx-issabel5/asternic_cdr /var/www/html/admin/modules/asternic_cdr
+     ```
+   - *Se desejar puxar diretamente do GitHub:*
+     ```bash
+     git clone --depth 1 https://github.com/LeandroSaltori/ipbx-issabel5.git /tmp/ipbx-repo
+     cp -rf /tmp/ipbx-repo/asternic_cdr /var/www/html/admin/modules/asternic_cdr
+     rm -rf /tmp/ipbx-repo
+     ```
+
+### Passo 5: Ajuste de Permissões
+Ajuste o proprietário e as permissões dos arquivos para o usuário `asterisk`:
+
+```bash
+chown -R asterisk:asterisk /var/www/html/admin/modules/asternic_cdr
+chmod -R 755 /var/www/html/admin/modules/asternic_cdr
+```
+
+### Passo 6: Recarregar o Asterisk
+Execute no terminal para aplicar as novas configurações:
+
+```bash
+asterisk -rx "module reload"
+```
+
+---
+
+## 🌐 Como Acessar o Painel de Relatórios
+
+Após concluir a instalação por qualquer um dos métodos, o relatório Asternic CDR estará disponível nos seguintes caminhos:
+
+1. **Acesso Direto (Recomendado):**
+   - URL: `https://<IP_DO_SEU_SERVIDOR>/admin/config.php?display=asternic_cdr`
+2. **Menu do Issabel PBX:**
+   - **Configuração PBX** > **Opções Avançadas** > **Asternic CDR Report**
+   - ou em **Reports** / **Relatórios** > **Asternic CDR Reports**
+
+---
+
+## 🔍 Solução de Problemas
+
+- **Página em Branco ou Erro de Permissão:**
+  Certifique-se de que o diretório `/var/www/html/admin/modules/asternic_cdr` pertence ao usuário e grupo `asterisk:asterisk`.
+  ```bash
+  chown -R asterisk:asterisk /var/www/html/admin/modules/asternic_cdr
+  ```
+
+- **Módulo não aparece no menu do IssabelPBX:**
+  Execute a atualização de módulos no terminal:
+  ```bash
+  fwconsole reload   # Para Issabel 5 / FreePBX mais recente
+  # OU
+  amportal a r       # Para Issabel 4 / FreePBX 2.11
+  ```
+
+---
+
+*Vídeo de referência:* [CDR ASTERNIC FREE - YouTube](https://www.youtube.com/watch?v=6OVUhVTcm5I)

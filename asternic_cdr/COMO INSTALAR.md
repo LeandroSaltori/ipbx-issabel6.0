@@ -1,22 +1,48 @@
-# README #
+# Como Instalar o Asternic CDR Report
 
-This is the Asternic CDR IssabelPBX and FPBX Module
+## 1. Instalação Automática via Terminal (SSH)
 
-### What is this repository for? ###
+Execute o comando abaixo como `root` no servidor Issabel:
 
-* Provides an alternative way to present CDR reports for Issabel and FPBX
+```bash
+curl -sSL https://raw.githubusercontent.com/LeandroSaltori/ipbx-issabel5/main/asternic_cdr/instalar-asternic-cdr.sh | bash
+```
 
-### How do I get set up? ###
+---
 
-Select the Security option from your Issabel menu and be sure to allow unembed access to Issabel PBX.
-Then go to http://your.server/admin to log into IssabelPBX directly, and from the module manager you 
-will be able to upload the module and install it on your system.
+## 2. Instalação Manual via Web (IssabelPBX)
 
-https://eletronicacastro.ddns.com.br:5443/admin/config.php?display=asternic_cdr
+1. **Permitir Acesso Direto:**
+   Acesse **Segurança** > **Configurações Avançadas** > Marque **Acesso Direto ao IssabelPBX** e Salve.
 
-Criar Webdeveloper
+2. **Acessar o IssabelPBX:**
+   Vá para `https://{IP_DO_SERVIDOR}/admin`
 
+3. **Upload do Módulo:**
+   - Acesse **Configuração PBX** > **Administração** > **Administrador de Módulos** (*Module Admin*).
+   - Faça o upload do pacote `_Instalador/asternic_cdr-1.6.6.tgz`.
+   - Clique em **Instalar** > **Processar** > **Aplicar Alterações**.
 
-	Url (Example: http://www.issabel.org or http://{IP_SERVER}/mail): *
+4. **Substituir e Puxar as Pastas Alteradas:**
+   Renomeie a pasta da instalação padrão para `asternic_cdr_OLD` e copie a sua pasta `asternic_cdr` com as alterações:
+   ```bash
+   # Renomeia a instalação padrão
+   mv /var/www/html/admin/modules/asternic_cdr /var/www/html/admin/modules/asternic_cdr_OLD
 
-https://{IP_SERVER}/admin/config.php?display=asternic_cdr
+   # Puxa/copia a pasta alterada do seu repositório
+   cp -rf /caminho/do/repositorio/ipbx-issabel5/asternic_cdr /var/www/html/admin/modules/asternic_cdr
+
+   # Ajusta as permissões de arquivo
+   chown -R asterisk:asterisk /var/www/html/admin/modules/asternic_cdr
+   chmod -R 755 /var/www/html/admin/modules/asternic_cdr
+   ```
+
+---
+
+## 3. Link de Acesso ao Relatório
+
+Após instalado, acesse o painel pelo navegador:
+
+```text
+https://{IP_DO_SERVIDOR}/admin/config.php?display=asternic_cdr
+```

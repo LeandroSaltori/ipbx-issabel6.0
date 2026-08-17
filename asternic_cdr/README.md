@@ -1,39 +1,47 @@
-# Instalação do Módulo CDR Asternic (Versão Gratuita) no Issabel
+# Asternic CDR Report - Módulo para Issabel PBX
 
-Este guia descreve o processo de instalação do módulo de relatórios de chamadas (CDR) da Asternic no servidor Issabel PBX.
-
-## Pré-requisitos
-- Servidor Issabel PBX instalado e em execução.
-- Módulo CDR Asternic (versão gratuita para Issabel) baixado previamente do site oficial da Asternic.
-
-## Passo a Passo da Instalação
-
-### 1. Configurações de Segurança
-Antes de instalar módulos externos, é necessário permitir o acesso direto a partir da interface do Issabel:
-1. Acesse o menu **Segurança** (Security).
-2. Vá para **Configurações Avançadas** (Advanced Settings).
-3. Habilite a opção **Acesso direto** (Direct Access).
-4. Clique em **Salvar**.
-
-### 2. Acesso ao Administrador de Módulos
-1. Navegue até o menu **Configuração PBX** (PBX Configuration).
-2. Selecione **Issabel PBX** e vá para **Administração** (Administration).
-3. Dentro de Administração, clique em **Administrador de Módulos** (Module Admin).
-
-### 3. Upload do Módulo
-1. No menu de Administração de Módulos, localize a seção de upload ou instalação de módulos externos.
-2. Selecione o arquivo `.tar.gz` ou a pasta do módulo que você baixou.
-3. Clique em **Enviar** (Submit) para carregar o módulo no servidor.
-
-### 4. Instalação e Ativação
-1. Após o upload bem-sucedido, ainda no **Administrador de Módulos** (Module Admin), procure pelo módulo **Asternic CDR Report** na lista.
-2. Selecione a opção **Instalar** (Install).
-3. Clique em **Processar** (Process) e **Confirmar** (Confirm) para concluir a instalação.
-4. Clique em **Aplicar Alterações** (Apply Config) para garantir que as configurações sejam salvas.
-
-### 5. Acesso ao Módulo
-1. Após a instalação, o módulo estará disponível em **Configuração PBX** > **Opções Avançadas** > **Asternic CDR Report**.
-2. A partir daí, você poderá visualizar estatísticas de chamadas, tempos de duração, detalhes por extensão e relatórios diários.
+O **Asternic CDR Report** é um módulo de relatórios avançados de chamadas (CDR) para servidores **Issabel PBX** (versões 4 e 5) e FreePBX.
 
 ---
-*Fonte: Tutorial baseado no vídeo [CDR ASTERNIC FREE](https://www.youtube.com/watch?v=6OVUhVTcm5I).*
+
+## ⚡ Instalação Automática (Recomendada)
+
+Para instalar o módulo de forma rápida e automatizada diretamente no seu servidor Issabel:
+
+```bash
+curl -sSL https://raw.githubusercontent.com/LeandroSaltori/ipbx-issabel5/main/asternic_cdr/instalar-asternic-cdr.sh | bash
+```
+
+Ou, se você já possui este repositório clonado no servidor:
+
+```bash
+cd asternic_cdr
+chmod +x instalar-asternic-cdr.sh
+./instalar-asternic-cdr.sh
+```
+
+---
+
+## 🛠️ Instalação Manual
+
+1. Habilite o **Acesso Direto ao IssabelPBX** no menu **Segurança** > **Configurações Avançadas**.
+2. Acesse `https://<IP_DO_SERVIDOR>/admin` no seu navegador.
+3. No **Administrador de Módulos** (*Module Admin*), faça o upload do pacote `_Instalador/asternic_cdr-1.6.6.tgz`.
+4. Instale o módulo e clique em **Aplicar Alterações** (*Apply Config*).
+5. Copie os arquivos customizados desta pasta para `/var/www/html/admin/modules/asternic_cdr/`.
+6. Ajuste as permissões no terminal SSH:
+   ```bash
+   chown -R asterisk:asterisk /var/www/html/admin/modules/asternic_cdr
+   chmod -R 755 /var/www/html/admin/modules/asternic_cdr
+   ```
+
+---
+
+## 🌐 Como Acessar o Relatório
+
+- **Link Direto:** `https://<IP_DO_SERVIDOR>/admin/config.php?display=asternic_cdr`
+- **Menu Issabel:** **Configuração PBX** > **Opções Avançadas** > **Asternic CDR Report**
+
+---
+
+*Para um guia detalhado passo a passo, consulte o arquivo [AsternicCDR_Install.md](../AsternicCDR_Install.md) na raiz do repositório.*
