@@ -10,7 +10,7 @@
   +----------------------------------------------------------------------+
   | The Initial Developer of the Original Code is PaloSanto Solutions    |
   +----------------------------------------------------------------------+
-  $Id: paloSantoPesquisa.class.php,v 3.0 2026-08-17 Prisma Telecom $ */
+  $Id: paloSantoPesquisa.class.php,v 4.0 2026-08-17 Prisma Telecom $ */
 
 class paloSantoPesquisa {
     var $_DB;
@@ -96,7 +96,8 @@ class paloSantoPesquisa {
                         $this->pdo = $pdo;
                         return;
                     }
-                } catch (Exception $e) {}
+                } catch (Exception $e) {
+                } catch (Throwable $t) {}
             }
         }
 
@@ -105,7 +106,8 @@ class paloSantoPesquisa {
                 PDO::ATTR_ERRMODE => PDO::ERRMODE_SILENT,
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC
             ));
-        } catch (Exception $e) {}
+        } catch (Exception $e) {
+        } catch (Throwable $t) {}
     }
 
     function getExtensionNamesMap()
@@ -114,7 +116,7 @@ class paloSantoPesquisa {
         if ($this->pdo) {
             try {
                 $stmt = $this->pdo->query("SELECT extension, name FROM asterisk.users WHERE extension IS NOT NULL AND extension != ''");
-                if ($stmt) {
+                if ($stmt !== false) {
                     $rows = $stmt->fetchAll();
                     if (is_array($rows)) {
                         foreach ($rows as $r) {
@@ -124,12 +126,13 @@ class paloSantoPesquisa {
                         }
                     }
                 }
-            } catch (Exception $e) {}
+            } catch (Exception $e) {
+            } catch (Throwable $t) {}
 
             if (empty($map)) {
                 try {
                     $stmt = $this->pdo->query("SELECT id as extension, description as name FROM asterisk.devices WHERE id IS NOT NULL AND id != ''");
-                    if ($stmt) {
+                    if ($stmt !== false) {
                         $rows = $stmt->fetchAll();
                         if (is_array($rows)) {
                             foreach ($rows as $r) {
@@ -139,7 +142,8 @@ class paloSantoPesquisa {
                             }
                         }
                     }
-                } catch (Exception $e) {}
+                } catch (Exception $e) {
+                } catch (Throwable $t) {}
             }
         }
         return $map;
@@ -151,7 +155,7 @@ class paloSantoPesquisa {
         if ($this->pdo) {
             try {
                 $stmt = $this->pdo->query("SELECT extension as queue, descr as name FROM asterisk.queues_config WHERE extension IS NOT NULL AND extension != ''");
-                if ($stmt) {
+                if ($stmt !== false) {
                     $rows = $stmt->fetchAll();
                     if (is_array($rows)) {
                         foreach ($rows as $r) {
@@ -161,7 +165,8 @@ class paloSantoPesquisa {
                         }
                     }
                 }
-            } catch (Exception $e) {}
+            } catch (Exception $e) {
+            } catch (Throwable $t) {}
         }
         return $map;
     }
@@ -172,7 +177,7 @@ class paloSantoPesquisa {
         if ($this->pdo) {
             try {
                 $stmt = $this->pdo->query("SELECT DISTINCT operador FROM pesquisa WHERE operador IS NOT NULL AND operador != '' AND operador != '-' ORDER BY operador ASC");
-                if ($stmt) {
+                if ($stmt !== false) {
                     $rows = $stmt->fetchAll(PDO::FETCH_COLUMN);
                     if (is_array($rows)) {
                         foreach ($rows as $r) {
@@ -180,7 +185,8 @@ class paloSantoPesquisa {
                         }
                     }
                 }
-            } catch (Exception $e) {}
+            } catch (Exception $e) {
+            } catch (Throwable $t) {}
         }
         sort($list);
         return array_unique($list);
@@ -204,26 +210,29 @@ class paloSantoPesquisa {
             }
 
             try {
-                $sql = "SELECT recordingfile, duration, billsec, dst, dstchannel, channel, userfield FROM cdr 
+                $sql = "SELECT recordingfile, duration, billsec, dst, dstchannel, channel FROM cdr 
                         WHERE calldate BETWEEN ? AND ? 
                         AND (src LIKE ? OR dst LIKE ? OR channel LIKE ? OR dstchannel LIKE ?) 
                         ORDER BY ABS(TIMESTAMPDIFF(SECOND, calldate, ?)) ASC LIMIT 1";
                 $stmt = $this->pdo->prepare($sql);
-                $stmt->execute(array($start, $end, "%$telClean%", "%$telClean%", "%$telClean%", "%$telClean%", $dt));
-                $row = $stmt->fetch();
-                if ($row) {
-                    $info['recordingfile'] = !empty($row['recordingfile']) ? $row['recordingfile'] : '';
-                    $info['duration'] = (int)$row['duration'];
-                    $info['billsec'] = (int)$row['billsec'];
-                    $sec = (int)$row['duration'];
-                    $info['duration_formatted'] = sprintf('%02d:%02d', floor($sec / 60), $sec % 60);
+                if ($stmt !== false) {
+                    $stmt->execute(array($start, $end, "%$telClean%", "%$telClean%", "%$telClean%", "%$telClean%", $dt));
+                    $row = $stmt->fetch();
+                    if ($row) {
+                        $info['recordingfile'] = !empty($row['recordingfile']) ? $row['recordingfile'] : '';
+                        $info['duration'] = (int)$row['duration'];
+                        $info['billsec'] = (int)$row['billsec'];
+                        $sec = (int)$row['duration'];
+                        $info['duration_formatted'] = sprintf('%02d:%02d', floor($sec / 60), $sec % 60);
 
-                    $combined = $row['dstchannel'] . ' ' . $row['channel'] . ' ' . $row['userfield'] . ' ' . $row['dst'];
-                    if (preg_match('/(?:Queue|Fila|q-)?([5-9]\d{3})/i', $combined, $mQ)) {
-                        $info['fila'] = $mQ[1];
+                        $combined = (isset($row['dstchannel']) ? $row['dstchannel'] : '') . ' ' . (isset($row['channel']) ? $row['channel'] : '') . ' ' . (isset($row['dst']) ? $row['dst'] : '');
+                        if (preg_match('/(?:Queue|Fila|q-)?([5-9]\d{3})/i', $combined, $mQ)) {
+                            $info['fila'] = $mQ[1];
+                        }
                     }
                 }
-            } catch (Exception $e) {}
+            } catch (Exception $e) {
+            } catch (Throwable $t) {}
         }
 
         if (empty($info['recordingfile']) && !empty($data) && !empty($telefone)) {
@@ -291,11 +300,14 @@ class paloSantoPesquisa {
 
         try {
             $stmt = $this->pdo->prepare($sql);
-            $stmt->execute($params);
-            return (int)$stmt->fetchColumn();
+            if ($stmt !== false) {
+                $stmt->execute($params);
+                return (int)$stmt->fetchColumn();
+            }
         } catch (Exception $e) {
-            return 0;
-        }
+        } catch (Throwable $t) {}
+
+        return 0;
     }
 
     function getPesquisa($limit, $offset, $filter_field = '', $filter_value = '', $date_start = '', $date_end = '', $operador = '', $avaliacao = '', $solucao = '')
@@ -340,12 +352,15 @@ class paloSantoPesquisa {
 
         try {
             $stmt = $this->pdo->prepare($sql);
-            $stmt->execute($params);
-            $rows = $stmt->fetchAll();
-            return is_array($rows) ? $rows : array();
+            if ($stmt !== false) {
+                $stmt->execute($params);
+                $rows = $stmt->fetchAll();
+                return is_array($rows) ? $rows : array();
+            }
         } catch (Exception $e) {
-            return array();
-        }
+        } catch (Throwable $t) {}
+
+        return array();
     }
 
     function getPesquisaStats($date_start = '', $date_end = '', $operador = '')
@@ -393,9 +408,15 @@ class paloSantoPesquisa {
 
         try {
             $stmt = $this->pdo->prepare($sql);
-            $stmt->execute($params);
-            $stats = $stmt->fetch();
+            if ($stmt !== false) {
+                $stmt->execute($params);
+                $stats = $stmt->fetch();
+            } else {
+                $stats = false;
+            }
         } catch (Exception $e) {
+            $stats = false;
+        } catch (Throwable $t) {
             $stats = false;
         }
 
@@ -412,8 +433,11 @@ class paloSantoPesquisa {
                     SUM(CASE WHEN UPPER(solucao) IN ('SIM', '1') THEN 1 ELSE 0 END) as resolvido_sim,
                     SUM(CASE WHEN UPPER(solucao) IN ('NAO', 'NÃO', '2') THEN 1 ELSE 0 END) as resolvido_nao
                     FROM pesquisa");
-                $stats = $stmtAll->fetch();
-            } catch (Exception $e) {}
+                if ($stmtAll !== false) {
+                    $stats = $stmtAll->fetch();
+                }
+            } catch (Exception $e) {
+            } catch (Throwable $t) {}
         }
 
         if (!$stats || empty($stats['total'])) {
@@ -424,10 +448,10 @@ class paloSantoPesquisa {
             );
         }
 
-        // Cruzamento abrangente com a tabela CDR do Asterisk
+        // Cruzamento seguro com a tabela CDR do Asterisk
         $cdrTotalPesquisa = 0;
         try {
-            $whereCdr = array("(dst LIKE '%pesquisa%' OR dst = '8996' OR dst = '9000' OR dcontext LIKE '%pesquisa%' OR dstchannel LIKE '%pesquisa%' OR lastdata LIKE '%pesquisa%')");
+            $whereCdr = array("(dst LIKE '%pesquisa%' OR dst = '8996' OR dst = '9000' OR dcontext LIKE '%pesquisa%' OR dstchannel LIKE '%pesquisa%')");
             $paramsCdr = array();
             if (!empty($dsSql)) {
                 $whereCdr[] = "calldate >= ?";
@@ -439,9 +463,12 @@ class paloSantoPesquisa {
             }
             $strWhereCdr = "WHERE " . implode(" AND ", $whereCdr);
             $stmtCdr = $this->pdo->prepare("SELECT COUNT(*) FROM cdr $strWhereCdr");
-            $stmtCdr->execute($paramsCdr);
-            $cdrTotalPesquisa = (int)$stmtCdr->fetchColumn();
-        } catch (Exception $e) {}
+            if ($stmtCdr !== false) {
+                $stmtCdr->execute($paramsCdr);
+                $cdrTotalPesquisa = (int)$stmtCdr->fetchColumn();
+            }
+        } catch (Exception $e) {
+        } catch (Throwable $t) {}
 
         $totalDB = (int)$stats['total'];
         $otimo = (int)$stats['otimo'];
@@ -483,10 +510,12 @@ class paloSantoPesquisa {
         if (!$this->pdo) return null;
         try {
             $stmt = $this->pdo->prepare("SELECT * FROM pesquisa WHERE id=?");
-            $stmt->execute(array($id));
-            return $stmt->fetch();
+            if ($stmt !== false) {
+                $stmt->execute(array($id));
+                return $stmt->fetch();
+            }
         } catch (Exception $e) {
-            return null;
-        }
+        } catch (Throwable $t) {}
+        return null;
     }
 }
