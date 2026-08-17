@@ -492,12 +492,14 @@ if [ ! -f /usr/local/parselog/parselog.php ] || [ ! -d /var/www/html/stats ]; th
     rm -rf "$TMP_ASTERNIC"
 fi
 
-# 3. Implantação do Módulo Relatório de Filas Customizado
+# 3. Implantação do seu Relatório de Filas Melhorado (Interface Customizada)
 if [ -d "$QUEUE_SRC" ]; then
-    mkdir -p /var/www/html/modules/relatorio_de_filas /var/www/html/Relatorio_de_filas
+    mkdir -p /var/www/html/modules/relatorio_de_filas /var/www/html/Relatorio_de_filas /var/www/html/stats
     cp -rf "$QUEUE_SRC/"* /var/www/html/modules/relatorio_de_filas/
     cp -rf "$QUEUE_SRC/"* /var/www/html/Relatorio_de_filas/ 2>/dev/null || true
-    chown -R asterisk:asterisk /var/www/html/modules/relatorio_de_filas /var/www/html/Relatorio_de_filas
+    cp -rf "$QUEUE_SRC/"* /var/www/html/stats/ 2>/dev/null || true
+    chown -R asterisk:asterisk /var/www/html/modules/relatorio_de_filas /var/www/html/Relatorio_de_filas /var/www/html/stats
+    chmod -R 755 /var/www/html/modules/relatorio_de_filas /var/www/html/Relatorio_de_filas /var/www/html/stats
     
     if command -v sqlite3 &>/dev/null; then
         sqlite3 /var/www/db/acl.db "INSERT OR IGNORE INTO acl_resource (name, description) VALUES ('relatorio_de_filas', 'Relatório de Filas');" 2>/dev/null || true
