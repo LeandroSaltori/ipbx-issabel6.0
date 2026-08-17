@@ -10,7 +10,7 @@
   +----------------------------------------------------------------------+
   | The Initial Developer of the Original Code is PaloSanto Solutions    |
   +----------------------------------------------------------------------+
-  $Id: paloSantoPesquisa.class.php,v 11.0 2026-08-17 Prisma Telecom $ */
+  $Id: paloSantoPesquisa.class.php,v 12.0 2026-08-17 Prisma Telecom $ */
 
 class paloSantoPesquisa {
     var $_DB;
@@ -215,7 +215,8 @@ class paloSantoPesquisa {
         $ts = strtotime($dt);
         if (!$ts) return '';
 
-        $start = date('Y-m-d H:i:s', $ts - 600);
+        // Janela ampliada para até 30 minutos antes (cobre o tempo de espera da fila + atendimento)
+        $start = date('Y-m-d H:i:s', $ts - 1800);
         $end   = date('Y-m-d H:i:s', $ts + 120);
 
         $telClean = preg_replace('/[^0-9]/', '', $telefone);
@@ -224,48 +225,30 @@ class paloSantoPesquisa {
         }
 
         try {
-            $sql = "SELECT dst, dstchannel, channel, dcontext, accountcode, userfield FROM cdr 
+            $sql = "SELECT dst, dstchannel, channel, dcontext, accountcode, userfield, lastdata FROM cdr 
                     WHERE calldate BETWEEN ? AND ? 
                     AND (src LIKE ? OR clid LIKE ? OR dst LIKE ? OR channel LIKE ? OR dstchannel LIKE ?) 
-                    ORDER BY calldate ASC";
+                    ORDER BY calldate DESC";
             $stmt = $this->pdo->prepare($sql);
             if ($stmt !== false) {
                 $stmt->execute(array($start, $end, "%$telClean%", "%$telClean%", "%$telClean%", "%$telClean%", "%$telClean%"));
                 $rows = $stmt->fetchAll();
                 if (is_array($rows)) {
-                    // 1. Procura primeiro se accountcode tem uma fila conhecida
+                    // 1. Procura se qualquer coluna do CDR contém uma fila cadastrada
                     foreach ($rows as $r) {
-                        $acc = trim($r['accountcode']);
-                        if (!empty($acc) && in_array($acc, $knownQueueNums)) {
-                            return $acc;
-                        }
-                    }
-
-                    // 2. Procura se dst é um número de fila cadastrado
-                    foreach ($rows as $r) {
-                        $dst = trim($r['dst']);
-                        if (!empty($dst) && in_array($dst, $knownQueueNums)) {
-                            return $dst;
-                        }
-                    }
-
-                    // 3. Procura por padrões ext-queues, q-NUM ou Queue/NUM em qualquer coluna
-                    foreach ($rows as $r) {
-                        $comb = $r['dst'] . ' ' . $r['dstchannel'] . ' ' . $r['channel'] . ' ' . $r['dcontext'] . ' ' . $r['userfield'];
-                        if (preg_match('/(?:ext-queues|from-queue|Queue\/|q-)(\d{3,5})/i', $comb, $m)) {
-                            if (empty($knownQueueNums) || in_array($m[1], $knownQueueNums)) {
-                                return $m[1];
-                            }
-                        }
-                    }
-
-                    // 4. Procura por qualquer número de fila conhecido dentro dos textos do CDR
-                    foreach ($rows as $r) {
-                        $comb = $r['dst'] . ' ' . $r['dstchannel'] . ' ' . $r['channel'] . ' ' . $r['dcontext'];
+                        $comb = $r['accountcode'] . ' ' . $r['dst'] . ' ' . $r['dstchannel'] . ' ' . $r['channel'] . ' ' . $r['dcontext'] . ' ' . $r['lastdata'] . ' ' . $r['userfield'];
                         foreach ($knownQueueNums as $qn) {
-                            if (strpos($comb, $qn) !== false) {
+                            if (preg_match('/(?:^|\D)' . preg_quote($qn, '/') . '(?:\D|$)/', $comb)) {
                                 return $qn;
                             }
+                        }
+                    }
+
+                    // 2. Procura por padrões ext-queues, q-NUM ou Queue/NUM em qualquer coluna
+                    foreach ($rows as $r) {
+                        $comb = $r['dst'] . ' ' . $r['dstchannel'] . ' ' . $r['channel'] . ' ' . $r['dcontext'] . ' ' . $r['lastdata'] . ' ' . $r['userfield'];
+                        if (preg_match('/(?:ext-queues|from-queue|Queue\/|q-)(\d{3,5})/i', $comb, $m)) {
+                            return $m[1];
                         }
                     }
                 }
@@ -329,7 +312,7 @@ class paloSantoPesquisa {
                     }
                 }
 
-                // 2. Se a Fila ainda não foi identificada, realiza busca profunda de Fila de Entrada por (data, hora, telefone)
+                // 2. Se a Fila ainda não foi identificada, realiza busca profunda de Fila de Entrada na janela de 30 min por (data, hora, telefone)
                 if (empty($info['fila'])) {
                     $info['fila'] = $this->findQueueForCall($telefone, $dt, $knownQueueNums);
                 }
