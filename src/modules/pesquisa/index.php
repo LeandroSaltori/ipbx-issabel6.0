@@ -33,9 +33,14 @@ function _moduleContent(&$smarty, $module_name)
     $templates_dir = (isset($arrConf['templates_dir'])) ? $arrConf['templates_dir'] : 'themes';
     $local_templates_dir = "$base_dir/modules/$module_name/" . $templates_dir . '/' . $arrConf['theme'];
 
-    // Conexão com banco SQLite pesquisa.db
-    $dsn = "sqlite3:////var/www/db/pesquisa.db";
+    // Conexão com banco SQLite pesquisa.db com fallback
+    global $arrConf;
+    $dbPath = !empty($arrConf['issabel_dbdir']) ? "$arrConf[issabel_dbdir]/pesquisa.db" : "/var/www/db/pesquisa.db";
+    $dsn = "sqlite3:///$dbPath";
     $pDB = new paloDB($dsn);
+    if (!$pDB->connStatus) {
+        $pDB = new paloDB("sqlite3:////var/www/db/pesquisa.db");
+    }
 
     $action = getAction();
     $content = "";
@@ -52,9 +57,9 @@ function reportPesquisa($smarty, $module_name, $local_templates_dir, &$pDB, $arr
 {
     $pPesquisa = new paloSantoPesquisa($pDB);
 
-    // Parâmetros de Filtro
-    $date_start = isset($_POST['date_start']) ? trim($_POST['date_start']) : (isset($_GET['date_start']) ? trim($_GET['date_start']) : date('Y-m-01'));
-    $date_end   = isset($_POST['date_end']) ? trim($_POST['date_end']) : (isset($_GET['date_end']) ? trim($_GET['date_end']) : date('Y-m-d'));
+    // Parâmetros de Filtro (por padrão vazio para trazer todos os registros existentes)
+    $date_start = isset($_POST['date_start']) ? trim($_POST['date_start']) : (isset($_GET['date_start']) ? trim($_GET['date_start']) : '');
+    $date_end   = isset($_POST['date_end']) ? trim($_POST['date_end']) : (isset($_GET['date_end']) ? trim($_GET['date_end']) : '');
     $operador   = isset($_POST['operador']) ? trim($_POST['operador']) : (isset($_GET['operador']) ? trim($_GET['operador']) : '');
     $avaliacao  = isset($_POST['avaliacao']) ? trim($_POST['avaliacao']) : (isset($_GET['avaliacao']) ? trim($_GET['avaliacao']) : '');
     $solucao    = isset($_POST['solucao']) ? trim($_POST['solucao']) : (isset($_GET['solucao']) ? trim($_GET['solucao']) : '');
@@ -108,25 +113,29 @@ function reportPesquisa($smarty, $module_name, $local_templates_dir, &$pDB, $arr
         foreach ($arrResult as $key => $value) {
             $arrTmp = array();
 
+            // Mapeamento dinâmico de colunas para suportar qualquer versão de banco
+            $val_data = isset($value['data']) ? $value['data'] : (isset($value['DATA']) ? $value['DATA'] : '-');
+            $val_hora = isset($value['hora']) ? $value['hora'] : (isset($value['HORA']) ? $value['HORA'] : '');
+            $val_operador = isset($value['operador']) ? $value['operador'] : (isset($value['OPERADOR']) ? $value['OPERADOR'] : (isset($value['ramal']) ? $value['ramal'] : (isset($value['RAMAL']) ? $value['RAMAL'] : 'Geral')));
+            $val_fila = isset($value['fila']) ? $value['fila'] : (isset($value['FILA']) ? $value['FILA'] : 'Atendimento');
+            $val_telefone = isset($value['telefone']) ? $value['telefone'] : (isset($value['TELEFONE']) ? $value['TELEFONE'] : (isset($value['numero']) ? $value['numero'] : (isset($value['NUMERO']) ? $value['NUMERO'] : 'Anônimo')));
+            $val_avaliacao = isset($value['avaliacao']) ? $value['avaliacao'] : (isset($value['AVALIACAO']) ? $value['AVALIACAO'] : (isset($value['nota']) ? $value['nota'] : (isset($value['NOTA']) ? $value['NOTA'] : '')));
+            $val_solucao = isset($value['solucao']) ? $value['solucao'] : (isset($value['SOLUCAO']) ? $value['SOLUCAO'] : (isset($value['resolvido']) ? $value['resolvido'] : (isset($value['RESOLVIDO']) ? $value['RESOLVIDO'] : '')));
+
             // 1. Data e Hora
-            $d = !empty($value['data']) ? $value['data'] : '-';
-            $h = !empty($value['hora']) ? $value['hora'] : '-';
-            $arrTmp[0] = "<span style='font-size:12px; color:#475569;'><i class='fa fa-calendar'></i> $d &nbsp; <i class='fa fa-clock-o'></i> $h</span>";
+            $arrTmp[0] = "<span style='font-size:12px; color:#475569;'><i class='fa fa-calendar'></i> $val_data " . (!empty($val_hora) ? "&nbsp; <i class='fa fa-clock-o'></i> $val_hora" : "") . "</span>";
 
             // 2. Operador / Ramal
-            $op = !empty($value['operador']) ? $value['operador'] : 'Geral';
-            $arrTmp[1] = "<span style='background:#ede9fe; color:#6d28d9; padding:4px 10px; border-radius:6px; font-weight:600; font-size:12px;'>👤 $op</span>";
+            $arrTmp[1] = "<span style='background:#ede9fe; color:#6d28d9; padding:4px 10px; border-radius:6px; font-weight:600; font-size:12px;'>👤 $val_operador</span>";
 
             // 3. Fila
-            $fila = !empty($value['fila']) ? $value['fila'] : 'Atendimento';
-            $arrTmp[2] = "<span style='background:#f1f5f9; color:#475569; padding:3px 8px; border-radius:4px; font-size:11px;'>$fila</span>";
+            $arrTmp[2] = "<span style='background:#f1f5f9; color:#475569; padding:3px 8px; border-radius:4px; font-size:11px;'>$val_fila</span>";
 
             // 4. Telefone
-            $tel = !empty($value['telefone']) ? $value['telefone'] : 'Anônimo';
-            $arrTmp[3] = "<span style='font-weight:600; color:#1e293b;'><i class='fa fa-phone'></i> $tel</span>";
+            $arrTmp[3] = "<span style='font-weight:600; color:#1e293b;'><i class='fa fa-phone'></i> $val_telefone</span>";
 
             // 5. Avaliação com Badges Modernas e Estrelas
-            $avUpper = strtoupper(trim($value['avaliacao']));
+            $avUpper = strtoupper(trim($val_avaliacao));
             switch ($avUpper) {
                 case 'OTIMO':
                 case 'ÓTIMO':
@@ -151,18 +160,18 @@ function reportPesquisa($smarty, $module_name, $local_templates_dir, &$pDB, $arr
                     $arrTmp[4] = "<span style='background:#ef4444; color:#ffffff; padding:4px 10px; border-radius:12px; font-weight:bold; font-size:11px; display:inline-block;'>⭐ RUIM</span>";
                     break;
                 default:
-                    $arrTmp[4] = "<span style='background:#94a3b8; color:#ffffff; padding:4px 10px; border-radius:12px; font-weight:bold; font-size:11px; display:inline-block;'>$avUpper</span>";
+                    $arrTmp[4] = "<span style='background:#94a3b8; color:#ffffff; padding:4px 10px; border-radius:12px; font-weight:bold; font-size:11px; display:inline-block;'>" . (!empty($avUpper) ? $avUpper : '-') . "</span>";
                     break;
             }
 
             // 6. Solução
-            $solUpper = strtoupper(trim($value['solucao']));
+            $solUpper = strtoupper(trim($val_solucao));
             if ($solUpper == 'SIM' || $solUpper == '1') {
                 $arrTmp[5] = "<span style='background:#dcfce7; color:#15803d; border:1px solid #86efac; padding:4px 10px; border-radius:8px; font-weight:bold; font-size:11px;'>✔ SIM</span>";
             } elseif ($solUpper == 'NAO' || $solUpper == 'NÃO' || $solUpper == '2') {
                 $arrTmp[5] = "<span style='background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5; padding:4px 10px; border-radius:8px; font-weight:bold; font-size:11px;'>✖ NÃO</span>";
             } else {
-                $arrTmp[5] = "<span style='background:#f1f5f9; color:#64748b; padding:4px 10px; border-radius:8px; font-size:11px;'>$solUpper</span>";
+                $arrTmp[5] = "<span style='background:#f1f5f9; color:#64748b; padding:4px 10px; border-radius:8px; font-size:11px;'>" . (!empty($solUpper) ? $solUpper : '-') . "</span>";
             }
 
             $arrData[] = $arrTmp;

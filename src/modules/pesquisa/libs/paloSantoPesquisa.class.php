@@ -50,23 +50,29 @@ class paloSantoPesquisa{
         $params = array();
 
         if (!empty($date_start)) {
-            $where[] = "data >= ?";
+            $d_br = date('d/m/Y', strtotime($date_start));
+            $where[] = "(data >= ? OR data LIKE ?)";
             $params[] = $date_start;
+            $params[] = "%$d_br%";
         }
         if (!empty($date_end)) {
-            $where[] = "data <= ?";
+            $d_br = date('d/m/Y', strtotime($date_end));
+            $where[] = "(data <= ? OR data LIKE ?)";
             $params[] = $date_end;
+            $params[] = "%$d_br%";
         }
         if (!empty($operador)) {
             $where[] = "operador LIKE ?";
             $params[] = "%$operador%";
         }
         if (!empty($avaliacao)) {
-            $where[] = "avaliacao = ?";
+            $where[] = "(UPPER(avaliacao) = ? OR avaliacao = ?)";
+            $params[] = strtoupper($avaliacao);
             $params[] = $avaliacao;
         }
         if (!empty($solucao)) {
-            $where[] = "solucao = ?";
+            $where[] = "(UPPER(solucao) = ? OR solucao = ?)";
+            $params[] = strtoupper($solucao);
             $params[] = $solucao;
         }
 
@@ -87,28 +93,34 @@ class paloSantoPesquisa{
         $params = array();
 
         if (!empty($date_start)) {
-            $where[] = "data >= ?";
+            $d_br = date('d/m/Y', strtotime($date_start));
+            $where[] = "(data >= ? OR data LIKE ?)";
             $params[] = $date_start;
+            $params[] = "%$d_br%";
         }
         if (!empty($date_end)) {
-            $where[] = "data <= ?";
+            $d_br = date('d/m/Y', strtotime($date_end));
+            $where[] = "(data <= ? OR data LIKE ?)";
             $params[] = $date_end;
+            $params[] = "%$d_br%";
         }
         if (!empty($operador)) {
             $where[] = "operador LIKE ?";
             $params[] = "%$operador%";
         }
         if (!empty($avaliacao)) {
-            $where[] = "avaliacao = ?";
+            $where[] = "(UPPER(avaliacao) = ? OR avaliacao = ?)";
+            $params[] = strtoupper($avaliacao);
             $params[] = $avaliacao;
         }
         if (!empty($solucao)) {
-            $where[] = "solucao = ?";
+            $where[] = "(UPPER(solucao) = ? OR solucao = ?)";
+            $params[] = strtoupper($solucao);
             $params[] = $solucao;
         }
 
         $strWhere = !empty($where) ? "WHERE " . implode(" AND ", $where) : "";
-        $query = "SELECT * FROM pesquisa $strWhere ORDER BY id DESC LIMIT $limit OFFSET $offset";
+        $query = "SELECT * FROM pesquisa $strWhere ORDER BY rowid DESC LIMIT $limit OFFSET $offset";
 
         $result = $this->_DB->fetchTable($query, true, $params);
         if ($result === false) {
@@ -124,12 +136,16 @@ class paloSantoPesquisa{
         $params = array();
 
         if (!empty($date_start)) {
-            $where[] = "data >= ?";
+            $d_br = date('d/m/Y', strtotime($date_start));
+            $where[] = "(data >= ? OR data LIKE ?)";
             $params[] = $date_start;
+            $params[] = "%$d_br%";
         }
         if (!empty($date_end)) {
-            $where[] = "data <= ?";
+            $d_br = date('d/m/Y', strtotime($date_end));
+            $where[] = "(data <= ? OR data LIKE ?)";
             $params[] = $date_end;
+            $params[] = "%$d_br%";
         }
         if (!empty($operador)) {
             $where[] = "operador LIKE ?";
@@ -141,13 +157,13 @@ class paloSantoPesquisa{
         // Total e contagem de notas
         $query = "SELECT 
             COUNT(*) as total,
-            SUM(CASE WHEN UPPER(avaliacao) = 'OTIMO' OR UPPER(avaliacao) = 'ÓTIMO' THEN 1 ELSE 0 END) as otimo,
-            SUM(CASE WHEN UPPER(avaliacao) = 'MUITO BOM' THEN 1 ELSE 0 END) as muito_bom,
-            SUM(CASE WHEN UPPER(avaliacao) = 'MEDIO' OR UPPER(avaliacao) = 'MÉDIO' THEN 1 ELSE 0 END) as medio,
-            SUM(CASE WHEN UPPER(avaliacao) = 'BOM' THEN 1 ELSE 0 END) as bom,
-            SUM(CASE WHEN UPPER(avaliacao) = 'RUIM' THEN 1 ELSE 0 END) as ruim,
-            SUM(CASE WHEN UPPER(solucao) = 'SIM' THEN 1 ELSE 0 END) as resolvido_sim,
-            SUM(CASE WHEN UPPER(solucao) = 'NAO' OR UPPER(solucao) = 'NÃO' THEN 1 ELSE 0 END) as resolvido_nao
+            SUM(CASE WHEN UPPER(avaliacao) IN ('OTIMO', 'ÓTIMO', '5') THEN 1 ELSE 0 END) as otimo,
+            SUM(CASE WHEN UPPER(avaliacao) IN ('MUITO BOM', '4') THEN 1 ELSE 0 END) as muito_bom,
+            SUM(CASE WHEN UPPER(avaliacao) IN ('MEDIO', 'MÉDIO', '3') THEN 1 ELSE 0 END) as medio,
+            SUM(CASE WHEN UPPER(avaliacao) IN ('BOM', '2') THEN 1 ELSE 0 END) as bom,
+            SUM(CASE WHEN UPPER(avaliacao) IN ('RUIM', '1') THEN 1 ELSE 0 END) as ruim,
+            SUM(CASE WHEN UPPER(solucao) IN ('SIM', '1') THEN 1 ELSE 0 END) as resolvido_sim,
+            SUM(CASE WHEN UPPER(solucao) IN ('NAO', 'NÃO', '2') THEN 1 ELSE 0 END) as resolvido_nao
             FROM pesquisa $strWhere";
 
         $stats = $this->_DB->getFirstRowQuery($query, true, $params);
@@ -183,17 +199,6 @@ class paloSantoPesquisa{
         $taxaResolucao = ($sim + $nao) > 0 ? round(($sim / ($sim + $nao)) * 100, 1) : 0;
         $taxaSatisfacao = $total > 0 ? round((($otimo + $muito_bom) / $total) * 100, 1) : 0;
 
-        // Ranking por operador
-        $queryOp = "SELECT operador, COUNT(*) as qtd,
-            SUM(CASE WHEN UPPER(avaliacao) IN ('OTIMO', 'ÓTIMO', 'MUITO BOM') THEN 1 ELSE 0 END) as positivos,
-            SUM(CASE WHEN UPPER(solucao) = 'SIM' THEN 1 ELSE 0 END) as resolvidos
-            FROM pesquisa $strWhere
-            GROUP BY operador
-            ORDER BY qtd DESC
-            LIMIT 10";
-        $operadores = $this->_DB->fetchTable($queryOp, true, $params);
-        if (!$operadores) $operadores = array();
-
         return array(
             'total' => $total,
             'otimo' => $otimo,
@@ -205,8 +210,7 @@ class paloSantoPesquisa{
             'resolvido_nao' => $nao,
             'media_estrelas' => $mediaEstrelas,
             'taxa_resolucao' => $taxaResolucao,
-            'taxa_satisfacao' => $taxaSatisfacao,
-            'operadores' => $operadores
+            'taxa_satisfacao' => $taxaSatisfacao
         );
     }
 
