@@ -10,7 +10,11 @@
   +----------------------------------------------------------------------+
   | The Initial Developer of the Original Code is PaloSanto Solutions    |
   +----------------------------------------------------------------------+
-  $Id: paloSantoPesquisa.class.php,v 1.8 2026-08-17 Prisma Telecom $ */
+  $Id: paloSantoPesquisa.class.php,v 1.9 2026-08-17 Prisma Telecom $ */
+
+@include_once "libs/paloSantoDB.class.php";
+@include_once "libs/paloSantoConfig.class.php";
+@include_once "libs/misc.lib.php";
 
 class paloSantoPesquisa {
     var $_DB;
@@ -32,6 +36,9 @@ class paloSantoPesquisa {
 
     function connectBestDatabase()
     {
+        @include_once "/var/www/html/libs/paloSantoConfig.class.php";
+        @include_once "/var/www/html/libs/misc.lib.php";
+
         // 1. Tenta conexao nativa do Issabel framework
         if (function_exists('generarDSNSistema')) {
             $dsn = @generarDSNSistema('asteriskuser', 'asteriskcdrdb');
