@@ -2,8 +2,9 @@
 # ==============================================================================
 # SCRIPT MESTRE DE INSTALAÇÃO E CUSTOMIZAÇÃO - ISSABEL PBX (PRISMA TELECOM)
 # ==============================================================================
-# Este script automatiza o processo de pós-instalação do Issabel PBX.
-# Aplica temas, módulos personalizados, correções de telas, relatórios e áudios.
+# Este script automatiza o processo de pós-instalação e atualização do Issabel PBX.
+# Suporta Issabel 4 (CentOS 7) e Issabel 5 (Rocky Linux 8).
+# Aplica temas, módulos personalizados, correções de telas, relatórios, áudios e configs.
 #
 # Estratégia de Backup:
 # Nenhuma pasta nativa é excluída. As pastas nativas são renomeadas para "<nome>_old".
@@ -70,7 +71,7 @@ backup_and_deploy() {
 # ==============================================================================
 # 1. ALTERAR TELA DO TERMINAL (MOTD)
 # ==============================================================================
-log_info "1/19 - Configurando tela personalizada do terminal (MOTD)..."
+log_info "1/20 - Configurando tela personalizada do terminal (MOTD)..."
 if [ -f "$REPO_DIR/scripts/motd.sh" ]; then
     MOTD_DEST="/usr/local/sbin/motd.sh"
     backup_and_deploy "$REPO_DIR/scripts/motd.sh" "$MOTD_DEST"
@@ -81,7 +82,7 @@ fi
 # ==============================================================================
 # 2. DIRETÓRIO ADMIN (/var/www/html/admin)
 # ==============================================================================
-log_info "2/19 - Atualizando pasta /var/www/html/admin..."
+log_info "2/20 - Atualizando pasta /var/www/html/admin..."
 if [ -d "$REPO_DIR/src/admin" ]; then
     backup_and_deploy "$REPO_DIR/src/admin" "/var/www/html/admin"
     chown -R asterisk:asterisk /var/www/html/admin
@@ -91,7 +92,7 @@ fi
 # ==============================================================================
 # 3. AGENDA.PHP
 # ==============================================================================
-log_info "3/19 - Instalando Agenda.php..."
+log_info "3/20 - Instalando Agenda.php..."
 if [ -f "$REPO_DIR/src/Agenda.php" ]; then
     cp -f "$REPO_DIR/src/Agenda.php" /var/www/html/Agenda.php
     cp -f "$REPO_DIR/src/Agenda.php" /var/www/html/agenda.php
@@ -103,7 +104,7 @@ fi
 # ==============================================================================
 # 4. WEBPHONE WEBRTC
 # ==============================================================================
-log_info "4/19 - Instalando Webphone..."
+log_info "4/20 - Instalando Webphone..."
 if [ -d "$REPO_DIR/src/webphone" ]; then
     mkdir -p /var/www/html/webphone
     cp -rf "$REPO_DIR/src/webphone/"* /var/www/html/webphone/
@@ -115,7 +116,7 @@ fi
 # ==============================================================================
 # 5. EXTENSÃO CHROME / CLICK TO DIAL (EXTENSAO-PRISMA)
 # ==============================================================================
-log_info "5/19 - Instalando backend da Extensão Prisma Click-to-Dial (call.php)..."
+log_info "5/20 - Instalando backend da Extensão Prisma Click-to-Dial (call.php)..."
 if [ -f "$REPO_DIR/src/extensions/chrome-click-to-dial/call.php" ]; then
     cp -f "$REPO_DIR/src/extensions/chrome-click-to-dial/call.php" /var/www/html/call.php
     chown asterisk:asterisk /var/www/html/call.php
@@ -126,7 +127,7 @@ fi
 # ==============================================================================
 # 6. ASTERNIC CDR
 # ==============================================================================
-log_info "6/19 - Instalando/Atualizando Asternic CDR..."
+log_info "6/20 - Instalando/Atualizando Asternic CDR..."
 ASTERNIC_DEST="/var/www/html/admin/modules/asternic_cdr"
 if [ -d "$REPO_DIR/src/modules/asternic_cdr" ]; then
     if [ -d "$ASTERNIC_DEST" ]; then
@@ -153,7 +154,7 @@ fi
 # ==============================================================================
 # 7. CHANSPY (ESCUTA DE LIGAÇÕES)
 # ==============================================================================
-log_info "7/19 - Configurando ChanSpy..."
+log_info "7/20 - Configurando ChanSpy..."
 CHANSPY_FILE="/etc/asterisk/extensions_override_issabelpbx.conf"
 if ! grep -q "\[app-chanspy\]" "$CHANSPY_FILE" 2>/dev/null; then
     if [ -f "$REPO_DIR/src/dialplan/chanspy.conf" ]; then
@@ -187,7 +188,7 @@ fi
 # ==============================================================================
 # 8. ENVIO MENSAGEM TEXTO (PJSIP MESSAGING)
 # ==============================================================================
-log_info "8/19 - Configurando EnvioMensagemTexto..."
+log_info "8/20 - Configurando EnvioMensagemTexto..."
 CUSTOM_EXT="/etc/asterisk/extensions_custom.conf"
 if ! grep -q "\[textmessages\]" "$CUSTOM_EXT" 2>/dev/null; then
     if [ -f "$REPO_DIR/src/dialplan/textmessages.conf" ]; then
@@ -218,7 +219,7 @@ fi
 # ==============================================================================
 # 9. SERVIDOR LDAP DE RAMAIS
 # ==============================================================================
-log_info "9/19 - Instalando Servidor LDAP de Ramais..."
+log_info "9/20 - Instalando Servidor LDAP de Ramais..."
 LDAP_BIN_SRC="$REPO_DIR/src/ldap/issabel-ldap"
 LDAP_SVC_SRC="$REPO_DIR/src/ldap/systemd/issabel-ldap.service"
 
@@ -239,7 +240,7 @@ fi
 # ==============================================================================
 # 10. PASTAS LANG E MODULES EM /var/www/html
 # ==============================================================================
-log_info "10/19 - Atualizando pastas lang e modules em /var/www/html..."
+log_info "10/20 - Atualizando pastas lang e modules em /var/www/html..."
 if [ -d "$REPO_DIR/src/lang" ]; then
     backup_and_deploy "$REPO_DIR/src/lang" "/var/www/html/lang"
     chown -R asterisk:asterisk /var/www/html/lang
@@ -258,7 +259,7 @@ fi
 # ==============================================================================
 # 11. MÚSICA DE ESPERA (MOH)
 # ==============================================================================
-log_info "11/19 - Atualizando Músicas de Espera (MOH)..."
+log_info "11/20 - Atualizando Músicas de Espera (MOH)..."
 MOH_DEST="/var/lib/asterisk/moh"
 if [ -d "$REPO_DIR/src/sounds/moh" ]; then
     mkdir -p "$MOH_DEST"
@@ -271,7 +272,7 @@ fi
 # ==============================================================================
 # 12. NOTIFICAÇÕES TELEGRAM
 # ==============================================================================
-log_info "12/19 - Configurando Notificações via Telegram..."
+log_info "12/20 - Configurando Notificações via Telegram..."
 TELEGRAM_SRC="$REPO_DIR/scripts/monitor_issabel_users.sh"
 if [ -f "$TELEGRAM_SRC" ]; then
     cp -f "$TELEGRAM_SRC" /usr/local/bin/monitor_issabel_users.sh
@@ -288,7 +289,7 @@ fi
 # ==============================================================================
 # 13. PAINEL IPBX (control_panel)
 # ==============================================================================
-log_info "13/19 - Instalando Painel IPbx..."
+log_info "13/20 - Instalando Painel IPbx..."
 PANEL_SRC="$REPO_DIR/src/modules/control_panel"
 if [ -d "$PANEL_SRC" ]; then
     cp -rf "$PANEL_SRC" /var/www/html/modules/control_panel
@@ -304,7 +305,7 @@ fi
 # ==============================================================================
 # 14. PESQUISA DE SATISFAÇÃO
 # ==============================================================================
-log_info "14/19 - Instalando Pesquisa de Satisfação..."
+log_info "14/20 - Instalando Pesquisa de Satisfação..."
 SOUNDS_CUSTOM="/var/lib/asterisk/sounds/custom"
 PESQUISA_SOUNDS="$REPO_DIR/src/sounds/custom"
 
@@ -374,7 +375,7 @@ fi
 # ==============================================================================
 # 15. RELATÓRIO QUEUE STATS E RAMAIS
 # ==============================================================================
-log_info "15/19 - Instalando Relatório de Filas e Ramais..."
+log_info "15/20 - Instalando Relatório de Filas e Ramais..."
 QUEUE_SRC="$REPO_DIR/src/modules/relatorio_de_filas"
 
 if [ -d "$QUEUE_SRC" ]; then
@@ -398,7 +399,7 @@ fi
 # ==============================================================================
 # 16. MÓDULOS WEB DEVELOPER
 # ==============================================================================
-log_info "16/19 - Instalando Módulos Web Developer..."
+log_info "16/20 - Instalando Módulos Web Developer..."
 for MOD in build_module delete_module language_admin; do
     if [ -d "$REPO_DIR/src/modules/$MOD" ]; then
         cp -rf "$REPO_DIR/src/modules/$MOD" /var/www/html/modules/
@@ -410,7 +411,7 @@ log_success "Ferramentas Web Developer instaladas."
 # ==============================================================================
 # 17. FAVICON E TEMAS (prisma_v5)
 # ==============================================================================
-log_info "17/19 - Instalando Favicon e Tema Prisma v5..."
+log_info "17/20 - Instalando Favicon e Tema Prisma v5..."
 if [ -f "$REPO_DIR/src/favicon.ico" ]; then
     cp -f "$REPO_DIR/src/favicon.ico" /var/www/html/favicon.ico
     mkdir -p /var/www/html/themes/tenant/images /var/www/html/themes/prisma_v5/images
@@ -427,7 +428,7 @@ fi
 # ==============================================================================
 # 18. INSTALAÇÃO DE FERRAMENTAS DE DIAGNÓSTICO (TCPDUMP & SNGREP)
 # ==============================================================================
-log_info "18/19 - Instalando ferramentas de diagnóstico de rede e SIP (tcpdump & sngrep)..."
+log_info "18/20 - Instalando ferramentas de diagnóstico de rede e SIP (tcpdump & sngrep)..."
 if command -v yum &>/dev/null; then
     yum install -y tcpdump 2>/dev/null || true
     if ! command -v sngrep &>/dev/null; then
@@ -451,7 +452,7 @@ log_success "Ferramentas tcpdump e sngrep instaladas."
 # ==============================================================================
 # 19. AJUSTES DE TEMPO E BIP DE TRANSFERÊNCIA
 # ==============================================================================
-log_info "19/19 - Aplicando ajustes de tempo de transferência e BIP no Asterisk..."
+log_info "19/20 - Aplicando ajustes de tempo de transferência e BIP no Asterisk..."
 FEATURES_CUSTOM="/etc/asterisk/features_general_custom.conf"
 
 if ! grep -q "transferdigittimeout" "$FEATURES_CUSTOM" 2>/dev/null; then
@@ -474,6 +475,40 @@ EOF
 else
     log_info "Ajustes de transferência já estão configurados."
 fi
+
+# ==============================================================================
+# 20. ALTERAR USER-AGENT PJSIP (IPbx-Prisma)
+# ==============================================================================
+log_info "20/20 - Configurando User-Agent PJSIP para IPbx-Prisma..."
+PJSIP_CONF="/etc/asterisk/pjsip.conf"
+PJSIP_CUSTOM="/etc/asterisk/pjsip_custom.conf"
+
+if [ -f "$PJSIP_CONF" ]; then
+    if grep -q "^user_agent=" "$PJSIP_CONF" 2>/dev/null; then
+        sed -i 's/^user_agent=.*/user_agent=IPbx-Prisma/' "$PJSIP_CONF"
+    elif grep -q "\[global\]" "$PJSIP_CONF" 2>/dev/null; then
+        sed -i '/\[global\]/a user_agent=IPbx-Prisma' "$PJSIP_CONF"
+    else
+        cat << 'EOF' >> "$PJSIP_CONF"
+
+[global]
+type=global
+user_agent=IPbx-Prisma
+EOF
+    fi
+fi
+
+if [ -f "$PJSIP_CUSTOM" ]; then
+    if ! grep -q "user_agent=IPbx-Prisma" "$PJSIP_CUSTOM" 2>/dev/null; then
+        cat << 'EOF' >> "$PJSIP_CUSTOM"
+
+[global]
+type=global
+user_agent=IPbx-Prisma
+EOF
+    fi
+fi
+log_success "User-Agent PJSIP configurado para IPbx-Prisma."
 
 # ==============================================================================
 # RECARGA DE SERVIÇOS E FINALIZAÇÃO
