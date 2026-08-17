@@ -10,7 +10,7 @@
   +----------------------------------------------------------------------+
   | The Initial Developer of the Original Code is PaloSanto Solutions    |
   +----------------------------------------------------------------------+
-  $Id: paloSantoPesquisa.class.php,v 12.0 2026-08-17 Prisma Telecom $ */
+  $Id: paloSantoPesquisa.class.php,v 13.0 2026-08-17 Prisma Telecom $ */
 
 class paloSantoPesquisa {
     var $_DB;
@@ -215,7 +215,6 @@ class paloSantoPesquisa {
         $ts = strtotime($dt);
         if (!$ts) return '';
 
-        // Janela ampliada para até 30 minutos antes (cobre o tempo de espera da fila + atendimento)
         $start = date('Y-m-d H:i:s', $ts - 1800);
         $end   = date('Y-m-d H:i:s', $ts + 120);
 
@@ -234,7 +233,6 @@ class paloSantoPesquisa {
                 $stmt->execute(array($start, $end, "%$telClean%", "%$telClean%", "%$telClean%", "%$telClean%", "%$telClean%"));
                 $rows = $stmt->fetchAll();
                 if (is_array($rows)) {
-                    // 1. Procura se qualquer coluna do CDR contém uma fila cadastrada
                     foreach ($rows as $r) {
                         $comb = $r['accountcode'] . ' ' . $r['dst'] . ' ' . $r['dstchannel'] . ' ' . $r['channel'] . ' ' . $r['dcontext'] . ' ' . $r['lastdata'] . ' ' . $r['userfield'];
                         foreach ($knownQueueNums as $qn) {
@@ -244,7 +242,6 @@ class paloSantoPesquisa {
                         }
                     }
 
-                    // 2. Procura por padrões ext-queues, q-NUM ou Queue/NUM em qualquer coluna
                     foreach ($rows as $r) {
                         $comb = $r['dst'] . ' ' . $r['dstchannel'] . ' ' . $r['channel'] . ' ' . $r['dcontext'] . ' ' . $r['lastdata'] . ' ' . $r['userfield'];
                         if (preg_match('/(?:ext-queues|from-queue|Queue\/|q-)(\d{3,5})/i', $comb, $m)) {
@@ -280,7 +277,6 @@ class paloSantoPesquisa {
             $knownQueueNums = array_keys($queueMap);
 
             try {
-                // 1. Busca o registro da chamada que possui o arquivo de áudio de gravação
                 $sql = "SELECT recordingfile, duration, billsec, dst, dstchannel, channel, accountcode FROM cdr 
                         WHERE calldate BETWEEN ? AND ? 
                         AND (src LIKE ? OR dst LIKE ? OR channel LIKE ? OR dstchannel LIKE ?) 
@@ -312,7 +308,6 @@ class paloSantoPesquisa {
                     }
                 }
 
-                // 2. Se a Fila ainda não foi identificada, realiza busca profunda de Fila de Entrada na janela de 30 min por (data, hora, telefone)
                 if (empty($info['fila'])) {
                     $info['fila'] = $this->findQueueForCall($telefone, $dt, $knownQueueNums);
                 }
@@ -534,9 +529,10 @@ class paloSantoPesquisa {
             );
         }
 
+        // Recupera contagem real de chamadas transferidas para a URA de Pesquisa (9000 ou 8996) no CDR
         $cdrTotalPesquisa = 0;
         try {
-            $whereCdr = array("(dst = '9000' OR dst = '8996' OR (dcontext LIKE '%pesquisa%' AND dstchannel LIKE '%pesquisa%'))");
+            $whereCdr = array("(dst IN ('9000', '8996', '9999', '8888') OR dcontext LIKE '%pesquisa%' OR dstchannel LIKE '%pesquisa%' OR channel LIKE '%pesquisa%' OR lastdata LIKE '%pesquisa%')");
             $paramsCdr = array();
             if (!empty($dsSql)) {
                 $whereCdr[] = "calldate >= ?";
@@ -565,9 +561,11 @@ class paloSantoPesquisa {
         $sim = (int)$stats['resolvido_sim'];
         $nao = (int)$stats['resolvido_nao'];
 
-        if ($cdrTotalPesquisa > $totalDB && $cdrTotalPesquisa < ($totalDB * 3)) {
+        $avaliadosDB = $otimo + $muito_bom + $medio + $bom + $ruim;
+
+        if ($cdrTotalPesquisa > $avaliadosDB) {
             $total = $cdrTotalPesquisa;
-            $nao_avaliou = max($nao_avaliou_db, $total - ($otimo + $muito_bom + $medio + $bom + $ruim));
+            $nao_avaliou = max($nao_avaliou_db, $total - $avaliadosDB);
         } else {
             $total = $totalDB;
             $nao_avaliou = $nao_avaliou_db;
