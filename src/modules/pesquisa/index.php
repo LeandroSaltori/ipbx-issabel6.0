@@ -10,7 +10,7 @@
   +----------------------------------------------------------------------+
   | The Initial Developer of the Original Code is PaloSanto Solutions    |
   +----------------------------------------------------------------------+
-  $Id: index.php,v 13.0 2026-08-17 Prisma Telecom $ */
+  $Id: index.php,v 14.0 2026-08-17 Prisma Telecom $ */
 
 require_once "modules/agent_console/libs/issabel2.lib.php";
 include_once "libs/paloSantoDB.class.php";
@@ -613,7 +613,6 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
             text-align: center;
         }
 
-        /* Tooltip de Fila Compacta */
         .queue-badge-compact {
             background: #f1f5f9;
             color: #334155;
@@ -786,7 +785,6 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
                             $val_duracao   = !empty($cdrInfo['duration_formatted']) ? $cdrInfo['duration_formatted'] : '-';
                             $recFile       = !empty($cdrInfo['recordingfile']) ? $cdrInfo['recordingfile'] : '';
 
-                            // Formatação Compacta da Fila com Hover Tooltip
                             $rawFila = !empty($row['fila']) ? trim($row['fila']) : (!empty($cdrInfo['fila']) ? trim($cdrInfo['fila']) : '');
                             if (!empty($rawFila) && isset($queueNamesMap[$rawFila])) {
                                 $fullName = "$rawFila - " . $queueNamesMap[$rawFila];
@@ -812,27 +810,27 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
                                         case 'OTIMO':
                                         case 'ÓTIMO':
                                         case '5':
-                                            echo "<span style='background:#10b981; color:#ffffff; padding:3px 10px; border-radius:12px; font-weight:bold; font-size:10px; display:inline-flex; align-items:center; gap:4px;'>✅ ⭐⭐⭐⭐⭐ EXCELENTE</span>";
+                                            echo "<span style='background:#10b981; color:#ffffff; padding:4px 10px; border-radius:12px; font-weight:bold; font-size:11px; display:inline-flex; align-items:center; gap:6px;'><span style='font-size:12px;'>✅</span> <span style='letter-spacing:2px;'>⭐⭐⭐⭐⭐</span> EXCELENTE</span>";
                                             break;
                                         case 'MUITO BOM':
                                         case '4':
-                                            echo "<span style='background:#3b82f6; color:#ffffff; padding:3px 10px; border-radius:12px; font-weight:bold; font-size:10px; display:inline-flex; align-items:center; gap:4px;'>✅ ⭐⭐⭐⭐ MUITO BOM</span>";
+                                            echo "<span style='background:#3b82f6; color:#ffffff; padding:4px 10px; border-radius:12px; font-weight:bold; font-size:11px; display:inline-flex; align-items:center; gap:6px;'><span style='font-size:12px;'>✅</span> <span style='letter-spacing:2px;'>⭐⭐⭐⭐</span> MUITO BOM</span>";
                                             break;
                                         case 'MEDIO':
                                         case 'MÉDIO':
                                         case 'REGULAR':
                                         case 'BOM':
                                         case '3':
-                                            echo "<span style='background:#f59e0b; color:#ffffff; padding:3px 10px; border-radius:12px; font-weight:bold; font-size:10px; display:inline-flex; align-items:center; gap:4px;'>✅ ⭐⭐⭐ $avUpper</span>";
+                                            echo "<span style='background:#f59e0b; color:#ffffff; padding:4px 10px; border-radius:12px; font-weight:bold; font-size:11px; display:inline-flex; align-items:center; gap:6px;'><span style='font-size:12px;'>✅</span> <span style='letter-spacing:2px;'>⭐⭐⭐</span> $avUpper</span>";
                                             break;
                                         case '2':
-                                            echo "<span style='background:#f97316; color:#ffffff; padding:3px 10px; border-radius:12px; font-weight:bold; font-size:10px; display:inline-flex; align-items:center; gap:4px;'>✅ ⭐⭐ BOM</span>";
+                                            echo "<span style='background:#f97316; color:#ffffff; padding:4px 10px; border-radius:12px; font-weight:bold; font-size:11px; display:inline-flex; align-items:center; gap:6px;'><span style='font-size:12px;'>✅</span> <span style='letter-spacing:2px;'>⭐⭐</span> BOM</span>";
                                             break;
                                         case 'RUIM':
                                         case 'PESSIMO':
                                         case 'PÉSSIMO':
                                         case '1':
-                                            echo "<span style='background:#ef4444; color:#ffffff; padding:3px 10px; border-radius:12px; font-weight:bold; font-size:10px; display:inline-flex; align-items:center; gap:4px;'>❌ ⭐ $avUpper</span>";
+                                            echo "<span style='background:#ef4444; color:#ffffff; padding:4px 10px; border-radius:12px; font-weight:bold; font-size:11px; display:inline-flex; align-items:center; gap:6px;'><span style='font-size:12px;'>❌</span> <span style='letter-spacing:2px;'>⭐</span> $avUpper</span>";
                                             break;
                                         case 'NAO AVALIOU':
                                         case 'NÃO AVALIOU':
@@ -841,10 +839,10 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
                                         case 'DESISTIU':
                                         case '0':
                                         case '':
-                                            echo "<span style='background:#64748b; color:#ffffff; padding:3px 10px; border-radius:12px; font-weight:bold; font-size:10px; display:inline-flex; align-items:center; gap:4px;'>📵 NÃO AVALIOU</span>";
+                                            echo "<span style='background:#64748b; color:#ffffff; padding:4px 10px; border-radius:12px; font-weight:bold; font-size:11px; display:inline-flex; align-items:center; gap:6px;'><span style='font-size:12px;'>📵</span> NÃO AVALIOU</span>";
                                             break;
                                         default:
-                                            echo "<span style='background:#94a3b8; color:#ffffff; padding:3px 10px; border-radius:12px; font-weight:bold; font-size:10px; display:inline-flex; align-items:center; gap:4px;'>✅ $avUpper</span>";
+                                            echo "<span style='background:#94a3b8; color:#ffffff; padding:4px 10px; border-radius:12px; font-weight:bold; font-size:11px; display:inline-flex; align-items:center; gap:6px;'><span style='font-size:12px;'>✅</span> $avUpper</span>";
                                             break;
                                     }
                                     ?>
