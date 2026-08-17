@@ -10,12 +10,41 @@
   +----------------------------------------------------------------------+
   | The Initial Developer of the Original Code is PaloSanto Solutions    |
   +----------------------------------------------------------------------+
-  $Id: index.php,v 9.0 2026-08-17 Prisma Telecom $ */
+  $Id: index.php,v 11.0 2026-08-17 Prisma Telecom $ */
 
 require_once "modules/agent_console/libs/issabel2.lib.php";
 include_once "libs/paloSantoDB.class.php";
 include_once "libs/paloSantoConfig.class.php";
 require_once "libs/misc.lib.php";
+
+function formatDateBr($d) {
+    if (empty($d) || $d == '-') return '-';
+    $d = trim($d);
+    if (preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $d, $m)) {
+        return "{$m[3]}/{$m[2]}/{$m[1]}";
+    }
+    $ts = strtotime($d);
+    return $ts ? date('d/m/Y', $ts) : $d;
+}
+
+function formatPhoneBr($num) {
+    if (empty($num) || $num == '-') return '-';
+    $clean = preg_replace('/[^0-9]/', '', $num);
+    
+    // Remove zeros à esquerda de operadoras (ex: 0011... -> 11... ou 011... -> 11...)
+    if (strlen($clean) >= 12 && substr($clean, 0, 2) === '00') {
+        $clean = substr($clean, 2);
+    } elseif (strlen($clean) >= 11 && substr($clean, 0, 1) === '0') {
+        $clean = substr($clean, 1);
+    }
+
+    if (strlen($clean) == 11) {
+        return sprintf('(%s) %s-%s', substr($clean, 0, 2), substr($clean, 2, 5), substr($clean, 7, 4));
+    } elseif (strlen($clean) == 10) {
+        return sprintf('(%s) %s-%s', substr($clean, 0, 2), substr($clean, 2, 4), substr($clean, 6, 4));
+    }
+    return $num;
+}
 
 function _moduleContent(&$smarty, $module_name)
 {
@@ -139,19 +168,19 @@ function handleExportExcel($pPesquisa)
         foreach ($arrResult as $row) {
             $val_operador  = !empty($row['operador']) ? $row['operador'] : (!empty($row['ramal']) ? $row['ramal'] : '-');
             $val_nome      = isset($extNamesMap[$val_operador]) ? $extNamesMap[$val_operador] : '-';
-            $val_data      = !empty($row['data']) ? $row['data'] : '-';
+            $val_data      = formatDateBr(!empty($row['data']) ? $row['data'] : '-');
             $val_hora      = !empty($row['hora']) ? $row['hora'] : '-';
-            $val_telefone  = !empty($row['telefone']) ? $row['telefone'] : (!empty($row['numero']) ? $row['numero'] : '-');
+            $raw_tel       = !empty($row['telefone']) ? $row['telefone'] : (!empty($row['numero']) ? $row['numero'] : '-');
+            $val_telefone  = formatPhoneBr($raw_tel);
             $val_avaliacao = !empty($row['avaliacao']) ? $row['avaliacao'] : '-';
             $val_solucao   = !empty($row['solucao']) ? $row['solucao'] : '-';
 
-            $cdrInfo     = $pPesquisa->findCdrInfoForCall($val_telefone, $val_data, $val_hora, $val_operador);
+            $cdrInfo     = $pPesquisa->findCdrInfoForCall($raw_tel, !empty($row['data']) ? $row['data'] : '', $val_hora, $val_operador);
             $val_duracao = !empty($cdrInfo['duration_formatted']) ? $cdrInfo['duration_formatted'] : '-';
 
             $rawFila = !empty($row['fila']) ? trim($row['fila']) : (!empty($cdrInfo['fila']) ? trim($cdrInfo['fila']) : '');
-            if (!empty($rawFila) && $rawFila != 'Atendimento') {
-                $qName = isset($queueNamesMap[$rawFila]) ? $queueNamesMap[$rawFila] : '';
-                $val_fila = !empty($qName) ? "$rawFila - $qName" : $rawFila;
+            if (!empty($rawFila) && isset($queueNamesMap[$rawFila])) {
+                $val_fila = "$rawFila - " . $queueNamesMap[$rawFila];
             } else {
                 $val_fila = '-';
             }
@@ -223,19 +252,19 @@ function handleExportPdf($pPesquisa)
                 $val_operador  = !empty($row['operador']) ? $row['operador'] : (!empty($row['ramal']) ? $row['ramal'] : '-');
                 $val_nome      = isset($extNamesMap[$val_operador]) ? $extNamesMap[$val_operador] : '';
                 $val_disp_op   = !empty($val_nome) ? "$val_operador - $val_nome" : $val_operador;
-                $val_data      = !empty($row['data']) ? $row['data'] : '-';
+                $val_data      = formatDateBr(!empty($row['data']) ? $row['data'] : '-');
                 $val_hora      = !empty($row['hora']) ? $row['hora'] : '-';
-                $val_telefone  = !empty($row['telefone']) ? $row['telefone'] : (!empty($row['numero']) ? $row['numero'] : '-');
+                $raw_tel       = !empty($row['telefone']) ? $row['telefone'] : (!empty($row['numero']) ? $row['numero'] : '-');
+                $val_telefone  = formatPhoneBr($raw_tel);
                 $val_avaliacao = !empty($row['avaliacao']) ? $row['avaliacao'] : '-';
                 $val_solucao   = !empty($row['solucao']) ? $row['solucao'] : '-';
 
-                $cdrInfo       = $pPesquisa->findCdrInfoForCall($val_telefone, $val_data, $val_hora, $val_operador);
+                $cdrInfo       = $pPesquisa->findCdrInfoForCall($raw_tel, !empty($row['data']) ? $row['data'] : '', $val_hora, $val_operador);
                 $val_duracao   = !empty($cdrInfo['duration_formatted']) ? $cdrInfo['duration_formatted'] : '-';
 
                 $rawFila = !empty($row['fila']) ? trim($row['fila']) : (!empty($cdrInfo['fila']) ? trim($cdrInfo['fila']) : '');
-                if (!empty($rawFila) && $rawFila != 'Atendimento') {
-                    $qName = isset($queueNamesMap[$rawFila]) ? $queueNamesMap[$rawFila] : '';
-                    $val_fila = !empty($qName) ? "$rawFila - $qName" : $rawFila;
+                if (!empty($rawFila) && isset($queueNamesMap[$rawFila])) {
+                    $val_fila = "$rawFila - " . $queueNamesMap[$rawFila];
                 } else {
                     $val_fila = '-';
                 }
@@ -603,7 +632,7 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
         <div class="pesquisa-header">
             <div class="pesquisa-title">
                 <h2>Relatório de Pesquisa de Satisfação - IPbx Prisma</h2>
-                <p>Módulo Executivo Oficial de Pesquisa pós-atendimento (Disque / Transfira para <strong>8996</strong>)</p>
+                <p>Módulo Executivo Oficial de Pesquisa pós-atendimento (Disque / Transfira para <strong>9000</strong> ou <strong>8996</strong>)</p>
             </div>
             <div class="pesquisa-top-btns">
                 <a href="modules/pesquisa/help/index.html" target="_blank" class="btn-top btn-top-manual">📖 Manual</a>
@@ -738,20 +767,20 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
                             $val_operador  = !empty($row['operador']) ? $row['operador'] : (!empty($row['ramal']) ? $row['ramal'] : '-');
                             $val_nome      = isset($extNamesMap[$val_operador]) ? $extNamesMap[$val_operador] : '';
                             $val_disp_op   = !empty($val_nome) ? "$val_operador - $val_nome" : $val_operador;
-                            $val_data      = !empty($row['data']) ? $row['data'] : '-';
+                            $val_data      = formatDateBr(!empty($row['data']) ? $row['data'] : '-');
                             $val_hora      = !empty($row['hora']) ? $row['hora'] : '-';
-                            $val_telefone  = !empty($row['telefone']) ? $row['telefone'] : (!empty($row['numero']) ? $row['numero'] : '-');
+                            $raw_tel       = !empty($row['telefone']) ? $row['telefone'] : (!empty($row['numero']) ? $row['numero'] : '-');
+                            $val_telefone  = formatPhoneBr($raw_tel);
                             $val_avaliacao = !empty($row['avaliacao']) ? $row['avaliacao'] : '-';
                             $val_solucao   = !empty($row['solucao']) ? $row['solucao'] : '-';
 
-                            $cdrInfo       = $pPesquisa->findCdrInfoForCall($val_telefone, $val_data, $val_hora, $val_operador);
+                            $cdrInfo       = $pPesquisa->findCdrInfoForCall($raw_tel, !empty($row['data']) ? $row['data'] : '', $val_hora, $val_operador);
                             $val_duracao   = !empty($cdrInfo['duration_formatted']) ? $cdrInfo['duration_formatted'] : '-';
                             $recFile       = !empty($cdrInfo['recordingfile']) ? $cdrInfo['recordingfile'] : '';
 
                             $rawFila = !empty($row['fila']) ? trim($row['fila']) : (!empty($cdrInfo['fila']) ? trim($cdrInfo['fila']) : '');
-                            if (!empty($rawFila) && $rawFila != 'Atendimento') {
-                                $qName = isset($queueNamesMap[$rawFila]) ? $queueNamesMap[$rawFila] : '';
-                                $val_fila = !empty($qName) ? "$rawFila - $qName" : $rawFila;
+                            if (!empty($rawFila) && isset($queueNamesMap[$rawFila])) {
+                                $val_fila = "$rawFila - " . $queueNamesMap[$rawFila];
                             } else {
                                 $val_fila = '-';
                             }
