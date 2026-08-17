@@ -442,6 +442,15 @@ if [ -d "$REPO_DIR/src/modules/pesquisa" ]; then
         sqlite3 /var/www/db/acl.db "INSERT OR IGNORE INTO acl_resource (name, description) VALUES ('pesquisa', 'Pesquisa de Satisfação');" 2>/dev/null || true
         
         sqlite3 /var/www/db/acl.db "INSERT OR IGNORE INTO acl_group_permission (id_action, id_group, id_resource) SELECT 1, 1, id FROM acl_resource WHERE name = 'pesquisa';" 2>/dev/null || true
+
+        # Saneamento automático de links no menu.db (Remove IPs legados hardcoded)
+        sqlite3 /var/www/db/menu.db "UPDATE menu SET Link = REPLACE(Link, 'https://192.168.0.245', '') WHERE Link LIKE '%192.168.0.245%';" 2>/dev/null || true
+        sqlite3 /var/www/db/menu.db "UPDATE menu SET Link = REPLACE(Link, 'http://192.168.0.245', '') WHERE Link LIKE '%192.168.0.245%';" 2>/dev/null || true
+        
+        # Corrige atalhos do PBX que apontavam para URLs inválidas
+        sqlite3 /var/www/db/menu.db "UPDATE menu SET Link = '/admin/config.php?display=blacklist' WHERE id = 'blacklist' OR Link LIKE '%blacklist%';" 2>/dev/null || true
+        sqlite3 /var/www/db/menu.db "UPDATE menu SET Link = '/admin/config.php?display=extensions' WHERE id = 'nome_ramais' OR id = 'ramais';" 2>/dev/null || true
+        sqlite3 /var/www/db/menu.db "UPDATE menu SET Link = '/admin/config.php?display=asternic_log' WHERE id = 'relatorio_geral' OR id = 'asternic_cdr';" 2>/dev/null || true
     fi
 
     # Registra o atalho de discagem e transferencia 8996 no Asterisk
