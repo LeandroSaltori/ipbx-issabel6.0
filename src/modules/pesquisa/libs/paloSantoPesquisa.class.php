@@ -10,48 +10,25 @@
   +----------------------------------------------------------------------+
   | The Initial Developer of the Original Code is PaloSanto Solutions    |
   +----------------------------------------------------------------------+
-  $Id: paloSantoPesquisa.class.php,v 1.9 2026-08-17 Prisma Telecom $ */
-
-@include_once "libs/paloSantoDB.class.php";
-@include_once "libs/paloSantoConfig.class.php";
-@include_once "libs/misc.lib.php";
+  $Id: paloSantoPesquisa.class.php,v 2.0 2026-08-17 Prisma Telecom $ */
 
 class paloSantoPesquisa {
     var $_DB;
+    var $pdo;
     var $errMsg;
 
-    function __construct(&$pDB)
+    function __construct(&$pDB = null)
     {
-        if (is_object($pDB) && isset($pDB->connStatus) && $pDB->connStatus) {
-            $this->_DB = $pDB;
-        } else {
-            $this->_DB = $this->connectBestDatabase();
-        }
+        $this->connectDatabase();
     }
 
-    function paloSantoPesquisa(&$pDB)
+    function paloSantoPesquisa(&$pDB = null)
     {
         $this->__construct($pDB);
     }
 
-    function connectBestDatabase()
+    function connectDatabase()
     {
-        @include_once "/var/www/html/libs/paloSantoConfig.class.php";
-        @include_once "/var/www/html/libs/misc.lib.php";
-
-        // 1. Tenta conexao nativa do Issabel framework
-        if (function_exists('generarDSNSistema')) {
-            $dsn = @generarDSNSistema('asteriskuser', 'asteriskcdrdb');
-            if (!empty($dsn)) {
-                $pDB = new paloDB($dsn);
-                if ($pDB && $pDB->connStatus) {
-                    $test = $pDB->getFirstRowQuery("SELECT count(*) FROM pesquisa", false);
-                    if ($test !== false) return $pDB;
-                }
-            }
-        }
-
-        // 2. Extrai senhas do amportal.conf e issabel.conf
         $passwords = array('', 'asterisk', 'asteriskuser');
         if (file_exists('/etc/issabel.conf')) {
             $c = @file_get_contents('/etc/issabel.conf');
@@ -60,31 +37,39 @@ class paloSantoPesquisa {
         if (file_exists('/etc/amportal.conf')) {
             $c = @file_get_contents('/etc/amportal.conf');
             if (preg_match('/AMPDBPASS\s*=\s*(.*)/i', $c, $m)) $passwords[] = trim($m[1]);
-            if (preg_match('/CDRDBPASS\s*=\s*(.*)/i', $c, $m)) $passwords[] = trim($m[1]);
         }
-        if (file_exists('/etc/asterisk/cdr_mysql.conf')) {
-            $c = @file_get_contents('/etc/asterisk/cdr_mysql.conf');
-            if (preg_match('/password\s*=\s*(.*)/i', $c, $m)) $passwords[] = trim($m[1]);
-        }
-
         $users = array('root', 'asteriskuser', 'asterisk');
+
+        // 1. Tenta conexao PDO direta no MySQL asteriskcdrdb (463 registros do cliente)
         foreach ($users as $u) {
             foreach ($passwords as $p) {
-                $dsn = "mysql://$u:$p@localhost/asteriskcdrdb";
-                $pDB = new paloDB($dsn);
-                if ($pDB && $pDB->connStatus) {
-                    $test = $pDB->getFirstRowQuery("SELECT count(*) FROM pesquisa", false);
-                    if ($test !== false) return $pDB;
-                }
+                try {
+                    $pdo = new PDO("mysql:host=localhost;dbname=asteriskcdrdb;charset=utf8", $u, $p, array(
+                        PDO::ATTR_ERRMODE => PDO::ERRMODE_SILENT,
+                        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC
+                    ));
+                    $stmt = $pdo->query("SELECT COUNT(*) FROM pesquisa");
+                    if ($stmt !== false) {
+                        $this->pdo = $pdo;
+                        return;
+                    }
+                } catch (Exception $e) {}
             }
         }
 
-        // 3. Fallback SQLite
-        return new paloDB("sqlite3:////var/www/db/pesquisa.db");
+        // 2. Fallback PDO SQLite
+        try {
+            $this->pdo = new PDO("sqlite:/var/www/db/pesquisa.db", null, null, array(
+                PDO::ATTR_ERRMODE => PDO::ERRMODE_SILENT,
+                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC
+            ));
+        } catch (Exception $e) {}
     }
 
     function getNumPesquisa($filter_field = '', $filter_value = '', $date_start = '', $date_end = '', $operador = '', $avaliacao = '', $solucao = '')
     {
+        if (!$this->pdo) return 0;
+
         $where = array();
         $params = array();
 
@@ -116,20 +101,21 @@ class paloSantoPesquisa {
         }
 
         $strWhere = !empty($where) ? "WHERE " . implode(" AND ", $where) : "";
-        $query = "SELECT COUNT(*) FROM pesquisa $strWhere";
+        $sql = "SELECT COUNT(*) FROM pesquisa $strWhere";
 
-        if ($this->_DB) {
-            $arrParam = !empty($params) ? $params : false;
-            $result = $this->_DB->getFirstRowQuery($query, false, $arrParam);
-            if ($result !== false && isset($result[0])) {
-                return (int)$result[0];
-            }
+        try {
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->execute($params);
+            return (int)$stmt->fetchColumn();
+        } catch (Exception $e) {
+            return 0;
         }
-        return 0;
     }
 
     function getPesquisa($limit, $offset, $filter_field = '', $filter_value = '', $date_start = '', $date_end = '', $operador = '', $avaliacao = '', $solucao = '')
     {
+        if (!$this->pdo) return array();
+
         $where = array();
         $params = array();
 
@@ -161,18 +147,28 @@ class paloSantoPesquisa {
         }
 
         $strWhere = !empty($where) ? "WHERE " . implode(" AND ", $where) : "";
-        $query = "SELECT * FROM pesquisa $strWhere ORDER BY data DESC, hora DESC LIMIT $limit OFFSET $offset";
+        $sql = "SELECT * FROM pesquisa $strWhere ORDER BY data DESC, hora DESC LIMIT " . (int)$limit . " OFFSET " . (int)$offset;
 
-        if ($this->_DB) {
-            $arrParam = !empty($params) ? $params : false;
-            $result = $this->_DB->fetchTable($query, true, $arrParam);
-            if (is_array($result)) return $result;
+        try {
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->execute($params);
+            $rows = $stmt->fetchAll();
+            return is_array($rows) ? $rows : array();
+        } catch (Exception $e) {
+            return array();
         }
-        return array();
     }
 
     function getPesquisaStats($date_start = '', $date_end = '', $operador = '')
     {
+        if (!$this->pdo) {
+            return array(
+                'total' => 0, 'otimo' => 0, 'muito_bom' => 0, 'medio' => 0, 'bom' => 0, 'ruim' => 0,
+                'resolvido_sim' => 0, 'resolvido_nao' => 0, 'media_estrelas' => 0,
+                'taxa_resolucao' => 0, 'taxa_satisfacao' => 0
+            );
+        }
+
         $where = array();
         $params = array();
 
@@ -191,7 +187,7 @@ class paloSantoPesquisa {
 
         $strWhere = !empty($where) ? "WHERE " . implode(" AND ", $where) : "";
 
-        $query = "SELECT 
+        $sql = "SELECT 
             COUNT(*) as total,
             SUM(CASE WHEN UPPER(avaliacao) IN ('EXCELENTE', 'OTIMO', 'ÓTIMO', '5') THEN 1 ELSE 0 END) as otimo,
             SUM(CASE WHEN UPPER(avaliacao) IN ('MUITO BOM', '4') THEN 1 ELSE 0 END) as muito_bom,
@@ -202,15 +198,17 @@ class paloSantoPesquisa {
             SUM(CASE WHEN UPPER(solucao) IN ('NAO', 'NÃO', '2') THEN 1 ELSE 0 END) as resolvido_nao
             FROM pesquisa $strWhere";
 
-        $stats = false;
-        if ($this->_DB) {
-            $arrParam = !empty($params) ? $params : false;
-            $stats = $this->_DB->getFirstRowQuery($query, true, $arrParam);
+        try {
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->execute($params);
+            $stats = $stmt->fetch();
+        } catch (Exception $e) {
+            $stats = false;
         }
 
         if (!$stats || empty($stats['total'])) {
             if (!empty($strWhere)) {
-                $queryAll = "SELECT 
+                $sqlAll = "SELECT 
                     COUNT(*) as total,
                     SUM(CASE WHEN UPPER(avaliacao) IN ('EXCELENTE', 'OTIMO', 'ÓTIMO', '5') THEN 1 ELSE 0 END) as otimo,
                     SUM(CASE WHEN UPPER(avaliacao) IN ('MUITO BOM', '4') THEN 1 ELSE 0 END) as muito_bom,
@@ -220,7 +218,10 @@ class paloSantoPesquisa {
                     SUM(CASE WHEN UPPER(solucao) IN ('SIM', '1') THEN 1 ELSE 0 END) as resolvido_sim,
                     SUM(CASE WHEN UPPER(solucao) IN ('NAO', 'NÃO', '2') THEN 1 ELSE 0 END) as resolvido_nao
                     FROM pesquisa";
-                $stats = $this->_DB->getFirstRowQuery($queryAll, true, false);
+                try {
+                    $stmtAll = $this->pdo->query($sqlAll);
+                    $stats = $stmtAll->fetch();
+                } catch (Exception $e) {}
             }
         }
 
@@ -263,12 +264,13 @@ class paloSantoPesquisa {
 
     function getPesquisaById($id)
     {
-        $query = "SELECT * FROM pesquisa WHERE id=?";
-        $result = $this->_DB->getFirstRowQuery($query, true, array("$id"));
-        if ($result === false) {
-            $this->errMsg = $this->_DB->errMsg;
+        if (!$this->pdo) return null;
+        try {
+            $stmt = $this->pdo->prepare("SELECT * FROM pesquisa WHERE id=?");
+            $stmt->execute(array($id));
+            return $stmt->fetch();
+        } catch (Exception $e) {
             return null;
         }
-        return $result;
     }
 }
