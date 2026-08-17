@@ -520,6 +520,15 @@ fi
 # 16. MÓDULOS WEB DEVELOPER
 # ==============================================================================
 log_info "16/20 - Instalando Módulos Web Developer..."
+
+# 1. Instala o pacote base do issabel-developer via yum/dnf
+if command -v dnf &>/dev/null; then
+    dnf install -y issabel-developer 2>/dev/null || true
+elif command -v yum &>/dev/null; then
+    yum install -y issabel-developer 2>/dev/null || true
+fi
+
+# 2. Registra o menu nativo e submenus no banco SQLite
 if command -v sqlite3 &>/dev/null; then
     sqlite3 /var/www/db/acl.db "INSERT OR IGNORE INTO acl_resource (name, description) VALUES ('developer', 'Developer');" 2>/dev/null || true
     sqlite3 /var/www/db/menu.db "DELETE FROM menu WHERE id = 'developer' OR id = 'web_developer';" 2>/dev/null || true
@@ -527,10 +536,12 @@ if command -v sqlite3 &>/dev/null; then
     sqlite3 /var/www/db/acl.db "INSERT OR IGNORE INTO acl_group_permission (id_action, id_group, id_resource) SELECT 1, 1, id FROM acl_resource WHERE name = 'developer';" 2>/dev/null || true
 fi
 
+# 3. Sobrescreve com os arquivos corrigidos (build_module, delete_module, language_admin)
 for MOD in build_module delete_module language_admin; do
     if [ -d "$REPO_DIR/src/modules/$MOD" ]; then
         cp -rf "$REPO_DIR/src/modules/$MOD" /var/www/html/modules/
         chown -R asterisk:asterisk "/var/www/html/modules/$MOD"
+        chmod -R 755 "/var/www/html/modules/$MOD"
         
         if command -v sqlite3 &>/dev/null; then
             sqlite3 /var/www/db/acl.db "INSERT OR IGNORE INTO acl_resource (name, description) VALUES ('$MOD', '$MOD');" 2>/dev/null || true
@@ -540,7 +551,7 @@ for MOD in build_module delete_module language_admin; do
         fi
     fi
 done
-log_success "Ferramentas Web Developer instaladas e registradas."
+log_success "Ferramentas Web Developer instaladas e corrigidas."
 
 # ==============================================================================
 # 17. FAVICON E TEMAS (prisma_v5)
