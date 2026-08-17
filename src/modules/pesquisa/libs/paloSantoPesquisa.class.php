@@ -10,7 +10,7 @@
   +----------------------------------------------------------------------+
   | The Initial Developer of the Original Code is PaloSanto Solutions    |
   +----------------------------------------------------------------------+
-  $Id: paloSantoPesquisa.class.php,v 15.0 2026-08-17 Prisma Telecom $ */
+  $Id: paloSantoPesquisa.class.php,v 17.0 2026-08-17 Prisma Telecom $ */
 
 class paloSantoPesquisa {
     var $_DB;
@@ -343,11 +343,44 @@ class paloSantoPesquisa {
     {
         if (!$this->pdo) return 0;
 
-        $where = array();
-        $params = array();
+        $avUp = strtoupper(trim($avaliacao));
+        $isNaoAvaliou = in_array($avUp, array('NAO AVALIOU', 'NÃO AVALIOU', 'ABANDONOU', 'SEM RESPOSTA', 'DESISTIU', '0'));
 
         $dsSql = $this->formatDateForSql($date_start);
         $deSql = $this->formatDateForSql($date_end);
+
+        if ($isNaoAvaliou) {
+            // Count from CDR calls transferred to 9000/8996
+            $whereCdr = array("(dst IN ('9000', '8996', '9999', '8888') OR dst LIKE '%9000%' OR dst LIKE '%8996%' OR dcontext LIKE '%pesquisa%' OR dstchannel LIKE '%pesquisa%' OR channel LIKE '%pesquisa%' OR lastdata LIKE '%pesquisa%')");
+            $paramsCdr = array();
+            if (!empty($dsSql)) {
+                $whereCdr[] = "calldate >= ?";
+                $paramsCdr[] = $dsSql . " 00:00:00";
+            }
+            if (!empty($deSql)) {
+                $whereCdr[] = "calldate <= ?";
+                $paramsCdr[] = $deSql . " 23:59:59";
+            }
+
+            $strWhereCdr = "WHERE " . implode(" AND ", $whereCdr);
+            try {
+                $stmtCdr = $this->pdo->prepare("SELECT COUNT(*) FROM cdr $strWhereCdr");
+                if ($stmtCdr !== false) {
+                    $stmtCdr->execute($paramsCdr);
+                    $totalCdrTransfers = (int)$stmtCdr->fetchColumn();
+
+                    $stmtEval = $this->pdo->query("SELECT COUNT(*) FROM pesquisa WHERE UPPER(avaliacao) NOT IN ('NAO AVALIOU', 'NÃO AVALIOU', 'ABANDONOU', 'SEM RESPOSTA', '0', '') AND avaliacao IS NOT NULL");
+                    $evalCount = $stmtEval ? (int)$stmtEval->fetchColumn() : 0;
+
+                    $naoAvaliouCount = max(0, $totalCdrTransfers - $evalCount);
+                    if ($naoAvaliouCount > 0) return $naoAvaliouCount;
+                }
+            } catch (Exception $e) {
+            } catch (Throwable $t) {}
+        }
+
+        $where = array();
+        $params = array();
 
         if (!empty($filter_field) && !empty($filter_value)) {
             $where[] = "$filter_field LIKE ?";
@@ -366,8 +399,7 @@ class paloSantoPesquisa {
             $params[] = $operador;
         }
         if (!empty($avaliacao)) {
-            $avUp = strtoupper(trim($avaliacao));
-            if (in_array($avUp, array('NAO AVALIOU', 'NÃO AVALIOU', 'ABANDONOU', 'SEM RESPOSTA', 'DESISTIU', '0'))) {
+            if ($isNaoAvaliou) {
                 $where[] = "(UPPER(avaliacao) IN ('NAO AVALIOU', 'NÃO AVALIOU', 'ABANDONOU', 'SEM RESPOSTA', 'DESISTISTU', 'DESISTIU', '0', '') OR avaliacao IS NULL)";
             } else {
                 $where[] = "(UPPER(avaliacao) = ? OR avaliacao = ?)";
@@ -409,11 +441,89 @@ class paloSantoPesquisa {
     {
         if (!$this->pdo) return array();
 
-        $where = array();
-        $params = array();
+        $avUp = strtoupper(trim($avaliacao));
+        $isNaoAvaliou = in_array($avUp, array('NAO AVALIOU', 'NÃO AVALIOU', 'ABANDONOU', 'SEM RESPOSTA', 'DESISTIU', '0'));
 
         $dsSql = $this->formatDateForSql($date_start);
         $deSql = $this->formatDateForSql($date_end);
+
+        if ($isNaoAvaliou) {
+            // First check if there are rows in pesquisa
+            $wherePesq = array("(UPPER(avaliacao) IN ('NAO AVALIOU', 'NÃO AVALIOU', 'ABANDONOU', 'SEM RESPOSTA', 'DESISTIU', '0', '') OR avaliacao IS NULL)");
+            $paramsPesq = array();
+            if (!empty($dsSql)) {
+                $wherePesq[] = "data >= ?";
+                $paramsPesq[] = $dsSql;
+            }
+            if (!empty($deSql)) {
+                $wherePesq[] = "data <= ?";
+                $paramsPesq[] = $deSql;
+            }
+            if (!empty($operador)) {
+                $wherePesq[] = "operador = ?";
+                $paramsPesq[] = $operador;
+            }
+
+            $sqlPesq = "SELECT * FROM pesquisa WHERE " . implode(" AND ", $wherePesq) . " ORDER BY data DESC, hora DESC LIMIT " . (int)$limit . " OFFSET " . (int)$offset;
+            try {
+                $stmt = $this->pdo->prepare($sqlPesq);
+                if ($stmt !== false) {
+                    $stmt->execute($paramsPesq);
+                    $rowsPesq = $stmt->fetchAll();
+                    if (is_array($rowsPesq) && count($rowsPesq) > 0) {
+                        return $rowsPesq;
+                    }
+                }
+            } catch (Exception $e) {
+            } catch (Throwable $t) {}
+
+            // If zero rows in pesquisa table, fetch abandoned transfers from CDR!
+            $whereCdr = array("(dst IN ('9000', '8996', '9999', '8888') OR dst LIKE '%9000%' OR dst LIKE '%8996%' OR dcontext LIKE '%pesquisa%' OR dstchannel LIKE '%pesquisa%' OR channel LIKE '%pesquisa%' OR lastdata LIKE '%pesquisa%')");
+            $paramsCdr = array();
+            if (!empty($dsSql)) {
+                $whereCdr[] = "calldate >= ?";
+                $paramsCdr[] = $dsSql . " 00:00:00";
+            }
+            if (!empty($deSql)) {
+                $whereCdr[] = "calldate <= ?";
+                $paramsCdr[] = $deSql . " 23:59:59";
+            }
+
+            $sqlCdr = "SELECT calldate, clid, src, dst, channel, dstchannel, accountcode, cnum FROM cdr WHERE " . implode(" AND ", $whereCdr) . " ORDER BY calldate DESC LIMIT " . (int)$limit . " OFFSET " . (int)$offset;
+            try {
+                $stmtCdr = $this->pdo->prepare($sqlCdr);
+                if ($stmtCdr !== false) {
+                    $stmtCdr->execute($paramsCdr);
+                    $cdrRows = $stmtCdr->fetchAll();
+                    if (is_array($cdrRows) && count($cdrRows) > 0) {
+                        $result = array();
+                        foreach ($cdrRows as $r) {
+                            $ts = strtotime($r['calldate']);
+                            $phone = !empty($r['cnum']) ? $r['cnum'] : (!empty($r['src']) ? $r['src'] : '-');
+                            $op = !empty($r['src']) ? $r['src'] : (!empty($operador) ? $operador : '-');
+                            if (preg_match('/(?:SIP|PJSIP|IAX2)\/(\d{3,5})/', $r['channel'] . ' ' . $r['dstchannel'], $m)) {
+                                $op = $m[1];
+                            }
+                            $result[] = array(
+                                'id' => '',
+                                'operador' => $op,
+                                'fila' => !empty($r['accountcode']) ? $r['accountcode'] : '',
+                                'data' => date('Y-m-d', $ts),
+                                'hora' => date('H:i:s', $ts),
+                                'telefone' => $phone,
+                                'avaliacao' => 'NÃO AVALIOU',
+                                'solucao' => 'NÃO AVALIOU'
+                            );
+                        }
+                        return $result;
+                    }
+                }
+            } catch (Exception $e) {
+            } catch (Throwable $t) {}
+        }
+
+        $where = array();
+        $params = array();
 
         if (!empty($filter_field) && !empty($filter_value)) {
             $where[] = "$filter_field LIKE ?";
@@ -432,8 +542,7 @@ class paloSantoPesquisa {
             $params[] = $operador;
         }
         if (!empty($avaliacao)) {
-            $avUp = strtoupper(trim($avaliacao));
-            if (in_array($avUp, array('NAO AVALIOU', 'NÃO AVALIOU', 'ABANDONOU', 'SEM RESPOSTA', 'DESISTIU', '0'))) {
+            if ($isNaoAvaliou) {
                 $where[] = "(UPPER(avaliacao) IN ('NAO AVALIOU', 'NÃO AVALIOU', 'ABANDONOU', 'SEM RESPOSTA', 'DESISTISTU', 'DESISTIU', '0', '') OR avaliacao IS NULL)";
             } else {
                 $where[] = "(UPPER(avaliacao) = ? OR avaliacao = ?)";
