@@ -10,7 +10,7 @@
   +----------------------------------------------------------------------+
   | The Initial Developer of the Original Code is PaloSanto Solutions    |
   +----------------------------------------------------------------------+
-  $Id: paloSantoPesquisa.class.php,v 1.4 2026-08-17 Prisma Telecom $ */
+  $Id: paloSantoPesquisa.class.php,v 1.5 2026-08-17 Prisma Telecom $ */
 
 class paloSantoPesquisa {
     var $_DB;
@@ -31,29 +31,38 @@ class paloSantoPesquisa {
         $this->__construct($pDB);
     }
 
-    function getNumPesquisa($date_start = '', $date_end = '', $operador = '', $avaliacao = '', $solucao = '')
+    function getNumPesquisa($filter_field = '', $filter_value = '', $date_start = '', $date_end = '', $operador = '', $avaliacao = '', $solucao = '')
     {
         $where = array();
         $params = array();
 
+        if (!empty($filter_field) && !empty($filter_value)) {
+            $where[] = "$filter_field LIKE ?";
+            $params[] = "%$filter_value%";
+        }
         if (!empty($date_start)) {
-            $where[] = "data >= ?";
+            $where[] = "(data >= ? OR data LIKE ?)";
             $params[] = $date_start;
+            $params[] = "%" . date('d/m/Y', strtotime($date_start)) . "%";
         }
         if (!empty($date_end)) {
-            $where[] = "data <= ?";
+            $where[] = "(data <= ? OR data LIKE ?)";
             $params[] = $date_end;
+            $params[] = "%" . date('d/m/Y', strtotime($date_end)) . "%";
         }
         if (!empty($operador)) {
-            $where[] = "operador LIKE ?";
+            $where[] = "(operador LIKE ? OR ramal LIKE ?)";
+            $params[] = "%$operador%";
             $params[] = "%$operador%";
         }
         if (!empty($avaliacao)) {
-            $where[] = "avaliacao = ?";
+            $where[] = "(UPPER(avaliacao) = ? OR avaliacao = ?)";
+            $params[] = strtoupper($avaliacao);
             $params[] = $avaliacao;
         }
         if (!empty($solucao)) {
-            $where[] = "solucao = ?";
+            $where[] = "(UPPER(solucao) = ? OR solucao = ?)";
+            $params[] = strtoupper($solucao);
             $params[] = $solucao;
         }
 
@@ -69,34 +78,43 @@ class paloSantoPesquisa {
         return 0;
     }
 
-    function getPesquisa($limit, $offset, $date_start = '', $date_end = '', $operador = '', $avaliacao = '', $solucao = '')
+    function getPesquisa($limit, $offset, $filter_field = '', $filter_value = '', $date_start = '', $date_end = '', $operador = '', $avaliacao = '', $solucao = '')
     {
         $where = array();
         $params = array();
 
+        if (!empty($filter_field) && !empty($filter_value)) {
+            $where[] = "$filter_field LIKE ?";
+            $params[] = "%$filter_value%";
+        }
         if (!empty($date_start)) {
-            $where[] = "data >= ?";
+            $where[] = "(data >= ? OR data LIKE ?)";
             $params[] = $date_start;
+            $params[] = "%" . date('d/m/Y', strtotime($date_start)) . "%";
         }
         if (!empty($date_end)) {
-            $where[] = "data <= ?";
+            $where[] = "(data <= ? OR data LIKE ?)";
             $params[] = $date_end;
+            $params[] = "%" . date('d/m/Y', strtotime($date_end)) . "%";
         }
         if (!empty($operador)) {
-            $where[] = "operador LIKE ?";
+            $where[] = "(operador LIKE ? OR ramal LIKE ?)";
+            $params[] = "%$operador%";
             $params[] = "%$operador%";
         }
         if (!empty($avaliacao)) {
-            $where[] = "avaliacao = ?";
+            $where[] = "(UPPER(avaliacao) = ? OR avaliacao = ?)";
+            $params[] = strtoupper($avaliacao);
             $params[] = $avaliacao;
         }
         if (!empty($solucao)) {
-            $where[] = "solucao = ?";
+            $where[] = "(UPPER(solucao) = ? OR solucao = ?)";
+            $params[] = strtoupper($solucao);
             $params[] = $solucao;
         }
 
         $strWhere = !empty($where) ? "WHERE " . implode(" AND ", $where) : "";
-        $query = "SELECT * FROM pesquisa $strWhere ORDER BY id DESC LIMIT $limit OFFSET $offset";
+        $query = "SELECT * FROM pesquisa $strWhere ORDER BY rowid DESC LIMIT $limit OFFSET $offset";
 
         if ($this->_DB) {
             $result = $this->_DB->fetchTable($query, true, $params);
@@ -111,15 +129,18 @@ class paloSantoPesquisa {
         $params = array();
 
         if (!empty($date_start)) {
-            $where[] = "data >= ?";
+            $where[] = "(data >= ? OR data LIKE ?)";
             $params[] = $date_start;
+            $params[] = "%" . date('d/m/Y', strtotime($date_start)) . "%";
         }
         if (!empty($date_end)) {
-            $where[] = "data <= ?";
+            $where[] = "(data <= ? OR data LIKE ?)";
             $params[] = $date_end;
+            $params[] = "%" . date('d/m/Y', strtotime($date_end)) . "%";
         }
         if (!empty($operador)) {
-            $where[] = "operador LIKE ?";
+            $where[] = "(operador LIKE ? OR ramal LIKE ?)";
+            $params[] = "%$operador%";
             $params[] = "%$operador%";
         }
 
@@ -127,18 +148,35 @@ class paloSantoPesquisa {
 
         $query = "SELECT 
             COUNT(*) as total,
-            SUM(CASE WHEN UPPER(avaliacao) = 'OTIMO' OR UPPER(avaliacao) = 'ÓTIMO' OR avaliacao = '5' THEN 1 ELSE 0 END) as otimo,
-            SUM(CASE WHEN UPPER(avaliacao) = 'MUITO BOM' OR avaliacao = '4' THEN 1 ELSE 0 END) as muito_bom,
-            SUM(CASE WHEN UPPER(avaliacao) = 'MEDIO' OR UPPER(avaliacao) = 'MÉDIO' OR avaliacao = '3' THEN 1 ELSE 0 END) as medio,
-            SUM(CASE WHEN UPPER(avaliacao) = 'BOM' OR avaliacao = '2' THEN 1 ELSE 0 END) as bom,
-            SUM(CASE WHEN UPPER(avaliacao) = 'RUIM' OR avaliacao = '1' THEN 1 ELSE 0 END) as ruim,
-            SUM(CASE WHEN UPPER(solucao) = 'SIM' OR solucao = '1' THEN 1 ELSE 0 END) as resolvido_sim,
-            SUM(CASE WHEN UPPER(solucao) = 'NAO' OR UPPER(solucao) = 'NÃO' OR solucao = '2' THEN 1 ELSE 0 END) as resolvido_nao
+            SUM(CASE WHEN UPPER(avaliacao) IN ('OTIMO', 'ÓTIMO', '5') THEN 1 ELSE 0 END) as otimo,
+            SUM(CASE WHEN UPPER(avaliacao) IN ('MUITO BOM', '4') THEN 1 ELSE 0 END) as muito_bom,
+            SUM(CASE WHEN UPPER(avaliacao) IN ('MEDIO', 'MÉDIO', '3') THEN 1 ELSE 0 END) as medio,
+            SUM(CASE WHEN UPPER(avaliacao) IN ('BOM', '2') THEN 1 ELSE 0 END) as bom,
+            SUM(CASE WHEN UPPER(avaliacao) IN ('RUIM', '1') THEN 1 ELSE 0 END) as ruim,
+            SUM(CASE WHEN UPPER(solucao) IN ('SIM', '1') THEN 1 ELSE 0 END) as resolvido_sim,
+            SUM(CASE WHEN UPPER(solucao) IN ('NAO', 'NÃO', '2') THEN 1 ELSE 0 END) as resolvido_nao
             FROM pesquisa $strWhere";
 
         $stats = false;
         if ($this->_DB) {
             $stats = $this->_DB->getFirstRowQuery($query, true, $params);
+        }
+
+        if (!$stats || empty($stats['total'])) {
+            // Se filtrou mas não veio nada, tenta calcular total geral
+            if (!empty($strWhere)) {
+                $queryAll = "SELECT 
+                    COUNT(*) as total,
+                    SUM(CASE WHEN UPPER(avaliacao) IN ('OTIMO', 'ÓTIMO', '5') THEN 1 ELSE 0 END) as otimo,
+                    SUM(CASE WHEN UPPER(avaliacao) IN ('MUITO BOM', '4') THEN 1 ELSE 0 END) as muito_bom,
+                    SUM(CASE WHEN UPPER(avaliacao) IN ('MEDIO', 'MÉDIO', '3') THEN 1 ELSE 0 END) as medio,
+                    SUM(CASE WHEN UPPER(avaliacao) IN ('BOM', '2') THEN 1 ELSE 0 END) as bom,
+                    SUM(CASE WHEN UPPER(avaliacao) IN ('RUIM', '1') THEN 1 ELSE 0 END) as ruim,
+                    SUM(CASE WHEN UPPER(solucao) IN ('SIM', '1') THEN 1 ELSE 0 END) as resolvido_sim,
+                    SUM(CASE WHEN UPPER(solucao) IN ('NAO', 'NÃO', '2') THEN 1 ELSE 0 END) as resolvido_nao
+                    FROM pesquisa";
+                $stats = $this->_DB->getFirstRowQuery($queryAll, true, array());
+            }
         }
 
         if (!$stats || empty($stats['total'])) {
