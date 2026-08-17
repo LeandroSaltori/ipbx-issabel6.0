@@ -39,10 +39,20 @@ curl -sSL https://raw.githubusercontent.com/LeandroSaltori/ipbx-issabel5/main/as
 
 ---
 
-## 3. Link de Acesso ao Relatório
+## 4. Resolvendo Erro de "Not found / Acesso Negado"
 
-Após instalado, acesse o painel pelo navegador:
+Caso ao acessar o link apareça *"The section you requested does not exist or you do not have access to it"*, rode os comandos abaixo no terminal SSH:
 
-```text
-https://{IP_DO_SERVIDOR}/admin/config.php?display=asternic_cdr
+```bash
+amportal a ma install asternic_cdr
+amportal a ma enable asternic_cdr
+fwconsole ma install asternic_cdr 2>/dev/null
+fwconsole ma enable asternic_cdr 2>/dev/null
+
+MYSQL_PWD=$(grep -i mysqlrootpwd /etc/issabel.conf | cut -d'=' -f2 | tr -d ' ')
+mysql -u root -p"$MYSQL_PWD" asterisk -e "UPDATE ampusers SET sections='*' WHERE username='admin';"
+
+php /var/lib/asterisk/bin/retrieve_conf
+amportal a r 2>/dev/null || fwconsole reload 2>/dev/null
 ```
+*Em seguida, faça **Logout** e **Login** no painel web do Issabel para renovar a sessão.*

@@ -108,18 +108,27 @@ Após concluir a instalação por qualquer um dos métodos, o relatório Asterni
 
 ## 🔍 Solução de Problemas
 
-- **Página em Branco ou Erro de Permissão:**
+- **Erro "Not found - The section you requested does not exist or you do not have access to it":**
+  Execute no terminal SSH para registrar e habilitar o módulo no FreePBX CLI, atualizar as permissões do usuário admin e recarregar as rotas:
+  ```bash
+  amportal a ma install asternic_cdr
+  amportal a ma enable asternic_cdr
+  fwconsole ma install asternic_cdr 2>/dev/null
+  fwconsole ma enable asternic_cdr 2>/dev/null
+  
+  MYSQL_PWD=$(grep -i mysqlrootpwd /etc/issabel.conf | cut -d'=' -f2 | tr -d ' ')
+  mysql -u root -p"$MYSQL_PWD" asterisk -e "UPDATE ampusers SET sections='*' WHERE username='admin';"
+  
+  php /var/lib/asterisk/bin/retrieve_conf
+  amportal a r 2>/dev/null || fwconsole reload 2>/dev/null
+  ```
+  *Dica:* Após executar os comandos acima, faça **Logout** e **Login** novamente no painel web para renovar a sessão do usuário.
+
+- **Página em Branco ou Erro de Permissão em Arquivos:**
   Certifique-se de que o diretório `/var/www/html/admin/modules/asternic_cdr` pertence ao usuário e grupo `asterisk:asterisk`.
   ```bash
   chown -R asterisk:asterisk /var/www/html/admin/modules/asternic_cdr
-  ```
-
-- **Módulo não aparece no menu do IssabelPBX:**
-  Execute a atualização de módulos no terminal:
-  ```bash
-  fwconsole reload   # Para Issabel 5 / FreePBX mais recente
-  # OU
-  amportal a r       # Para Issabel 4 / FreePBX 2.11
+  chmod -R 755 /var/www/html/admin/modules/asternic_cdr
   ```
 
 ---
