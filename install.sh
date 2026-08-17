@@ -649,11 +649,11 @@ if [ -d "$REPO_DIR/src/themes/prisma_v5" ]; then
 fi
 
 # ==============================================================================
-# 18. INSTALAÇÃO DE FERRAMENTAS DE DIAGNÓSTICO (TCPDUMP & SNGREP)
+# 18. INSTALAÇÃO DE FERRAMENTAS DE DIAGNÓSTICO (NET-TOOLS, TCPDUMP & SNGREP)
 # ==============================================================================
-log_info "18/20 - Instalando ferramentas de diagnóstico de rede e SIP (tcpdump & sngrep)..."
+log_info "18/20 - Instalando ferramentas de diagnóstico e rede (net-tools, tcpdump & sngrep)..."
 if command -v yum &>/dev/null; then
-    yum install -y tcpdump 2>/dev/null || true
+    yum install -y net-tools tcpdump 2>/dev/null || true
     if ! command -v sngrep &>/dev/null; then
         yum install -y epel-release 2>/dev/null || true
         if ! yum install -y sngrep 2>/dev/null; then
@@ -662,9 +662,9 @@ if command -v yum &>/dev/null; then
         fi
     fi
 elif command -v dnf &>/dev/null; then
-    dnf install -y tcpdump sngrep 2>/dev/null || true
+    dnf install -y net-tools tcpdump sngrep 2>/dev/null || true
 fi
-log_success "Ferramentas tcpdump e sngrep instaladas."
+log_success "Ferramentas net-tools (ifconfig/netstat), tcpdump e sngrep instaladas."
 
 # ==============================================================================
 # 19. AJUSTES DE TEMPO E BIP DE TRANSFERÊNCIA
