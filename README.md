@@ -55,7 +55,11 @@ ipbx-issabel6.0/
 │   └── update-addressbook       # Utilitário de sincronização da agenda
 ├── src/                         # Código-fonte, componentes e módulos
 │   ├── admin/                   # Interface administrativa customizada do Issabel
-│   ├── dialplan/                # Dialplans Asterisk (ChanSpy, TextMessages, URA)
+│   ├── dialplan/                # Dialplans Asterisk (ChanSpy, TextMessages, URA, Features)
+│   │   ├── chanspy.conf
+│   │   ├── features_general_custom.conf # Ajustes de tempo de transferência e BIP
+│   │   ├── pesquisa_satisfacao.conf
+│   │   └── textmessages.conf
 │   ├── extensions/              # Extensão Chrome (Click-to-Dial / call.php)
 │   ├── ldap/                    # Servidor LDAP leve (porta 10389) e serviço systemd
 │   ├── modules/                 # Módulos WEB do Issabel (Asternic, Painel, Queue Stats, Dev)
@@ -66,10 +70,19 @@ ipbx-issabel6.0/
 │   ├── Agenda.php               # Agenda telefônica WEB
 │   ├── favicon.ico              # Favicon customizado
 │   └── lang/                    # Arquivos de tradução pt-br
-├── install.sh                   # Script mestre de instalação automatizada
+├── install.sh                   # Script mestre de instalação automatizada (19 etapas)
 ├── README.md                    # Manual mestre do repositório
 └── LICENSE                      # Licença open-source
 ```
+
+---
+
+## ✨ Recursos Adicionados da Versão Prisma Telecom
+
+1. 🔍 **TCPDump:** Ferramenta para captura e diagnóstico de pacotes de rede no servidor.
+2. 📞 **SNGREP:** Analisador gráfico interativo de chamadas SIP no terminal SSH.
+3. ⏱️ **Tempo de Transferência de Chamadas:** Aumentado o tempo limite de digitação de dígitos para 7 segundos (`transferdigittimeout = 7`) e tempo limite de resposta em transferência assistida para 30 segundos (`atxfernoanswertimeout = 30`).
+4. 🔔 **BIP de Transferência:** Tom de cortesia e BIP emitidos ao completar transferências (`courtesytone = beep` / `xfersound = beep`).
 
 ---
 
