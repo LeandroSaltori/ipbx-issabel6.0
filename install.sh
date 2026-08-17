@@ -1,0 +1,443 @@
+#!/bin/bash
+# ==============================================================================
+# SCRIPT MESTRE DE INSTALAÇÃO E CUSTOMIZAÇÃO - ISSABEL PBX (PRISMA TELECOM)
+# ==============================================================================
+# Este script automatiza o processo de pós-instalação do Issabel PBX.
+# Aplica temas, módulos personalizados, correções de telas, relatórios e áudios.
+#
+# Estratégia de Backup:
+# Nenhuma pasta nativa é excluída. As pastas nativas são renomeadas para "<nome>_old".
+# ==============================================================================
+
+set -e
+
+# --- CORES PARA LOGS ---
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+NC='\033[0m' # No Color
+
+log_info() { echo -e "${CYAN}[INFO]${NC} $1"; }
+log_success() { echo -e "${GREEN}[SUCESSO]${NC} $1"; }
+log_warn() { echo -e "${YELLOW}[AVISO]${NC} $1"; }
+log_error() { echo -e "${RED}[ERRO]${NC} $1"; }
+
+# --- VERIFICAÇÃO DE PERMISSÃO ROOT ---
+if [ "$EUID" -ne 0 ]; then
+    log_error "Este script precisa ser executado como root!"
+    exit 1
+fi
+
+log_info "Iniciando a instalação automatizada das customizações IPBX Issabel..."
+
+# --- DIRETÓRIO DO REPOSITÓRIO ---
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_DIR="$SCRIPT_DIR"
+
+# Se o script foi executado fora do repositório clonado, baixa a cópia atualizada
+if [ ! -f "$REPO_DIR/install.sh" ] || [ ! -d "$REPO_DIR/src" ]; then
+    TMP_REPO="/tmp/ipbx-issabel-repo"
+    log_info "Baixando o repositório completo para $TMP_REPO..."
+    rm -rf "$TMP_REPO"
+    git clone --depth 1 https://github.com/LeandroSaltori/ipbx-issabel5.git "$TMP_REPO"
+    REPO_DIR="$TMP_REPO"
+fi
+
+cd "$REPO_DIR"
+
+# --- FUNÇÃO DE BACKUP COM SUFIXO _old ---
+backup_and_deploy() {
+    local src="$1"
+    local dest="$2"
+    local backup="${dest}_old"
+
+    if [ -e "$dest" ]; then
+        if [ ! -e "$backup" ]; then
+            log_info "Backup criado: $dest -> $backup"
+            mv "$dest" "$backup"
+        else
+            log_warn "Backup $backup já existe. Preservando backup original."
+            rm -rf "$dest"
+        fi
+    fi
+
+    log_info "Implantando: $src -> $dest"
+    cp -rf "$src" "$dest"
+}
+
+# ==============================================================================
+# 1. ALTERAR TELA DO TERMINAL (MOTD)
+# ==============================================================================
+log_info "1/17 - Configurando tela personalizada do terminal (MOTD)..."
+if [ -f "$REPO_DIR/scripts/motd.sh" ]; then
+    MOTD_DEST="/usr/local/sbin/motd.sh"
+    backup_and_deploy "$REPO_DIR/scripts/motd.sh" "$MOTD_DEST"
+    chmod +x "$MOTD_DEST"
+    log_success "Tela do terminal (MOTD) configurada."
+fi
+
+# ==============================================================================
+# 2. DIRETÓRIO ADMIN (/var/www/html/admin)
+# ==============================================================================
+log_info "2/17 - Atualizando pasta /var/www/html/admin..."
+if [ -d "$REPO_DIR/src/admin" ]; then
+    backup_and_deploy "$REPO_DIR/src/admin" "/var/www/html/admin"
+    chown -R asterisk:asterisk /var/www/html/admin
+    log_success "Pasta admin atualizada."
+fi
+
+# ==============================================================================
+# 3. AGENDA.PHP
+# ==============================================================================
+log_info "3/17 - Instalando Agenda.php..."
+if [ -f "$REPO_DIR/src/Agenda.php" ]; then
+    cp -f "$REPO_DIR/src/Agenda.php" /var/www/html/Agenda.php
+    cp -f "$REPO_DIR/src/Agenda.php" /var/www/html/agenda.php
+    chown asterisk:asterisk /var/www/html/Agenda.php /var/www/html/agenda.php
+    chmod 644 /var/www/html/Agenda.php /var/www/html/agenda.php
+    log_success "Agenda.php instalada."
+fi
+
+# ==============================================================================
+# 4. WEBPHONE WEBRTC
+# ==============================================================================
+log_info "4/17 - Instalando Webphone..."
+if [ -d "$REPO_DIR/src/webphone" ]; then
+    mkdir -p /var/www/html/webphone
+    cp -rf "$REPO_DIR/src/webphone/"* /var/www/html/webphone/
+    chown -R asterisk:asterisk /var/www/html/webphone
+    chmod -R 755 /var/www/html/webphone
+    log_success "Webphone instalado em /var/www/html/webphone."
+fi
+
+# ==============================================================================
+# 5. EXTENSÃO CHROME / CLICK TO DIAL (EXTENSAO-PRISMA)
+# ==============================================================================
+log_info "5/17 - Instalando backend da Extensão Prisma Click-to-Dial (call.php)..."
+if [ -f "$REPO_DIR/src/extensions/chrome-click-to-dial/call.php" ]; then
+    cp -f "$REPO_DIR/src/extensions/chrome-click-to-dial/call.php" /var/www/html/call.php
+    chown asterisk:asterisk /var/www/html/call.php
+    chmod 644 /var/www/html/call.php
+    log_success "call.php instalado em /var/www/html/call.php."
+fi
+
+# ==============================================================================
+# 6. ASTERNIC CDR
+# ==============================================================================
+log_info "6/17 - Instalando/Atualizando Asternic CDR..."
+ASTERNIC_DEST="/var/www/html/admin/modules/asternic_cdr"
+if [ -d "$REPO_DIR/src/modules/asternic_cdr" ]; then
+    if [ -d "$ASTERNIC_DEST" ]; then
+        if [ ! -d "/var/www/html/admin/modules/asternic_cdr_OLD" ]; then
+            mv "$ASTERNIC_DEST" "/var/www/html/admin/modules/asternic_cdr_OLD"
+        else
+            rm -rf "$ASTERNIC_DEST"
+        fi
+    fi
+    cp -rf "$REPO_DIR/src/modules/asternic_cdr" "$ASTERNIC_DEST"
+    chown -R asterisk:asterisk "$ASTERNIC_DEST"
+    chmod -R 755 "$ASTERNIC_DEST"
+    
+    if command -v fwconsole &>/dev/null; then
+        fwconsole ma install asternic_cdr 2>/dev/null || true
+        fwconsole ma enable asternic_cdr 2>/dev/null || true
+    elif command -v amportal &>/dev/null; then
+        amportal a ma install asternic_cdr 2>/dev/null || true
+        amportal a ma enable asternic_cdr 2>/dev/null || true
+    fi
+    log_success "Asternic CDR instalado com sucesso."
+fi
+
+# ==============================================================================
+# 7. CHANSPY (ESCUTA DE LIGAÇÕES)
+# ==============================================================================
+log_info "7/17 - Configurando ChanSpy..."
+CHANSPY_FILE="/etc/asterisk/extensions_override_issabelpbx.conf"
+if ! grep -q "\[app-chanspy\]" "$CHANSPY_FILE" 2>/dev/null; then
+    if [ -f "$REPO_DIR/src/dialplan/chanspy.conf" ]; then
+        cat "$REPO_DIR/src/dialplan/chanspy.conf" >> "$CHANSPY_FILE"
+    else
+        cat << 'EOF' >> "$CHANSPY_FILE"
+
+; --- CONFIGURAÇÃO CHANSPY (PRISMA TELECOM) ---
+[app-chanspy]
+exten => 555,1,Macro(user-callerid,)
+exten => 555,n,Answer
+exten => 555,n,Wait(1)
+exten => 555,n,Authenticate(1234)
+exten => 555,n,Wait(1)
+exten => 555,n,ChanSpy()
+exten => 555,n,Hangup
+exten => _555X.,1,Macro(user-callerid,)
+exten => _555X.,n,Answer
+exten => _555X.,n,Wait(1)
+exten => _555X.,n,Authenticate(1234)
+exten => _555X.,n,Wait(1)
+exten => _555X.,n,ChanSpy(SIP/${EXTEN:3})
+exten => _555X.,n,Hangup
+EOF
+    fi
+    log_success "ChanSpy adicionado em $CHANSPY_FILE."
+else
+    log_info "ChanSpy já está configurado no dialplan."
+fi
+
+# ==============================================================================
+# 8. ENVIO MENSAGEM TEXTO (PJSIP MESSAGING)
+# ==============================================================================
+log_info "8/17 - Configurando EnvioMensagemTexto..."
+CUSTOM_EXT="/etc/asterisk/extensions_custom.conf"
+if ! grep -q "\[textmessages\]" "$CUSTOM_EXT" 2>/dev/null; then
+    if [ -f "$REPO_DIR/src/dialplan/textmessages.conf" ]; then
+        cat "$REPO_DIR/src/dialplan/textmessages.conf" >> "$CUSTOM_EXT"
+    else
+        cat << 'EOF' >> "$CUSTOM_EXT"
+
+; --- CONFIGURAÇÃO ENVIO MENSAGEM TEXTO PJSIP ---
+[textmessages]
+exten => _.,1,Gosub(send-text,s,1,(${EXTEN}))
+exten => e,1,Hangup()
+
+[send-text]
+exten => s,1,NoOp(Sending Text To: ${ARG1})
+exten => s,n,Set(PEER=${CUT(CUT(CUT(MESSAGE(from),@,1),<,2),:,2)})
+exten => s,n,Set(FROM=${DB(AMPUSER/${PEER}/cidname)})
+exten => s,n,Set(CALLERID_NUM=${DB(AMPUSER/${PEER}/cidnum)})
+exten => s,n,Set(FROM_SIP=${STRREPLACE(MESSAGE(from),<sip:${PEER}@,<sip:${CALLERID_NUM}@)})
+exten => s,n,MessageSend(pjsip:${ARG1},${FROM_SIP})
+exten => s,n,Hangup()
+EOF
+    fi
+    log_success "Contextos de mensagem de texto adicionados em $CUSTOM_EXT."
+else
+    log_info "Contexto textmessages já configurado."
+fi
+
+# ==============================================================================
+# 9. SERVIDOR LDAP DE RAMAIS
+# ==============================================================================
+log_info "9/17 - Instalando Servidor LDAP de Ramais..."
+LDAP_BIN_SRC="$REPO_DIR/src/ldap/issabel-ldap"
+LDAP_SVC_SRC="$REPO_DIR/src/ldap/systemd/issabel-ldap.service"
+
+if [ -f "$LDAP_BIN_SRC" ]; then
+    cp -f "$LDAP_BIN_SRC" /usr/local/bin/issabel-ldap
+    chmod 755 /usr/local/bin/issabel-ldap
+    
+    if [ -f "$LDAP_SVC_SRC" ]; then
+        cp -f "$LDAP_SVC_SRC" /etc/systemd/system/issabel-ldap.service
+        chmod 644 /etc/systemd/system/issabel-ldap.service
+        systemctl daemon-reload
+        systemctl enable issabel-ldap.service 2>/dev/null || true
+        systemctl restart issabel-ldap.service 2>/dev/null || true
+        log_success "Servidor LDAP de ramais instalado e ativo na porta 10389."
+    fi
+fi
+
+# ==============================================================================
+# 10. PASTAS LANG E MODULES EM /var/www/html
+# ==============================================================================
+log_info "10/17 - Atualizando pastas lang e modules em /var/www/html..."
+if [ -d "$REPO_DIR/src/lang" ]; then
+    backup_and_deploy "$REPO_DIR/src/lang" "/var/www/html/lang"
+    chown -R asterisk:asterisk /var/www/html/lang
+fi
+
+if [ -d "$REPO_DIR/src/modules" ]; then
+    if [ -d "/var/www/html/modules" ] && [ ! -d "/var/www/html/modules_old" ]; then
+        log_info "Backup criado: /var/www/html/modules -> /var/www/html/modules_old"
+        cp -rf /var/www/html/modules /var/www/html/modules_old
+    fi
+    cp -rf "$REPO_DIR/src/modules/"* /var/www/html/modules/
+    chown -R asterisk:asterisk /var/www/html/modules
+    log_success "Módulos sincronizados em /var/www/html/modules."
+fi
+
+# ==============================================================================
+# 11. MÚSICA DE ESPERA (MOH)
+# ==============================================================================
+log_info "11/17 - Atualizando Músicas de Espera (MOH)..."
+MOH_DEST="/var/lib/asterisk/moh"
+if [ -d "$REPO_DIR/src/sounds/moh" ]; then
+    mkdir -p "$MOH_DEST"
+    cp -rn "$REPO_DIR/src/sounds/moh/"*.wav "$MOH_DEST/" 2>/dev/null || cp -rf "$REPO_DIR/src/sounds/moh/"*.wav "$MOH_DEST/" 2>/dev/null || true
+    chown -R asterisk:asterisk "$MOH_DEST"
+    chmod 644 "$MOH_DEST"/*.wav 2>/dev/null || true
+    log_success "Músicas de espera atualizadas em $MOH_DEST."
+fi
+
+# ==============================================================================
+# 12. NOTIFICAÇÕES TELEGRAM
+# ==============================================================================
+log_info "12/17 - Configurando Notificações via Telegram..."
+TELEGRAM_SRC="$REPO_DIR/scripts/monitor_issabel_users.sh"
+if [ -f "$TELEGRAM_SRC" ]; then
+    cp -f "$TELEGRAM_SRC" /usr/local/bin/monitor_issabel_users.sh
+    chmod +x /usr/local/bin/monitor_issabel_users.sh
+    
+    if ! crontab -l 2>/dev/null | grep -q "monitor_issabel_users.sh"; then
+        (crontab -l 2>/dev/null; echo "* * * * * /usr/local/bin/monitor_issabel_users.sh") | crontab -
+        log_success "Agendamento de notificação Telegram criado no crontab."
+    else
+        log_info "Agendamento Telegram já existe no crontab."
+    fi
+fi
+
+# ==============================================================================
+# 13. PAINEL IPBX (control_panel)
+# ==============================================================================
+log_info "13/17 - Instalando Painel IPbx..."
+PANEL_SRC="$REPO_DIR/src/modules/control_panel"
+if [ -d "$PANEL_SRC" ]; then
+    cp -rf "$PANEL_SRC" /var/www/html/modules/control_panel
+    chown -R asterisk:asterisk /var/www/html/modules/control_panel
+    
+    if command -v sqlite3 &>/dev/null; then
+        sqlite3 /var/www/db/acl.db "INSERT OR IGNORE INTO acl_resource (name, description) VALUES ('control_panel', 'Painel IPbx');" 2>/dev/null || true
+        sqlite3 /var/www/db/menu.db "INSERT OR IGNORE INTO menu (id, IdParent, Link, Name, Type, order_no) VALUES ('control_panel', 'pbxconfig', '', 'Painel IPbx', 'module', 8);" 2>/dev/null || true
+    fi
+    log_success "Painel IPbx instalado e registrado."
+fi
+
+# ==============================================================================
+# 14. PESQUISA DE SATISFAÇÃO
+# ==============================================================================
+log_info "14/17 - Instalando Pesquisa de Satisfação..."
+SOUNDS_CUSTOM="/var/lib/asterisk/sounds/custom"
+PESQUISA_SOUNDS="$REPO_DIR/src/sounds/custom"
+
+if [ -d "$PESQUISA_SOUNDS" ]; then
+    mkdir -p "$SOUNDS_CUSTOM"
+    cp -f "$PESQUISA_SOUNDS"/*.wav "$SOUNDS_CUSTOM/" 2>/dev/null || true
+    chown -R asterisk:asterisk "$SOUNDS_CUSTOM"
+    
+    if ! grep -q "\[pesquisa-satisfação\]" "$CUSTOM_EXT" 2>/dev/null; then
+        cat << 'EOF' >> "$CUSTOM_EXT"
+
+; --- PESQUISA DE SATISFAÇÃO (PRISMA TELECOM) ---
+[pesquisa-satisfação]
+exten => 8996,1,Goto(pesquisa,s,1)
+
+[pesquisa]
+exten => s,1,NooP(-----INICIO DA PESQUISA---)
+same => n,Answer
+same => n,Playback(custom/audio1,nm)
+same => n,Goto(menu,s,1)
+
+[menu]
+include => menu1a5
+exten => s,1,NooP(-----inicio da pesquisa menu 1---)
+same => n,Answer
+same => n,Playback(custom/audio2,nm)
+same => n,WaitExten(5,1)
+
+[menu1a5]
+exten => 1,1,Set(avaliacao=RUIM)
+exten => 1,n,Goto(menu2,s,1)
+exten => 2,1,Set(avaliacao=BOM)
+exten => 2,n,Goto(menu2,s,1)
+exten => 3,1,Set(avaliacao=MEDIO)
+exten => 3,n,Goto(menu2,s,1)
+exten => 4,1,Set(avaliacao=MUITO BOM)
+exten => 4,n,Goto(menu2,s,1)
+exten => 5,1,Set(avaliacao=OTIMO)
+exten => 5,n,Goto(menu2,s,1)
+exten => i,1,Playback(custom/invalido,nm)
+exten => i,n,Goto(menu,s,1)
+
+[menu2]
+include => menu1a2
+exten => s,1,Noop(-----inicio da pesquisa menu 2---)
+exten => s,n,Answer
+exten => s,n,Playback(custom/audio3,nm)
+exten => s,n,WaitExten(5,1)
+
+[menu1a2]
+exten => 1,1,Set(solucao=SIM)
+exten => 1,n,Goto(fim,s,1)
+exten => 2,1,Set(solucao=NAO)
+exten => 2,n,Goto(fim,s,1)
+exten => i,1,Playback(custom/invalido,nm)
+exten => i,n,Goto(menu2,s,1)
+
+[fim]
+exten => s,1,NooP(Finalizando Pesquisa)
+exten => s,n,Playback(custom/agradecimento,nm)
+exten => s,n,Hangup
+EOF
+        log_success "Dialplan de pesquisa de satisfação adicionado."
+    fi
+fi
+
+# ==============================================================================
+# 15. RELATÓRIO QUEUE STATS E RAMAIS
+# ==============================================================================
+log_info "15/17 - Instalando Relatório de Filas e Ramais..."
+QUEUE_SRC="$REPO_DIR/src/modules/relatorio_de_filas"
+
+if [ -d "$QUEUE_SRC" ]; then
+    mkdir -p /var/www/html/modules/relatorio_de_filas
+    cp -rf "$QUEUE_SRC/"* /var/www/html/modules/relatorio_de_filas/
+    chown -R asterisk:asterisk /var/www/html/modules/relatorio_de_filas
+    
+    if command -v sqlite3 &>/dev/null; then
+        sqlite3 /var/www/db/acl.db "INSERT OR IGNORE INTO acl_resource (name, description) VALUES ('relatorio_de_filas', 'Relatório de Filas');" 2>/dev/null || true
+        sqlite3 /var/www/db/menu.db "INSERT OR IGNORE INTO menu (id, IdParent, Link, Name, Type, order_no) VALUES ('relatorio_de_filas', 'reports', '', 'Relatório de Filas', 'module', 9);" 2>/dev/null || true
+    fi
+fi
+
+if [ -d "$REPO_DIR/src/ramais" ]; then
+    mkdir -p /var/www/html/ramais
+    cp -rf "$REPO_DIR/src/ramais/"* /var/www/html/ramais/
+    chown -R asterisk:asterisk /var/www/html/ramais
+    log_success "Módulo Ramais e Relatório de Filas configurados."
+fi
+
+# ==============================================================================
+# 16. MÓDULOS WEB DEVELOPER
+# ==============================================================================
+log_info "16/17 - Instalando Módulos Web Developer..."
+for MOD in build_module delete_module language_admin; do
+    if [ -d "$REPO_DIR/src/modules/$MOD" ]; then
+        cp -rf "$REPO_DIR/src/modules/$MOD" /var/www/html/modules/
+        chown -R asterisk:asterisk "/var/www/html/modules/$MOD"
+    fi
+done
+log_success "Ferramentas Web Developer instaladas."
+
+# ==============================================================================
+# 17. FAVICON E TEMAS (prisma_v5)
+# ==============================================================================
+log_info "17/17 - Instalando Favicon e Tema Prisma v5..."
+if [ -f "$REPO_DIR/src/favicon.ico" ]; then
+    cp -f "$REPO_DIR/src/favicon.ico" /var/www/html/favicon.ico
+    mkdir -p /var/www/html/themes/tenant/images /var/www/html/themes/prisma_v5/images
+    cp -f "$REPO_DIR/src/favicon.ico" /var/www/html/themes/tenant/images/favicon.ico 2>/dev/null || true
+    cp -f "$REPO_DIR/src/favicon.ico" /var/www/html/themes/prisma_v5/images/favicon.ico 2>/dev/null || true
+fi
+
+if [ -d "$REPO_DIR/src/themes/prisma_v5" ]; then
+    cp -rf "$REPO_DIR/src/themes/prisma_v5" /var/www/html/themes/
+    chown -R asterisk:asterisk /var/www/html/themes
+    log_success "Tema Prisma v5 e Favicon aplicados."
+fi
+
+# ==============================================================================
+# RECARGA DE SERVIÇOS E FINALIZAÇÃO
+# ==============================================================================
+log_info "Finalizando instalação e recarregando serviços..."
+asterisk -rx "module reload" 2>/dev/null || asterisk -rx "core reload" 2>/dev/null || true
+
+if systemctl is-active httpd &>/dev/null; then
+    systemctl restart httpd
+elif systemctl is-active apache2 &>/dev/null; then
+    systemctl restart apache2
+fi
+
+echo -e "\n${GREEN}======================================================================${NC}"
+echo -e "${GREEN}  INSTALAÇÃO DE CUSTOMIZAÇÕES DO ISSABEL CONCLUÍDA COM SUCESSO!     ${NC}"
+echo -e "${GREEN}======================================================================${NC}"
+echo -e "${CYAN}Todas as pastas nativas substituídas foram salvas com o sufixo '_old'${NC}"
+echo -e "${CYAN}Exemplo: /var/www/html/admin_old, lang_old, modules_old, etc.${NC}\n"
