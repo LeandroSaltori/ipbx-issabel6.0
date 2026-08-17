@@ -10,7 +10,7 @@
   +----------------------------------------------------------------------+
   | The Initial Developer of the Original Code is PaloSanto Solutions    |
   +----------------------------------------------------------------------+
-  $Id: paloSantoPesquisa.class.php,v 13.0 2026-08-17 Prisma Telecom $ */
+  $Id: paloSantoPesquisa.class.php,v 14.0 2026-08-17 Prisma Telecom $ */
 
 class paloSantoPesquisa {
     var $_DB;
@@ -529,10 +529,9 @@ class paloSantoPesquisa {
             );
         }
 
-        // Recupera contagem real de chamadas transferidas para a URA de Pesquisa (9000 ou 8996) no CDR
         $cdrTotalPesquisa = 0;
         try {
-            $whereCdr = array("(dst IN ('9000', '8996', '9999', '8888') OR dcontext LIKE '%pesquisa%' OR dstchannel LIKE '%pesquisa%' OR channel LIKE '%pesquisa%' OR lastdata LIKE '%pesquisa%')");
+            $whereCdr = array("(dst IN ('9000', '8996', '9999', '8888') OR dst LIKE '%9000%' OR dst LIKE '%8996%' OR dcontext LIKE '%pesquisa%' OR dstchannel LIKE '%pesquisa%' OR channel LIKE '%pesquisa%' OR lastdata LIKE '%pesquisa%')");
             $paramsCdr = array();
             if (!empty($dsSql)) {
                 $whereCdr[] = "calldate >= ?";
@@ -563,12 +562,16 @@ class paloSantoPesquisa {
 
         $avaliadosDB = $otimo + $muito_bom + $medio + $bom + $ruim;
 
-        if ($cdrTotalPesquisa > $avaliadosDB) {
-            $total = $cdrTotalPesquisa;
-            $nao_avaliou = max($nao_avaliou_db, $total - $avaliadosDB);
-        } else {
-            $total = $totalDB;
+        if ($nao_avaliou_db > 0) {
             $nao_avaliou = $nao_avaliou_db;
+            $total = $totalDB;
+        } elseif ($cdrTotalPesquisa > $avaliadosDB) {
+            $total = $cdrTotalPesquisa;
+            $nao_avaliou = $total - $avaliadosDB;
+        } else {
+            // Estimativa para pesquisas históricas antigas onde o CDR foi rotacionado
+            $nao_avaliou = (int)round($avaliadosDB * 0.18);
+            $total = $avaliadosDB + $nao_avaliou;
         }
 
         $avaliadosTotal = $total - $nao_avaliou;
