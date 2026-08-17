@@ -162,7 +162,15 @@ if [ -d "$REPO_DIR/src/modules/asternic_cdr" ]; then
         amportal a ma install asternic_cdr 2>/dev/null || true
         amportal a ma enable asternic_cdr 2>/dev/null || true
     fi
-    log_success "Asternic CDR instalado com sucesso."
+
+    # Registra o menu "Relatorio Geral" dentro da aba Reports (Relatórios)
+    if command -v sqlite3 &>/dev/null; then
+        sqlite3 /var/www/db/acl.db "INSERT OR IGNORE INTO acl_resource (name, description) VALUES ('relatorio_cdr', 'Relatorio Geral');" 2>/dev/null || true
+        sqlite3 /var/www/db/menu.db "DELETE FROM menu WHERE id = 'relatorio_cdr';" 2>/dev/null || true
+        sqlite3 /var/www/db/menu.db "INSERT INTO menu (id, IdParent, Link, Name, Type, order_no) VALUES ('relatorio_cdr', 'reports', 'admin/config.php?display=asternic_cdr', 'Relatorio Geral', 'framed', 10);" 2>/dev/null || true
+        sqlite3 /var/www/db/acl.db "INSERT OR IGNORE INTO acl_group_permission (id_action, id_group, id_resource) SELECT 1, 1, id FROM acl_resource WHERE name = 'relatorio_cdr';" 2>/dev/null || true
+    fi
+    log_success "Asternic CDR instalado e adicionado ao menu Relatórios."
 fi
 
 # ==============================================================================
@@ -318,9 +326,9 @@ if [ -d "$PANEL_SRC" ]; then
 fi
 
 # ==============================================================================
-# 14. PESQUISA DE SATISFAÇÃO
+# 14. PESQUISA DE SATISFAÇÃO (URA + MÓDULO WEB)
 # ==============================================================================
-log_info "14/20 - Instalando Pesquisa de Satisfação..."
+log_info "14/20 - Instalando Pesquisa de Satisfação (URA e Módulo Web)..."
 SOUNDS_CUSTOM="/var/lib/asterisk/sounds/custom"
 PESQUISA_SOUNDS="$REPO_DIR/src/sounds/custom"
 
@@ -387,13 +395,45 @@ EOF
     fi
 fi
 
+# Implantação do Módulo Web da Pesquisa de Satisfação
+if [ -d "$REPO_DIR/src/modules/pesquisa" ]; then
+    mkdir -p /var/www/html/modules/pesquisa
+    cp -rf "$REPO_DIR/src/modules/pesquisa/"* /var/www/html/modules/pesquisa/
+    chown -R asterisk:asterisk /var/www/html/modules/pesquisa
+    chmod -R 755 /var/www/html/modules/pesquisa
+    
+    if command -v sqlite3 &>/dev/null; then
+        # Cria a tabela no banco pesquisa.db
+        sqlite3 /var/www/db/pesquisa.db "CREATE TABLE IF NOT EXISTS pesquisa (id INTEGER PRIMARY KEY AUTOINCREMENT, data DATETIME DEFAULT CURRENT_TIMESTAMP, ramal VARCHAR(20), numero VARCHAR(30), avaliacao VARCHAR(50), solucao VARCHAR(10));" 2>/dev/null || true
+        chown asterisk:asterisk /var/www/db/pesquisa.db 2>/dev/null || true
+        chmod 666 /var/www/db/pesquisa.db 2>/dev/null || true
+        
+        sqlite3 /var/www/db/acl.db "INSERT OR IGNORE INTO acl_resource (name, description) VALUES ('pesquisa', 'Pesquisa');" 2>/dev/null || true
+        sqlite3 /var/www/db/acl.db "INSERT OR IGNORE INTO acl_resource (name, description) VALUES ('pesquisa_ajuda', 'Pesquisa - Como Funciona?');" 2>/dev/null || true
+        
+        sqlite3 /var/www/db/menu.db "DELETE FROM menu WHERE id = 'pesquisa' OR id = 'pesquisa_ajuda';" 2>/dev/null || true
+        sqlite3 /var/www/db/menu.db "INSERT INTO menu (id, IdParent, Link, Name, Type, order_no) VALUES ('pesquisa', 'reports', '', 'Pesquisa', 'module', 11);" 2>/dev/null || true
+        sqlite3 /var/www/db/menu.db "INSERT INTO menu (id, IdParent, Link, Name, Type, order_no) VALUES ('pesquisa_ajuda', 'reports', 'modules/pesquisa/help/index.html', 'Pesquisa - Como Funciona?', 'framed', 12);" 2>/dev/null || true
+        
+        sqlite3 /var/www/db/acl.db "INSERT OR IGNORE INTO acl_group_permission (id_action, id_group, id_resource) SELECT 1, 1, id FROM acl_resource WHERE name IN ('pesquisa', 'pesquisa_ajuda');" 2>/dev/null || true
+    fi
+    log_success "Módulo Web da Pesquisa de Satisfação registrado no menu Relatórios."
+fi
+
 # ==============================================================================
-# 15. RELATÓRIO QUEUE STATS, ASTERNIC LITE E RAMAIS
+# 15. RELATÓRIO QUEUE STATS, ASTERNIC LITE, CALLCENTER E RAMAIS
 # ==============================================================================
-log_info "15/20 - Instalando Asternic Call Center Stats Lite, Relatório de Filas e Ramais..."
+log_info "15/20 - Instalando Asternic Call Center Stats Lite, Relatório de Filas e CallCenter..."
 QUEUE_SRC="$REPO_DIR/src/modules/relatorio_de_filas"
 
-# 1. Criação do banco de dados qstatslite no MySQL / MariaDB
+# 1. Instala o módulo oficial de Call Center do Issabel
+if command -v dnf &>/dev/null; then
+    dnf install -y issabel-callcenter 2>/dev/null || true
+elif command -v yum &>/dev/null; then
+    yum install -y issabel-callcenter 2>/dev/null || true
+fi
+
+# 2. Criação do banco de dados qstatslite no MySQL / MariaDB
 MYSQL_PWD=""
 if [ -f /etc/issabel.conf ]; then
     MYSQL_PWD=$(grep -i mysqlrootpwd /etc/issabel.conf 2>/dev/null | cut -d'=' -f2 | tr -d ' ')
@@ -442,7 +482,7 @@ CREATE TABLE IF NOT EXISTS `queue_stats` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 EOF
 
-# 2. Instalação do Asternic Call Center Stats Lite (parselog.php e /var/www/html/stats)
+# 3. Instalação do Asternic Call Center Stats Lite (parselog.php e /var/www/html/stats)
 if [ ! -f /usr/local/parselog/parselog.php ] || [ ! -d /var/www/html/stats ]; then
     log_info "Baixando e configurando Asternic Stats Lite..."
     TMP_ASTERNIC="/tmp/asternic-stats-install"
@@ -492,14 +532,15 @@ if [ ! -f /usr/local/parselog/parselog.php ] || [ ! -d /var/www/html/stats ]; th
     rm -rf "$TMP_ASTERNIC"
 fi
 
-# 3. Implantação do seu Relatório de Filas Melhorado (Interface Customizada)
+# 4. Implantação do seu Relatório de Filas Melhorado (Interface Customizada)
 if [ -d "$QUEUE_SRC" ]; then
-    mkdir -p /var/www/html/modules/relatorio_de_filas /var/www/html/Relatorio_de_filas /var/www/html/stats
+    mkdir -p /var/www/html/modules/relatorio_de_filas /var/www/html/Relatorio_de_filas /var/www/html/relatorio_de_filas /var/www/html/stats
     cp -rf "$QUEUE_SRC/"* /var/www/html/modules/relatorio_de_filas/
     cp -rf "$QUEUE_SRC/"* /var/www/html/Relatorio_de_filas/ 2>/dev/null || true
+    cp -rf "$QUEUE_SRC/"* /var/www/html/relatorio_de_filas/ 2>/dev/null || true
     cp -rf "$QUEUE_SRC/"* /var/www/html/stats/ 2>/dev/null || true
-    chown -R asterisk:asterisk /var/www/html/modules/relatorio_de_filas /var/www/html/Relatorio_de_filas /var/www/html/stats
-    chmod -R 755 /var/www/html/modules/relatorio_de_filas /var/www/html/Relatorio_de_filas /var/www/html/stats
+    chown -R asterisk:asterisk /var/www/html/modules/relatorio_de_filas /var/www/html/Relatorio_de_filas /var/www/html/relatorio_de_filas /var/www/html/stats
+    chmod -R 755 /var/www/html/modules/relatorio_de_filas /var/www/html/Relatorio_de_filas /var/www/html/relatorio_de_filas /var/www/html/stats
     
     if command -v sqlite3 &>/dev/null; then
         sqlite3 /var/www/db/acl.db "INSERT OR IGNORE INTO acl_resource (name, description) VALUES ('relatorio_de_filas', 'Relatório de Filas');" 2>/dev/null || true
@@ -532,7 +573,7 @@ fi
 if command -v sqlite3 &>/dev/null; then
     sqlite3 /var/www/db/acl.db "INSERT OR IGNORE INTO acl_resource (name, description) VALUES ('developer', 'Developer');" 2>/dev/null || true
     sqlite3 /var/www/db/menu.db "DELETE FROM menu WHERE id = 'developer' OR id = 'web_developer';" 2>/dev/null || true
-    sqlite3 /var/www/db/menu.db "INSERT INTO menu (id, IdParent, Link, Name, Type, order_no) VALUES ('developer', '', '', 'Developer', 'framed', 99);" 2>/dev/null || true
+    sqlite3 /var/www/db/menu.db "INSERT INTO menu (id, IdParent, Link, Name, Type, order_no) VALUES ('developer', '', '', 'Developer', 'module', 99);" 2>/dev/null || true
     sqlite3 /var/www/db/acl.db "INSERT OR IGNORE INTO acl_group_permission (id_action, id_group, id_resource) SELECT 1, 1, id FROM acl_resource WHERE name = 'developer';" 2>/dev/null || true
 fi
 
