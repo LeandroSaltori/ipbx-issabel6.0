@@ -10,7 +10,7 @@
   +----------------------------------------------------------------------+
   | The Initial Developer of the Original Code is PaloSanto Solutions    |
   +----------------------------------------------------------------------+
-  $Id: index.php,v 12.0 2026-08-17 Prisma Telecom $ */
+  $Id: index.php,v 13.0 2026-08-17 Prisma Telecom $ */
 
 require_once "modules/agent_console/libs/issabel2.lib.php";
 include_once "libs/paloSantoDB.class.php";
@@ -31,7 +31,6 @@ function formatPhoneBr($num) {
     if (empty($num) || $num == '-') return '-';
     $clean = preg_replace('/[^0-9]/', '', $num);
     
-    // Remove zeros à esquerda de operadoras (ex: 0011... -> 11... ou 011... -> 11...)
     if (strlen($clean) >= 12 && substr($clean, 0, 2) === '00') {
         $clean = substr($clean, 2);
     } elseif (strlen($clean) >= 11 && substr($clean, 0, 1) === '0') {
@@ -56,19 +55,16 @@ function _moduleContent(&$smarty, $module_name)
 
     $pPesquisaObj = new paloSantoPesquisa();
 
-    // Handler de Áudio (Stream / Download)
     if (isset($_GET['action']) && ($_GET['action'] == 'stream_audio' || $_GET['action'] == 'download_audio')) {
         handleAudioPlayback();
         exit;
     }
 
-    // Handler de Exportação Excel
     if (isset($_GET['action']) && $_GET['action'] == 'export_excel') {
         handleExportExcel($pPesquisaObj);
         exit;
     }
 
-    // Handler de Exportação PDF
     if (isset($_GET['action']) && $_GET['action'] == 'export_pdf') {
         handleExportPdf($pPesquisaObj);
         exit;
@@ -294,33 +290,27 @@ function handleExportPdf($pPesquisa)
 
 function renderFullExecutiveDashboard($pPesquisa, $module_name)
 {
-    // Captura Parâmetros de Filtro
     $date_start = isset($_REQUEST['date_start']) ? trim($_REQUEST['date_start']) : '';
     $date_end   = isset($_REQUEST['date_end']) ? trim($_REQUEST['date_end']) : '';
     $operador   = isset($_REQUEST['operador']) ? trim($_REQUEST['operador']) : '';
     $avaliacao  = isset($_REQUEST['avaliacao']) ? trim($_REQUEST['avaliacao']) : '';
     $solucao    = isset($_REQUEST['solucao']) ? trim($_REQUEST['solucao']) : '';
 
-    // Paginação
     $page  = isset($_REQUEST['page']) ? max(1, (int)$_REQUEST['page']) : 1;
     $limit = 20;
     $offset = ($page - 1) * $limit;
 
-    // Estatísticas dos Cards e Gráficos
     $stats = $pPesquisa->getPesquisaStats($date_start, $date_end, $operador);
 
-    // Lista de Operadores Únicos & Mapas de Nomes
     $operadoresList = $pPesquisa->getOperadoresList();
     $extNamesMap    = $pPesquisa->getExtensionNamesMap();
     $queueNamesMap  = $pPesquisa->getQueueNamesMap();
 
-    // Registros Filtrados
     $total = $pPesquisa->getNumPesquisa('', '', $date_start, $date_end, $operador, $avaliacao, $solucao);
     $arrResult = $pPesquisa->getPesquisa($limit, $offset, '', '', $date_start, $date_end, $operador, $avaliacao, $solucao);
 
     $totalPages = max(1, ceil($total / $limit));
 
-    // URLs de Exportação
     $exportParams = http_build_query(array(
         'menu' => $module_name,
         'rawmode' => 'yes',
@@ -355,7 +345,6 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
             padding: 5px;
         }
 
-        /* Compact Header */
         .pesquisa-header {
             display: flex;
             justify-content: space-between;
@@ -396,7 +385,6 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
         .btn-top-manual { background: #0284c7; color: #ffffff; }
         .btn-top-expand { background: #0d9488; color: #ffffff; }
 
-        /* Single Line Compact Filter Box */
         .filter-card-box {
             background: #ffffff;
             border-radius: 10px;
@@ -465,7 +453,6 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
         .btn-pdf { background: #dc2626; color: #ffffff; }
         .btn-reset { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
 
-        /* KPI Cards Grid (5 Cards) */
         .kpi-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -509,7 +496,6 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
             margin-top: 4px;
         }
 
-        /* Compact Charts Grid */
         .charts-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -544,7 +530,6 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
             height: 100%;
         }
 
-        /* Custom Modern Table */
         .table-card-box {
             background: #ffffff;
             border-radius: 10px;
@@ -578,7 +563,6 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
             background: #f8fafc;
         }
 
-        /* Pagination Bar */
         .pagination-bar {
             display: flex;
             justify-content: space-between;
@@ -610,7 +594,6 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
         .page-link-btn:hover { background: #e2e8f0; }
         .page-link-btn.disabled { opacity: 0.5; pointer-events: none; }
 
-        /* Audio Modal */
         #audioModalPesquisa {
             display: none;
             position: fixed;
@@ -628,6 +611,27 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
             width: 380px;
             box-shadow: 0 20px 25px -5px rgba(0,0,0,0.2);
             text-align: center;
+        }
+
+        /* Tooltip de Fila Compacta */
+        .queue-badge-compact {
+            background: #f1f5f9;
+            color: #334155;
+            padding: 3px 8px;
+            border-radius: 6px;
+            font-weight: 700;
+            font-size: 11px;
+            cursor: help;
+            border: 1px solid #e2e8f0;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            transition: all 0.2s;
+        }
+        .queue-badge-compact:hover {
+            background: #e2e8f0;
+            color: #0f172a;
+            border-color: #cbd5e1;
         }
     </style>
 
@@ -782,18 +786,20 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
                             $val_duracao   = !empty($cdrInfo['duration_formatted']) ? $cdrInfo['duration_formatted'] : '-';
                             $recFile       = !empty($cdrInfo['recordingfile']) ? $cdrInfo['recordingfile'] : '';
 
+                            // Formatação Compacta da Fila com Hover Tooltip
                             $rawFila = !empty($row['fila']) ? trim($row['fila']) : (!empty($cdrInfo['fila']) ? trim($cdrInfo['fila']) : '');
                             if (!empty($rawFila) && isset($queueNamesMap[$rawFila])) {
-                                $val_fila = "$rawFila - " . $queueNamesMap[$rawFila];
+                                $fullName = "$rawFila - " . $queueNamesMap[$rawFila];
+                                $val_fila_html = "<span title='" . htmlspecialchars($fullName, ENT_QUOTES) . "' class='queue-badge-compact'>🏢 $rawFila</span>";
                             } elseif (!empty($rawFila) && is_numeric($rawFila) && strlen($rawFila) >= 3 && $rawFila != '7940') {
-                                $val_fila = "Fila $rawFila";
+                                $val_fila_html = "<span title='Fila $rawFila' class='queue-badge-compact'>🏢 $rawFila</span>";
                             } else {
-                                $val_fila = '-';
+                                $val_fila_html = "<span style='color:#cbd5e1;'>-</span>";
                             }
                             ?>
                             <tr>
                                 <td><span style='background:#ede9fe; color:#6d28d9; padding:3px 8px; border-radius:6px; font-weight:600; font-size:11px;'>👤 <?php echo htmlspecialchars($val_disp_op); ?></span></td>
-                                <td><span style='background:#f1f5f9; color:#475569; padding:2px 6px; border-radius:4px; font-size:11px;'><?php echo htmlspecialchars($val_fila); ?></span></td>
+                                <td><?php echo $val_fila_html; ?></td>
                                 <td><span style='color:#334155; font-size:11px;'>📅 <?php echo htmlspecialchars($val_data); ?></span></td>
                                 <td><span style='color:#64748b; font-size:11px;'>🕒 <?php echo htmlspecialchars($val_hora); ?></span></td>
                                 <td><span style='color:#0f172a; font-weight:600; font-size:11px;'>⏱️ <?php echo htmlspecialchars($val_duracao); ?></span></td>
@@ -806,27 +812,27 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
                                         case 'OTIMO':
                                         case 'ÓTIMO':
                                         case '5':
-                                            echo "<span style='background:#10b981; color:#ffffff; padding:3px 8px; border-radius:10px; font-weight:bold; font-size:10px; display:inline-block;'>⭐⭐⭐⭐⭐ EXCELENTE</span>";
+                                            echo "<span style='background:#10b981; color:#ffffff; padding:3px 10px; border-radius:12px; font-weight:bold; font-size:10px; display:inline-flex; align-items:center; gap:4px;'>✅ ⭐⭐⭐⭐⭐ EXCELENTE</span>";
                                             break;
                                         case 'MUITO BOM':
                                         case '4':
-                                            echo "<span style='background:#3b82f6; color:#ffffff; padding:3px 8px; border-radius:10px; font-weight:bold; font-size:10px; display:inline-block;'>⭐⭐⭐⭐ MUITO BOM</span>";
+                                            echo "<span style='background:#3b82f6; color:#ffffff; padding:3px 10px; border-radius:12px; font-weight:bold; font-size:10px; display:inline-flex; align-items:center; gap:4px;'>✅ ⭐⭐⭐⭐ MUITO BOM</span>";
                                             break;
                                         case 'MEDIO':
                                         case 'MÉDIO':
                                         case 'REGULAR':
                                         case 'BOM':
                                         case '3':
-                                            echo "<span style='background:#f59e0b; color:#ffffff; padding:3px 8px; border-radius:10px; font-weight:bold; font-size:10px; display:inline-block;'>⭐⭐⭐ $avUpper</span>";
+                                            echo "<span style='background:#f59e0b; color:#ffffff; padding:3px 10px; border-radius:12px; font-weight:bold; font-size:10px; display:inline-flex; align-items:center; gap:4px;'>✅ ⭐⭐⭐ $avUpper</span>";
                                             break;
                                         case '2':
-                                            echo "<span style='background:#f97316; color:#ffffff; padding:3px 8px; border-radius:10px; font-weight:bold; font-size:10px; display:inline-block;'>⭐⭐ BOM</span>";
+                                            echo "<span style='background:#f97316; color:#ffffff; padding:3px 10px; border-radius:12px; font-weight:bold; font-size:10px; display:inline-flex; align-items:center; gap:4px;'>✅ ⭐⭐ BOM</span>";
                                             break;
                                         case 'RUIM':
                                         case 'PESSIMO':
                                         case 'PÉSSIMO':
                                         case '1':
-                                            echo "<span style='background:#ef4444; color:#ffffff; padding:3px 8px; border-radius:10px; font-weight:bold; font-size:10px; display:inline-block;'>⭐ $avUpper</span>";
+                                            echo "<span style='background:#ef4444; color:#ffffff; padding:3px 10px; border-radius:12px; font-weight:bold; font-size:10px; display:inline-flex; align-items:center; gap:4px;'>❌ ⭐ $avUpper</span>";
                                             break;
                                         case 'NAO AVALIOU':
                                         case 'NÃO AVALIOU':
@@ -835,10 +841,10 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
                                         case 'DESISTIU':
                                         case '0':
                                         case '':
-                                            echo "<span style='background:#64748b; color:#ffffff; padding:3px 8px; border-radius:10px; font-weight:bold; font-size:10px; display:inline-block;'>📵 NÃO AVALIOU</span>";
+                                            echo "<span style='background:#64748b; color:#ffffff; padding:3px 10px; border-radius:12px; font-weight:bold; font-size:10px; display:inline-flex; align-items:center; gap:4px;'>📵 NÃO AVALIOU</span>";
                                             break;
                                         default:
-                                            echo "<span style='background:#94a3b8; color:#ffffff; padding:3px 8px; border-radius:10px; font-weight:bold; font-size:10px; display:inline-block;'>$avUpper</span>";
+                                            echo "<span style='background:#94a3b8; color:#ffffff; padding:3px 10px; border-radius:12px; font-weight:bold; font-size:10px; display:inline-flex; align-items:center; gap:4px;'>✅ $avUpper</span>";
                                             break;
                                     }
                                     ?>
