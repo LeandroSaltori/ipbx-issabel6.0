@@ -393,10 +393,60 @@ fi
 log_info "15/20 - Instalando Relatório de Filas e Ramais..."
 QUEUE_SRC="$REPO_DIR/src/modules/relatorio_de_filas"
 
+# Criação do banco de dados qstatslite no MySQL / MariaDB
+MYSQL_PWD=""
+if [ -f /etc/issabel.conf ]; then
+    MYSQL_PWD=$(grep -i mysqlrootpwd /etc/issabel.conf 2>/dev/null | cut -d'=' -f2 | tr -d ' ')
+fi
+
+mysql -u root -p"$MYSQL_PWD" -e "CREATE DATABASE IF NOT EXISTS qstatslite DEFAULT CHARACTER SET utf8 COLLATE utf8_general_ci;" 2>/dev/null || mysql -u root -e "CREATE DATABASE IF NOT EXISTS qstatslite DEFAULT CHARACTER SET utf8 COLLATE utf8_general_ci;" 2>/dev/null || true
+
+mysql -u root -p"$MYSQL_PWD" qstatslite 2>/dev/null << 'EOF' || mysql -u root qstatslite 2>/dev/null << 'EOF' || true
+CREATE TABLE IF NOT EXISTS `qname` (
+  `qname_id` int(11) NOT NULL AUTO_INCREMENT,
+  `queue` varchar(50) NOT NULL DEFAULT '',
+  PRIMARY KEY (`qname_id`),
+  KEY `queue` (`queue`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+CREATE TABLE IF NOT EXISTS `qagent` (
+  `agent_id` int(11) NOT NULL AUTO_INCREMENT,
+  `agent` varchar(50) NOT NULL DEFAULT '',
+  PRIMARY KEY (`agent_id`),
+  KEY `agent` (`agent`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+CREATE TABLE IF NOT EXISTS `qevent` (
+  `event_id` int(11) NOT NULL AUTO_INCREMENT,
+  `event` varchar(50) NOT NULL DEFAULT '',
+  PRIMARY KEY (`event_id`),
+  KEY `event` (`event`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+CREATE TABLE IF NOT EXISTS `queue_stats` (
+  `datetime` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
+  `qname` int(11) NOT NULL DEFAULT '0',
+  `qagent` int(11) NOT NULL DEFAULT '0',
+  `qevent` int(11) NOT NULL DEFAULT '0',
+  `info1` varchar(100) NOT NULL DEFAULT '',
+  `info2` varchar(100) NOT NULL DEFAULT '',
+  `info3` varchar(100) NOT NULL DEFAULT '',
+  `info4` varchar(100) NOT NULL DEFAULT '',
+  `info5` varchar(100) NOT NULL DEFAULT '',
+  `uniqueid` varchar(32) NOT NULL DEFAULT '',
+  KEY `datetime` (`datetime`),
+  KEY `qname` (`qname`),
+  KEY `qagent` (`qagent`),
+  KEY `qevent` (`qevent`),
+  KEY `uniqueid` (`uniqueid`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+EOF
+
 if [ -d "$QUEUE_SRC" ]; then
-    mkdir -p /var/www/html/modules/relatorio_de_filas
+    mkdir -p /var/www/html/modules/relatorio_de_filas /var/www/html/Relatorio_de_filas
     cp -rf "$QUEUE_SRC/"* /var/www/html/modules/relatorio_de_filas/
-    chown -R asterisk:asterisk /var/www/html/modules/relatorio_de_filas
+    cp -rf "$QUEUE_SRC/"* /var/www/html/Relatorio_de_filas/ 2>/dev/null || true
+    chown -R asterisk:asterisk /var/www/html/modules/relatorio_de_filas /var/www/html/Relatorio_de_filas
     
     if command -v sqlite3 &>/dev/null; then
         sqlite3 /var/www/db/acl.db "INSERT OR IGNORE INTO acl_resource (name, description) VALUES ('relatorio_de_filas', 'Relatório de Filas');" 2>/dev/null || true
