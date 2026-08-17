@@ -399,6 +399,21 @@ exten => s,n,Hangup
 EOF
         log_success "Dialplan de pesquisa de satisfação adicionado."
     fi
+
+    # Registra o Custom Destination no FreePBX/IssabelPBX (banco asterisk)
+    MYSQL_PWD=""
+    if [ -f /etc/issabel.conf ]; then
+        MYSQL_PWD=$(grep -i mysqlrootpwd /etc/issabel.conf 2>/dev/null | cut -d'=' -f2 | tr -d ' ')
+    fi
+
+    mysql -u root -p"$MYSQL_PWD" asterisk -e "INSERT INTO custom_destinations (custom_dest, description, notes) VALUES ('pesquisa-satisfação,8996,1', 'Pesquisa de Satisfação', 'URA de pesquisa de satisfação') ON DUPLICATE KEY UPDATE description='Pesquisa de Satisfação';" 2>/dev/null || mysql -u root asterisk -e "INSERT INTO custom_destinations (custom_dest, description, notes) VALUES ('pesquisa-satisfação,8996,1', 'Pesquisa de Satisfação', 'URA de pesquisa de satisfação') ON DUPLICATE KEY UPDATE description='Pesquisa de Satisfação';" 2>/dev/null || true
+    
+    if command -v fwconsole &>/dev/null; then
+        fwconsole reload 2>/dev/null || true
+    elif command -v amportal &>/dev/null; then
+        amportal a r 2>/dev/null || true
+    fi
+    log_success "Custom Destination da Pesquisa de Satisfação registrado no PBX."
 fi
 
 # Implantação do Módulo Web da Pesquisa de Satisfação
