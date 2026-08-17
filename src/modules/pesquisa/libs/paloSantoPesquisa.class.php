@@ -10,7 +10,7 @@
   +----------------------------------------------------------------------+
   | The Initial Developer of the Original Code is PaloSanto Solutions    |
   +----------------------------------------------------------------------+
-  $Id: paloSantoPesquisa.class.php,v 2.7 2026-08-17 Prisma Telecom $ */
+  $Id: paloSantoPesquisa.class.php,v 2.8 2026-08-17 Prisma Telecom $ */
 
 class paloSantoPesquisa {
     var $_DB;
@@ -398,15 +398,38 @@ class paloSantoPesquisa {
             );
         }
 
-        $total = (int)$stats['total'];
+        // Cruzamento dinâmico com o CDR do Asterisk (para detectar total de chamadas enviadas à URA de Pesquisa)
+        $cdrTotalPesquisa = 0;
+        try {
+            $whereCdr = array("(dst = '8996' OR dst = '9000' OR dcontext = 'pesquisa' OR dstchannel LIKE '%pesquisa%')");
+            $paramsCdr = array();
+            if (!empty($dsSql)) {
+                $whereCdr[] = "calldate >= ?";
+                $paramsCdr[] = $dsSql . " 00:00:00";
+            }
+            if (!empty($deSql)) {
+                $whereCdr[] = "calldate <= ?";
+                $paramsCdr[] = $deSql . " 23:59:59";
+            }
+            $strWhereCdr = "WHERE " . implode(" AND ", $whereCdr);
+            $stmtCdr = $this->pdo->prepare("SELECT COUNT(*) FROM cdr $strWhereCdr");
+            $stmtCdr->execute($paramsCdr);
+            $cdrTotalPesquisa = (int)$stmtCdr->fetchColumn();
+        } catch (Exception $e) {}
+
+        $totalDB = (int)$stats['total'];
         $otimo = (int)$stats['otimo'];
         $muito_bom = (int)$stats['muito_bom'];
         $medio = (int)$stats['medio'];
         $bom = (int)$stats['bom'];
         $ruim = (int)$stats['ruim'];
-        $nao_avaliou = (int)$stats['nao_avaliou'];
+        $nao_avaliou_db = (int)$stats['nao_avaliou'];
         $sim = (int)$stats['resolvido_sim'];
         $nao = (int)$stats['resolvido_nao'];
+
+        // Se o CDR do Asterisk registrou mais chamadas enviadas à Pesquisa do que a tabela pesquisa, a diferença são chamadas onde o cliente desligou no meio da URA
+        $total = max($totalDB, $cdrTotalPesquisa);
+        $nao_avaliou = max($nao_avaliou_db, $total - ($otimo + $muito_bom + $medio + $bom + $ruim));
 
         $avaliadosTotal = $total - $nao_avaliou;
         $somaPontos = ($otimo * 5) + ($muito_bom * 4) + ($medio * 3) + ($bom * 2) + ($ruim * 1);
