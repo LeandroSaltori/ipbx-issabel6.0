@@ -443,6 +443,23 @@ if [ -d "$REPO_DIR/src/modules/pesquisa" ]; then
         
         sqlite3 /var/www/db/acl.db "INSERT OR IGNORE INTO acl_group_permission (id_action, id_group, id_resource) SELECT 1, 1, id FROM acl_resource WHERE name = 'pesquisa';" 2>/dev/null || true
     fi
+
+    # Registra o atalho de discagem e transferencia 8996 no Asterisk
+    if [ -f /etc/asterisk/extensions_custom.conf ]; then
+        if ! grep -q "exten => 8996" /etc/asterisk/extensions_custom.conf; then
+            cat << 'EOF' >> /etc/asterisk/extensions_custom.conf
+
+;==========================================================
+; ATALHO DIRETO DE TESTE E TRANSFERENCIA DE PESQUISA (8996)
+;==========================================================
+[from-internal-custom]
+exten => 8996,1,NoOp(---- CHAMADA DIRETA PARA PESQUISA DE SATISFACAO 8996 ----)
+same => n,Goto(pesquisa,s,1)
+EOF
+        fi
+        asterisk -rx "dialplan reload" 2>/dev/null || true
+    fi
+
     log_success "Módulo Web da Pesquisa de Satisfação registrado no menu Relatórios."
 fi
 

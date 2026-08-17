@@ -10,7 +10,7 @@
   +----------------------------------------------------------------------+
   | The Initial Developer of the Original Code is PaloSanto Solutions    |
   +----------------------------------------------------------------------+
-  $Id: index.php,v 3.0 2026-08-17 Prisma Telecom $ */
+  $Id: index.php,v 4.0 2026-08-17 Prisma Telecom $ */
 
 require_once "modules/agent_console/libs/issabel2.lib.php";
 include_once "libs/paloSantoDB.class.php";
@@ -220,6 +220,9 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
     // Estatísticas dos Cards e Gráficos
     $stats = $pPesquisa->getPesquisaStats($date_start, $date_end, $operador);
 
+    // Lista de Operadores Únicos
+    $operadoresList = $pPesquisa->getOperadoresList();
+
     // Registros Filtrados
     $total = $pPesquisa->getNumPesquisa('', '', $date_start, $date_end, $operador, $avaliacao, $solucao);
     $arrResult = $pPesquisa->getPesquisa($limit, $offset, '', '', $date_start, $date_end, $operador, $avaliacao, $solucao);
@@ -256,105 +259,111 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
         .pesquisa-root {
             font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
             color: #1e293b;
-            padding: 10px 5px;
+            padding: 5px;
         }
 
-        /* Top Header Action Bar */
+        /* Compact Header */
         .pesquisa-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 16px;
+            margin-bottom: 12px;
         }
         .pesquisa-title h2 {
             margin: 0;
-            font-size: 22px;
+            font-size: 20px;
             font-weight: 800;
             color: #0f172a;
             letter-spacing: -0.3px;
         }
         .pesquisa-title p {
-            margin: 3px 0 0 0;
-            font-size: 13px;
+            margin: 1px 0 0 0;
+            font-size: 11px;
             color: #64748b;
         }
         .pesquisa-top-btns {
             display: flex;
-            gap: 10px;
+            gap: 8px;
         }
         .btn-top {
-            padding: 8px 16px;
-            border-radius: 8px;
+            padding: 6px 12px;
+            border-radius: 6px;
             font-weight: 700;
-            font-size: 13px;
+            font-size: 12px;
             text-decoration: none;
             border: none;
             cursor: pointer;
             display: inline-flex;
             align-items: center;
-            gap: 6px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            gap: 5px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
             transition: all 0.2s;
         }
         .btn-top:hover { transform: translateY(-1px); opacity: 0.95; }
         .btn-top-manual { background: #0284c7; color: #ffffff; }
         .btn-top-expand { background: #0d9488; color: #ffffff; }
 
-        /* Filter Card Box */
+        /* Single Line Compact Filter Box */
         .filter-card-box {
             background: #ffffff;
-            border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 20px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+            border-radius: 10px;
+            padding: 12px 16px;
+            margin-bottom: 15px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.04);
             border: 1px solid #e2e8f0;
         }
-        .filter-form-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-            gap: 14px;
-            align-items: end;
+        .filter-inline-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: flex-end;
         }
         .filter-field-group {
             display: flex;
             flex-direction: column;
+            flex: 1;
+            min-width: 130px;
         }
         .filter-field-group label {
-            font-size: 11px;
+            font-size: 10px;
             font-weight: 700;
             color: #475569;
             text-transform: uppercase;
             letter-spacing: 0.4px;
-            margin-bottom: 5px;
+            margin-bottom: 3px;
         }
         .filter-input {
-            padding: 8px 12px;
+            padding: 6px 10px;
             border: 1px solid #cbd5e1;
-            border-radius: 8px;
-            font-size: 13px;
+            border-radius: 6px;
+            font-size: 12px;
             color: #0f172a;
             background: #ffffff;
             outline: none;
+            height: 32px;
+            box-sizing: border-box;
             transition: border-color 0.2s;
         }
-        .filter-input:focus { border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1); }
+        .filter-input:focus { border-color: #6366f1; }
         .filter-btn-row {
             display: flex;
-            gap: 8px;
-            flex-wrap: wrap;
+            gap: 6px;
+            align-items: center;
         }
         .btn-action {
-            padding: 8px 16px;
-            border-radius: 8px;
+            height: 32px;
+            padding: 0 14px;
+            border-radius: 6px;
             font-weight: 700;
-            font-size: 13px;
+            font-size: 12px;
             border: none;
             cursor: pointer;
             text-decoration: none;
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            gap: 6px;
+            gap: 5px;
+            box-sizing: border-box;
             transition: all 0.2s;
         }
         .btn-action:hover { opacity: 0.9; }
@@ -366,15 +375,15 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
         /* KPI Cards Grid */
         .kpi-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-            gap: 16px;
-            margin-bottom: 24px;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 12px;
+            margin-bottom: 15px;
         }
         .kpi-card-item {
             background: #ffffff;
-            border-radius: 12px;
-            padding: 20px;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+            border-radius: 10px;
+            padding: 14px 16px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.04);
             border: 1px solid #f1f5f9;
             border-left: 5px solid #6366f1;
             display: flex;
@@ -387,52 +396,52 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
         .kpi-card-item.amber { border-left-color: #f59e0b; }
 
         .kpi-card-title {
-            font-size: 11px;
+            font-size: 10px;
             font-weight: 800;
             color: #64748b;
             text-transform: uppercase;
             letter-spacing: 0.5px;
-            margin-bottom: 8px;
+            margin-bottom: 4px;
         }
         .kpi-card-num {
-            font-size: 28px;
+            font-size: 24px;
             font-weight: 800;
             color: #0f172a;
             line-height: 1;
         }
         .kpi-card-desc {
-            font-size: 12px;
+            font-size: 11px;
             color: #94a3b8;
-            margin-top: 8px;
+            margin-top: 4px;
         }
 
-        /* Charts Grid */
+        /* Compact Charts Grid */
         .charts-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 20px;
-            margin-bottom: 24px;
+            gap: 15px;
+            margin-bottom: 15px;
         }
         @media (max-width: 900px) { .charts-grid { grid-template-columns: 1fr; } }
 
         .chart-card-box {
             background: #ffffff;
-            border-radius: 12px;
-            padding: 20px;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+            border-radius: 10px;
+            padding: 14px 16px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.04);
             border: 1px solid #f1f5f9;
-            height: 280px;
+            height: 220px;
             display: flex;
             flex-direction: column;
         }
         .chart-card-box h4 {
-            margin: 0 0 12px 0;
-            font-size: 14px;
+            margin: 0 0 8px 0;
+            font-size: 12px;
             font-weight: 800;
             color: #334155;
             text-transform: uppercase;
             border-bottom: 1px solid #f1f5f9;
-            padding-bottom: 8px;
+            padding-bottom: 4px;
         }
         .chart-canvas-wrapper {
             position: relative;
@@ -444,8 +453,8 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
         /* Custom Modern Table */
         .table-card-box {
             background: #ffffff;
-            border-radius: 12px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+            border-radius: 10px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.04);
             border: 1px solid #e2e8f0;
             overflow: hidden;
         }
@@ -459,16 +468,16 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
             color: #ffffff;
         }
         .pesquisa-table th {
-            padding: 12px 16px;
-            font-size: 11px;
+            padding: 10px 14px;
+            font-size: 10px;
             font-weight: 800;
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
         .pesquisa-table td {
-            padding: 12px 16px;
+            padding: 10px 14px;
             border-bottom: 1px solid #f1f5f9;
-            font-size: 13px;
+            font-size: 12px;
             vertical-align: middle;
         }
         .pesquisa-table tbody tr:hover {
@@ -480,12 +489,12 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 16px 20px;
+            padding: 12px 16px;
             background: #ffffff;
             border-top: 1px solid #f1f5f9;
         }
         .pagination-info {
-            font-size: 13px;
+            font-size: 12px;
             color: #64748b;
             font-weight: 600;
         }
@@ -494,7 +503,7 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
             gap: 6px;
         }
         .page-link-btn {
-            padding: 6px 12px;
+            padding: 5px 12px;
             border-radius: 6px;
             background: #f1f5f9;
             color: #334155;
@@ -533,19 +542,19 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
         <div class="pesquisa-header">
             <div class="pesquisa-title">
                 <h2>Relatório de Pesquisa de Satisfação - IPbx Prisma</h2>
-                <p>Módulo Executivo Oficial de Pesquisa pós-atendimento</p>
+                <p>Módulo Executivo Oficial de Pesquisa pós-atendimento (Disque / Transfira para <strong>8996</strong>)</p>
             </div>
             <div class="pesquisa-top-btns">
                 <a href="modules/pesquisa/help/index.html" target="_blank" class="btn-top btn-top-manual">📖 Manual</a>
-                <button onclick="window.open(window.location.href, '_blank')" class="btn-top btn-top-expand">↗ Expandir Aba</button>
+                <button onclick="window.open('?menu=<?php echo htmlspecialchars($module_name); ?>&rawmode=yes', '_blank')" class="btn-top btn-top-expand">↗ Expandir Aba</button>
             </div>
         </div>
 
-        <!-- Card de Filtros -->
+        <!-- Card de Filtros Compacto de 1 Linha -->
         <div class="filter-card-box">
             <form method="GET" action="index.php">
                 <input type="hidden" name="menu" value="<?php echo htmlspecialchars($module_name); ?>" />
-                <div class="filter-form-grid">
+                <div class="filter-inline-row">
                     <div class="filter-field-group">
                         <label>📅 Data Inicial</label>
                         <input type="date" name="date_start" value="<?php echo htmlspecialchars($date_start); ?>" class="filter-input" />
@@ -556,7 +565,14 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
                     </div>
                     <div class="filter-field-group">
                         <label>👤 Operador / Ramal</label>
-                        <input type="text" name="operador" placeholder="Ex: 1001" value="<?php echo htmlspecialchars($operador); ?>" class="filter-input" />
+                        <select name="operador" class="filter-input">
+                            <option value="">-- Todos os Operadores --</option>
+                            <?php if (is_array($operadoresList)): ?>
+                                <?php foreach ($operadoresList as $op): ?>
+                                    <option value="<?php echo htmlspecialchars($op); ?>" <?php if ($operador == $op) echo 'selected'; ?>>👤 Ramal / Agent <?php echo htmlspecialchars($op); ?></option>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
+                        </select>
                     </div>
                     <div class="filter-field-group">
                         <label>⭐ Avaliação</label>
@@ -597,7 +613,7 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
             </div>
             <div class="kpi-card-item green">
                 <div class="kpi-card-title">⭐ Média de Satisfação</div>
-                <div class="kpi-card-num"><?php echo $media; ?> <span style="font-size:16px; color:#f59e0b;">/ 5.0</span></div>
+                <div class="kpi-card-num"><?php echo $media; ?> <span style="font-size:14px; color:#f59e0b;">/ 5.0</span></div>
                 <div class="kpi-card-desc">Índice Geral de Atendimento</div>
             </div>
             <div class="kpi-card-item blue">
@@ -657,11 +673,11 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
                             $recFile       = $pPesquisa->findRecordingForCall($val_telefone, $val_data, $val_hora, $val_operador);
                             ?>
                             <tr>
-                                <td><span style='background:#ede9fe; color:#6d28d9; padding:4px 10px; border-radius:6px; font-weight:600; font-size:12px;'>👤 <?php echo htmlspecialchars($val_operador); ?></span></td>
-                                <td><span style='background:#f1f5f9; color:#475569; padding:3px 8px; border-radius:4px; font-size:11px;'><?php echo htmlspecialchars($val_fila); ?></span></td>
-                                <td><span style='color:#334155; font-size:12px;'>📅 <?php echo htmlspecialchars($val_data); ?></span></td>
-                                <td><span style='color:#64748b; font-size:12px;'>🕒 <?php echo htmlspecialchars($val_hora); ?></span></td>
-                                <td><span style='font-weight:600; color:#1e293b;'>📞 <?php echo htmlspecialchars($val_telefone); ?></span></td>
+                                <td><span style='background:#ede9fe; color:#6d28d9; padding:3px 8px; border-radius:6px; font-weight:600; font-size:11px;'>👤 <?php echo htmlspecialchars($val_operador); ?></span></td>
+                                <td><span style='background:#f1f5f9; color:#475569; padding:2px 6px; border-radius:4px; font-size:11px;'><?php echo htmlspecialchars($val_fila); ?></span></td>
+                                <td><span style='color:#334155; font-size:11px;'>📅 <?php echo htmlspecialchars($val_data); ?></span></td>
+                                <td><span style='color:#64748b; font-size:11px;'>🕒 <?php echo htmlspecialchars($val_hora); ?></span></td>
+                                <td><span style='font-weight:600; color:#1e293b; font-size:12px;'>📞 <?php echo htmlspecialchars($val_telefone); ?></span></td>
                                 <td>
                                     <?php
                                     $avUpper = strtoupper(trim($val_avaliacao));
@@ -670,30 +686,30 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
                                         case 'OTIMO':
                                         case 'ÓTIMO':
                                         case '5':
-                                            echo "<span style='background:#10b981; color:#ffffff; padding:4px 10px; border-radius:12px; font-weight:bold; font-size:11px; display:inline-block;'>⭐⭐⭐⭐⭐ $avUpper</span>";
+                                            echo "<span style='background:#10b981; color:#ffffff; padding:3px 8px; border-radius:10px; font-weight:bold; font-size:10px; display:inline-block;'>⭐⭐⭐⭐⭐ $avUpper</span>";
                                             break;
                                         case 'MUITO BOM':
                                         case '4':
-                                            echo "<span style='background:#3b82f6; color:#ffffff; padding:4px 10px; border-radius:12px; font-weight:bold; font-size:11px; display:inline-block;'>⭐⭐⭐⭐ MUITO BOM</span>";
+                                            echo "<span style='background:#3b82f6; color:#ffffff; padding:3px 8px; border-radius:10px; font-weight:bold; font-size:10px; display:inline-block;'>⭐⭐⭐⭐ MUITO BOM</span>";
                                             break;
                                         case 'MEDIO':
                                         case 'MÉDIO':
                                         case 'REGULAR':
                                         case 'BOM':
                                         case '3':
-                                            echo "<span style='background:#f59e0b; color:#ffffff; padding:4px 10px; border-radius:12px; font-weight:bold; font-size:11px; display:inline-block;'>⭐⭐⭐ $avUpper</span>";
+                                            echo "<span style='background:#f59e0b; color:#ffffff; padding:3px 8px; border-radius:10px; font-weight:bold; font-size:10px; display:inline-block;'>⭐⭐⭐ $avUpper</span>";
                                             break;
                                         case '2':
-                                            echo "<span style='background:#f97316; color:#ffffff; padding:4px 10px; border-radius:12px; font-weight:bold; font-size:11px; display:inline-block;'>⭐⭐ BOM</span>";
+                                            echo "<span style='background:#f97316; color:#ffffff; padding:3px 8px; border-radius:10px; font-weight:bold; font-size:10px; display:inline-block;'>⭐⭐ BOM</span>";
                                             break;
                                         case 'RUIM':
                                         case 'PESSIMO':
                                         case 'PÉSSIMO':
                                         case '1':
-                                            echo "<span style='background:#ef4444; color:#ffffff; padding:4px 10px; border-radius:12px; font-weight:bold; font-size:11px; display:inline-block;'>⭐ $avUpper</span>";
+                                            echo "<span style='background:#ef4444; color:#ffffff; padding:3px 8px; border-radius:10px; font-weight:bold; font-size:10px; display:inline-block;'>⭐ $avUpper</span>";
                                             break;
                                         default:
-                                            echo "<span style='background:#94a3b8; color:#ffffff; padding:4px 10px; border-radius:12px; font-weight:bold; font-size:11px; display:inline-block;'>$avUpper</span>";
+                                            echo "<span style='background:#94a3b8; color:#ffffff; padding:3px 8px; border-radius:10px; font-weight:bold; font-size:10px; display:inline-block;'>$avUpper</span>";
                                             break;
                                     }
                                     ?>
@@ -702,30 +718,30 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
                                     <?php
                                     $solUpper = strtoupper(trim($val_solucao));
                                     if ($solUpper == 'SIM' || $solUpper == '1') {
-                                        echo "<span style='background:#dcfce7; color:#15803d; border:1px solid #86efac; padding:4px 10px; border-radius:8px; font-weight:bold; font-size:11px;'>✔ SIM</span>";
+                                        echo "<span style='background:#dcfce7; color:#15803d; border:1px solid #86efac; padding:3px 8px; border-radius:6px; font-weight:bold; font-size:10px;'>✔ SIM</span>";
                                     } elseif ($solUpper == 'NAO' || $solUpper == 'NÃO' || $solUpper == '2') {
-                                        echo "<span style='background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5; padding:4px 10px; border-radius:8px; font-weight:bold; font-size:11px;'>✖ NÃO</span>";
+                                        echo "<span style='background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5; padding:3px 8px; border-radius:6px; font-weight:bold; font-size:10px;'>✖ NÃO</span>";
                                     } else {
-                                        echo "<span style='background:#f1f5f9; color:#64748b; padding:4px 10px; border-radius:8px; font-size:11px;'>$solUpper</span>";
+                                        echo "<span style='background:#f1f5f9; color:#64748b; padding:3px 8px; border-radius:6px; font-size:10px;'>$solUpper</span>";
                                     }
                                     ?>
                                 </td>
                                 <td>
                                     <?php if (!empty($recFile)): ?>
                                         <?php $fileEnc = urlencode($recFile); ?>
-                                        <div style="display:flex; gap:6px; align-items:center;">
-                                            <button type="button" onclick="playPesquisaAudio('<?php echo $fileEnc; ?>')" style="background:#0284c7; color:#ffffff; border:none; padding:4px 12px; border-radius:14px; font-weight:700; font-size:11px; cursor:pointer;">▶ Play</button>
-                                            <a href="?menu=<?php echo htmlspecialchars($module_name); ?>&action=download_audio&file=<?php echo $fileEnc; ?>" target="_blank" style="background:#16a34a; color:#ffffff; padding:4px 12px; border-radius:14px; font-weight:700; font-size:11px; text-decoration:none;">Baixar</a>
+                                        <div style="display:flex; gap:4px; align-items:center;">
+                                            <button type="button" onclick="playPesquisaAudio('<?php echo $fileEnc; ?>')" style="background:#0284c7; color:#ffffff; border:none; padding:3px 10px; border-radius:12px; font-weight:700; font-size:10px; cursor:pointer;">▶ Play</button>
+                                            <a href="?menu=<?php echo htmlspecialchars($module_name); ?>&action=download_audio&file=<?php echo $fileEnc; ?>" target="_blank" style="background:#16a34a; color:#ffffff; padding:3px 10px; border-radius:12px; font-weight:700; font-size:10px; text-decoration:none;">Baixar</a>
                                         </div>
                                     <?php else: ?>
-                                        <span style="color:#cbd5e1; font-size:11px;">Sem áudio</span>
+                                        <span style="color:#cbd5e1; font-size:10px;">Sem áudio</span>
                                     <?php endif; ?>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
                     <?php else: ?>
                         <tr>
-                            <td colspan="8" style="text-align:center; padding:30px; color:#64748b;">
+                            <td colspan="8" style="text-align:center; padding:25px; color:#64748b;">
                                 🚀 Nenhum registro encontrado para os filtros selecionados.
                             </td>
                         </tr>
@@ -764,9 +780,9 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
     <!-- Modal Player de Audio -->
     <div id="audioModalPesquisa">
         <div class="audio-modal-content">
-            <h4 style="margin:0 0 12px 0; color:#1e293b; font-size:16px;">🎧 Reproduzindo Gravação</h4>
+            <h4 style="margin:0 0 12px 0; color:#1e293b; font-size:15px;">🎧 Reproduzindo Gravação</h4>
             <audio id="pesquisaAudioElement" controls style="width:100%; margin-bottom:15px;"></audio>
-            <button onclick="closeAudioModal()" style="background:#64748b; color:#fff; border:none; padding:8px 20px; border-radius:6px; font-weight:bold; cursor:pointer;">Fechar</button>
+            <button onclick="closeAudioModal()" style="background:#64748b; color:#fff; border:none; padding:6px 16px; border-radius:6px; font-weight:bold; cursor:pointer;">Fechar</button>
         </div>
     </div>
 

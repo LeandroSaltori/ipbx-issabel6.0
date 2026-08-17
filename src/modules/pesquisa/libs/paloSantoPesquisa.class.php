@@ -10,7 +10,7 @@
   +----------------------------------------------------------------------+
   | The Initial Developer of the Original Code is PaloSanto Solutions    |
   +----------------------------------------------------------------------+
-  $Id: paloSantoPesquisa.class.php,v 2.3 2026-08-17 Prisma Telecom $ */
+  $Id: paloSantoPesquisa.class.php,v 2.4 2026-08-17 Prisma Telecom $ */
 
 class paloSantoPesquisa {
     var $_DB;
@@ -108,6 +108,26 @@ class paloSantoPesquisa {
         } catch (Exception $e) {}
     }
 
+    function getOperadoresList()
+    {
+        $list = array();
+        if ($this->pdo) {
+            try {
+                $stmt = $this->pdo->query("SELECT DISTINCT operador FROM pesquisa WHERE operador IS NOT NULL AND operador != '' AND operador != '-' ORDER BY operador ASC");
+                if ($stmt) {
+                    $rows = $stmt->fetchAll(PDO::FETCH_COLUMN);
+                    if (is_array($rows)) {
+                        foreach ($rows as $r) {
+                            if (!empty($r)) $list[] = trim($r);
+                        }
+                    }
+                }
+            } catch (Exception $e) {}
+        }
+        sort($list);
+        return array_unique($list);
+    }
+
     function findRecordingForCall($telefone, $data, $hora, $operador)
     {
         if (!$this->pdo) return '';
@@ -116,8 +136,8 @@ class paloSantoPesquisa {
         $ts = strtotime($dt);
 
         if ($ts) {
-            $start = date('Y-m-d H:i:s', $ts - 1200); // 20 min antes
-            $end   = date('Y-m-d H:i:s', $ts + 1200); // 20 min depois
+            $start = date('Y-m-d H:i:s', $ts - 1200);
+            $end   = date('Y-m-d H:i:s', $ts + 1200);
 
             $telClean = preg_replace('/[^0-9]/', '', $telefone);
             if (strlen($telClean) > 4) {
@@ -139,7 +159,6 @@ class paloSantoPesquisa {
             } catch (Exception $e) {}
         }
 
-        // Fallback no sistema de arquivos do monitor do Asterisk
         if (!empty($data) && !empty($telefone)) {
             $yearMonthDay = str_replace('-', '/', $data);
             $telClean = preg_replace('/[^0-9]/', '', $telefone);
@@ -180,8 +199,8 @@ class paloSantoPesquisa {
             $params[] = $deSql;
         }
         if (!empty($operador)) {
-            $where[] = "operador LIKE ?";
-            $params[] = "%$operador%";
+            $where[] = "operador = ?";
+            $params[] = $operador;
         }
         if (!empty($avaliacao)) {
             $where[] = "(UPPER(avaliacao) = ? OR avaliacao = ?)";
@@ -229,8 +248,8 @@ class paloSantoPesquisa {
             $params[] = $deSql;
         }
         if (!empty($operador)) {
-            $where[] = "operador LIKE ?";
-            $params[] = "%$operador%";
+            $where[] = "operador = ?";
+            $params[] = $operador;
         }
         if (!empty($avaliacao)) {
             $where[] = "(UPPER(avaliacao) = ? OR avaliacao = ?)";
@@ -281,8 +300,8 @@ class paloSantoPesquisa {
             $params[] = $deSql;
         }
         if (!empty($operador)) {
-            $where[] = "operador LIKE ?";
-            $params[] = "%$operador%";
+            $where[] = "operador = ?";
+            $params[] = $operador;
         }
 
         $strWhere = !empty($where) ? "WHERE " . implode(" AND ", $where) : "";
