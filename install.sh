@@ -312,6 +312,7 @@ if [ -d "$PANEL_SRC" ]; then
     if command -v sqlite3 &>/dev/null; then
         sqlite3 /var/www/db/acl.db "INSERT OR IGNORE INTO acl_resource (name, description) VALUES ('control_panel', 'Painel IPbx');" 2>/dev/null || true
         sqlite3 /var/www/db/menu.db "INSERT OR IGNORE INTO menu (id, IdParent, Link, Name, Type, order_no) VALUES ('control_panel', 'pbxconfig', '', 'Painel IPbx', 'module', 8);" 2>/dev/null || true
+        sqlite3 /var/www/db/acl.db "INSERT OR IGNORE INTO acl_group_permission (id_action, id_group, id_resource) SELECT 1, 1, id FROM acl_resource WHERE name = 'control_panel';" 2>/dev/null || true
     fi
     log_success "Painel IPbx instalado e registrado."
 fi
@@ -400,6 +401,7 @@ if [ -d "$QUEUE_SRC" ]; then
     if command -v sqlite3 &>/dev/null; then
         sqlite3 /var/www/db/acl.db "INSERT OR IGNORE INTO acl_resource (name, description) VALUES ('relatorio_de_filas', 'Relatório de Filas');" 2>/dev/null || true
         sqlite3 /var/www/db/menu.db "INSERT OR IGNORE INTO menu (id, IdParent, Link, Name, Type, order_no) VALUES ('relatorio_de_filas', 'reports', '', 'Relatório de Filas', 'module', 9);" 2>/dev/null || true
+        sqlite3 /var/www/db/acl.db "INSERT OR IGNORE INTO acl_group_permission (id_action, id_group, id_resource) SELECT 1, 1, id FROM acl_resource WHERE name = 'relatorio_de_filas';" 2>/dev/null || true
     fi
 fi
 
@@ -414,13 +416,25 @@ fi
 # 16. MÓDULOS WEB DEVELOPER
 # ==============================================================================
 log_info "16/20 - Instalando Módulos Web Developer..."
+if command -v sqlite3 &>/dev/null; then
+    sqlite3 /var/www/db/acl.db "INSERT OR IGNORE INTO acl_resource (name, description) VALUES ('web_developer', 'Web Developer');" 2>/dev/null || true
+    sqlite3 /var/www/db/menu.db "INSERT OR IGNORE INTO menu (id, IdParent, Link, Name, Type, order_no) VALUES ('web_developer', 'system', '', 'Web Developer', 'framed', 15);" 2>/dev/null || true
+    sqlite3 /var/www/db/acl.db "INSERT OR IGNORE INTO acl_group_permission (id_action, id_group, id_resource) SELECT 1, 1, id FROM acl_resource WHERE name = 'web_developer';" 2>/dev/null || true
+fi
+
 for MOD in build_module delete_module language_admin; do
     if [ -d "$REPO_DIR/src/modules/$MOD" ]; then
         cp -rf "$REPO_DIR/src/modules/$MOD" /var/www/html/modules/
         chown -R asterisk:asterisk "/var/www/html/modules/$MOD"
+        
+        if command -v sqlite3 &>/dev/null; then
+            sqlite3 /var/www/db/acl.db "INSERT OR IGNORE INTO acl_resource (name, description) VALUES ('$MOD', '$MOD');" 2>/dev/null || true
+            sqlite3 /var/www/db/menu.db "INSERT OR IGNORE INTO menu (id, IdParent, Link, Name, Type, order_no) VALUES ('$MOD', 'web_developer', '', '$MOD', 'module', 1);" 2>/dev/null || true
+            sqlite3 /var/www/db/acl.db "INSERT OR IGNORE INTO acl_group_permission (id_action, id_group, id_resource) SELECT 1, 1, id FROM acl_resource WHERE name = '$MOD';" 2>/dev/null || true
+        fi
     fi
 done
-log_success "Ferramentas Web Developer instaladas."
+log_success "Ferramentas Web Developer instaladas e registradas."
 
 # ==============================================================================
 # 17. FAVICON E TEMAS (prisma_v5)
