@@ -83,6 +83,8 @@ fi
 if [ -n "$MYSQL_PWD" ]; then
   echo "[+] Registrando módulo na base de dados do IssabelPBX (asterisk.modules)..."
   mysql -u root -p"$MYSQL_PWD" asterisk -e "INSERT INTO modules (modulename, version, enabled, signature) VALUES ('asternic_cdr', '1.6.6', 1, '') ON DUPLICATE KEY UPDATE enabled=1, version='1.6.6';" 2>/dev/null || true
+  # Garante permissões totais para o usuário admin no IssabelPBX
+  mysql -u root -p"$MYSQL_PWD" asterisk -e "UPDATE ampusers SET sections='*' WHERE username='admin';" 2>/dev/null || true
 fi
 
 # 7. Ajuste de permissões e proprietário (asterisk:asterisk)
@@ -90,12 +92,20 @@ echo "[+] Ajustando permissões do diretório web (/var/www/html/admin/modules/a
 chown -R asterisk:asterisk "$TARGET_DIR"
 chmod -R 755 "$TARGET_DIR"
 
-# 8. Recarregamento das configurações do Asterisk / Issabel
-echo "[+] Recarregando configurações do PBX..."
+# 8. Habilitação do módulo no FreePBX / IssabelPBX CLI e recarregamento
+echo "[+] Habilitando módulo e recarregando configurações do PBX..."
 if command -v fwconsole &>/dev/null; then
+  fwconsole ma install asternic_cdr &>/dev/null || true
+  fwconsole ma enable asternic_cdr &>/dev/null || true
   fwconsole reload &>/dev/null || true
 elif command -v amportal &>/dev/null; then
+  amportal a ma install asternic_cdr &>/dev/null || true
+  amportal a ma enable asternic_cdr &>/dev/null || true
   amportal a r &>/dev/null || true
+fi
+
+if [ -f /var/lib/asterisk/bin/retrieve_conf ]; then
+  php /var/lib/asterisk/bin/retrieve_conf &>/dev/null || true
 fi
 
 if command -v asterisk &>/dev/null; then
