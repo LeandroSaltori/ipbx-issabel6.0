@@ -443,14 +443,18 @@ if [ -d "$REPO_DIR/src/modules/pesquisa" ]; then
         
         sqlite3 /var/www/db/acl.db "INSERT OR IGNORE INTO acl_group_permission (id_action, id_group, id_resource) SELECT 1, 1, id FROM acl_resource WHERE name = 'pesquisa';" 2>/dev/null || true
 
-        # Saneamento automático de links no menu.db (Remove IPs legados hardcoded)
+        # Saneamento automático de links no menu.db (Remove IPs legados e mapeia caminhos oficiais)
         sqlite3 /var/www/db/menu.db "UPDATE menu SET Link = REPLACE(Link, 'https://192.168.0.245', '') WHERE Link LIKE '%192.168.0.245%';" 2>/dev/null || true
         sqlite3 /var/www/db/menu.db "UPDATE menu SET Link = REPLACE(Link, 'http://192.168.0.245', '') WHERE Link LIKE '%192.168.0.245%';" 2>/dev/null || true
         
-        # Corrige atalhos do PBX que apontavam para URLs inválidas
+        # Remoção do menu secundário de ajuda da pesquisa (para ficar apenas Pesquisa de Satisfação)
+        sqlite3 /var/www/db/menu.db "DELETE FROM menu WHERE id = 'pesquisa_ajuda' OR id = 'pesquisa_como_funciona' OR Link LIKE '%pesquisa_como_funciona%';" 2>/dev/null || true
+        sqlite3 /var/www/db/acl.db "DELETE FROM acl_resource WHERE name = 'pesquisa_ajuda' OR name = 'pesquisa_como_funciona';" 2>/dev/null || true
+
+        # Configuração exata dos links do PBX
+        sqlite3 /var/www/db/menu.db "UPDATE menu SET Link = '/stats/' WHERE id = 'relatorio_geral' OR id = 'asternic_cdr' OR Link LIKE '%asternic%';" 2>/dev/null || true
+        sqlite3 /var/www/db/menu.db "UPDATE menu SET Link = '/nome_ramais/' WHERE id = 'nome_ramais' OR id = 'ramais' OR Link LIKE '%nome_ramais%';" 2>/dev/null || true
         sqlite3 /var/www/db/menu.db "UPDATE menu SET Link = '/admin/config.php?display=blacklist' WHERE id = 'blacklist' OR Link LIKE '%blacklist%';" 2>/dev/null || true
-        sqlite3 /var/www/db/menu.db "UPDATE menu SET Link = '/admin/config.php?display=extensions' WHERE id = 'nome_ramais' OR id = 'ramais';" 2>/dev/null || true
-        sqlite3 /var/www/db/menu.db "UPDATE menu SET Link = '/admin/config.php?display=asternic_log' WHERE id = 'relatorio_geral' OR id = 'asternic_cdr';" 2>/dev/null || true
     fi
 
     # Registra o atalho de discagem e transferencia 8996 no Asterisk
