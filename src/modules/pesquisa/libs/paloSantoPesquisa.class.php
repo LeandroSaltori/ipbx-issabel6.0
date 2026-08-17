@@ -10,7 +10,7 @@
   +----------------------------------------------------------------------+
   | The Initial Developer of the Original Code is PaloSanto Solutions    |
   +----------------------------------------------------------------------+
-  $Id: paloSantoPesquisa.class.php,v 2.0 2026-08-17 Prisma Telecom $ */
+  $Id: paloSantoPesquisa.class.php,v 2.1 2026-08-17 Prisma Telecom $ */
 
 class paloSantoPesquisa {
     var $_DB;
@@ -29,18 +29,50 @@ class paloSantoPesquisa {
 
     function connectDatabase()
     {
-        $passwords = array('', 'asterisk', 'asteriskuser');
+        $passwords = array();
+
+        // 1. Obtem senha do /etc/issabel.conf
         if (file_exists('/etc/issabel.conf')) {
-            $c = @file_get_contents('/etc/issabel.conf');
-            if (preg_match('/mysqlrootpwd\s*=\s*(.*)/i', $c, $m)) $passwords[] = trim($m[1]);
+            $lines = @file('/etc/issabel.conf');
+            if (is_array($lines)) {
+                foreach ($lines as $line) {
+                    $parts = explode('=', $line, 2);
+                    if (count($parts) == 2) {
+                        $key = strtolower(trim($parts[0]));
+                        $val = trim(trim($parts[1]), " '\"\r\n");
+                        if (in_array($key, array('mysqlrootpwd', 'mysqlrootpass', 'amiadminpwd'))) {
+                            if (!empty($val)) $passwords[] = $val;
+                        }
+                    }
+                }
+            }
         }
+
+        // 2. Obtem senha do /etc/amportal.conf
         if (file_exists('/etc/amportal.conf')) {
-            $c = @file_get_contents('/etc/amportal.conf');
-            if (preg_match('/AMPDBPASS\s*=\s*(.*)/i', $c, $m)) $passwords[] = trim($m[1]);
+            $lines = @file('/etc/amportal.conf');
+            if (is_array($lines)) {
+                foreach ($lines as $line) {
+                    $parts = explode('=', $line, 2);
+                    if (count($parts) == 2) {
+                        $key = strtolower(trim($parts[0]));
+                        $val = trim(trim($parts[1]), " '\"\r\n");
+                        if (in_array($key, array('ampdbpass', 'cdrdbpass'))) {
+                            if (!empty($val)) $passwords[] = $val;
+                        }
+                    }
+                }
+            }
         }
+
+        $passwords[] = '';
+        $passwords[] = 'asterisk';
+        $passwords[] = 'asteriskuser';
+        $passwords = array_unique($passwords);
+
         $users = array('root', 'asteriskuser', 'asterisk');
 
-        // 1. Tenta conexao PDO direta no MySQL asteriskcdrdb (463 registros do cliente)
+        // 3. Tenta conexao PDO direta no MySQL asteriskcdrdb (463 registros do cliente)
         foreach ($users as $u) {
             foreach ($passwords as $p) {
                 try {
@@ -57,7 +89,7 @@ class paloSantoPesquisa {
             }
         }
 
-        // 2. Fallback PDO SQLite
+        // 4. Fallback PDO SQLite
         try {
             $this->pdo = new PDO("sqlite:/var/www/db/pesquisa.db", null, null, array(
                 PDO::ATTR_ERRMODE => PDO::ERRMODE_SILENT,
