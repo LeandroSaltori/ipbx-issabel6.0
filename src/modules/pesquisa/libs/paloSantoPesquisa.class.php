@@ -10,7 +10,7 @@
   +----------------------------------------------------------------------+
   | The Initial Developer of the Original Code is PaloSanto Solutions    |
   +----------------------------------------------------------------------+
-  $Id: paloSantoPesquisa.class.php,v 1.5 2026-08-17 Prisma Telecom $ */
+  $Id: paloSantoPesquisa.class.php,v 1.6 2026-08-17 Prisma Telecom $ */
 
 class paloSantoPesquisa {
     var $_DB;
@@ -70,7 +70,8 @@ class paloSantoPesquisa {
         $query = "SELECT COUNT(*) FROM pesquisa $strWhere";
 
         if ($this->_DB) {
-            $result = $this->_DB->getFirstRowQuery($query, false, $params);
+            $arrParam = !empty($params) ? $params : false;
+            $result = $this->_DB->getFirstRowQuery($query, false, $arrParam);
             if ($result !== false && isset($result[0])) {
                 return (int)$result[0];
             }
@@ -117,7 +118,8 @@ class paloSantoPesquisa {
         $query = "SELECT * FROM pesquisa $strWhere ORDER BY rowid DESC LIMIT $limit OFFSET $offset";
 
         if ($this->_DB) {
-            $result = $this->_DB->fetchTable($query, true, $params);
+            $arrParam = !empty($params) ? $params : false;
+            $result = $this->_DB->fetchTable($query, true, $arrParam);
             if (is_array($result)) return $result;
         }
         return array();
@@ -159,11 +161,11 @@ class paloSantoPesquisa {
 
         $stats = false;
         if ($this->_DB) {
-            $stats = $this->_DB->getFirstRowQuery($query, true, $params);
+            $arrParam = !empty($params) ? $params : false;
+            $stats = $this->_DB->getFirstRowQuery($query, true, $arrParam);
         }
 
         if (!$stats || empty($stats['total'])) {
-            // Se filtrou mas não veio nada, tenta calcular total geral
             if (!empty($strWhere)) {
                 $queryAll = "SELECT 
                     COUNT(*) as total,
@@ -175,7 +177,7 @@ class paloSantoPesquisa {
                     SUM(CASE WHEN UPPER(solucao) IN ('SIM', '1') THEN 1 ELSE 0 END) as resolvido_sim,
                     SUM(CASE WHEN UPPER(solucao) IN ('NAO', 'NÃO', '2') THEN 1 ELSE 0 END) as resolvido_nao
                     FROM pesquisa";
-                $stats = $this->_DB->getFirstRowQuery($queryAll, true, array());
+                $stats = $this->_DB->getFirstRowQuery($queryAll, true, false);
             }
         }
 
