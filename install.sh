@@ -747,10 +747,11 @@ if command -v yum &>/dev/null; then
             yum install -y sngrep 2>/dev/null || true
         fi
     fi
+    yum install -y net-tools tcpdump sngrep NetworkManager-tui 2>/dev/null || true
 elif command -v dnf &>/dev/null; then
-    dnf install -y net-tools tcpdump sngrep 2>/dev/null || true
+    dnf install -y net-tools tcpdump sngrep NetworkManager-tui 2>/dev/null || true
 fi
-log_success "Ferramentas net-tools (ifconfig/netstat), tcpdump e sngrep instaladas."
+log_success "Ferramentas net-tools (ifconfig/netstat), tcpdump, sngrep e nmtui (NetworkManager-tui) instaladas."
 
 # ==============================================================================
 # 19. AJUSTES DE TEMPO E BIP DE TRANSFERÊNCIA
