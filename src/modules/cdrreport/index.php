@@ -796,19 +796,19 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
             <form method="GET" action="index.php">
                 <input type="hidden" name="menu" value="<?php echo htmlspecialchars($module_name); ?>" />
                 <div class="filter-inline-row">
-                    <div class="filter-field-group">
+                    <div class="filter-field-group" title="📅 Data Inicial do Período&#10;Selecione a data de início da busca de chamadas no CDR.">
                         <label>📅 Data Inicial</label>
                         <input type="date" name="date_start" value="<?php echo htmlspecialchars($date_start); ?>" class="filter-input" />
                     </div>
-                    <div class="filter-field-group">
+                    <div class="filter-field-group" title="📅 Data Final do Período&#10;Selecione a data limite da busca de ligações.">
                         <label>📅 Data Final</label>
                         <input type="date" name="date_end" value="<?php echo htmlspecialchars($date_end); ?>" class="filter-input" />
                     </div>
-                    <div class="filter-field-group">
+                    <div class="filter-field-group" title="📞 Padrão ou Número&#10;Digite o ramal, número de telefone ou texto a ser pesquisado no campo selecionado.">
                         <label>📞 Padrão / Número</label>
                         <input type="text" name="field_pattern" value="<?php echo htmlspecialchars($field_pattern); ?>" placeholder="Ex: 5001 ou 99988..." class="filter-input" />
                     </div>
-                    <div class="filter-field-group">
+                    <div class="filter-field-group" title="📌 Campo de Busca SQL&#10;Escolha em qual coluna do CDR aplicar a pesquisa do texto digitado:&#10;• Destino (dst): Ramal ou número chamado&#10;• Origem (src): Número da Bina ou ramal que ligou&#10;• Canal Origem: Porta/tronco de entrada (ex: SIP/1001)&#10;• Fila/Accountcode: Código da fila de atendimento&#10;• DID: Linha direta de entrada no PBX.">
                         <label>📌 Campo Busca</label>
                         <select name="field_name" class="filter-input">
                             <option value="dst" <?php if ($field_name == 'dst') echo 'selected'; ?>>Destino (dst)</option>
@@ -819,7 +819,7 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
                             <option value="did" <?php if ($field_name == 'did') echo 'selected'; ?>>DID Entrante</option>
                         </select>
                     </div>
-                    <div class="filter-field-group">
+                    <div class="filter-field-group" title="🚦 Status da Ligação&#10;Filtre por:&#10;• Atendidas (ANSWERED): Houve diálogo&#10;• Não Atendidas (NO ANSWER): Tocou sem resposta&#10;• Ocupado (BUSY): Destino ocupado&#10;• Falhas (FAILED): Erro de rota ou rede.">
                         <label>🚦 Status</label>
                         <select name="status" class="filter-input">
                             <option value="ALL" <?php if ($status == 'ALL') echo 'selected'; ?>>-- Todos os Status --</option>
@@ -829,7 +829,7 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
                             <option value="FAILED" <?php if ($status == 'FAILED') echo 'selected'; ?>>✖ Falhas (FAILED)</option>
                         </select>
                     </div>
-                    <div class="filter-field-group">
+                    <div class="filter-field-group" title="🏢 Fila ou Grupo de Atendimento&#10;Filtre pelas ligações direcionadas a uma fila de atendimento específica.">
                         <label>🏢 Fila / Grupo</label>
                         <select name="ringgroup" class="filter-input">
                             <option value="">-- Qualquer Fila/Grupo --</option>
@@ -843,10 +843,10 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
                         </select>
                     </div>
                     <div class="filter-btn-row">
-                        <button type="submit" class="btn-action btn-search">🔍 Filtrar</button>
-                        <a href="?<?php echo $exportParams; ?>&action=export_excel" class="btn-action btn-excel">📊 Excel</a>
-                        <a href="?<?php echo $exportParams; ?>&action=export_pdf" target="_blank" class="btn-action btn-pdf">📄 PDF</a>
-                        <a href="?menu=<?php echo htmlspecialchars($module_name); ?>" class="btn-action btn-reset">🔄 Reset</a>
+                        <button type="submit" class="btn-action btn-search" title="🔍 Filtrar Resultados&#10;Buscar ligações no banco CDR com base nos critérios informados.">🔍 Filtrar</button>
+                        <a href="?<?php echo $exportParams; ?>&action=export_excel" class="btn-action btn-excel" title="📊 Baixar Excel (.csv)&#10;Exportar a lista inteira de ligações em formato de planilha.">📊 Excel</a>
+                        <a href="?<?php echo $exportParams; ?>&action=export_pdf" target="_blank" class="btn-action btn-pdf" title="📄 Gerar Relatório PDF&#10;Abrir visualização pronta para impressão ou salvar em documento PDF.">📄 PDF</a>
+                        <a href="?menu=<?php echo htmlspecialchars($module_name); ?>" class="btn-action btn-reset" title="🔄 Limpar Filtros&#10;Restaurar o filtro para a data atual.">🔄 Reset</a>
                     </div>
                 </div>
             </form>
@@ -854,27 +854,27 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
 
         <!-- Grid de 5 Cards KPIs Executivos -->
         <div class="kpi-grid">
-            <div class="kpi-card-item purple">
+            <div class="kpi-card-item purple" title="📋 Total de Ligações&#10;Soma de todas as chamadas registradas (recebidas, efetuadas e internas) no período selecionado.">
                 <div class="kpi-card-title">📋 Total de Ligações</div>
                 <div class="kpi-card-num"><?php echo number_format($totalCount, 0, ',', '.'); ?></div>
                 <div class="kpi-card-desc">Chamadas no Período</div>
             </div>
-            <div class="kpi-card-item green">
+            <div class="kpi-card-item green" title="✅ Ligações Atendidas&#10;Total e percentual de ligações onde o atendimento foi realizado e houve diálogo.">
                 <div class="kpi-card-title">✅ Atendidas</div>
                 <div class="kpi-card-num"><?php echo number_format($answeredCount, 0, ',', '.'); ?></div>
                 <div class="kpi-card-desc"><?php echo $ansPercent; ?>% do total</div>
             </div>
-            <div class="kpi-card-item red">
+            <div class="kpi-card-item red" title="📵 Ligações Não Atendidas / Ocupado&#10;Total e percentual de chamadas não completadas (chamadas sem resposta, ocupado ou com falha).">
                 <div class="kpi-card-title">📵 Não Atendidas</div>
                 <div class="kpi-card-num"><?php echo number_format($noAnswerCount + $busyCount + $failedCount, 0, ',', '.'); ?></div>
                 <div class="kpi-card-desc"><?php echo $missPercent; ?>% não completaram</div>
             </div>
-            <div class="kpi-card-item blue">
+            <div class="kpi-card-item blue" title="⏱️ Duração Total Falada&#10;Soma acumulada do tempo de conversação de todas as ligações atendidas.">
                 <div class="kpi-card-title">⏱️ Duração Total</div>
                 <div class="kpi-card-num"><?php echo formatSecsCdr($totalDuration); ?></div>
                 <div class="kpi-card-desc">Tempo acumulado de fala</div>
             </div>
-            <div class="kpi-card-item amber">
+            <div class="kpi-card-item amber" title="⏳ Tempo Médio por Chamada&#10;Tempo médio de conversa por cada ligação atendida no PBX.">
                 <div class="kpi-card-title">⏳ Tempo Médio</div>
                 <div class="kpi-card-num"><?php echo formatSecsCdr($avgDuration); ?></div>
                 <div class="kpi-card-desc">Por ligação atendida</div>
@@ -883,13 +883,13 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
 
         <!-- Grid de Gráficos -->
         <div class="charts-grid">
-            <div class="chart-card-box">
+            <div class="chart-card-box" title="📊 Volume por Horário&#10;Gráfico de barras indicando a quantidade de chamadas recebidas hora a hora para identificação de picos.">
                 <h4>📊 Distribuição de Chamadas por Horário (00h - 23h)</h4>
                 <div class="chart-canvas-wrapper">
                     <canvas id="chartCdrHourly"></canvas>
                 </div>
             </div>
-            <div class="chart-card-box">
+            <div class="chart-card-box" title="🚦 Status das Chamadas&#10;Gráfico de rosca demonstrando o percentual de Atendidas, Não Atendidas, Ocupadas e Falhas.">
                 <h4>🚦 Ocupação e Status das Chamadas</h4>
                 <div class="chart-canvas-wrapper">
                     <canvas id="chartCdrStatus"></canvas>
@@ -902,15 +902,15 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
             <table class="cdr-table">
                 <thead>
                     <tr>
-                        <th>Data / Hora</th>
-                        <th>Origem (Bina)</th>
-                        <th>Fila / Grupo</th>
-                        <th>Destino</th>
-                        <th>Status</th>
-                        <th>Duração</th>
-                        <th>DID / Tronco</th>
-                        <th>Gravação</th>
-                        <th>Eventos</th>
+                        <th title="📅 Data e Hora&#10;Momento exato da entrada da ligação no PBX.">Data / Hora</th>
+                        <th title="📞 Número de Origem (Bina)&#10;Telefone da pessoa que realizou a ligação ou ramal interno que originou.">Origem (Bina)</th>
+                        <th title="🏢 Fila ou Grupo&#10;Selo da fila por onde a ligação passou. Passe o mouse sobre o selo para ver o nome completo da fila.">Fila / Grupo</th>
+                        <th title="🎯 Destino&#10;Ramal, número externo ou DID direcionado.">Destino</th>
+                        <th title="🚦 Status da Chamada&#10;Classificação do resultado da ligação (Atendida, Não Atendeu, Ocupado ou Falha).">Status</th>
+                        <th title="⏱️ Duração da Conversa&#10;Tempo total de fala formatado em minutos e segundos.">Duração</th>
+                        <th title="📟 DID / Tronco&#10;Número de linha direta por onde a ligação entrou na central.">DID / Tronco</th>
+                        <th title="🎧 Gravação de Áudio&#10;Clique em Play para escutar no player ou Baixar para obter o áudio.">Gravação</th>
+                        <th title="📋 Histórico CEL&#10;Clique em CEL para abrir a janela de raio-X do histórico de eventos da chamada no Asterisk.">Eventos</th>
                     </tr>
                 </thead>
                 <tbody>

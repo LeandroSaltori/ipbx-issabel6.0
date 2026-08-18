@@ -203,27 +203,27 @@ function _moduleContent(&$smarty, $module_name)
 
         <!-- Grid de 5 Cards KPIs -->
         <div class="kpi-grid">
-            <div class="kpi-card-item purple">
+            <div class="kpi-card-item purple" title="📞 Pico de Ocupação Simultânea&#10;Maior quantidade de ligações ocorrendo ao mesmo tempo registrado nas últimas 24 horas.">
                 <div class="kpi-card-title">📞 Pico Simultâneo</div>
                 <div class="kpi-card-num"><?php echo $maxTotal; ?> <span style="font-size:13px; color:#64748b;">canais</span></div>
                 <div class="kpi-card-desc">Máximo nas últimas 24h</div>
             </div>
-            <div class="kpi-card-item green">
+            <div class="kpi-card-item green" title="🌐 Troncos SIP / PJSIP&#10;Quantidade máxima de canais de voz sobre IP (SIP/PJSIP) utilizados simultaneamente.">
                 <div class="kpi-card-title">🌐 Troncos SIP / PJSIP</div>
                 <div class="kpi-card-num"><?php echo $maxSIP; ?> <span style="font-size:13px; color:#64748b;">pico</span></div>
                 <div class="kpi-card-desc">Canais IP ativos</div>
             </div>
-            <div class="kpi-card-item blue">
+            <div class="kpi-card-item blue" title="📟 Canais DAHDI / E1 / FXO&#10;Pico de canais telefônicos físicos (placas E1, linhas digitais ou analógicas) ocupados.">
                 <div class="kpi-card-title">📟 Canais DAHDI / E1</div>
                 <div class="kpi-card-num"><?php echo $maxDahdi; ?> <span style="font-size:13px; color:#64748b;">pico</span></div>
                 <div class="kpi-card-desc">Canais digitais/analógicos</div>
             </div>
-            <div class="kpi-card-item amber">
+            <div class="kpi-card-item amber" title="🔗 Troncos e Interconexões IAX&#10;Pico de uso de canais do protocolo IAX2 utilizados em comunicação entre servidores Asterisk.">
                 <div class="kpi-card-title">🔗 Troncos IAX</div>
                 <div class="kpi-card-num"><?php echo $maxIAX; ?> <span style="font-size:13px; color:#64748b;">pico</span></div>
                 <div class="kpi-card-desc">Interconexões Asterisk</div>
             </div>
-            <div class="kpi-card-item slate">
+            <div class="kpi-card-item slate" title="📊 Média Diária de Ocupação&#10;Média contínua de canais simultâneos ocupados durante todo o período das 24h.">
                 <div class="kpi-card-title">📊 Média de Uso</div>
                 <div class="kpi-card-num"><?php echo $avgTotal; ?> <span style="font-size:13px; color:#64748b;">canais</span></div>
                 <div class="kpi-card-desc">Ocupação média contínua</div>
@@ -231,7 +231,7 @@ function _moduleContent(&$smarty, $module_name)
         </div>
 
         <!-- Gráfico Principal -->
-        <div class="chart-card-box">
+        <div class="chart-card-box" title="📈 Evolução do Consumo de Canais&#10;Gráfico de linhas indicando a curva de consumo de canais por horário nas últimas 24 horas.&#10;Passe o mouse nos pontos para ver o valor exato daquele momento.">
             <h4>📈 Evolução do Consumo de Canais Simultâneos (Últimas 24 Horas)</h4>
             <div class="chart-canvas-wrapper">
                 <canvas id="chartChannelsUsage"></canvas>

@@ -652,15 +652,15 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
             <form method="GET" action="index.php">
                 <input type="hidden" name="menu" value="<?php echo htmlspecialchars($module_name); ?>" />
                 <div class="filter-inline-row">
-                    <div class="filter-field-group">
+                    <div class="filter-field-group" title="📅 Data Inicial do Período&#10;Selecione a data de início para buscar as avaliações registradas.">
                         <label>📅 Data Inicial</label>
                         <input type="date" name="date_start" value="<?php echo htmlspecialchars($date_start); ?>" class="filter-input" />
                     </div>
-                    <div class="filter-field-group">
+                    <div class="filter-field-group" title="📅 Data Final do Período&#10;Selecione a data limite para encerramento do filtro.">
                         <label>📅 Data Final</label>
                         <input type="date" name="date_end" value="<?php echo htmlspecialchars($date_end); ?>" class="filter-input" />
                     </div>
-                    <div class="filter-field-group">
+                    <div class="filter-field-group" title="👤 Filtro de Operador ou Ramal&#10;Filtre o resultado pelo ramal ou nome do atendente que realizou a ligação.">
                         <label>👤 Operador / Ramal</label>
                         <select name="operador" class="filter-input">
                             <option value="">-- Todos os Operadores --</option>
@@ -675,7 +675,7 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
                             <?php endif; ?>
                         </select>
                     </div>
-                    <div class="filter-field-group">
+                    <div class="filter-field-group" title="⭐ Filtro de Avaliação&#10;Filtre por notas de 1 a 5 estrelas ou chamadas onde o cliente não avaliou.">
                         <label>⭐ Avaliação</label>
                         <select name="avaliacao" class="filter-input">
                             <option value="">-- Todas as Notas --</option>
@@ -688,7 +688,7 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
                             <option value="NAO AVALIOU" <?php if ($avaliacao == 'NAO AVALIOU') echo 'selected'; ?>>📵 NÃO AVALIOU / DESISTIU</option>
                         </select>
                     </div>
-                    <div class="filter-field-group">
+                    <div class="filter-field-group" title="🎯 Resolução de Problemas&#10;Filtre por chamadas onde o cliente respondeu SIM (Resolvido) ou NÃO (Não Resolvido).">
                         <label>🎯 Resolução</label>
                         <select name="solucao" class="filter-input">
                             <option value="">-- Todas --</option>
@@ -697,10 +697,10 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
                         </select>
                     </div>
                     <div class="filter-btn-row">
-                        <button type="submit" class="btn-action btn-search">🔍 Filtrar</button>
-                        <a href="?<?php echo $exportParams; ?>&action=export_excel" class="btn-action btn-excel">📊 Excel</a>
-                        <a href="?<?php echo $exportParams; ?>&action=export_pdf" target="_blank" class="btn-action btn-pdf">📄 PDF</a>
-                        <a href="?menu=<?php echo htmlspecialchars($module_name); ?>" class="btn-action btn-reset">🔄 Ver Todos</a>
+                        <button type="submit" class="btn-action btn-search" title="🔍 Aplicar Filtros&#10;Atualizar relatórios e gráficos com as datas e filtros selecionados.">🔍 Filtrar</button>
+                        <a href="?<?php echo $exportParams; ?>&action=export_excel" class="btn-action btn-excel" title="📊 Exportar Planilha Excel&#10;Baixar arquivo .csv contendo a lista completa de avaliações do filtro.">📊 Excel</a>
+                        <a href="?<?php echo $exportParams; ?>&action=export_pdf" target="_blank" class="btn-action btn-pdf" title="📄 Imprimir ou Salvar PDF&#10;Gerar documento de relatório formatado para impressão ou salvamento em PDF.">📄 PDF</a>
+                        <a href="?menu=<?php echo htmlspecialchars($module_name); ?>" class="btn-action btn-reset" title="🔄 Restaurar Padrão&#10;Limpar filtros e exibir todas as avaliações.">🔄 Ver Todos</a>
                     </div>
                 </div>
             </form>
@@ -708,27 +708,27 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
 
         <!-- Grid de 5 Cards KPIs Executivos -->
         <div class="kpi-grid">
-            <div class="kpi-card-item purple">
+            <div class="kpi-card-item purple" title="📋 Total de Chamadas em Pesquisa&#10;Soma acumulada de todas as ligações direcionadas para a URA de Pesquisa (ramal 9000/8996).">
                 <div class="kpi-card-title">📋 Total de Chamadas</div>
                 <div class="kpi-card-num"><?php echo number_format($totalCount, 0, ',', '.'); ?></div>
                 <div class="kpi-card-desc">Transferidas para Pesquisa</div>
             </div>
-            <div class="kpi-card-item green">
+            <div class="kpi-card-item green" title="⭐ Média Geral de Satisfação&#10;Média aritmética calculada entre todas as notas atribuídas pelos clientes (de 1.0 a 5.0 estrelas).">
                 <div class="kpi-card-title">⭐ Média de Satisfação</div>
                 <div class="kpi-card-num"><?php echo $media; ?> <span style="font-size:14px; color:#f59e0b;">/ 5.0</span></div>
                 <div class="kpi-card-desc">Índice dos Avaliados</div>
             </div>
-            <div class="kpi-card-item blue">
+            <div class="kpi-card-item blue" title="🎯 Taxa de Resolução de Solução&#10;Percentual de ligações onde o cliente confirmou que seu problema foi solucionado durante o atendimento.">
                 <div class="kpi-card-title">🎯 Taxa de Resolução</div>
                 <div class="kpi-card-num"><?php echo $resolucao; ?>%</div>
                 <div class="kpi-card-desc"><?php echo $sim; ?> resolvidos de <?php echo ($sim + $nao); ?></div>
             </div>
-            <div class="kpi-card-item amber">
+            <div class="kpi-card-item amber" title="🏆 Índice de Satisfação Positiva&#10;Percentual acumulado de notas altas (Excelente, Ótimo e Muito Bom) sobre o total de avaliados.">
                 <div class="kpi-card-title">🏆 Satisfação Positiva</div>
                 <div class="kpi-card-num"><?php echo $satisfacao; ?>%</div>
                 <div class="kpi-card-desc">Notas Excelente, Ótimo & Muito Bom</div>
             </div>
-            <div class="kpi-card-item slate">
+            <div class="kpi-card-item slate" title="📵 Clientes que Desligaram sem Avaliar&#10;Quantidade e percentual de clientes que desligaram o telefone antes de digitar a nota na URA.">
                 <div class="kpi-card-title">📵 Desligou sem Avaliar</div>
                 <div class="kpi-card-num"><?php echo number_format($nao_avaliou, 0, ',', '.'); ?></div>
                 <div class="kpi-card-desc"><?php echo $totalCount > 0 ? round(($nao_avaliou / $totalCount) * 100, 1) : 0; ?>% das chamadas</div>
@@ -737,13 +737,13 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
 
         <!-- Grid de Gráficos -->
         <div class="charts-grid">
-            <div class="chart-card-box">
+            <div class="chart-card-box" title="📊 Distribuição das Notas&#10;Gráfico comparativo demonstrando a proporção de avaliações de 1 a 5 estrelas e não avaliadas.">
                 <h4>📊 Distribuição das Notas</h4>
                 <div class="chart-canvas-wrapper">
                     <canvas id="chartNotasCustom"></canvas>
                 </div>
             </div>
-            <div class="chart-card-box">
+            <div class="chart-card-box" title="🎯 Resolução de Problemas&#10;Gráfico de rosca exibindo a proporção entre chamadas resolvidas (Sim) vs não resolvidas (Não).">
                 <h4>🎯 Resolução de Problemas</h4>
                 <div class="chart-canvas-wrapper">
                     <canvas id="chartSolucaoCustom"></canvas>
@@ -756,15 +756,15 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
             <table class="pesquisa-table">
                 <thead>
                     <tr>
-                        <th>Operador / Ramal</th>
-                        <th>Fila</th>
-                        <th>Data</th>
-                        <th>Hora</th>
-                        <th>Duração</th>
-                        <th>Telefone</th>
-                        <th>Avaliação do Atendimento</th>
-                        <th>Problema Resolvido?</th>
-                        <th>Gravação</th>
+                        <th title="👤 Operador ou Ramal&#10;Identificação do agente e ramal que atendeu a ligação inicial antes da transferência.">Operador / Ramal</th>
+                        <th title="🏢 Fila de Atendimento&#10;Fila telefônica por onde a chamada entrou na central PBX. Passe o mouse sobre o selo para ver o nome da fila.">Fila</th>
+                        <th title="📅 Data do Atendimento&#10;Data em que a ligação foi realizada e avaliada.">Data</th>
+                        <th title="🕒 Hora da Chamada&#10;Horário em que o cliente entrou na URA de pesquisa.">Hora</th>
+                        <th title="⏱️ Duração Total&#10;Tempo total em minutos e segundos de conversa com o operador.">Duração</th>
+                        <th title="📞 Telefone do Cliente&#10;Número da Bina de quem ligou (identificador telefônico do cliente).">Telefone</th>
+                        <th title="⭐ Avaliação do Atendimento&#10;Nota digitada pelo cliente (1 a 5 estrelas) ou indicação de NÃO AVALIOU se o cliente desligou.">Avaliação do Atendimento</th>
+                        <th title="🎯 Problema Resolvido?&#10;Confirmação digitada pelo cliente se a solicitação foi resolvida (Sim / Não).">Problema Resolvido?</th>
+                        <th title="🎧 Gravação da Chamada&#10;Clique no botão Play para escutar o áudio completo da ligação no player flutuante.">Gravação</th>
                     </tr>
                 </thead>
                 <tbody>

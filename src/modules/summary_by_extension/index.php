@@ -157,21 +157,21 @@ function _moduleContent(&$smarty, $module_name)
             <form method="GET" action="index.php">
                 <input type="hidden" name="menu" value="<?php echo htmlspecialchars($module_name); ?>" />
                 <div class="filter-inline-row">
-                    <div class="filter-field-group">
+                    <div class="filter-field-group" title="📅 Data Inicial do Período&#10;Selecione a data inicial para consolidação do tráfego por ramal.">
                         <label>📅 Data Inicial</label>
                         <input type="date" name="date_from" value="<?php echo htmlspecialchars($date_from); ?>" class="filter-input" />
                     </div>
-                    <div class="filter-field-group">
+                    <div class="filter-field-group" title="📅 Data Final do Período&#10;Selecione a data limite da consulta.">
                         <label>📅 Data Final</label>
                         <input type="date" name="date_to" value="<?php echo htmlspecialchars($date_to); ?>" class="filter-input" />
                     </div>
-                    <div class="filter-field-group">
+                    <div class="filter-field-group" title="🔍 Pesquisa por Número ou Nome&#10;Digite o número do ramal ou nome do operador para filtrar a lista.">
                         <label>🔍 Buscar Ramal / Nome</label>
                         <input type="text" name="search" value="<?php echo htmlspecialchars($search); ?>" placeholder="Ex: 1001 ou Fulano..." class="filter-input" />
                     </div>
                     <div class="filter-btn-row">
-                        <button type="submit" class="btn-action btn-search">🔍 Filtrar Resumo</button>
-                        <a href="?menu=<?php echo htmlspecialchars($module_name); ?>" class="btn-action btn-reset">🔄 Reset</a>
+                        <button type="submit" class="btn-action btn-search" title="🔍 Filtrar Resumo&#10;Consolidar os totais de atendimento do período informado.">🔍 Filtrar Resumo</button>
+                        <a href="?menu=<?php echo htmlspecialchars($module_name); ?>" class="btn-action btn-reset" title="🔄 Restaurar Filtro&#10;Exibir todos os ramais da central.">🔄 Reset</a>
                     </div>
                 </div>
             </form>
@@ -179,27 +179,27 @@ function _moduleContent(&$smarty, $module_name)
 
         <!-- Grid de 5 Cards KPIs -->
         <div class="kpi-grid">
-            <div class="kpi-card-item purple">
+            <div class="kpi-card-item purple" title="👥 Total de Ramais Ativos&#10;Quantidade total de ramais cadastrados no PBX com registros de atendimento.">
                 <div class="kpi-card-title">👥 Total de Ramais</div>
                 <div class="kpi-card-num"><?php echo $totalDevices; ?></div>
                 <div class="kpi-card-desc">Ramais ativos com atividade</div>
             </div>
-            <div class="kpi-card-item green">
+            <div class="kpi-card-item green" title="📥 Chamadas Recebidas&#10;Soma acumulada de todas as ligações recebidas por todos os ramais.">
                 <div class="kpi-card-title">📥 Chamadas Recebidas</div>
                 <div class="kpi-card-num"><?php echo number_format($totalInCalls, 0, ',', '.'); ?></div>
                 <div class="kpi-card-desc">Tempo: <?php echo formatSecsSum($totalInDur); ?></div>
             </div>
-            <div class="kpi-card-item blue">
+            <div class="kpi-card-item blue" title="📤 Chamadas Efetuadas&#10;Soma acumulada de todas as ligações efetuadas pelos atendentes para fora ou internamente.">
                 <div class="kpi-card-title">📤 Chamadas Efetuadas</div>
                 <div class="kpi-card-num"><?php echo number_format($totalOutCalls, 0, ',', '.'); ?></div>
                 <div class="kpi-card-desc">Tempo: <?php echo formatSecsSum($totalOutDur); ?></div>
             </div>
-            <div class="kpi-card-item amber">
+            <div class="kpi-card-item amber" title="📋 Total Consolidado de Ligações&#10;Soma de todas as chamadas entrantes e efetuadas da central PBX.">
                 <div class="kpi-card-title">📋 Total de Ligações</div>
                 <div class="kpi-card-num"><?php echo number_format($totalInCalls + $totalOutCalls, 0, ',', '.'); ?></div>
                 <div class="kpi-card-desc">No período selecionado</div>
             </div>
-            <div class="kpi-card-item slate">
+            <div class="kpi-card-item slate" title="⏱️ Duração Total Falada&#10;Tempo total acumulado em horas e minutos de fala de todos os ramais.">
                 <div class="kpi-card-title">⏱️ Duração Total</div>
                 <div class="kpi-card-num"><?php echo formatSecsSum($totalInDur + $totalOutDur); ?></div>
                 <div class="kpi-card-desc">Tempo acumulado geral</div>
@@ -207,7 +207,7 @@ function _moduleContent(&$smarty, $module_name)
         </div>
 
         <!-- Gráfico Top 10 -->
-        <div class="chart-card-box">
+        <div class="chart-card-box" title="📊 Top 10 Ramais em Tráfego&#10;Gráfico de barras destacando os 10 ramais com maior volume acumulado de chamadas.">
             <h4>📊 Top 10 Ramais com Maior Volume de Ligações (Recebidas vs Efetuadas)</h4>
             <div class="chart-canvas-wrapper">
                 <canvas id="chartSumTop10"></canvas>
@@ -219,14 +219,14 @@ function _moduleContent(&$smarty, $module_name)
             <table class="sum-table">
                 <thead>
                     <tr>
-                        <th>Ramal</th>
-                        <th>Atendente / Nome</th>
-                        <th>Recebidas (Qtd)</th>
-                        <th>Tempo Recebidas</th>
-                        <th>Efetuadas (Qtd)</th>
-                        <th>Tempo Efetuadas</th>
-                        <th>Total Ligações</th>
-                        <th>Tempo Total</th>
+                        <th title="👤 Ramal&#10;Número da extensão telefônica no PBX.">Ramal</th>
+                        <th title="👤 Nome do Atendente&#10;Nome do usuário cadastrado na extensão.">Atendente / Nome</th>
+                        <th title="📥 Quantidade Recebidas&#10;Total de chamadas atendidas por este ramal.">Recebidas (Qtd)</th>
+                        <th title="⏱️ Tempo em Recebidas&#10;Tempo total falado em chamadas recebidas.">Tempo Recebidas</th>
+                        <th title="📤 Quantidade Efetuadas&#10;Total de chamadas iniciadas por este ramal.">Efetuadas (Qtd)</th>
+                        <th title="⏱️ Tempo em Efetuadas&#10;Tempo total falado em chamadas efetuadas.">Tempo Efetuadas</th>
+                        <th title="📋 Total de Ligações&#10;Soma de ligações recebidas e efetuadas por este ramal.">Total Ligações</th>
+                        <th title="⏱️ Tempo Total Acumulado&#10;Soma do tempo falado de entrada e saída.">Tempo Total</th>
                     </tr>
                 </thead>
                 <tbody>

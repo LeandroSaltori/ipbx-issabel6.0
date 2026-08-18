@@ -164,15 +164,15 @@ function _moduleContent(&$smarty, $module_name)
             <form method="GET" action="index.php">
                 <input type="hidden" name="menu" value="<?php echo htmlspecialchars($module_name); ?>" />
                 <div class="filter-inline-row">
-                    <div class="filter-field-group">
+                    <div class="filter-field-group" title="📅 Data Inicial do Período&#10;Selecione a data de início da análise gráfica.">
                         <label>📅 Data Inicial</label>
                         <input type="date" name="date_start" value="<?php echo htmlspecialchars($date_start); ?>" class="filter-input" />
                     </div>
-                    <div class="filter-field-group">
+                    <div class="filter-field-group" title="📅 Data Final do Período&#10;Selecione a data limite da análise.">
                         <label>📅 Data Final</label>
                         <input type="date" name="date_end" value="<?php echo htmlspecialchars($date_end); ?>" class="filter-input" />
                     </div>
-                    <div class="filter-field-group">
+                    <div class="filter-field-group" title="👤 Filtro por Ramal Específico&#10;Selecione um ramal para visualizar apenas o gráfico individual daquela extensão.">
                         <label>👤 Ramal</label>
                         <select name="exten" class="filter-input">
                             <option value="">-- Todos os Ramais --</option>
@@ -181,7 +181,7 @@ function _moduleContent(&$smarty, $module_name)
                             <?php endforeach; ?>
                         </select>
                     </div>
-                    <div class="filter-field-group">
+                    <div class="filter-field-group" title="🏢 Filtro por Fila de Atendimento&#10;Selecione uma fila para analisar graficamente a distribuição de chamadas daquela fila.">
                         <label>🏢 Fila</label>
                         <select name="queue" class="filter-input">
                             <option value="">-- Todas as Filas --</option>
@@ -191,8 +191,8 @@ function _moduleContent(&$smarty, $module_name)
                         </select>
                     </div>
                     <div class="filter-btn-row">
-                        <button type="submit" class="btn-action btn-search">🔍 Filtrar Gráficos</button>
-                        <a href="?menu=<?php echo htmlspecialchars($module_name); ?>" class="btn-action btn-reset">🔄 Reset</a>
+                        <button type="submit" class="btn-action btn-search" title="🔍 Atualizar Gráficos&#10;Recarregar os gráficos estatísticos com os filtros selecionados.">🔍 Filtrar Gráficos</button>
+                        <a href="?menu=<?php echo htmlspecialchars($module_name); ?>" class="btn-action btn-reset" title="🔄 Restaurar Filtro&#10;Limpar filtros e exibir a visão geral.">🔄 Reset</a>
                     </div>
                 </div>
             </form>
@@ -200,27 +200,27 @@ function _moduleContent(&$smarty, $module_name)
 
         <!-- Grid de 5 Cards KPIs -->
         <div class="kpi-grid">
-            <div class="kpi-card-item purple">
+            <div class="kpi-card-item purple" title="📋 Total de Chamadas no Período&#10;Quantidade total de ligações processadas na consulta gráfica.">
                 <div class="kpi-card-title">📋 Total de Chamadas</div>
                 <div class="kpi-card-num"><?php echo number_format($totCalls, 0, ',', '.'); ?></div>
                 <div class="kpi-card-desc">No período selecionado</div>
             </div>
-            <div class="kpi-card-item green">
+            <div class="kpi-card-item green" title="📥 Chamadas Recebidas (Entrantes)&#10;Volume de ligações externas ou de clientes que entraram na central PBX.">
                 <div class="kpi-card-title">📥 Recebidas</div>
                 <div class="kpi-card-num"><?php echo number_format($totIn, 0, ',', '.'); ?></div>
                 <div class="kpi-card-desc">Chamadas entrantes</div>
             </div>
-            <div class="kpi-card-item blue">
-                <div class="kpi-card-title">📤 Efetua das</div>
+            <div class="kpi-card-item blue" title="📤 Chamadas Efetuadas (Saindo)&#10;Volume de ligações realizadas para fora da central pelos atendentes.">
+                <div class="kpi-card-title">📤 Efetuadas</div>
                 <div class="kpi-card-num"><?php echo number_format($totOut, 0, ',', '.'); ?></div>
                 <div class="kpi-card-desc">Chamadas saindo</div>
             </div>
-            <div class="kpi-card-item amber">
+            <div class="kpi-card-item amber" title="🎯 Taxa de Atendimento (%)&#10;Percentual de chamadas que foram atendidas com sucesso sobre o total de ligações.">
                 <div class="kpi-card-title">🎯 Taxa de Atendimento</div>
                 <div class="kpi-card-num"><?php echo $ansPercent; ?>%</div>
                 <div class="kpi-card-desc"><?php echo $ansCount; ?> atendidas de <?php echo $totCalls; ?></div>
             </div>
-            <div class="kpi-card-item slate">
+            <div class="kpi-card-item slate" title="⏳ Tempo Médio de Conversa&#10;Tempo médio em minutos e segundos por ligação atendida no período.">
                 <div class="kpi-card-title">⏳ Tempo Médio</div>
                 <div class="kpi-card-num"><?php echo sprintf('%02d:%02d', floor($avgDur / 60), $avgDur % 60); ?></div>
                 <div class="kpi-card-desc">Por chamada atendida</div>
@@ -229,13 +229,13 @@ function _moduleContent(&$smarty, $module_name)
 
         <!-- Gráficos -->
         <div class="charts-grid">
-            <div class="chart-card-box">
-                <h4>📊 Volume de Chamadas Recebidas vs Efetudas por Hora</h4>
+            <div class="chart-card-box" title="📊 Volume por Horário (Recebidas vs Efetuadas)&#10;Gráfico comparativo em colunas exibindo o fluxo de entrada e saída hora a hora.">
+                <h4>📊 Volume de Chamadas Recebidas vs Efetuadas por Hora</h4>
                 <div class="chart-canvas-wrapper">
                     <canvas id="chartGrHourly"></canvas>
                 </div>
             </div>
-            <div class="chart-card-box">
+            <div class="chart-card-box" title="🚦 Proporção de Status das Ligações&#10;Gráfico de rosca demonstrando a divisão entre Atendidas, Não Atendidas, Ocupado e Falhas.">
                 <h4>🚦 Distribuição de Status das Ligações</h4>
                 <div class="chart-canvas-wrapper">
                     <canvas id="chartGrStatus"></canvas>

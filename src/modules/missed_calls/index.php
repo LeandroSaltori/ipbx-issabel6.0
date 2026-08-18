@@ -150,28 +150,28 @@ function _moduleContent(&$smarty, $module_name)
             <form method="GET" action="index.php">
                 <input type="hidden" name="menu" value="<?php echo htmlspecialchars($module_name); ?>" />
                 <div class="filter-inline-row">
-                    <div class="filter-field-group">
+                    <div class="filter-field-group" title="📅 Data Inicial do Período&#10;Selecione a data de início da busca de ligações perdidas.">
                         <label>📅 Data Inicial</label>
                         <input type="date" name="date_start" value="<?php echo htmlspecialchars($date_start); ?>" class="filter-input" />
                     </div>
-                    <div class="filter-field-group">
+                    <div class="filter-field-group" title="📅 Data Final do Período&#10;Selecione a data limite da consulta.">
                         <label>📅 Data Final</label>
                         <input type="date" name="date_end" value="<?php echo htmlspecialchars($date_end); ?>" class="filter-input" />
                     </div>
-                    <div class="filter-field-group">
+                    <div class="filter-field-group" title="📌 Campo de Busca SQL&#10;Escolha se a pesquisa será feita pelo número de Destino (ramal/fila) ou Origem (bina).">
                         <label>📌 Buscar Campo</label>
                         <select name="filter_field" class="filter-input">
                             <option value="dst" <?php if ($filter_field == 'dst') echo 'selected'; ?>>Destino (dst)</option>
                             <option value="src" <?php if ($filter_field == 'src') echo 'selected'; ?>>Origem (src)</option>
                         </select>
                     </div>
-                    <div class="filter-field-group">
+                    <div class="filter-field-group" title="📞 Padrão / Número&#10;Digite o ramal ou número de telefone para filtrar chamadas perdidas específicas.">
                         <label>📞 Padrão / Número</label>
                         <input type="text" name="filter_value" value="<?php echo htmlspecialchars($filter_value); ?>" placeholder="Ex: 5001..." class="filter-input" />
                     </div>
                     <div class="filter-btn-row">
-                        <button type="submit" class="btn-action btn-search">🔍 Filtrar Perdidas</button>
-                        <a href="?menu=<?php echo htmlspecialchars($module_name); ?>" class="btn-action btn-reset">🔄 Reset</a>
+                        <button type="submit" class="btn-action btn-search" title="🔍 Filtrar Ligações Perdidas&#10;Buscar apenas chamadas não atendidas com base no período e filtros.">🔍 Filtrar Perdidas</button>
+                        <a href="?menu=<?php echo htmlspecialchars($module_name); ?>" class="btn-action btn-reset" title="🔄 Restaurar Filtro&#10;Limpar filtros e exibir todas as ligações perdidas da data atual.">🔄 Reset</a>
                     </div>
                 </div>
             </form>
@@ -179,27 +179,27 @@ function _moduleContent(&$smarty, $module_name)
 
         <!-- Grid de 5 Cards KPIs -->
         <div class="kpi-grid">
-            <div class="kpi-card-item red">
+            <div class="kpi-card-item red" title="📵 Total de Ligações Perdidas&#10;Soma de todas as chamadas no período que não foram completadas por atendimento.">
                 <div class="kpi-card-title">📵 Chamadas Perdidas</div>
                 <div class="kpi-card-num"><?php echo number_format($totCalls, 0, ',', '.'); ?></div>
                 <div class="kpi-card-desc">Total no período</div>
             </div>
-            <div class="kpi-card-item red">
+            <div class="kpi-card-item red" title="🚫 Ligações Não Atendidas (NO ANSWER)&#10;Quantidade de ligações que tocaram no destino até o limite de tempo sem atendimento.">
                 <div class="kpi-card-title">🚫 Não Atendidas</div>
                 <div class="kpi-card-num"><?php echo number_format($noAnsCount, 0, ',', '.'); ?></div>
                 <div class="kpi-card-desc">Sem resposta no ramal</div>
             </div>
-            <div class="kpi-card-item amber">
+            <div class="kpi-card-item amber" title="🟡 Ramal Ocupado (BUSY)&#10;Chamadas onde o ramal ou canal de destino encontrava-se ocupado em outra ligação.">
                 <div class="kpi-card-title">🟡 Ramal Ocupado</div>
                 <div class="kpi-card-num"><?php echo number_format($busyCount, 0, ',', '.'); ?></div>
                 <div class="kpi-card-desc">Ocupado no atendimento</div>
             </div>
-            <div class="kpi-card-item purple">
+            <div class="kpi-card-item purple" title="✖ Falhas Técnicas (FAILED)&#10;Chamadas não completadas por erro de rota, sinalização ou falha na rede de telefonia.">
                 <div class="kpi-card-title">✖ Falhas Tecnicas</div>
                 <div class="kpi-card-num"><?php echo number_format($failCount, 0, ',', '.'); ?></div>
                 <div class="kpi-card-desc">Erro de rota/sinal</div>
             </div>
-            <div class="kpi-card-item slate">
+            <div class="kpi-card-item slate" title="⏳ Tempo Médio de Espera&#10;Tempo médio em segundos que o cliente aguardou na linha antes de desligar ou desistir.">
                 <div class="kpi-card-title">⏳ Tempo Médio Espera</div>
                 <div class="kpi-card-num"><?php echo formatSecsMc($avgWait); ?></div>
                 <div class="kpi-card-desc">Antes de desligar</div>
@@ -208,13 +208,13 @@ function _moduleContent(&$smarty, $module_name)
 
         <!-- Gráficos -->
         <div class="charts-grid">
-            <div class="chart-card-box">
+            <div class="chart-card-box" title="📊 Perdidas por Horário&#10;Gráfico de barras indicando a quantidade de chamadas perdidas hora a hora.">
                 <h4>📊 Volume de Chamadas Perdidas por Horário</h4>
                 <div class="chart-canvas-wrapper">
                     <canvas id="chartMcHourly"></canvas>
                 </div>
             </div>
-            <div class="chart-card-box">
+            <div class="chart-card-box" title="🚦 Motivo do Não Atendimento&#10;Gráfico de rosca demonstrando a divisão entre Não Atendeu, Ocupado e Falha.">
                 <h4>🚦 Motivo do Não Atendimento</h4>
                 <div class="chart-canvas-wrapper">
                     <canvas id="chartMcReason"></canvas>
@@ -227,12 +227,12 @@ function _moduleContent(&$smarty, $module_name)
             <table class="mc-table">
                 <thead>
                     <tr>
-                        <th>Data / Hora</th>
-                        <th>Origem (Bina)</th>
-                        <th>Destino / Fila</th>
-                        <th>Status / Motivo</th>
-                        <th>Tempo de Espera</th>
-                        <th>Última Aplicação</th>
+                        <th title="📅 Data e Hora&#10;Momento do início da tentativa de ligação.">Data / Hora</th>
+                        <th title="📞 Origem (Bina)&#10;Número de telefone de quem realizou a chamada não atendida.">Origem (Bina)</th>
+                        <th title="🎯 Destino / Fila&#10;Ramal, fila ou número externo que não atendeu.">Destino / Fila</th>
+                        <th title="🚦 Status / Motivo&#10;Razão pela qual a chamada foi perdida (Não Atendeu, Ocupado ou Falha).">Status / Motivo</th>
+                        <th title="⏱️ Tempo de Espera&#10;Tempo total que a ligação tocou antes do encerramento.">Tempo de Espera</th>
+                        <th title="⚙️ Última Aplicação Asterisk&#10;Aplicação executada pelo PBX no momento da desconexão (ex: Dial, Voicemail, Hangup).">Última Aplicação</th>
                     </tr>
                 </thead>
                 <tbody>
