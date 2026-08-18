@@ -12,14 +12,28 @@ Write-Host "Generando logos..."
 [FastLogo]::Process($srcHorizontal, "$themeImgDir\logo_prisma_2.png", $true)
 [FastLogo]::Process($srcHorizontal, "$themeImgDir\logo_prisma_login.png", $true)
 
-# Logo do Rodape: texto escuro limpo transparente
+# Logo do Rodape / CDR: texto escuro limpo transparente
 [FastLogo]::Process($srcHorizontal, "$themeImgDir\banner.png", $false)
 
 # Icone Mini da Sidebar
 [FastLogo]::Process($srcIcon, "$themeImgDir\issabel_logo_mini.png", $false)
 [FastLogo]::Process($srcIcon, "$themeImgDir\issabel_logo_mini2.png", $false)
 
-# Copia para os modulos e raiz do tema
-Copy-Item -Force "$themeImgDir\logo_prisma.png" "c:\Users\USER\Documents\GitHub\ipbx-issabel6.0\src\modules\asternic_cdr\images\asternic_cdr_logo.jpg" -ErrorAction SilentlyContinue
+# Copia para TODOS os modulos Asternic CDR e Admin FreePBX
+$targetPaths = @(
+    "c:\Users\USER\Documents\GitHub\ipbx-issabel6.0\src\modules\asternic_cdr\images\asternic_cdr_logo.jpg",
+    "c:\Users\USER\Documents\GitHub\ipbx-issabel6.0\src\admin\modules\asternic_cdr\images\asternic_cdr_logo.jpg",
+    "c:\Users\USER\Documents\GitHub\ipbx-issabel6.0\src\admin\images\issabelpbx_small.png",
+    "c:\Users\USER\Documents\GitHub\ipbx-issabel6.0\src\admin\images\issabel_logo.png",
+    "c:\Users\USER\Documents\GitHub\ipbx-issabel6.0\src\admin\modules\framework\amp_conf\var\www\html\admin\images\issabel_logo.png",
+    "c:\Users\USER\Documents\GitHub\ipbx-issabel6.0\src\admin\modules\framework\amp_conf\var\www\html\admin\images\issabelpbx_small.png"
+)
 
-Write-Host "LOGOS ATUALIZADAS E PROCESSADAS COM SUCESSO!"
+foreach ($path in $targetPaths) {
+    $dir = Split-Path $path
+    if (-not (Test-Path $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
+    Copy-Item -Force "$themeImgDir\banner.png" $path -ErrorAction SilentlyContinue
+    Write-Host "Atualizada logo em: $path"
+}
+
+Write-Host "TODAS AS LOGOS DO CDR REPORTS E ADMIN FORAM ATUALIZADAS COM SUCESSO!"

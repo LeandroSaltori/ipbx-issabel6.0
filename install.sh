@@ -106,7 +106,16 @@ log_info "2/20 - Atualizando pasta /var/www/html/admin..."
 if [ -d "$REPO_DIR/src/admin" ]; then
     backup_and_deploy "$REPO_DIR/src/admin" "/var/www/html/admin"
     chown -R asterisk:asterisk /var/www/html/admin
-    log_success "Pasta admin atualizada."
+
+    # Sincroniza logos transparentes do Asternic CDR e Admin
+    if [ -f "$REPO_DIR/src/admin/modules/asternic_cdr/images/asternic_cdr_logo.jpg" ]; then
+        mkdir -p /var/www/html/admin/modules/asternic_cdr/images /var/www/html/modules/asternic_cdr/images /var/www/html/admin/images 2>/dev/null || true
+        cp -f "$REPO_DIR/src/admin/modules/asternic_cdr/images/asternic_cdr_logo.jpg" /var/www/html/admin/modules/asternic_cdr/images/asternic_cdr_logo.jpg 2>/dev/null || true
+        cp -f "$REPO_DIR/src/admin/modules/asternic_cdr/images/asternic_cdr_logo.jpg" /var/www/html/modules/asternic_cdr/images/asternic_cdr_logo.jpg 2>/dev/null || true
+        cp -f "$REPO_DIR/src/admin/images/issabel_logo.png" /var/www/html/admin/images/issabel_logo.png 2>/dev/null || true
+        cp -f "$REPO_DIR/src/admin/images/issabelpbx_small.png" /var/www/html/admin/images/issabelpbx_small.png 2>/dev/null || true
+    fi
+    log_success "Pasta admin e logos do CDR atualizadas."
 fi
 
 # ==============================================================================
