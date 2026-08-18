@@ -64,10 +64,19 @@ var baseurl = '';
 		<div class="login-content">
 
 			{if $LOGIN_INCORRECT || $STATUS_MSG || $LOGIN_ERROR || $EMPTY_FIELD || $REV_BLANK || $mb_message || $smarty.session.mb_message || $smarty.session.LOGIN_ERROR || $smarty.get.login_error || $smarty.get.error || $smarty.post.submit_login}
-			<div style="display: block !important; opacity: 1 !important; visibility: visible !important; background: rgba(220, 38, 38, 0.15) !important; border: 1px solid rgba(248, 113, 113, 0.4) !important; color: #fca5a5 !important; border-radius: 8px !important; padding: 12px 16px !important; margin-bottom: 20px !important; text-align: center !important; font-size: 14px !important; font-weight: 500 !important; line-height: 1.4 !important; backdrop-filter: blur(4px) !important;">
+			<div id="login_error_alert" style="display: block !important; opacity: 1 !important; visibility: visible !important; background: rgba(220, 38, 38, 0.15) !important; border: 1px solid rgba(248, 113, 113, 0.4) !important; color: #fca5a5 !important; border-radius: 8px !important; padding: 12px 16px !important; margin-bottom: 20px !important; text-align: center !important; font-size: 14px !important; font-weight: 500 !important; line-height: 1.4 !important; backdrop-filter: blur(4px) !important; transition: opacity 1s ease-in-out;">
 				<i class="entypo-attention" style="margin-right: 6px; font-size: 16px; color: #f87171; vertical-align: middle;"></i>
 				<span style="vertical-align: middle;">Usuário ou senha incorretos. Tente novamente.</span>
 			</div>
+			<script type="text/javascript">
+				setTimeout(function() {
+					var alertBox = document.getElementById('login_error_alert');
+					if (alertBox) {
+						alertBox.style.opacity = '0';
+						setTimeout(function() { alertBox.style.display = 'none'; }, 1000);
+					}
+				}, 4500);
+			</script>
 			{/if}
 
 			<form method="post" action="index.php" id="form_login">
