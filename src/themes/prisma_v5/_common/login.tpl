@@ -64,13 +64,13 @@ var baseurl = '';
 		<div class="login-content">
 
 			{if $STATUS_MSG || $LOGIN_ERROR || $EMPTY_FIELD || $REV_BLANK || $smarty.post.submit_login}
-			<div class="form-login-error" style="display: block !important; background: rgba(239, 68, 68, 0.2); border: 1px solid #ef4444; color: #ffffff; border-radius: 8px; padding: 12px 16px; margin-bottom: 20px; text-align: center; font-size: 14px; font-weight: 600; box-shadow: 0 4px 12px rgba(239,68,68,0.3);">
-				<i class="entypo-attention" style="margin-right: 8px; font-size: 16px; color: #f87171;"></i>
+			<div class="form-login-error" style="display: block !important; background: rgba(239, 68, 68, 0.95); border: 1px solid #dc2626; color: #ffffff; border-radius: 8px; padding: 14px 18px; margin-bottom: 20px; text-align: center; font-size: 14px; font-weight: 600; box-shadow: 0 4px 12px rgba(239,68,68,0.3);">
+				<i class="entypo-attention" style="margin-right: 8px; font-size: 18px; color: #ffffff;"></i>
 				{if $STATUS_MSG}{$STATUS_MSG}{elseif $LOGIN_ERROR}{$LOGIN_ERROR}{elseif $EMPTY_FIELD}{$EMPTY_FIELD}{elseif $REV_BLANK}{$REV_BLANK}{else}Usuário ou senha incorretos. Tente novamente.{/if}
 			</div>
 			{/if}
 
-			<form method="post">
+			<form method="post" action="index.php">
 
 				<div class="form-group">
 
@@ -126,8 +126,6 @@ var baseurl = '';
 	<script type='text/javascript' src="{$WEBPATH}themes/{$THEMENAME}/js/joinable.js"></script>
 	<script type='text/javascript' src="{$WEBPATH}themes/{$THEMENAME}/js/resizeable.js"></script>
 	<script type='text/javascript' src="{$WEBPATH}themes/{$THEMENAME}/js/neon-api.js"></script>
-	<script type='text/javascript' src="{$WEBPATH}themes/{$THEMENAME}/js/jquery.validate.min.js"></script>
-	<script type='text/javascript' src="{$WEBPATH}themes/{$THEMENAME}/js/neon-login.js"></script>
 	<script type='text/javascript' src="{$WEBPATH}themes/{$THEMENAME}/js/neon-custom.js"></script>
 	<script type='text/javascript' src="{$WEBPATH}themes/{$THEMENAME}/js/neon-demo.js"></script>
 
