@@ -945,13 +945,15 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
                                 <td>
                                     <?php
                                     if ($raw_st == 'ANSWERED') {
-                                        echo "<span class='status-badge-ans'>✅ Atendida</span>";
+                                        echo "<span class='status-badge-ans' title='✅ Chamada Atendida&#10;A ligação foi atendida com sucesso e houve diálogo.'>✅ Atendida</span>";
                                     } elseif ($raw_st == 'NO ANSWER') {
-                                        echo "<span class='status-badge-noans'>📵 Não Atendeu</span>";
+                                        echo "<span class='status-badge-noans' title='📵 Não Atendeu&#10;A ligação tocou no ramal ou fila mas ninguém respondeu antes do encerramento.'>📵 Não Atendeu</span>";
                                     } elseif ($raw_st == 'BUSY') {
-                                        echo "<span class='status-badge-busy'>🟡 Ocupado</span>";
+                                        echo "<span class='status-badge-busy' title='🟡 Ocupado&#10;O ramal de destino estava ocupado em outra chamada.'>🟡 Ocupado</span>";
+                                    } elseif ($raw_st == 'CONGESTION') {
+                                        echo "<span class='status-badge-fail' title='✖ Desistência / Linha Ocupada (CONGESTION)&#10;O chamador desligou a linha antes que qualquer ramal da fila/grupo atendesse, ou os canais estavam ocupados.'>✖ CONGESTION</span>";
                                     } else {
-                                        echo "<span class='status-badge-fail'>✖ $raw_st</span>";
+                                        echo "<span class='status-badge-fail' title='✖ Falha ou Desistência ($raw_st)&#10;A chamada não pôde ser completada devido a desistência rápida do chamador ou indisponibilidade de rota.'>✖ " . htmlspecialchars($raw_st) . "</span>";
                                     }
                                     ?>
                                 </td>
