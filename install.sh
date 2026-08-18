@@ -523,7 +523,6 @@ EOF
     fi
 
     log_success "Módulo Web da Pesquisa de Satisfação registrado no menu Relatórios."
-fi
 
 # ==============================================================================
 # 15. CALL CENTER OFICIAL DO ISSABEL
