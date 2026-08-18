@@ -39,30 +39,36 @@ fi
 
 log_info "Iniciando a instalação automatizada das customizações IPBX Issabel..."
 
-# --- DIRETÓRIO DO REPOSITÓRIO ---
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# --- DIRETÓRIO DO REPOSITÓRIO E ATUALIZAÇÃO AUTOMÁTICA ---
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd || echo "")"
 REPO_DIR="$SCRIPT_DIR"
+TMP_REPO="/tmp/ipbx-issabel-repo"
 
-# Se o script foi executado fora do repositório clonado, baixa a cópia atualizada
-if [ ! -f "$REPO_DIR/install.sh" ] || [ ! -d "$REPO_DIR/src" ]; then
-    TMP_REPO="/tmp/ipbx-issabel-repo"
-    log_info "Preparando download do repositório em $TMP_REPO..."
+# Se o repositório local for um clone git, força a atualização das novidades via git pull
+if [ -d "$REPO_DIR/.git" ]; then
+    log_info "Sincronizando repositório local com o GitHub..."
+    (cd "$REPO_DIR" && git fetch origin 2>/dev/null && (git pull origin main 2>/dev/null || git pull origin master 2>/dev/null)) || true
+fi
+
+# Se o script estiver fora do repositório ou desatualizado sem a pasta src/modules/nome_ramais, baixa o código mais recente
+if [ ! -f "$REPO_DIR/install.sh" ] || [ ! -d "$REPO_DIR/src/modules/nome_ramais" ]; then
+    log_info "Baixando última versão do repositório em $TMP_REPO..."
     rm -rf "$TMP_REPO"
     mkdir -p "$TMP_REPO"
 
-    # Garante que git esteja instalado no CentOS / Rocky Linux
     if ! command -v git &>/dev/null; then
         log_info "Instalando pacote git no servidor..."
         yum install -y git 2>/dev/null || dnf install -y git 2>/dev/null || true
     fi
 
     if command -v git &>/dev/null; then
-        log_info "Baixando o repositório completo via git..."
-        git clone --depth 1 https://github.com/LeandroSaltori/ipbx-issabel6.0.git "$TMP_REPO"
-    else
-        log_info "Baixando repositório compactado via curl..."
-        curl -sSL "https://github.com/LeandroSaltori/ipbx-issabel6.0/archive/refs/heads/main.tar.gz" | tar -xz -C "$TMP_REPO" --strip-components=1
+        git clone --depth 1 https://github.com/LeandroSaltori/ipbx-issabel6.0.git "$TMP_REPO" 2>/dev/null || true
     fi
+
+    if [ ! -d "$TMP_REPO/src" ]; then
+        curl -sSL "https://github.com/LeandroSaltori/ipbx-issabel6.0/archive/refs/heads/main.tar.gz" | tar -xz -C "$TMP_REPO" --strip-components=1 2>/dev/null || true
+    fi
+
     REPO_DIR="$TMP_REPO"
 fi
 
