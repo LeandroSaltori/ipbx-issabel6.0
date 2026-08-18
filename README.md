@@ -22,6 +22,30 @@ curl -sSL https://raw.githubusercontent.com/LeandroSaltori/ipbx-issabel6.0/main/
 
 ---
 
+## 🐧 Instalação do Issabel 5 / 6 do Zero no Rocky Linux (Netinstall)
+
+Caso esteja configurando um servidor limpo a partir do **Rocky Linux 8 ou 9** do zero via terminal, siga o procedimento de instalação oficial e pós-customização:
+
+### Passo 1: Instalação do PBX Issabel no Rocky Linux
+Conecte-se via SSH no servidor Rocky Linux como `root` e execute:
+
+```bash
+# Atualiza os repositórios e instala o pacote wget
+dnf update -y && dnf install -y wget git
+
+# Executa o instalador oficial Netinstall do Issabel 5/6
+wget -O - http://repo.issabel.org/issabel-netinstall.sh | bash
+```
+
+### Passo 2: Aplicação do Pacote IPBX Prisma Telecom
+Após o término do script Netinstall e o reboot do servidor, execute o comando abaixo para aplicar todas as customizações, temas e relatórios:
+
+```bash
+curl -sSL https://raw.githubusercontent.com/LeandroSaltori/ipbx-issabel6.0/main/install.sh | bash
+```
+
+---
+
 ## 🛡️ Política de Segurança e Backup Automatizado (`_old`)
 
 Para garantir total segurança e permitir a reversão se necessário, **nenhuma pasta nativa do Issabel é excluída**. 
