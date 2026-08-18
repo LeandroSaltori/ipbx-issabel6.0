@@ -119,34 +119,55 @@ if(isset($_REQUEST['file'])) {
 }
 
 echo "
-<link rel='stylesheet' type='text/css' href='modules/asternic_cdr/asternic_cdr.css' />
-<link rel='stylesheet' type='text/css' href='admin/modules/asternic_cdr/asternic_cdr.css' />
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-html, body, #asterniccontent, #asterniccontents, table, div, p, span, td, th {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+.playicon {
+background:url('${appconfig['relative_path']}asternic_playicon.png');
+background-repeat: no-repeat;
+width: 16px;
+height: 16px;
+margin-top: 2px;
 }
-body { background-color: #f8fafc !important; color: #1e293b !important; padding: 15px !important; }
-.playicon { background:url('${appconfig['relative_path']}asternic_playicon.png') no-repeat; width: 16px; height: 16px; margin-top: 2px; }
-.pauseicon { background:url('${appconfig['relative_path']}asternic_pauseicon.png') no-repeat; width: 16px; height: 16px; margin-top: 2px; }
-.downicon { background:url('${appconfig['relative_path']}asternic_downicon.png') no-repeat; width: 16px; height: 16px; margin-top: 2px; }
-.loadingicon { background:url('${appconfig['relative_path']}asternic_loading.gif') no-repeat; width: 16px; height: 16px; margin-top: 2px; }
-.erroricon { background:url('${appconfig['relative_path']}asternic_erroricon.png') no-repeat; width: 16px; height: 16px; margin-top: 2px; }
+.pauseicon {
+background:url('${appconfig['relative_path']}asternic_pauseicon.png');
+background-repeat: no-repeat;
+width: 16px;
+height: 16px;
+margin-top: 2px;
+}
+.downicon {
+background:url('${appconfig['relative_path']}asternic_downicon.png');
+background-repeat: no-repeat;
+width: 16px;
+height: 16px;
+margin-top: 2px;
+}
+.loadingicon {
+background:url('${appconfig['relative_path']}asternic_loading.gif');
+background-repeat: no-repeat;
+width: 16px;
+height: 16px;
+margin-top: 2px;
+}
+.erroricon {
+background:url('${appconfig['relative_path']}asternic_erroricon.png');
+background-repeat: no-repeat;
+width: 16px;
+height: 16px;
+margin-top: 2px;
+}
 
-#asternicmain { border: 1px solid #e2e8f0 !important; border-radius: 12px !important; background: #ffffff !important; box-shadow: 0 1px 4px rgba(0,0,0,0.04) !important; padding: 20px !important; }
-#asterniccontents table { width: 100% !important; border-collapse: collapse !important; border: 1px solid #e2e8f0 !important; border-radius: 8px !important; margin-top: 15px !important; }
-#asterniccontents thead tr th { background: #334155 !important; color: #ffffff !important; font-size: 11px !important; font-weight: 800 !important; text-transform: uppercase !important; letter-spacing: 0.5px !important; padding: 10px 14px !important; border: none !important; text-align: left !important; }
-#asterniccontents tbody tr { background: #ffffff !important; transition: background 0.15s !important; }
-#asterniccontents tbody tr:hover { background: #f1f5f9 !important; }
-#asterniccontents tbody td { padding: 10px 14px !important; border-bottom: 1px solid #f1f5f9 !important; font-size: 12px !important; color: #334155 !important; }
+#asterniccontents thead tr th {
+    height: 32px;
+    aline-height: 32px;
+    text-align: center;
+    color: #1c5d79;
+    background-image: url(${appconfig['relative_path']}asternic_col_bg.gif);
+    background-repeat: repeat;
+    border-left:solid 1px #FF9900;
+    border-right:solid 1px #FF9900;
+    border-collapse: collapse;
+}
 </style>
-
-<div class='ast-prisma-header'>
-    <div class='ast-prisma-title'>
-        <h2>Relatório Geral de Ligações (Asternic CDR) - IPbx Prisma</h2>
-        <p>Estatísticas consolidadas de tráfego, distribuição por horário, duração e relatório geral de chamadas</p>
-    </div>
-</div>
 ";
 
 

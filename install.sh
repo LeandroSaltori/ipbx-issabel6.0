@@ -282,8 +282,13 @@ if [ -d "$REPO_DIR/src/modules" ]; then
         /bin/cp -rf /var/www/html/modules /var/www/html/modules_old
     fi
     /bin/cp -rf "$REPO_DIR/src/modules/"* /var/www/html/modules/
+    if [ -d "$REPO_DIR/src/modules/asternic_cdr" ]; then
+        mkdir -p /var/www/html/admin/modules/asternic_cdr
+        /bin/cp -rf "$REPO_DIR/src/modules/asternic_cdr/"* /var/www/html/admin/modules/asternic_cdr/ 2>/dev/null || true
+        chown -R asterisk:asterisk /var/www/html/admin/modules/asternic_cdr
+    fi
     chown -R asterisk:asterisk /var/www/html/modules
-    log_success "Módulos sincronizados em /var/www/html/modules."
+    log_success "Módulos sincronizados em /var/www/html/modules e /var/www/html/admin/modules/."
 fi
 
 # ==============================================================================

@@ -1,0 +1,241 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: FreePBX - asternic_cdr module Brazilian Portuguese translation\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2025-06-03 12:00+0000\n"
+"PO-Revision-Date: 2025-06-04 07:22-0300\n"
+"Last-Translator: OpenAI Assistant\n"
+"Language-Team: Brazilian Portuguese\n"
+"Language: pt_BR\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Poedit 3.6\n"
+
+msgid "Home"
+msgstr "Início"
+
+msgid "Outgoing"
+msgstr "Saídas"
+
+msgid "Incoming"
+msgstr "Entradas"
+
+msgid "Distribution"
+msgstr "Distribuição"
+
+msgid "Today's Dashboard"
+msgstr "Painel de Hoje"
+
+msgid "Call Counters"
+msgstr "Contadores de Chamadas"
+
+msgid "Total Calls"
+msgstr "Chamadas Totais"
+
+msgid "Total Inbound Calls"
+msgstr "Total de Chamadas de Entrada"
+
+msgid "Total Outbound Calls"
+msgstr "Total de Chamadas de Saída"
+
+msgid "Unique Callers"
+msgstr "Chamadores Únicos"
+
+msgid "Call Duration"
+msgstr "Duração das Chamadas"
+
+msgid "Total Minutes"
+msgstr "Total de Minutos"
+
+msgid "Total Inbound Minutes"
+msgstr "Total de Minutos de Entrada"
+
+msgid "Total Outbound Minutes"
+msgstr "Total de Minutos de Saída"
+
+msgid "Average Inbound Call Duration"
+msgstr "Duração Média das Entradas"
+
+msgid "Average Outbound Call Duration"
+msgstr "Duração Média das Saídas"
+
+msgid "Select Extensions"
+msgstr "Selecione as Extensões"
+
+msgid "Available"
+msgstr "Disponíveis"
+
+msgid "Selected"
+msgstr "Selecionados"
+
+msgid "Select Timeframe"
+msgstr "Selecione o Período"
+
+msgid "Shortcuts"
+msgstr "Atalhos"
+
+msgid "Today"
+msgstr "Hoje"
+
+msgid "This Week"
+msgstr "Esta Semana"
+
+msgid "This Month"
+msgstr "Este Mês"
+
+msgid "Last three months"
+msgstr "Últimos três meses"
+
+msgid "Start Date"
+msgstr "Data de Início"
+
+msgid "End Date"
+msgstr "Data Final"
+
+msgid "Run Report"
+msgstr "Gerar Relatório"
+
+msgid "Report Information"
+msgstr "Informações do Relatório"
+
+msgid "Period"
+msgstr "Período"
+
+msgid "Outgoing Calls"
+msgstr "Chamadas de Saída"
+
+msgid "Incoming Calls"
+msgstr "Chamadas de Entrada"
+
+msgid "Number of Calls"
+msgstr "Número de Chamadas"
+
+msgid "Total Time"
+msgstr "Tempo Total"
+
+msgid "Avg. ring time"
+msgstr "Tempo Médio de Toque"
+
+msgid "User"
+msgstr "Usuário"
+
+msgid "Total"
+msgstr "Total"
+
+msgid "Completed"
+msgstr "Completadas"
+
+msgid "Missed"
+msgstr "Perdidas"
+
+msgid "% Missed"
+msgstr "% Perdidas"
+
+msgid "Duration"
+msgstr "Duração"
+
+msgid "% Duration"
+msgstr "% Duração"
+
+msgid "Avg Duration"
+msgstr "Duração Média"
+
+msgid "Total Ring Time"
+msgstr "Tempo Total de Toque"
+
+msgid "Avg Ring Time"
+msgstr "Média de Tempo de Toque"
+
+msgid "days"
+msgstr "dias"
+
+msgid "Call Distribution per Hour"
+msgstr "Distribuição de Chamadas por Hora"
+
+msgid "Hour"
+msgstr "Hora"
+
+msgid "Call Count"
+msgstr "Quantidade de Chamadas"
+
+msgid "Total Call Duration by User"
+msgstr "Duração Total de Chamadas por Usuário"
+
+msgid "Incoming/Outgoing Calls by User"
+msgstr "Chamadas de Entrada/Saída por Usuário"
+
+msgid "Date"
+msgstr "Data"
+
+msgid "Hour of day (8 means 08h00 - 08h59)"
+msgstr "Hora do dia (8 significa 08h00 - 08h59)"
+
+msgid "Sunday"
+msgstr "Domingo"
+
+msgid "Saturday"
+msgstr "Sábado"
+
+msgid "Friday"
+msgstr "Sexta-feira"
+
+msgid "Thursday"
+msgstr "Quinta-feira"
+
+msgid "Wednesday"
+msgstr "Quarta-feira"
+
+msgid "Tuesday"
+msgstr "Terça-feira"
+
+msgid "Monday"
+msgstr "Segunda-feira"
+
+msgid "Combined"
+msgstr "Total Entrada+Saida"
+
+msgid "Incoming / Outgoing"
+msgstr "Entrada / Saída"
+
+msgid "Ring Time"
+msgstr "Tempo de Toque"
+
+msgid "Billable Time"
+msgstr "Tempo Ligação"
+
+msgid "From"
+msgstr "De"
+
+msgid "To"
+msgstr "Para"
+
+msgid "Disposition"
+msgstr "Disposição"
+
+msgid "Listen"
+msgstr "Ouvir"
+
+msgid "Play"
+msgstr "Reproduzir"
+
+msgid "Download"
+msgstr "Baixar"
+
+msgid "Total Internal Calls"
+msgstr "Total de Chamadas Internas"
+
+msgid "Total Internal Minutes"
+msgstr "Total de Minutos Internos"
+
+msgid "Average Internal Call Duration"
+msgstr "Duração Média das Chamadas Internas"
+
+msgid "NO ANSWER"
+msgstr "Não Atendida"
+
+msgid "ANSWERED"
+msgstr "Atendida"
+
+msgid "FAILED"
+msgstr "Não Completou"
