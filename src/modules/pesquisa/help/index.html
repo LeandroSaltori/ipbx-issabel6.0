@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <title>Pesquisa de Satisfação - Guia Completo e Dashboard</title>
+    <title>Pesquisa de Satisfação - Guia Completo e Dashboard Executivo</title>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -33,6 +33,8 @@
             display: flex;
             align-items: center;
             gap: 8px;
+            border-bottom: 1px solid #f1f5f9;
+            padding-bottom: 8px;
         }
         .card {
             background: #f1f5f9;
@@ -93,6 +95,7 @@
         .badge-blue { background: #dbeafe; color: #1d4ed8; }
         .badge-orange { background: #ffedd5; color: #c2410c; }
         .badge-red { background: #fee2e2; color: #b91c1c; }
+        .badge-slate { background: #f1f5f9; color: #64748b; border: 1px solid #cbd5e1; }
         ul { padding-left: 20px; }
         li { margin-bottom: 8px; }
         code {
@@ -102,25 +105,39 @@
             font-size: 13px;
             color: #0f172a;
         }
+        .info-box {
+            background: #eff6ff;
+            border-left: 4px solid #3b82f6;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+        .warning-box {
+            background: #fffbeb;
+            border-left: 4px solid #f59e0b;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>📊 Pesquisa de Satisfação - Guia do Sistema & Painel Executivo</h1>
+        <h1>📊 Pesquisa de Satisfação - Guia do Sistema & Manual do Usuário</h1>
         
         <p>A <strong>Pesquisa de Satisfação</strong> do IPbx Prisma Telecom é uma solução completa para aferição da qualidade do atendimento e satisfação do cliente em tempo real, integrando URA Asterisk inteligente com um Dashboard Executivo visual.</p>
 
         <div class="card">
-            <strong>🎯 Ramais de Teste e Transferência:</strong> Disque ou transfira para o número <span class="badge badge-purple">9000</span> (ou atalho <span class="badge badge-purple">8996</span>).<br>
+            <strong>🎯 Ramais de Teste e Transferência:</strong> Disque ou transfira a chamada para o ramal <span class="badge badge-purple">9000</span> (ou atalho <span class="badge badge-purple">8996</span>).<br>
             <strong>🔗 Custom Destination no PBX:</strong> <code>pesquisa satisfação,9000,1</code>
         </div>
 
-        <h2>📈 1. Novo Painel Executivo (Dashboard)</h2>
-        <p>A tela de relatórios (<strong>Reports ➔ Pesquisa</strong>) conta com:</p>
+        <h2>📈 1. Painel Executivo e KPIs</h2>
+        <p>A tela de relatórios (<strong>Reports ➔ Pesquisa de Satisfação</strong>) apresenta métricas consolidada de atendimento:</p>
         <div class="grid-cards">
             <div class="kpi-sample">
-                <h3>📋 Total de Pesquisas</h3>
-                <p>Respondidas</p>
+                <h3>📋 Total de Chamadas</h3>
+                <p>Transferidas para URA</p>
             </div>
             <div class="kpi-sample" style="background:#f0fdf4; border-color:#bbf7d0;">
                 <h3 style="color:#166534;">⭐ Média de Satisfação</h3>
@@ -132,16 +149,53 @@
             </div>
             <div class="kpi-sample" style="background:#fffbeb; border-color:#fde68a;">
                 <h3 style="color:#92400e;">🏆 Satisfação Positiva</h3>
-                <p style="color:#78350f;">Ótimo & Muito Bom</p>
+                <p style="color:#78350f;">Notas 5 e 4</p>
+            </div>
+            <div class="kpi-sample" style="background:#f1f5f9; border-color:#cbd5e1;">
+                <h3 style="color:#475569;">📵 Desligou sem Avaliar</h3>
+                <p style="color:#334155;">Sem resposta</p>
             </div>
         </div>
+
+        <h2>💡 2. Como Entender as Colunas do Relatório</h2>
+        
+        <h3>🏢 Coluna Fila</h3>
         <ul>
-            <li><strong>Gráficos Interativos (Chart.js):</strong> Distribuição percentual das notas de atendimento e proporção de resolução de problemas (SIM vs NÃO).</li>
-            <li><strong>Filtros Avançados:</strong> Filtragem instantânea por <em>Data Inicial / Final</em>, <em>Operador/Ramal</em>, <em>Nota de Avaliação</em> e <em>Status de Resolução</em>.</li>
-            <li><strong>Exportação de Dados:</strong> Exportação rápida para Excel (CSV) e impressão/PDF.</li>
+            <li><strong>Selo Compacto (ex: <code>🏢 5001</code>):</strong> Indica a fila por onde a ligação de entrada passou antes de ser atendida. Passe o ponteiro do mouse por cima do selo para visualizar o **nome completo da fila** (ex: <em>5001 - Tecle 1 - Consulta Processual</em>).</li>
+            <li><strong>Traço (<code>-</code>):</strong> Exibido quando a chamada foi **direta para o ramal**, ligação interna ou transferência direta entre extensões sem passar por uma Fila de Atendimento.</li>
         </ul>
 
-        <h2>🎙️ 2. Fluxo da URA de Avaliação</h2>
+        <h3>📞 Coluna Telefone</h3>
+        <ul>
+            <li><strong>Número Formatado (ex: <code>(11) 99988-7766</code>):</strong> Número de bina detectado no atendimento.</li>
+            <li><strong>Traço (<code>-</code>):</strong> Exibido quando a chamada é de **número restrito**, id oculto, ou chamada originada internamente sem bina externa.</li>
+        </ul>
+
+        <h3>⭐ Coluna Avaliação do Atendimento</h3>
+        <ul>
+            <li><span class="badge badge-green">⭐⭐⭐⭐⭐ EXCELENTE / ÓTIMO</span>: Cliente digitou nota 5.</li>
+            <li><span class="badge badge-blue">⭐⭐⭐⭐ MUITO BOM</span>: Cliente digitou nota 4.</li>
+            <li><span class="badge badge-orange">⭐⭐⭐ BOM / REGULAR</span>: Cliente digitou nota 3.</li>
+            <li><span class="badge badge-orange">⭐⭐ RUIM</span>: Cliente digitou nota 2.</li>
+            <li><span class="badge badge-red">⭐ PÉSSIMO</span>: Cliente digitou nota 1.</li>
+            <li><span class="badge badge-slate">📵 NÃO AVALIOU</span>: Cliente foi transferido para a URA de pesquisa (ramal 9000/8996), porém **desligou o telefone antes de escolher uma opção**.</li>
+        </ul>
+
+        <h3>🎯 Coluna Problema Resolvido?</h3>
+        <ul>
+            <li><span class="badge badge-green">✔ SIM</span>: Cliente confirmou que sua demanda foi resolvida.</li>
+            <li><span class="badge badge-red">✖ NÃO</span>: Cliente informou que a demanda não foi resolvida.</li>
+            <li><span class="badge badge-slate">📵 NÃO AVALIOU</span>: Chamada encerrada antes da resposta.</li>
+        </ul>
+
+        <h3>⏱️ Duração e 🎧 Gravação de Áudio</h3>
+        <ul>
+            <li><strong>Duração Cruzada:</strong> Exibe a duração total da conversação do atendimento (cruzada automaticamente com a gravação correspondente no PBX).</li>
+            <li><strong>Botão ▶ Play:</strong> Abre o player flutuante instantâneo para ouvir a gravação sem sair da página.</li>
+            <li><strong>Botão Baixar:</strong> Realiza o download direto do arquivo de áudio no formato `.wav` / `.mp3`.</li>
+        </ul>
+
+        <h2>🎙️ 3. Fluxo da URA de Avaliação</h2>
         <table>
             <thead>
                 <tr>
@@ -160,11 +214,11 @@
                     <td><strong>2. Avaliação Geral</strong></td>
                     <td><code>audio2.wav</code></td>
                     <td>
-                        <span class="badge badge-green">5: ÓTIMO</span>
+                        <span class="badge badge-green">5: EXCELENTE</span>
                         <span class="badge badge-blue">4: MUITO BOM</span>
-                        <span class="badge badge-purple">3: MÉDIO</span>
-                        <span class="badge badge-orange">2: BOM</span>
-                        <span class="badge badge-red">1: RUIM</span>
+                        <span class="badge badge-orange">3: BOM / REGULAR</span>
+                        <span class="badge badge-orange">2: RUIM</span>
+                        <span class="badge badge-red">1: PÉSSIMO</span>
                     </td>
                 </tr>
                 <tr>
@@ -183,23 +237,18 @@
             </tbody>
         </table>
 
-        <h2>📞 3. Como Transferir para a Pesquisa</h2>
+        <h2>📞 4. Como Transferir para a Pesquisa</h2>
         <ul>
             <li><strong>Transferência Cega:</strong> Pressione <code>##</code> (ou tecla Flash), disque <code>9000</code> (ou <code>8996</code>) e desligue imediatamente.</li>
             <li><strong>Transferência Assistida:</strong> Pressione <code>*2</code>, disque <code>9000</code> (ou <code>8996</code>), aguarde a URA atender e desligue.</li>
             <li><strong>Fila Automática / URA:</strong> Configure o <em>Custom Destination</em> <code>pesquisa satisfação,9000,1</code> no FreePBX como destino pós-atendimento.</li>
         </ul>
 
-        <h2>💾 4. Armazenamento e Banco de Dados</h2>
-        <p>Os dados são gravados no banco MySQL <code>asteriskcdrdb.pesquisa</code> com a estrutura:</p>
-        <ul>
-            <li><code>operador</code>: Ramal ou identificação do atendente que realizou o atendimento.</li>
-            <li><code>fila</code>: Fila de atendimento de origem.</li>
-            <li><code>data</code> e <code>hora</code>: Timestamp exato da resposta.</li>
-            <li><code>telefone</code>: Número do cliente que avaliou.</li>
-            <li><code>avaliacao</code>: Nota atribuída (ÓTIMO, MUITO BOM, MÉDIO, BOM, RUIM).</li>
-            <li><code>solucao</code>: Status de resolução (SIM ou NÃO).</li>
-        </ul>
+        <h2>💾 5. Arquitetura de Dados e Cruzamento Inteligente</h2>
+        <div class="info-box">
+            <strong>ℹ️ Algoritmo de Cruzamento Inteligente (4 Etapas):</strong><br>
+            O módulo pesquisa automaticamente o log de chamadas (CDR) em um raio de até 30 minutos anteriores à avaliação, relacionando o telefone do cliente, o ramal do atendente e o registro de gravação do PBX. Caso a ligação tenha vindo de uma Fila (ex: 5001), o número da fila é vinculado automaticamente e exibido de forma compacta com tooltip informativo.
+        </div>
     </div>
 </body>
 </html>
