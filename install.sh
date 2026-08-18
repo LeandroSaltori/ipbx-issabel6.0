@@ -50,8 +50,8 @@ if [ -d "$REPO_DIR/.git" ]; then
     (cd "$REPO_DIR" && git fetch origin 2>/dev/null && (git pull origin main 2>/dev/null || git pull origin master 2>/dev/null)) || true
 fi
 
-# Se o script estiver fora do repositório ou desatualizado sem a pasta src/modules/nome_ramais, baixa o código mais recente
-if [ ! -f "$REPO_DIR/install.sh" ] || [ ! -d "$REPO_DIR/src/modules/nome_ramais" ]; then
+# Se o script estiver fora do repositório ou desatualizado sem a pasta src/nome_ramais, baixa o código mais recente
+if [ ! -f "$REPO_DIR/install.sh" ] || [ ! -d "$REPO_DIR/src/nome_ramais" ]; then
     log_info "Baixando última versão do repositório em $TMP_REPO..."
     rm -rf "$TMP_REPO"
     mkdir -p "$TMP_REPO"
