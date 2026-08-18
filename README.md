@@ -26,14 +26,17 @@ curl -sSL https://raw.githubusercontent.com/LeandroSaltori/ipbx-issabel6.0/main/
 
 Caso esteja configurando um servidor limpo a partir do **Rocky Linux 8 ou 9** do zero via terminal, siga o procedimento de instalação oficial e pós-customização:
 
-### Passo 1: Instalação do PBX Issabel no Rocky Linux
-Conecte-se via SSH no servidor Rocky Linux como `root` e execute:
+### Passo 1: Instalação do PBX Issabel 5 no Rocky Linux 8
+Conecte-se via SSH no servidor Rocky Linux 8 como `root` e execute:
 
 ```bash
-# Atualiza os repositórios e instala o pacote wget
-dnf update -y && dnf install -y wget git
+# 1. Atualizar pacotes do Rocky Linux 8
+dnf update -y
 
-# Executa o instalador oficial Netinstall do Issabel 5/6
+# 2. Instalar wget e git
+dnf install -y wget git
+
+# 3. Executar o instalador do Issabel 5
 wget -O - http://repo.issabel.org/issabel-netinstall.sh | bash
 ```
 
