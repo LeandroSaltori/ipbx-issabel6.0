@@ -103,23 +103,16 @@
             font-size: 13px;
             color: #0f172a;
         }
-        .info-box {
-            background: #eff6ff;
-            border-left: 4px solid #3b82f6;
-            padding: 15px;
-            border-radius: 8px;
-            margin: 15px 0;
-        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>📞 Relatório de Ligações (CDR) - Guia Completo e Manual</h1>
+        <h1>📞 Relatório de Ligações (CDR & CEL) - Guia Completo e Manual</h1>
         
         <p>O <strong>Relatório de Ligações (CDR Report)</strong> do IPbx Prisma Telecom armazena o histórico detalhado de todas as chamadas telefônicas recebidas, efetuadas e internas processadas pela central PBX.</p>
 
         <div class="card">
-            <strong>📋 Registro de Detalhes de Chamadas (CDR):</strong> Cada chamada é registrada com data, hora, número de origem (bina), ramal/fila de destino, status do atendimento, duração e gravação de áudio quando ativada.
+            <strong>📋 Registro de Detalhes de Chamadas (CDR):</strong> Cada chamada é registrada com data, hora, número de origem (bina), ramal/fila de destino, status do atendimento, duração, gravação de áudio e histórico de eventos do Asterisk (CEL).
         </div>
 
         <h2>📈 1. Painel Executivo e Métricas KPIs</h2>
@@ -146,48 +139,63 @@
             </div>
         </div>
 
-        <h2>💡 2. Como Entender as Colunas do Relatório</h2>
-        
-        <h3>📅 Data e Hora</h3>
-        <p>Momento exato em que a chamada entrou na central PBX no formato padrão brasileiro (<code>dd/mm/aaaa hh:mm:ss</code>).</p>
+        <h2>🔍 2. O que é e como funciona a Janela CEL (Log de Eventos)?</h2>
+        <p>O botão <code>📋 CEL</code> abre o <strong>Channel Event Logging (CEL)</strong> do Asterisk. O CEL é como uma "caixa preta" ou "raio-X" da ligação, registrando passo a passo a trajetória exata percorrida pela chamada na central telefônica.</p>
 
-        <h3>📞 Origem (Sourcing Number)</h3>
-        <p>Número de telefone da pessoa que realizou a ligação (Bina de entrada) ou ramal interno que iniciou a chamada efetuada.</p>
+        <h3>Significado dos Eventos (Eventos Asterisk)</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Selo de Evento</th>
+                    <th>Nome Técnico</th>
+                    <th>Explicação Didática</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><span class="badge" style="background:#dbeafe; color:#1e40af;">🚀 Início Canal</span></td>
+                    <td><code>CHAN_START</code></td>
+                    <td>A chamada acabou de entrar na central PBX e o canal de mídia foi iniciado.</td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-green">📞 Atendida</span></td>
+                    <td><code>ANSWER</code></td>
+                    <td>A ligação foi atendida pelo destinatário (ramal, agente de fila ou URA).</td>
+                </tr>
+                <tr>
+                    <td><span class="badge" style="background:#fef3c7; color:#b45309;">🤝 Conversa Conectada</span></td>
+                    <td><code>BRIDGE_ENTER</code></td>
+                    <td>Os canais de áudio da origem e do destino foram unidos, dando início ao diálogo.</td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-red">🔌 Conversa Encerrada</span></td>
+                    <td><code>BRIDGE_EXIT</code></td>
+                    <td>A comunicação de áudio entre as partes foi interrompida.</td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-red">📴 Desconectada</span></td>
+                    <td><code>HANGUP</code></td>
+                    <td>Uma das partes (quem ligou ou quem atendeu) desligou o telefone.</td>
+                </tr>
+                <tr>
+                    <td><span class="badge" style="background:#f1f5f9; color:#475569;">🏁 Fim Canal</span></td>
+                    <td><code>CHAN_END</code></td>
+                    <td>O canal telefônico específico foi encerrado no Asterisk.</td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-purple">🔚 Fim Ligação</span></td>
+                    <td><code>LINKEDID_END</code></td>
+                    <td>Todos os canais vinculados a esta mesma ligação foram finalizados.</td>
+                </tr>
+            </tbody>
+        </table>
 
-        <h3>🏢 Fila / Grupo de Atendimento</h3>
+        <h3>Significado da Coluna Exten (Contexto)</h3>
         <ul>
-            <li><strong>Selo Compacto (ex: <code>🏢 5001</code>):</strong> Indica a fila por onde a ligação passou antes de ser atendida. Passe o ponteiro do mouse por cima do selo para visualizar o nome completo da fila no tooltip.</li>
-            <li><strong>Traço (<code>-</code>):</strong> A chamada foi direta para o ramal ou entre extensões sem passar por Fila.</li>
-        </ul>
-
-        <h3>🎯 Destino</h3>
-        <p>Ramal, número externo ou DID de destino para onde a ligação foi direcionada.</p>
-
-        <h3>🚦 Status da Chamada</h3>
-        <ul>
-            <li><span class="badge badge-green">✅ Atendida (ANSWERED)</span>: Ligação foi atendida e estabeleceu conversa.</li>
-            <li><span class="badge badge-red">📵 Não Atendeu (NO ANSWER)</span>: Chamada tocou no destino mas ninguém atendeu.</li>
-            <li><span class="badge badge-yellow">🟡 Ocupado (BUSY)</span>: O ramal ou linha de destino estava ocupado.</li>
-            <li><span class="badge badge-red">✖ Falha (FAILED)</span>: Erro de sinalização ou falha na rota de saída/operadora.</li>
-        </ul>
-
-        <h3>⏱️ Duração</h3>
-        <p>Tempo total de conversação formatado em minutos e segundos (ex: <code>02:15</code>).</p>
-
-        <h3>🎧 Gravação de Áudio</h3>
-        <ul>
-            <li><strong>▶ Play:</strong> Reproduz a gravação diretamente no navegador via player flutuante.</li>
-            <li><strong>Baixar:</strong> Faz o download do arquivo de áudio no formato `.wav` ou `.mp3`.</li>
-            <li><strong>Sem Áudio:</strong> A ligação não foi gravada ou não atendeu.</li>
-        </ul>
-
-        <h3>📋 Eventos Asterisk (CEL)</h3>
-        <p>Ao clicar no ícone <code>📋 Events</code>, abre uma janela com o log técnico de eventos do Asterisk (Channel Event Logging), permitindo rastrear exatamente a rota percorrida pela ligação.</p>
-
-        <h2>📊 3. Gráficos Dinâmicos</h2>
-        <ul>
-            <li><strong>Distribuição de Chamadas por Horário:</strong> Mostra o volume de tráfego hora a hora para identificar picos de atendimento.</li>
-            <li><strong>Status das Ligações:</strong> Gráfico de rosca demonstrando a proporção de ligações atendidas vs não atendidas.</li>
+            <li><code>s (Start URA)</code>: Significa <em>Start</em>. É o ponto de entrada da ligação em uma URA ou fila de atendimento.</li>
+            <li><code>h (Hangup)</code>: Significa <em>Hangup</em>. É a rotina de pós-atendimento executada imediatamente após o desligamento da chamada.</li>
+            <li><code>t (Timeout)</code>: Tempo limite de digitação ou atendimento esgotado.</li>
+            <li><code>i (Inválido)</code>: Opção inválida digitada pelo cliente no menu da URA.</li>
         </ul>
     </div>
 </body>

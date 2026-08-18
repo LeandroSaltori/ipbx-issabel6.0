@@ -174,6 +174,18 @@ function renderCelDetailsHtml($pDB, $uniqueid)
     $sPeticionSQL = "SELECT $columnas FROM cel WHERE linkedid=? ORDER BY eventtime ASC";
     $arrEvents = $pDB->fetchTable($sPeticionSQL, FALSE, array($linkedId));
 
+    $evtMap = array(
+        'CHAN_START'    => array('label' => '🚀 Início Canal', 'color' => '#dbeafe', 'text' => '#1e40af', 'desc' => '🚀 CHAN_START: A chamada iniciou o processamento na central PBX.'),
+        'ANSWER'        => array('label' => '📞 Atendida', 'color' => '#dcfce7', 'text' => '#15803d', 'desc' => '📞 ANSWER: A ligação foi atendida com sucesso pelo destinatário.'),
+        'HANGUP'        => array('label' => '📴 Desconectada', 'color' => '#fee2e2', 'text' => '#b91c1c', 'desc' => '📴 HANGUP: Uma das partes (origem ou destino) desligou a chamada.'),
+        'CHAN_END'      => array('label' => '🏁 Fim Canal', 'color' => '#f1f5f9', 'text' => '#475569', 'desc' => '🏁 CHAN_END: O canal telefônico específico foi encerrado.'),
+        'LINKEDID_END'  => array('label' => '🔚 Fim Ligação', 'color' => '#e0e7ff', 'text' => '#4338ca', 'desc' => '🔚 LINKEDID_END: Todos os canais vinculados a esta chamada foram finalizados.'),
+        'BRIDGE_ENTER'  => array('label' => '🤝 Conversa Conectada', 'color' => '#fef3c7', 'text' => '#b45309', 'desc' => '🤝 BRIDGE_ENTER: Os canais de áudio foram conectados e a conversa começou.'),
+        'BRIDGE_EXIT'   => array('label' => '🔌 Conversa Encerrada', 'color' => '#fee2e2', 'text' => '#991b1b', 'desc' => '🔌 BRIDGE_EXIT: Desconexão da ponte de áudio entre as partes.'),
+        'APP_START'     => array('label' => '⚙️ Início App', 'color' => '#f3e8ff', 'text' => '#6b21a8', 'desc' => '⚙️ APP_START: Início da execução de uma aplicação do PBX (URA, Fila, Discagem).'),
+        'APP_END'       => array('label' => '⚙️ Fim App', 'color' => '#f3e8ff', 'text' => '#581c87', 'desc' => '⚙️ APP_END: Término da execução da aplicação do PBX.')
+    );
+
     ?>
     <!DOCTYPE html>
     <html lang="pt-BR">
@@ -181,41 +193,73 @@ function renderCelDetailsHtml($pDB, $uniqueid)
         <meta charset="UTF-8">
         <style>
             body { font-family:'Segoe UI', sans-serif; font-size:12px; color:#1e293b; padding:15px; margin:0; background:#f8fafc; }
-            h3 { margin:0 0 10px 0; font-size:14px; color:#0f172a; }
-            table { width:100%; border-collapse:collapse; background:#ffffff; border-radius:8px; overflow:hidden; box-shadow:0 1px 3px rgba(0,0,0,0.05); }
-            th { background:#334155; color:#ffffff; padding:8px 10px; font-size:10px; text-transform:uppercase; text-align:left; }
-            td { padding:8px 10px; border-bottom:1px solid #e2e8f0; font-size:11px; }
+            .cel-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+            h3 { margin:0; font-size:14px; color:#0f172a; font-weight:800; }
+            .cel-info-banner { background:#eff6ff; border-left:4px solid #3b82f6; padding:10px 14px; border-radius:6px; font-size:11px; color:#1e3a8a; margin-bottom:12px; line-height:1.4; }
+            table { width:100%; border-collapse:collapse; background:#ffffff; border-radius:8px; overflow:hidden; box-shadow:0 1px 3px rgba(0,0,0,0.05); border:1px solid #e2e8f0; }
+            th { background:#334155; color:#ffffff; padding:8px 10px; font-size:10px; text-transform:uppercase; text-align:left; letter-spacing:0.5px; }
+            td { padding:8px 10px; border-bottom:1px solid #f1f5f9; font-size:11px; vertical-align:middle; }
             tr:nth-child(even) { background:#f8fafc; }
-            .badge-evt { background:#e0e7ff; color:#4338ca; padding:2px 6px; border-radius:4px; font-weight:bold; font-size:10px; }
+            .badge-evt { padding:3px 8px; border-radius:6px; font-weight:bold; font-size:10px; display:inline-block; cursor:help; transition:all 0.2s; }
+            .exten-badge { background:#f1f5f9; color:#334155; padding:2px 6px; border-radius:4px; font-family:monospace; font-weight:bold; font-size:11px; cursor:help; }
         </style>
     </head>
     <body>
-        <h3>📋 Log de Eventos Asterisk (CEL - LinkedID: <?php echo htmlspecialchars($linkedId); ?>)</h3>
+        <div class="cel-header">
+            <h3>📋 Log de Eventos Asterisk (CEL - LinkedID: <?php echo htmlspecialchars($linkedId); ?>)</h3>
+        </div>
+        <div class="cel-info-banner">
+            💡 <strong>O que é o CEL?</strong> É o "raio-X" da ligação que registra cada evento da chamada. Passe o ponteiro do mouse sobre os nomes dos <strong>Eventos</strong> e <strong>Exten</strong> para ver a explicação detalhada de cada etapa.
+        </div>
         <table>
             <thead>
                 <tr>
                     <th>Data / Hora</th>
-                    <th>Evento</th>
+                    <th>Evento Asterisk</th>
                     <th>Nome Caller</th>
                     <th>Origem (Num)</th>
                     <th>DNID</th>
-                    <th>Exten</th>
-                    <th>App</th>
+                    <th>Exten (Contexto)</th>
+                    <th>Aplicação PBX</th>
                     <th>UniqueID</th>
                 </tr>
             </thead>
             <tbody>
                 <?php if (is_array($arrEvents) && count($arrEvents) > 0): ?>
                     <?php foreach ($arrEvents as $ev): ?>
+                        <?php
+                        $evtRaw = trim($ev[1]);
+                        if (isset($evtMap[$evtRaw])) {
+                            $eInfo = $evtMap[$evtRaw];
+                            $evtHtml = "<span title='" . htmlspecialchars($eInfo['desc'], ENT_QUOTES) . "' class='badge-evt' style='background:{$eInfo['color']}; color:{$eInfo['text']};'>{$eInfo['label']}</span>";
+                        } else {
+                            $evtHtml = "<span title='Evento técnico Asterisk: $evtRaw' class='badge-evt' style='background:#e0e7ff; color:#4338ca;'>$evtRaw</span>";
+                        }
+
+                        $extRaw = trim($ev[5]);
+                        if ($extRaw == 's') {
+                            $extHtml = "<span title='Extensão s (Start): Ponto inicial do atendimento da URA ou rota de entrada.' class='exten-badge'>s (Start URA)</span>";
+                        } elseif ($extRaw == 'h') {
+                            $extHtml = "<span title='Extensão h (Hangup): Etapa de pós-atendimento realizada após o desligamento.' class='exten-badge'>h (Hangup)</span>";
+                        } elseif ($extRaw == 't') {
+                            $extHtml = "<span title='Extensão t (Timeout): Tempo limite de atendimento ou digitação esgotado.' class='exten-badge'>t (Timeout)</span>";
+                        } elseif ($extRaw == 'i') {
+                            $extHtml = "<span title='Extensão i (Invalid): Opção inválida digitada pelo cliente.' class='exten-badge'>i (Inválido)</span>";
+                        } elseif (!empty($extRaw)) {
+                            $extHtml = "<span title='Ramal, número de destino ou opção digitada: $extRaw' class='exten-badge'>$extRaw</span>";
+                        } else {
+                            $extHtml = "<span style='color:#cbd5e1;'>-</span>";
+                        }
+                        ?>
                         <tr>
-                            <td><?php echo htmlspecialchars($ev[0]); ?></td>
-                            <td><span class="badge-evt"><?php echo htmlspecialchars($ev[1]); ?></span></td>
-                            <td><?php echo htmlspecialchars($ev[2]); ?></td>
-                            <td><?php echo htmlspecialchars($ev[3]); ?></td>
-                            <td><?php echo htmlspecialchars($ev[4]); ?></td>
-                            <td><?php echo htmlspecialchars($ev[5]); ?></td>
-                            <td><code><?php echo htmlspecialchars($ev[6]); ?></code></td>
-                            <td><small style="color:#64748b;"><?php echo htmlspecialchars($ev[7]); ?></small></td>
+                            <td><span style="color:#334155; font-weight:600; font-size:10px;">📅 <?php echo htmlspecialchars($ev[0]); ?></span></td>
+                            <td><?php echo $evtHtml; ?></td>
+                            <td><?php echo htmlspecialchars(!empty($ev[2]) ? $ev[2] : '-'); ?></td>
+                            <td><span style="font-weight:600; color:#0f172a;">📞 <?php echo htmlspecialchars(!empty($ev[3]) ? $ev[3] : '-'); ?></span></td>
+                            <td><?php echo htmlspecialchars(!empty($ev[4]) ? $ev[4] : '-'); ?></td>
+                            <td><?php echo $extHtml; ?></td>
+                            <td><code><?php echo htmlspecialchars(!empty($ev[6]) ? $ev[6] : '-'); ?></code></td>
+                            <td><small style="color:#94a3b8; font-size:10px;"><?php echo htmlspecialchars($ev[7]); ?></small></td>
                         </tr>
                     <?php endforeach; ?>
                 <?php else: ?>
