@@ -1,237 +1,321 @@
 <?php
-  /* vim: set expandtab tabstop=4 softtabstop=4 shiftwidth=4:
+/* vim: set expandtab tabstop=4 softtabstop=4 shiftwidth=4:
   Codificación: UTF-8
   +----------------------------------------------------------------------+
-  | Issabel version 4.0.4-18                                               |
+  | Issabel version 5.0 - Módulo Executivo de Chamadas Perdidas          |
   | http://www.issabel.org                                               |
   +----------------------------------------------------------------------+
   | Copyright (c) 2006 Palosanto Solutions S. A.                         |
   +----------------------------------------------------------------------+
-  | The contents of this file are subject to the General Public License  |
-  | (GPL) Version 2 (the "License"); you may not use this file except in |
-  | compliance with the License. You may obtain a copy of the License at |
-  | http://www.opensource.org/licenses/gpl-license.php                   |
-  |                                                                      |
-  | Software distributed under the License is distributed on an "AS IS"  |
-  | basis, WITHOUT WARRANTY OF ANY KIND, either express or implied. See  |
-  | the License for the specific language governing rights and           |
-  | limitations under the License.                                       |
-  +----------------------------------------------------------------------+
-  | The Initial Developer of the Original Code is PaloSanto Solutions    |
-  +----------------------------------------------------------------------+
-  $Id: index.php,v 1.1 2011-04-25 09:04:41 Eduardo Cueva ecueva@palosanto.com Exp $ */
-//include issabel framework
-include_once "libs/paloSantoGrid.class.php";
-include_once "libs/paloSantoForm.class.php";
+  $Id: index.php,v 20.0 2026-08-18 Prisma Telecom $ */
+
+include_once "libs/paloSantoDB.class.php";
 include_once "libs/paloSantoConfig.class.php";
 require_once "libs/misc.lib.php";
 
+function formatSecsMc($sec) {
+    $sec = (int)$sec;
+    if ($sec <= 0) return '00:00';
+    $m = floor($sec / 60);
+    $s = $sec % 60;
+    return sprintf('%02d:%02d', $m, $s);
+}
+
 function _moduleContent(&$smarty, $module_name)
 {
-    //include module files
-    include_once "modules/$module_name/configs/default.conf.php";
-    include_once "modules/$module_name/libs/paloSantoMissedCalls.class.php";
-
-    $base_dir=dirname($_SERVER['SCRIPT_FILENAME']);
-
     load_language_module($module_name);
 
-    //global variables
-    global $arrConf;
-    global $arrConfModule;
-    $arrConf = array_merge($arrConf,$arrConfModule);
+    $date_start    = isset($_REQUEST['date_start']) ? trim($_REQUEST['date_start']) : date("Y-m-d");
+    $date_end      = isset($_REQUEST['date_end']) ? trim($_REQUEST['date_end']) : date("Y-m-d");
+    $filter_field  = isset($_REQUEST['filter_field']) ? trim($_REQUEST['filter_field']) : 'dst';
+    $filter_value  = isset($_REQUEST['filter_value']) ? trim($_REQUEST['filter_value']) : '';
 
-    //folder path for custom templates
-    $templates_dir=(isset($arrConf['templates_dir']))?$arrConf['templates_dir']:'themes';
-    $local_templates_dir="$base_dir/modules/$module_name/".$templates_dir.'/'.$arrConf['theme'];
+    $dsn  = generarDSNSistema('asteriskuser', 'asteriskcdrdb');
+    $pDB  = new paloDB($dsn);
 
-    //conexion resource
-    // DSN para consulta de cdrs
-    $dsn = generarDSNSistema('asteriskuser', 'asteriskcdrdb');
-    $pDB = new paloDB($dsn);
+    $where = array("calldate BETWEEN ? AND ?", "disposition != 'ANSWERED'");
+    $params = array($date_start . " 00:00:00", $date_end . " 23:59:59");
 
-    $pDBACL = new paloDB($arrConf['issabel_dsn']['acl']);
-    if (!empty($pDBACL->errMsg)) {
-        return "ERROR DE DB: $pDBACL->errMsg";
-    }
-    $pACL = new paloACL($pDBACL);
-    if (!empty($pACL->errMsg)) {
-        return "ERROR DE ACL: $pACL->errMsg";
-    }
-
-    //actions
-    $action = getAction();
-    $content = "";
-
-    // Para usuarios que no son administradores, se restringe a los CDR de la
-    // propia extensión. Cuidado con no-admin que no tiene extensión.
-    $viewany = $pACL->hasModulePrivilege($_SESSION['issabel_user'],
-        $module_name, 'viewany');
-    $sExtension = $viewany ? '' : $pACL->getUserExtension($_SESSION['issabel_user']);
-    $sExtension = trim("$sExtension");
-    if (!$viewany && $sExtension == '') {
-        return _tr('No extension for missed calls. Contact your administrator.');
-    }
-
-    switch($action) {
-    default:
-        $content = reportMissedCalls($smarty, $module_name, $local_templates_dir, $pDB, $sExtension);
-        break;
-    }
-    return $content;
-}
-
-function reportMissedCalls($smarty, $module_name, $local_templates_dir, &$pDB, $sExtension)
-{
-    ini_set('max_execution_time', 3600);
-
-    $pCallingReport = new paloSantoMissedCalls($pDB);
-    $oFilterForm  = new paloForm($smarty, createFieldFilter());
-    $filter_field = getParameter("filter_field");
-    $filter_value = getParameter("filter_value");
-    $date_start   = getParameter("date_start");
-    $date_end     = getParameter("date_end");
-
-    //begin grid parameters
-    $oGrid  = new paloSantoGrid($smarty);
-    $oGrid->setTitle(_tr("Missed Calls"));
-    $oGrid->pagingShow(true); // show paging section.
-    $oGrid->enableExport();   // enable export.
-    $oGrid->setNameFile_Export(_tr("Missed Calls"));
-
-    $url = array(
-        "menu"         =>  $module_name,
-        "filter_field" =>  $filter_field,
-        "filter_value" =>  $filter_value
-    );
-
-    $date_start = (isset($date_start))?$date_start:date("d M Y").' 00:00';
-    $date_end   = (isset($date_end))?$date_end:date("d M Y").' 23:59';
-    $_POST['date_start'] = $date_start;
-    $_POST['date_end']   = $date_end;
-
-    $parmFilter = array(
-        "date_start" => $date_start,
-        "date_end" => $date_end
-    );
-
-    if (!$oFilterForm->validateForm($parmFilter)) {
-        $smarty->assign(array(
-            'mb_title'      =>  _tr('Validation Error'),
-            'mb_message'    =>  '<b>'._tr('The following fields contain errors').':</b><br/>'.
-                                implode(', ', array_keys($oFilterForm->arrErroresValidacion)),
-        ));
-        $date_start = date("d M Y").' 00:00';
-        $date_end   = date("d M Y").' 23:59';
-    }
-
-    $url = array_merge($url, array('date_start' => $date_start,'date_end' => $date_end));
-
-    $oGrid->setURL($url);
-
-    $arrColumns = array(_tr("Date"),_tr("Source"),_tr("Destination"),_tr("Time since last call"),_tr("Number of attempts"),_tr("Status"));
-    $oGrid->setColumns($arrColumns);
-
-    $arrData = null;
-    $date_start_format = date('Y-m-d H:i:s',strtotime($date_start.":00"));
-    $date_end_format   = date('Y-m-d H:i:s',strtotime($date_end.":59"));
-
-    $total = $pCallingReport->getNumCallingReport($date_start_format, $date_end_format,
-        $filter_field, $filter_value, $sExtension);
-
-    if($oGrid->isExportAction()){
-        $limit  = $total; // max number of rows.
-        $offset = 0;      // since the start.
-        $arrResult = $pCallingReport->getCallingReport($date_start_format, $date_end_format,
-            $filter_field, $filter_value, $sExtension);
-        $arrData = $pCallingReport->showDataReport($arrResult, $total);
-
-        $size = count($arrData);
-        $oGrid->setData($arrData);
-    }
-    else{
-        $limit  = 20;
-        $oGrid->setLimit($limit);
-        $arrResult = $pCallingReport->getCallingReport($date_start_format, $date_end_format,
-            $filter_field, $filter_value, $sExtension);
-        $arrData = $pCallingReport->showDataReport($arrResult, $total);
-        if ($pCallingReport->errMsg != '') {
-                $smarty->assign('mb_message', $pCallingReport->errMsg);
+    if (!empty($filter_value)) {
+        if ($filter_field == 'src') {
+            $where[] = "src LIKE ?";
+            $params[] = "%$filter_value%";
+        } else {
+            $where[] = "dst LIKE ?";
+            $params[] = "%$filter_value%";
         }
-
-        //recalculando el total para la paginación
-        $size = count($arrData);
-        $oGrid->setTotal($size);
-        $offset = $oGrid->calculateOffset(); //echo $size." : ".$offset;
-        $arrResult = $pCallingReport->getDataByPagination($arrData, $limit, $offset);
-        $oGrid->setData($arrResult);
     }
 
-    //begin section filter
+    $sqlWhere = "WHERE " . implode(" AND ", $where);
+    $sql = "SELECT calldate, src, dst, disposition, duration, billsec, lastapp, accountcode FROM cdr $sqlWhere ORDER BY calldate DESC LIMIT 10000";
+    $rows = $pDB->fetchTable($sql, TRUE, $params);
+    if (!is_array($rows)) $rows = array();
 
-    $smarty->assign("SHOW", _tr("Show"));
-    $htmlFilter  = $oFilterForm->fetchForm("$local_templates_dir/filter.tpl","",$_POST);
-    //end section filter
+    $totCalls   = count($rows);
+    $noAnsCount = 0;
+    $busyCount  = 0;
+    $failCount  = 0;
+    $totalWait  = 0;
 
-    $oGrid->showFilter(trim($htmlFilter));
-    $content = $oGrid->fetchGrid();
-    //end grid parameters
+    $hourlyLost = array_fill(0, 24, 0);
 
-    return $content;
-}
+    foreach ($rows as $r) {
+        $st = strtoupper(trim($r['disposition']));
+        $dur = (int)$r['duration'];
+        $totalWait += $dur;
 
+        if ($st == 'NO ANSWER') $noAnsCount++;
+        elseif ($st == 'BUSY') $busyCount++;
+        elseif ($st == 'FAILED') $failCount++;
+        else $noAnsCount++;
 
-function createFieldFilter(){
-    $arrFilter = array(
-            "src" => _tr("Source"),
-            "dst" => _tr("Destination"),
-                    );
+        if (preg_match('/(\d{2}):\d{2}:\d{2}/', $r['calldate'], $m)) {
+            $h = (int)$m[1];
+            if ($h >= 0 && $h <= 23) $hourlyLost[$h]++;
+        }
+    }
 
-    $arrFormElements = array(
-            "filter_field" => array("LABEL"                  => _tr("Search"),
-                                    "REQUIRED"               => "no",
-                                    "INPUT_TYPE"             => "SELECT",
-                                    "INPUT_EXTRA_PARAM"      => $arrFilter,
-                                    "VALIDATION_TYPE"        => "text",
-                                    "VALIDATION_EXTRA_PARAM" => ""),
-            "filter_value" => array("LABEL"                  => "",
-                                    "REQUIRED"               => "no",
-                                    "INPUT_TYPE"             => "TEXT",
-                                    "INPUT_EXTRA_PARAM"      => "",
-                                    "VALIDATION_TYPE"        => "text",
-                                    "VALIDATION_EXTRA_PARAM" => ""),
-            "date_start"  => array("LABEL"                  => _tr("Start Date"),
-                                    "REQUIRED"               => "yes",
-                                    "INPUT_TYPE"             => "DATE",
-                                    "INPUT_EXTRA_PARAM"      => array("TIME" => true, "FORMAT" => "%d %b %Y %H:%M"),
-                                    "VALIDATION_TYPE"        => "",
-                                    "VALIDATION_EXTRA_PARAM" => "^[[:digit:]]{1,2}[[:space:]]+[[:alnum:]]{3}[[:space:]]+[[:digit:]]{4}[[:space:]]+[[:digit:]]{1,2}:[[:digit:]]{1,2}$"),
-            "date_end"    => array("LABEL"                  => _tr("End Date"),
-                                    "REQUIRED"               => "yes",
-                                    "INPUT_TYPE"             => "DATE",
-                                    "INPUT_EXTRA_PARAM"      => array("TIME" => true, "FORMAT" => "%d %b %Y %H:%M"),
-                                    "VALIDATION_TYPE"        => "ereg",
-                                    "VALIDATION_EXTRA_PARAM" => "^[[:digit:]]{1,2}[[:space:]]+[[:alnum:]]{3}[[:space:]]+[[:digit:]]{4}[[:space:]]+[[:digit:]]{1,2}:[[:digit:]]{1,2}$"),
-                    );
-    return $arrFormElements;
-}
+    $avgWait = $totCalls > 0 ? (int)round($totalWait / $totCalls) : 0;
 
+    ob_start();
+    ?>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    <style>
+        .mc-root { font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif; color: #1e293b; padding: 5px; }
+        .mc-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+        .mc-title h2 { margin: 0; font-size: 20px; font-weight: 800; color: #0f172a; letter-spacing: -0.3px; }
+        .mc-title p { margin: 1px 0 0 0; font-size: 11px; color: #64748b; }
+        .mc-top-btns { display: flex; gap: 8px; }
+        .btn-top { padding: 6px 12px; border-radius: 6px; font-weight: 700; font-size: 12px; text-decoration: none; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); transition: all 0.2s; }
+        .btn-top:hover { transform: translateY(-1px); opacity: 0.95; }
+        .btn-top-manual { background: #0284c7; color: #ffffff; }
+        .btn-top-expand { background: #0d9488; color: #ffffff; }
 
-function getAction()
-{
-    if(getParameter("save_new")) //Get parameter by POST (submit)
-        return "save_new";
-    else if(getParameter("save_edit"))
-        return "save_edit";
-    else if(getParameter("delete"))
-        return "delete";
-    else if(getParameter("new_open"))
-        return "view_form";
-    else if(getParameter("action")=="view")      //Get parameter by GET (command pattern, links)
-        return "view_form";
-    else if(getParameter("action")=="view_edit")
-        return "view_form";
-    else
-        return "report"; //cancel
+        .filter-card-box { background: #ffffff; border-radius: 10px; padding: 12px 16px; margin-bottom: 15px; box-shadow: 0 1px 4px rgba(0,0,0,0.04); border: 1px solid #e2e8f0; }
+        .filter-inline-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; }
+        .filter-field-group { display: flex; flex-direction: column; flex: 1; min-width: 140px; }
+        .filter-field-group label { font-size: 10px; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 3px; }
+        .filter-input { padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12px; color: #0f172a; background: #ffffff; outline: none; height: 32px; box-sizing: border-box; transition: border-color 0.2s; }
+        .filter-input:focus { border-color: #6366f1; }
+        .filter-btn-row { display: flex; gap: 6px; align-items: center; }
+        .btn-action { height: 32px; padding: 0 14px; border-radius: 6px; font-weight: 700; font-size: 12px; border: none; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; gap: 5px; box-sizing: border-box; transition: all 0.2s; }
+        .btn-action:hover { opacity: 0.9; }
+        .btn-search { background: #dc2626; color: #ffffff; }
+        .btn-reset { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
+
+        .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-bottom: 15px; }
+        .kpi-card-item { background: #ffffff; border-radius: 10px; padding: 14px 16px; box-shadow: 0 1px 4px rgba(0,0,0,0.04); border: 1px solid #f1f5f9; border-left: 5px solid #ef4444; display: flex; flex-direction: column; justify-content: space-between; }
+        .kpi-card-item.red { border-left-color: #ef4444; }
+        .kpi-card-item.amber { border-left-color: #f59e0b; }
+        .kpi-card-item.purple { border-left-color: #8b5cf6; }
+        .kpi-card-item.slate { border-left-color: #64748b; }
+
+        .kpi-card-title { font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+        .kpi-card-num { font-size: 24px; font-weight: 800; color: #0f172a; line-height: 1; }
+        .kpi-card-desc { font-size: 11px; color: #94a3b8; margin-top: 4px; }
+
+        .charts-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 15px; margin-bottom: 15px; }
+        @media (max-width: 900px) { .charts-grid { grid-template-columns: 1fr; } }
+        .chart-card-box { background: #ffffff; border-radius: 10px; padding: 16px 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.04); border: 1px solid #e2e8f0; height: 260px; display: flex; flex-direction: column; margin-bottom: 15px; }
+        .chart-card-box h4 { margin: 0 0 10px 0; font-size: 12px; font-weight: 800; color: #334155; text-transform: uppercase; border-bottom: 1px solid #f1f5f9; padding-bottom: 4px; }
+        .chart-canvas-wrapper { position: relative; flex: 1; width: 100%; height: 100%; }
+
+        .table-card-box { background: #ffffff; border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.04); border: 1px solid #e2e8f0; overflow: hidden; }
+        .mc-table { width: 100%; border-collapse: collapse; text-align: left; }
+        .mc-table thead { background: #334155; color: #ffffff; }
+        .mc-table th { padding: 10px 14px; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; }
+        .mc-table td { padding: 10px 14px; border-bottom: 1px solid #f1f5f9; font-size: 12px; vertical-align: middle; }
+        .mc-table tbody tr:hover { background: #fff1f2; }
+
+        .badge-noans { background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; padding: 3px 8px; border-radius: 6px; font-weight: bold; font-size: 10px; }
+        .badge-busy { background: #fef3c7; color: #b45309; border: 1px solid #fde68a; padding: 3px 8px; border-radius: 6px; font-weight: bold; font-size: 10px; }
+        .badge-fail { background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; padding: 3px 8px; border-radius: 6px; font-weight: bold; font-size: 10px; }
+    </style>
+
+    <div class="mc-root">
+        <!-- Header Principal -->
+        <div class="mc-header">
+            <div class="mc-title">
+                <h2>Relatório de Chamadas Perdidas - IPbx Prisma</h2>
+                <p>Histórico detalhado de ligações não atendidas, ocupadas ou abandonadas</p>
+            </div>
+            <div class="mc-top-btns">
+                <a href="modules/missed_calls/help/index.html" target="_blank" class="btn-top btn-top-manual">📖 Manual</a>
+                <button onclick="window.open('?menu=<?php echo htmlspecialchars($module_name); ?>&rawmode=yes', '_blank')" class="btn-top btn-top-expand">↗ Expandir Aba</button>
+            </div>
+        </div>
+
+        <!-- Filtro Compacto -->
+        <div class="filter-card-box">
+            <form method="GET" action="index.php">
+                <input type="hidden" name="menu" value="<?php echo htmlspecialchars($module_name); ?>" />
+                <div class="filter-inline-row">
+                    <div class="filter-field-group">
+                        <label>📅 Data Inicial</label>
+                        <input type="date" name="date_start" value="<?php echo htmlspecialchars($date_start); ?>" class="filter-input" />
+                    </div>
+                    <div class="filter-field-group">
+                        <label>📅 Data Final</label>
+                        <input type="date" name="date_end" value="<?php echo htmlspecialchars($date_end); ?>" class="filter-input" />
+                    </div>
+                    <div class="filter-field-group">
+                        <label>📌 Buscar Campo</label>
+                        <select name="filter_field" class="filter-input">
+                            <option value="dst" <?php if ($filter_field == 'dst') echo 'selected'; ?>>Destino (dst)</option>
+                            <option value="src" <?php if ($filter_field == 'src') echo 'selected'; ?>>Origem (src)</option>
+                        </select>
+                    </div>
+                    <div class="filter-field-group">
+                        <label>📞 Padrão / Número</label>
+                        <input type="text" name="filter_value" value="<?php echo htmlspecialchars($filter_value); ?>" placeholder="Ex: 5001..." class="filter-input" />
+                    </div>
+                    <div class="filter-btn-row">
+                        <button type="submit" class="btn-action btn-search">🔍 Filtrar Perdidas</button>
+                        <a href="?menu=<?php echo htmlspecialchars($module_name); ?>" class="btn-action btn-reset">🔄 Reset</a>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <!-- Grid de 5 Cards KPIs -->
+        <div class="kpi-grid">
+            <div class="kpi-card-item red">
+                <div class="kpi-card-title">📵 Chamadas Perdidas</div>
+                <div class="kpi-card-num"><?php echo number_format($totCalls, 0, ',', '.'); ?></div>
+                <div class="kpi-card-desc">Total no período</div>
+            </div>
+            <div class="kpi-card-item red">
+                <div class="kpi-card-title">🚫 Não Atendidas</div>
+                <div class="kpi-card-num"><?php echo number_format($noAnsCount, 0, ',', '.'); ?></div>
+                <div class="kpi-card-desc">Sem resposta no ramal</div>
+            </div>
+            <div class="kpi-card-item amber">
+                <div class="kpi-card-title">🟡 Ramal Ocupado</div>
+                <div class="kpi-card-num"><?php echo number_format($busyCount, 0, ',', '.'); ?></div>
+                <div class="kpi-card-desc">Ocupado no atendimento</div>
+            </div>
+            <div class="kpi-card-item purple">
+                <div class="kpi-card-title">✖ Falhas Tecnicas</div>
+                <div class="kpi-card-num"><?php echo number_format($failCount, 0, ',', '.'); ?></div>
+                <div class="kpi-card-desc">Erro de rota/sinal</div>
+            </div>
+            <div class="kpi-card-item slate">
+                <div class="kpi-card-title">⏳ Tempo Médio Espera</div>
+                <div class="kpi-card-num"><?php echo formatSecsMc($avgWait); ?></div>
+                <div class="kpi-card-desc">Antes de desligar</div>
+            </div>
+        </div>
+
+        <!-- Gráficos -->
+        <div class="charts-grid">
+            <div class="chart-card-box">
+                <h4>📊 Volume de Chamadas Perdidas por Horário</h4>
+                <div class="chart-canvas-wrapper">
+                    <canvas id="chartMcHourly"></canvas>
+                </div>
+            </div>
+            <div class="chart-card-box">
+                <h4>🚦 Motivo do Não Atendimento</h4>
+                <div class="chart-canvas-wrapper">
+                    <canvas id="chartMcReason"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabela -->
+        <div class="table-card-box">
+            <table class="mc-table">
+                <thead>
+                    <tr>
+                        <th>Data / Hora</th>
+                        <th>Origem (Bina)</th>
+                        <th>Destino / Fila</th>
+                        <th>Status / Motivo</th>
+                        <th>Tempo de Espera</th>
+                        <th>Última Aplicação</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php if (count($rows) > 0): ?>
+                        <?php foreach ($rows as $r): ?>
+                            <?php
+                            $st = strtoupper(trim($r['disposition']));
+                            ?>
+                            <tr>
+                                <td><span style="color:#334155; font-size:11px; font-weight:600;">📅 <?php echo htmlspecialchars($r['calldate']); ?></span></td>
+                                <td><span style="font-weight:600; color:#1e293b;">📞 <?php echo htmlspecialchars(!empty($r['src']) ? $r['src'] : '-'); ?></span></td>
+                                <td><span style="background:#f1f5f9; color:#334155; padding:3px 8px; border-radius:6px; font-weight:600; font-size:11px;">🎯 <?php echo htmlspecialchars(!empty($r['dst']) ? $r['dst'] : '-'); ?></span></td>
+                                <td>
+                                    <?php
+                                    if ($st == 'NO ANSWER') echo "<span class='badge-noans'>📵 NÃO ATENDEU</span>";
+                                    elseif ($st == 'BUSY') echo "<span class='badge-busy'>🟡 OCUPADO</span>";
+                                    else echo "<span class='badge-fail'>✖ $st</span>";
+                                    ?>
+                                </td>
+                                <td><span style="color:#0f172a; font-weight:700; font-size:11px;">⏱️ <?php echo formatSecsMc($r['duration']); ?></span></td>
+                                <td><code><?php echo htmlspecialchars(!empty($r['lastapp']) ? $r['lastapp'] : '-'); ?></code></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    <?php else: ?>
+                        <tr>
+                            <td colspan="6" style="text-align:center; padding:25px; color:#64748b;">
+                                🎉 Nenhuma chamada perdida encontrada para os filtros selecionados!
+                            </td>
+                        </tr>
+                    <?php endif; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+    document.addEventListener("DOMContentLoaded", function() {
+        if (typeof Chart !== 'undefined') {
+            var ctxHourly = document.getElementById('chartMcHourly').getContext('2d');
+            new Chart(ctxHourly, {
+                type: 'bar',
+                data: {
+                    labels: ['00h','01h','02h','03h','04h','05h','06h','07h','08h','09h','10h','11h','12h','13h','14h','15h','16h','17h','18h','19h','20h','21h','22h','23h'],
+                    datasets: [{
+                        label: 'Chamadas Perdidas',
+                        data: <?php echo json_encode($hourlyLost); ?>,
+                        backgroundColor: '#ef4444',
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { beginAtZero: true, grid: { color: '#f1f5f9' } },
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
+
+            var ctxReason = document.getElementById('chartMcReason').getContext('2d');
+            new Chart(ctxReason, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Não Atendeu', 'Ocupado', 'Falha'],
+                    datasets: [{
+                        data: [<?php echo "$noAnsCount, $busyCount, $failCount"; ?>],
+                        backgroundColor: ['#ef4444', '#f59e0b', '#dc2626'],
+                        borderWidth: 2,
+                        borderColor: '#ffffff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'right' } }
+                }
+            });
+        }
+    });
+    </script>
+    <?php
+    return ob_get_clean();
 }
 ?>

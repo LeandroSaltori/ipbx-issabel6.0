@@ -462,6 +462,15 @@ if [ -d "$REPO_DIR/src/modules/summary_by_extension" ]; then
     chmod -R 755 /var/www/html/modules/summary_by_extension
     systemctl reload httpd 2>/dev/null || systemctl restart httpd 2>/dev/null || true
 fi
+
+# Implantação do Módulo Web de Chamadas Perdidas (missed_calls)
+if [ -d "$REPO_DIR/src/modules/missed_calls" ]; then
+    mkdir -p /var/www/html/modules/missed_calls
+    /bin/cp -rf "$REPO_DIR/src/modules/missed_calls/"* /var/www/html/modules/missed_calls/
+    chown -R asterisk:asterisk /var/www/html/modules/missed_calls
+    chmod -R 755 /var/www/html/modules/missed_calls
+    systemctl reload httpd 2>/dev/null || systemctl restart httpd 2>/dev/null || true
+fi
     
     if command -v sqlite3 &>/dev/null; then
         # Cria a tabela no banco pesquisa.db (SQLite)
