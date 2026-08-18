@@ -942,6 +942,17 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
                             $uniqueId  = !empty($r[6]) ? $r[6] : '';
                             $did       = !empty($r[16]) ? $r[16] : '-';
 
+                            // Fallback se a gravação não estiver no campo recordingfile, busca pelo UniqueID no monitor
+                            if (empty($recFile) && !empty($uniqueId)) {
+                                $globRes = glob("/var/spool/asterisk/monitor/*{$uniqueId}*");
+                                if (empty($globRes)) {
+                                    $globRes = glob("/var/spool/asterisk/monitor/*/*/*/*{$uniqueId}*");
+                                }
+                                if (!empty($globRes) && isset($globRes[0])) {
+                                    $recFile = basename($globRes[0]);
+                                }
+                            }
+
                             if (!empty($raw_rg) && isset($groupsMap[$raw_rg])) {
                                 $fullName = "$raw_rg - " . $groupsMap[$raw_rg];
                                 $val_rg_html = "<span title='" . htmlspecialchars($fullName, ENT_QUOTES) . "' class='queue-badge-compact'>🏢 $raw_rg</span>";
@@ -976,9 +987,9 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
                                 <td>
                                     <?php if (!empty($recFile)): ?>
                                         <?php $fileEnc = urlencode($recFile); ?>
-                                        <div style="display:flex; gap:4px; align-items:center;">
-                                            <button type="button" onclick="playCdrAudio('<?php echo $fileEnc; ?>')" style="background:#0284c7; color:#ffffff; border:none; padding:3px 10px; border-radius:12px; font-weight:700; font-size:10px; cursor:pointer;">▶ Play</button>
-                                            <a href="?menu=<?php echo htmlspecialchars($module_name); ?>&rawmode=yes&action=download_audio&file=<?php echo $fileEnc; ?>" target="_blank" style="background:#16a34a; color:#ffffff; padding:3px 10px; border-radius:12px; font-weight:700; font-size:10px; text-decoration:none;">Baixar</a>
+                                        <div style="display:flex; gap:6px; align-items:center;">
+                                            <button type="button" onclick="playCdrAudio('<?php echo $fileEnc; ?>')" style="background: linear-gradient(135deg, #7c3aed, #6d28d9); color: #ffffff; border: none; padding: 4px 10px; border-radius: 20px; font-weight: 700; font-size: 10px; cursor: pointer; box-shadow: 0 2px 6px rgba(124,58,237,0.3); transition: all 0.2s;" title="🎧 Ouvir Gravação">▶ Ouvir</button>
+                                            <a href="?menu=<?php echo htmlspecialchars($module_name); ?>&rawmode=yes&action=download_audio&file=<?php echo $fileEnc; ?>" target="_blank" style="background: rgba(255,255,255,0.08); color: #6d28d9; border: 1px solid rgba(124,58,237,0.4); padding: 3px 9px; border-radius: 20px; font-weight: 600; font-size: 10px; text-decoration: none; transition: all 0.2s;" title="⬇️ Baixar Arquivo de Áudio">⬇️ Baixar</a>
                                         </div>
                                     <?php else: ?>
                                         <span style="color:#cbd5e1; font-size:10px;">Sem áudio</span>

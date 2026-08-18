@@ -204,12 +204,24 @@ function reportMonitoring($smarty, $module_name, $local_templates_dir, &$pDB, $p
             if ($arrTmp[4] == '') $arrTmp[4] = "<font color='gray'>"._tr("unknown")."</font>";
             $arrTmp[5] = "<label title='".$value['duration']." "._tr('seconds')."' style='color:green'>".$arrTmp[5]."</label>";
 
+            // Format Call Type Badges
+            $recTypeRaw = strtolower(trim($arrTmp[6]));
+            if ($recTypeRaw == 'incoming' || $recTypeRaw == 'entrada') {
+                $arrTmp[6] = '<span style="background: rgba(34,197,94,0.15); color: #4ade80; border: 1px solid rgba(74,222,128,0.4); border-radius: 12px; padding: 4px 10px; font-weight: 600; font-size: 11px; display: inline-flex; align-items: center; gap: 4px;"><i class="fa fa-arrow-down"></i> Entrada</span>';
+            } elseif ($recTypeRaw == 'outgoing' || $recTypeRaw == 'saida') {
+                $arrTmp[6] = '<span style="background: rgba(59,130,246,0.15); color: #60a5fa; border: 1px solid rgba(96,165,250,0.4); border-radius: 12px; padding: 4px 10px; font-weight: 600; font-size: 11px; display: inline-flex; align-items: center; gap: 4px;"><i class="fa fa-arrow-up"></i> Saída</span>';
+            } elseif ($recTypeRaw == 'queue' || $recTypeRaw == 'fila') {
+                $arrTmp[6] = '<span style="background: rgba(168,85,247,0.15); color: #c084fc; border: 1px solid rgba(192,132,252,0.4); border-radius: 12px; padding: 4px 10px; font-weight: 600; font-size: 11px; display: inline-flex; align-items: center; gap: 4px;"><i class="fa fa-users"></i> Fila</span>';
+            } elseif ($recTypeRaw == 'group' || $recTypeRaw == 'grupo') {
+                $arrTmp[6] = '<span style="background: rgba(234,179,8,0.15); color: #fde047; border: 1px solid rgba(253,224,71,0.4); border-radius: 12px; padding: 4px 10px; font-weight: 600; font-size: 11px; display: inline-flex; align-items: center; gap: 4px;"><i class="fa fa-user-plus"></i> Grupo</span>';
+            }
+
             if ($arrTmp[7] != 'deleted') {
                 $esc_recfile = htmlentities($value['recordingfile'], ENT_COMPAT, 'UTF-8');
                 $recinfo = $pMonitoring->resolveRecordingPath($value['recordingfile']);
                 if (is_null($recinfo['fullpath'])) {
-                    $recordingLink = '<span title="'.$esc_recfile.'" style="color: red"><b>'.
-                        htmlentities(_tr('Recording missing', ENT_COMPAT, 'UTF-8')).'</b></span>';
+                    $recordingLink = '<span title="'.$esc_recfile.'" style="color: #94a3b8; font-size: 11px; background: rgba(148,163,184,0.15); border: 1px solid rgba(148,163,184,0.3); border-radius: 12px; padding: 4px 10px; font-weight: 500; display: inline-flex; align-items: center; gap: 4px;">'.
+                        '<i class="fa fa-microphone-slash"></i> Gravação Ausente</span>';
                 } else {
                     $urlparams = array(
                         'menu'      =>  $module_name,
@@ -218,16 +230,20 @@ function reportMonitoring($smarty, $module_name, $local_templates_dir, &$pDB, $p
                         'namefile'  =>  $arrTmp[7],
                         'rawmode'   =>  'yes',
                     );
-                    //$recordingLink = "<a title=\"$esc_recfile\" href=\"javascript:popUp('index.php?".urlencode(http_build_query($urlparams)."',350,100);")."\">"._tr("Listen")."</a>&nbsp;";
                     $protocol = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http");
-                    $recURL=$protocol.'://'.$_SERVER["HTTP_HOST"].'/'.'index.php?'.urlencode(http_build_query($urlparams));
-                    $recordingLink = "<a title=\"$esc_recfile\" href=\"javascript:playaudio('".$recURL."')\">"._tr("Listen")."</a>&nbsp;";
+                    $recURL = $protocol.'://'.$_SERVER["HTTP_HOST"].'/'.'index.php?'.urlencode(http_build_query($urlparams));
+                    
+                    $urlparamsDownload = $urlparams;
+                    $urlparamsDownload['action'] = 'download';
+                    $downloadURL = 'index.php?'.http_build_query($urlparamsDownload);
 
-                    $urlparams['action'] = 'download';
-                    $recordingLink .= "<a title=\"$esc_recfile\" href='?".http_build_query($urlparams)."' >"._tr("Download")."</a>";
+                    $recordingLink = "<div style='display:inline-flex; gap:6px; align-items:center;'>".
+                        "<button type='button' onclick=\"playaudio('".$recURL."')\" style='background: linear-gradient(135deg, #7c3aed, #6d28d9); color: #ffffff; border: none; border-radius: 20px; padding: 4px 12px; font-weight: 700; font-size: 11px; cursor: pointer; box-shadow: 0 2px 6px rgba(124,58,237,0.3); transition: all 0.2s;'><i class='fa fa-play'></i> Ouvir</button>".
+                        "<a href='".$downloadURL."' style='background: rgba(255,255,255,0.08); color: #c084fc; border: 1px solid rgba(168,85,247,0.4); border-radius: 20px; padding: 3px 10px; font-weight: 600; font-size: 10px; text-decoration: none; transition: all 0.2s;'><i class='fa fa-download'></i> Baixar</a>".
+                        "</div>";
                 }
             } else {
-                $recordingLink = '';
+                $recordingLink = '<span style="color:#ef4444; font-size:11px; font-weight:600;"><i class="fa fa-trash"></i> Excluída</span>';
             }
             $arrTmp[7] = $recordingLink;
 
