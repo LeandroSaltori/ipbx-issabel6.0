@@ -425,6 +425,16 @@ if [ -d "$REPO_DIR/src/modules/pesquisa" ]; then
     chown -R asterisk:asterisk /var/www/html/modules/pesquisa
     chmod -R 755 /var/www/html/modules/pesquisa
     systemctl reload httpd 2>/dev/null || systemctl restart httpd 2>/dev/null || true
+fi
+
+# Implantação do Módulo Web do Relatório de Ligações (CDR Report)
+if [ -d "$REPO_DIR/src/modules/cdrreport" ]; then
+    mkdir -p /var/www/html/modules/cdrreport
+    /bin/cp -rf "$REPO_DIR/src/modules/cdrreport/"* /var/www/html/modules/cdrreport/
+    chown -R asterisk:asterisk /var/www/html/modules/cdrreport
+    chmod -R 755 /var/www/html/modules/cdrreport
+    systemctl reload httpd 2>/dev/null || systemctl restart httpd 2>/dev/null || true
+fi
     
     if command -v sqlite3 &>/dev/null; then
         # Cria a tabela no banco pesquisa.db (SQLite)

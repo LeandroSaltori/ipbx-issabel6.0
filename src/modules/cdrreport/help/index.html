@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Relatório de Ligações - Guia do Usuário e Manual</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: #f8fafc;
+            color: #1e293b;
+            padding: 30px;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 950px;
+            margin: 0 auto;
+            background: #ffffff;
+            border-radius: 12px;
+            padding: 40px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+        h1 {
+            color: #4f46e5;
+            font-size: 26px;
+            margin-top: 0;
+            border-bottom: 2px solid #e2e8f0;
+            padding-bottom: 15px;
+        }
+        h2 {
+            color: #1e293b;
+            font-size: 18px;
+            margin-top: 30px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border-bottom: 1px solid #f1f5f9;
+            padding-bottom: 8px;
+        }
+        .card {
+            background: #f1f5f9;
+            border-left: 4px solid #4f46e5;
+            padding: 16px 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .grid-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .kpi-sample {
+            background: #faf5ff;
+            border: 1px solid #e9d5ff;
+            border-radius: 8px;
+            padding: 15px;
+            text-align: center;
+        }
+        .kpi-sample h3 {
+            margin: 0;
+            font-size: 13px;
+            color: #6b21a8;
+            text-transform: uppercase;
+        }
+        .kpi-sample p {
+            margin: 8px 0 0 0;
+            font-size: 22px;
+            font-weight: bold;
+            color: #581c87;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        th {
+            background-color: #f8fafc;
+            color: #475569;
+            font-weight: 600;
+        }
+        .badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .badge-green { background: #dcfce7; color: #15803d; }
+        .badge-red { background: #fee2e2; color: #b91c1c; }
+        .badge-yellow { background: #fef3c7; color: #b45309; }
+        .badge-purple { background: #e0e7ff; color: #4338ca; }
+        ul { padding-left: 20px; }
+        li { margin-bottom: 8px; }
+        code {
+            background: #e2e8f0;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 13px;
+            color: #0f172a;
+        }
+        .info-box {
+            background: #eff6ff;
+            border-left: 4px solid #3b82f6;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📞 Relatório de Ligações (CDR) - Guia Completo e Manual</h1>
+        
+        <p>O <strong>Relatório de Ligações (CDR Report)</strong> do IPbx Prisma Telecom armazena o histórico detalhado de todas as chamadas telefônicas recebidas, efetuadas e internas processadas pela central PBX.</p>
+
+        <div class="card">
+            <strong>📋 Registro de Detalhes de Chamadas (CDR):</strong> Cada chamada é registrada com data, hora, número de origem (bina), ramal/fila de destino, status do atendimento, duração e gravação de áudio quando ativada.
+        </div>
+
+        <h2>📈 1. Painel Executivo e Métricas KPIs</h2>
+        <div class="grid-cards">
+            <div class="kpi-sample">
+                <h3>📋 Total de Ligações</h3>
+                <p>Chamadas Registradas</p>
+            </div>
+            <div class="kpi-sample" style="background:#f0fdf4; border-color:#bbf7d0;">
+                <h3 style="color:#166534;">✅ Atendidas</h3>
+                <p style="color:#14532d;">Com conversa</p>
+            </div>
+            <div class="kpi-sample" style="background:#fef2f2; border-color:#fecaca;">
+                <h3 style="color:#991b1b;">📵 Não Atendidas</h3>
+                <p style="color:#7f1d1d;">Sem resposta / Ocupado</p>
+            </div>
+            <div class="kpi-sample" style="background:#eff6ff; border-color:#bfdbfe;">
+                <h3 style="color:#1e40af;">⏱️ Duração Total</h3>
+                <p style="color:#1e3a8a;">Horas acumuladas</p>
+            </div>
+            <div class="kpi-sample" style="background:#fffbeb; border-color:#fde68a;">
+                <h3 style="color:#92400e;">⏳ Tempo Médio</h3>
+                <p style="color:#78350f;">Por ligação</p>
+            </div>
+        </div>
+
+        <h2>💡 2. Como Entender as Colunas do Relatório</h2>
+        
+        <h3>📅 Data e Hora</h3>
+        <p>Momento exato em que a chamada entrou na central PBX no formato padrão brasileiro (<code>dd/mm/aaaa hh:mm:ss</code>).</p>
+
+        <h3>📞 Origem (Sourcing Number)</h3>
+        <p>Número de telefone da pessoa que realizou a ligação (Bina de entrada) ou ramal interno que iniciou a chamada efetuada.</p>
+
+        <h3>🏢 Fila / Grupo de Atendimento</h3>
+        <ul>
+            <li><strong>Selo Compacto (ex: <code>🏢 5001</code>):</strong> Indica a fila por onde a ligação passou antes de ser atendida. Passe o ponteiro do mouse por cima do selo para visualizar o nome completo da fila no tooltip.</li>
+            <li><strong>Traço (<code>-</code>):</strong> A chamada foi direta para o ramal ou entre extensões sem passar por Fila.</li>
+        </ul>
+
+        <h3>🎯 Destino</h3>
+        <p>Ramal, número externo ou DID de destino para onde a ligação foi direcionada.</p>
+
+        <h3>🚦 Status da Chamada</h3>
+        <ul>
+            <li><span class="badge badge-green">✅ Atendida (ANSWERED)</span>: Ligação foi atendida e estabeleceu conversa.</li>
+            <li><span class="badge badge-red">📵 Não Atendeu (NO ANSWER)</span>: Chamada tocou no destino mas ninguém atendeu.</li>
+            <li><span class="badge badge-yellow">🟡 Ocupado (BUSY)</span>: O ramal ou linha de destino estava ocupado.</li>
+            <li><span class="badge badge-red">✖ Falha (FAILED)</span>: Erro de sinalização ou falha na rota de saída/operadora.</li>
+        </ul>
+
+        <h3>⏱️ Duração</h3>
+        <p>Tempo total de conversação formatado em minutos e segundos (ex: <code>02:15</code>).</p>
+
+        <h3>🎧 Gravação de Áudio</h3>
+        <ul>
+            <li><strong>▶ Play:</strong> Reproduz a gravação diretamente no navegador via player flutuante.</li>
+            <li><strong>Baixar:</strong> Faz o download do arquivo de áudio no formato `.wav` ou `.mp3`.</li>
+            <li><strong>Sem Áudio:</strong> A ligação não foi gravada ou não atendeu.</li>
+        </ul>
+
+        <h3>📋 Eventos Asterisk (CEL)</h3>
+        <p>Ao clicar no ícone <code>📋 Events</code>, abre uma janela com o log técnico de eventos do Asterisk (Channel Event Logging), permitindo rastrear exatamente a rota percorrida pela ligação.</p>
+
+        <h2>📊 3. Gráficos Dinâmicos</h2>
+        <ul>
+            <li><strong>Distribuição de Chamadas por Horário:</strong> Mostra o volume de tráfego hora a hora para identificar picos de atendimento.</li>
+            <li><strong>Status das Ligações:</strong> Gráfico de rosca demonstrando a proporção de ligações atendidas vs não atendidas.</li>
+        </ul>
+    </div>
+</body>
+</html>
