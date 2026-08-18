@@ -81,225 +81,596 @@ function _moduleContent(&$smarty, $module_name)
 
 function reportMonitoring($smarty, $module_name, $local_templates_dir, &$pDB, $pACL, $arrConf, $user, $extension)
 {
-    require_once "libs/paloSantoForm.class.php";
-    $arrUniqueids=explode(',', $_POST['uniqueid']);    
-    if (isset($_POST['submit_eliminar']) && isset($_POST['uniqueid']) &&
-        is_array($arrUniqueids) && count($arrUniqueids) > 0) {
-        deleteRecord($smarty, $module_name, $local_templates_dir, $pDB, $pACL, $arrConf, $user, $extension, $arrUniqueids);
-    }
+    return renderFullMonitoringDashboard($smarty, $module_name, $local_templates_dir, $pDB, $pACL, $arrConf, $user, $extension);
+}
 
+function renderFullMonitoringDashboard($smarty, $module_name, $local_templates_dir, &$pDB, $pACL, $arrConf, $user, $extension)
+{
     $bPuedeVerTodos = hasModulePrivilege($user, $module_name, 'reportany');
-    $bPuedeBorrar = hasModulePrivilege($user, $module_name, 'deleteany');
+    $bPuedeBorrar   = hasModulePrivilege($user, $module_name, 'deleteany');
+    $pMonitoring    = new paloSantoMonitoring($pDB);
 
-    $pMonitoring = new paloSantoMonitoring($pDB);
-
-    $filter_field = getParameter("filter_field");
-
-    switch($filter_field){
-        case "dst":
-            $filter_field = "dst";
-            $nameFilterField = _tr("Destination");
-            break;
-        case "recordingfile":
-            $filter_field = "recordingfile";
-            $nameFilterField = _tr("Type");
-            break;
-        default:
-            $filter_field = "src";
-            $nameFilterField = _tr("Source");
-            break;
-    }
-    if($filter_field == "recordingfile"){
-        $filter_value     = getParameter("filter_value_recordingfile");
-        $filter           = "";
-        $filter_recordingfile = $filter_value;
-    }
-    else{
-        $filter_value     = getParameter("filter_value");
-        $filter           = $filter_value;
-        $filter_recordingfile = "";
-    }
-    switch($filter_value){
-        case "outgoing":
-              $smarty->assign("SELECTED_2", "Selected");
-              $nameFilterUserfield = _tr("Outgoing");
-              break;
-        case "queue":
-              $smarty->assign("SELECTED_3", "Selected");
-              $nameFilterUserfield = _tr("Queue");
-              break;
-        case "group":
-              $smarty->assign("SELECTED_4", "Selected");
-              $nameFilterUserfield = _tr("Group");
-              break;
-        default:
-              $smarty->assign("SELECTED_1", "Selected");
-              $nameFilterUserfield = _tr("Incoming");
-              break;
-    }
-    $date_ini = getParameter("date_start");
-    $date_end = getParameter("date_end");
-    $limit    = getParameter("limit");
-    if ($limit == 0) {
-        $limit = 100000;
+    // Process Deletion if requested
+    if ($bPuedeBorrar && isset($_POST['action_type']) && $_POST['action_type'] == 'delete_records' && !empty($_POST['selected_uniqueids'])) {
+        $arrIds = is_array($_POST['selected_uniqueids']) ? $_POST['selected_uniqueids'] : $_POST['selected_uniqueids'];
+        deleteRecord($smarty, $module_name, $local_templates_dir, $pDB, $pACL, $arrConf, $user, $extension, $arrIds);
     }
 
-    $path_record = $arrConf['records_dir'];
+    // Filter Parameters
+    $date_start_raw = isset($_REQUEST['date_start']) ? trim($_REQUEST['date_start']) : date("Y-m-d");
+    $date_end_raw   = isset($_REQUEST['date_end']) ? trim($_REQUEST['date_end']) : date("Y-m-d");
 
-    $_POST['date_start'] = isset($date_ini)?$date_ini:date("d M Y");
-    $_POST['date_end']   = isset($date_end)?$date_end:date("d M Y");
-    $_POST['limit']      = isset($limit)?$limit:'100000';
+    $date_start_ts = strtotime($date_start_raw);
+    $date_end_ts   = strtotime($date_end_raw);
+    $date_start    = $date_start_ts ? date("Y-m-d", $date_start_ts) : date("Y-m-d");
+    $date_end      = $date_end_ts ? date("Y-m-d", $date_end_ts) : date("Y-m-d");
 
-    if($date_ini===""){
-        $_POST['date_start'] = " ";
-    }
-    if($date_end==="")
-        $_POST['date_end'] = " ";
+    $filter_field  = isset($_REQUEST['filter_field']) ? trim($_REQUEST['filter_field']) : 'src';
+    $filter_value  = isset($_REQUEST['filter_value']) ? trim($_REQUEST['filter_value']) : '';
+    $rec_type      = isset($_REQUEST['rec_type']) ? trim($_REQUEST['rec_type']) : 'ALL';
+    $page          = isset($_REQUEST['page']) ? max(1, (int)$_REQUEST['page']) : 1;
+    $limit         = isset($_REQUEST['limit']) ? (int)$_REQUEST['limit'] : 20;
+    if ($limit <= 0) $limit = 20;
 
-    if (!empty($pACL->errMsg)) {
-        echo "ERROR DE ACL: $pACL->errMsg <br>";
-    }
-
-    $date_initial = date('Y-m-d',strtotime($_POST['date_start']))." 00:00:00";
-    $date_final   = date('Y-m-d',strtotime($_POST['date_end']))." 23:59:59";
-    $_DATA = $_POST;
-
-    // TODO: agregar filtro por extensión de usuario de Issabel sólo para reportany
-
-    // Se asume que sólo el administrador puede consultar con extension NULL
     $param = array(
-        'date_start'    =>  $date_initial,
-        'date_end'      =>  $date_final,
+        'date_start' => $date_start . ' 00:00:00',
+        'date_end'   => $date_end . ' 23:59:59',
     );
     if (!$bPuedeVerTodos) $param['extension'] = $extension;
-    if ($filter_field != '' && $filter_value != '') $param[$filter_field] = $filter_value;
-    $total = $pMonitoring->getNumMonitoring($param);
-    $url = array('menu' => $module_name);
+    if (!empty($filter_field) && !empty($filter_value)) {
+        $param[$filter_field] = $filter_value;
+    }
+    if ($rec_type != 'ALL' && !empty($rec_type)) {
+        $param['recordingfile'] = $rec_type;
+    }
 
-    $paramFilter = array(
-       'filter_field'           => $filter_field,
-       'filter_value'           => $filter,
-       'filter_value_recordingfile' => $filter_recordingfile,
-       'date_start'             => $_POST['date_start'],
-       'date_end'               => $_POST['date_end'],
-       'limit'                  => isset($limit)?$limit:'100000',
-    );
-    $url = array_merge($url, $paramFilter);
+    // Query All records for KPI stats
+    $arrResultAll = $pMonitoring->getMonitoring($param, 100000, 0);
+    $rawList      = is_array($arrResultAll) ? $arrResultAll : array();
+    $totalCount   = count($rawList);
 
-    $arrData = null;
-    $arrColumns = array(_tr("UniqueID"), _tr("Date"), _tr("Time"), _tr("Source"),
-            _tr("Destination"),_tr("Duration"),_tr("Type"),_tr("Message"));
+    // KPI Stat Counters
+    $incCount = 0;
+    $outCount = 0;
+    $queueCount = 0;
+    $groupCount = 0;
 
-    // Se asume que sólo el administrador puede consultar con extension NULL
-    $offset=0;
-    $arrResult = $pMonitoring->getMonitoring($param, $limit, $offset);
-
-    if (is_array($arrResult)) {
-        foreach ($arrResult as $value) {
-            $arrTmp = formatCallRecordingTuple($value);
-            array_unshift($arrTmp, $value['uniqueid']);
-
-            // checkbox(id_uniqueid) date time src dst hh:mm:ss rectype namefile
-            if ($arrTmp[3] == '') $arrTmp[3] = "<font color='gray'>"._tr("unknown")."</font>";
-            if ($arrTmp[4] == '') $arrTmp[4] = "<font color='gray'>"._tr("unknown")."</font>";
-            $arrTmp[5] = "<label title='".$value['duration']." "._tr('seconds')."' style='color:green'>".$arrTmp[5]."</label>";
-
-            // Format Call Type Badges
-            $recTypeRaw = strtolower(trim($arrTmp[6]));
-            if ($recTypeRaw == 'incoming' || $recTypeRaw == 'entrada') {
-                $arrTmp[6] = '<span style="background: rgba(34,197,94,0.15); color: #4ade80; border: 1px solid rgba(74,222,128,0.4); border-radius: 12px; padding: 4px 10px; font-weight: 600; font-size: 11px; display: inline-flex; align-items: center; gap: 4px;"><i class="fa fa-arrow-down"></i> Entrada</span>';
-            } elseif ($recTypeRaw == 'outgoing' || $recTypeRaw == 'saida') {
-                $arrTmp[6] = '<span style="background: rgba(59,130,246,0.15); color: #60a5fa; border: 1px solid rgba(96,165,250,0.4); border-radius: 12px; padding: 4px 10px; font-weight: 600; font-size: 11px; display: inline-flex; align-items: center; gap: 4px;"><i class="fa fa-arrow-up"></i> Saída</span>';
-            } elseif ($recTypeRaw == 'queue' || $recTypeRaw == 'fila') {
-                $arrTmp[6] = '<span style="background: rgba(168,85,247,0.15); color: #c084fc; border: 1px solid rgba(192,132,252,0.4); border-radius: 12px; padding: 4px 10px; font-weight: 600; font-size: 11px; display: inline-flex; align-items: center; gap: 4px;"><i class="fa fa-users"></i> Fila</span>';
-            } elseif ($recTypeRaw == 'group' || $recTypeRaw == 'grupo') {
-                $arrTmp[6] = '<span style="background: rgba(234,179,8,0.15); color: #fde047; border: 1px solid rgba(253,224,71,0.4); border-radius: 12px; padding: 4px 10px; font-weight: 600; font-size: 11px; display: inline-flex; align-items: center; gap: 4px;"><i class="fa fa-user-plus"></i> Grupo</span>';
-            }
-
-            if ($arrTmp[7] != 'deleted') {
-                $esc_recfile = htmlentities($value['recordingfile'], ENT_COMPAT, 'UTF-8');
-                $recinfo = $pMonitoring->resolveRecordingPath($value['recordingfile']);
-                if (is_null($recinfo['fullpath'])) {
-                    $recordingLink = '<span title="'.$esc_recfile.'" style="color: #94a3b8; font-size: 11px; background: rgba(148,163,184,0.15); border: 1px solid rgba(148,163,184,0.3); border-radius: 12px; padding: 4px 10px; font-weight: 500; display: inline-flex; align-items: center; gap: 4px;">'.
-                        '<i class="fa fa-microphone-slash"></i> Gravação Ausente</span>';
-                } else {
-                    $urlparams = array(
-                        'menu'      =>  $module_name,
-                        'action'    =>  'display_record',
-                        'id'        =>  $value['uniqueid'],
-                        'namefile'  =>  $arrTmp[7],
-                        'rawmode'   =>  'yes',
-                    );
-                    $protocol = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http");
-                    $recURL = $protocol.'://'.$_SERVER["HTTP_HOST"].'/'.'index.php?'.urlencode(http_build_query($urlparams));
-                    
-                    $urlparamsDownload = $urlparams;
-                    $urlparamsDownload['action'] = 'download';
-                    $downloadURL = 'index.php?'.http_build_query($urlparamsDownload);
-
-                    $recordingLink = "<div style='display:inline-flex; gap:6px; align-items:center;'>".
-                        "<button type='button' onclick=\"playaudio('".$recURL."')\" style='background: linear-gradient(135deg, #7c3aed, #6d28d9); color: #ffffff; border: none; border-radius: 20px; padding: 4px 12px; font-weight: 700; font-size: 11px; cursor: pointer; box-shadow: 0 2px 6px rgba(124,58,237,0.3); transition: all 0.2s;'><i class='fa fa-play'></i> Ouvir</button>".
-                        "<a href='".$downloadURL."' style='background: rgba(255,255,255,0.08); color: #c084fc; border: 1px solid rgba(168,85,247,0.4); border-radius: 20px; padding: 3px 10px; font-weight: 600; font-size: 10px; text-decoration: none; transition: all 0.2s;'><i class='fa fa-download'></i> Baixar</a>".
-                        "</div>";
-                }
-            } else {
-                $recordingLink = '<span style="color:#ef4444; font-size:11px; font-weight:600;"><i class="fa fa-trash"></i> Excluída</span>';
-            }
-            $arrTmp[7] = $recordingLink;
-
-            $arrData[] = $arrTmp;
+    foreach ($rawList as $r) {
+        $fname = basename($r['recordingfile']);
+        if ($fname != 'deleted' && !empty($fname)) {
+            $char = strtolower($fname[0]);
+            if ($char == 'o') $outCount++;
+            elseif ($char == 'q') $queueCount++;
+            elseif ($char == 'g' || $char == 'r') $groupCount++;
+            else $incCount++;
         }
     }
 
-    //begin section filter
-    $arrFormFilterMonitoring = createFieldFilter();
-    $oFilterForm = new paloForm($smarty, $arrFormFilterMonitoring);
+    $offset = ($page - 1) * $limit;
+    $pageList = array_slice($rawList, $offset, $limit);
+    $totalPages = max(1, ceil($totalCount / $limit));
 
-    $smarty->assign("INCOMING", _tr("Incoming"));
-    $smarty->assign("OUTGOING", _tr("Outgoing"));
-    $smarty->assign("QUEUE", _tr("Queue"));
-    $smarty->assign("GROUP", _tr("Group"));
-    $smarty->assign("SHOW", _tr("Show"));
-    $_POST["filter_field"]           = $filter_field;
-    $_POST["filter_value"]           = $filter;
-    $_POST["filter_value_recordingfile"] = $filter_recordingfile;
-    $_POST["limit"]                  = $limit;
+    ob_start();
+    ?>
+    <!DOCTYPE html>
+    <html lang="pt-BR">
+    <head>
+        <meta charset="UTF-8">
+        <style>
+            .monitoring-root {
+                font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+                background: #f8fafc;
+                padding: 18px;
+                border-radius: 12px;
+                color: #1e293b;
+            }
+            .monitoring-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 18px;
+                background: #ffffff;
+                padding: 16px 20px;
+                border-radius: 12px;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+                border: 1px solid #e2e8f0;
+            }
+            .monitoring-title h2 {
+                margin: 0;
+                font-size: 20px;
+                font-weight: 800;
+                color: #0f172a;
+                letter-spacing: -0.5px;
+            }
+            .monitoring-title p {
+                margin: 4px 0 0 0;
+                font-size: 12px;
+                color: #64748b;
+            }
+            .monitoring-top-btns {
+                display: flex;
+                gap: 8px;
+            }
+            .btn-top {
+                padding: 7px 14px;
+                border-radius: 8px;
+                font-size: 12px;
+                font-weight: 700;
+                text-decoration: none;
+                cursor: pointer;
+                border: none;
+                transition: all 0.2s;
+                display: inline-flex;
+                align-items: center;
+                gap: 6px;
+            }
+            .btn-top-manual { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
+            .btn-top-manual:hover { background: #e2e8f0; color: #0f172a; }
+            .btn-top-expand { background: #7c3aed; color: #ffffff; }
+            .btn-top-expand:hover { background: #6d28d9; }
 
-    $htmlFilter = $oFilterForm->fetchForm("$local_templates_dir/filter.tpl","",$_POST);
-    //end section filter
+            .kpi-grid {
+                display: grid;
+                grid-template-columns: repeat(4, 1fr);
+                gap: 15px;
+                margin-bottom: 18px;
+            }
+            @media (max-width: 900px) { .kpi-grid { grid-template-columns: repeat(2, 1fr); } }
 
-   $valueLimit = number_format($limit,0,",",".");
-    if ($total == $paramFilter['limit']) {
-        $msgLimit =    '<font color=red>'.
-                       '<span class="glyphicon glyphicon-info-sign" aria-hidden="true"></span>'." ".
-                       _tr("Limit")." = ".$valueLimit.
-                       '</font>';
-    } else {
-        $msgLimit =    '<font color=green>'.
-                       '<span class="glyphicon glyphicon-info-sign" aria-hidden="true"></span>'." ".
-                       _tr("Limit")." = ".$valueLimit.
-                       '</font>';
-    }
+            .kpi-card-box {
+                background: #ffffff;
+                border-radius: 12px;
+                padding: 16px 20px;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+                border: 1px solid #e2e8f0;
+                display: flex;
+                align-items: center;
+                gap: 15px;
+                transition: transform 0.2s, box-shadow 0.2s;
+            }
+            .kpi-card-box:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+            }
+            .kpi-icon-circle {
+                width: 46px;
+                height: 46px;
+                border-radius: 12px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 20px;
+                flex-shrink: 0;
+            }
+            .kpi-icon-total { background: #ede9fe; color: #7c3aed; }
+            .kpi-icon-inc { background: #dcfce7; color: #16a34a; }
+            .kpi-icon-out { background: #dbeafe; color: #2563eb; }
+            .kpi-icon-queue { background: #fef3c7; color: #d97706; }
 
-    $MsgFilter = "<b>"._tr("Filter applied: ")."</b>".
-    '<span class="glyphicon glyphicon-calendar" aria-hidden="true"></span>'." ".
-    _tr("Start Date")." = ".$paramFilter['date_start'].", "._tr("End Date")." = ".
-    $paramFilter['date_end']." - ".
-    '<span class="glyphicon glyphicon-phone-alt" aria-hidden="true"></span>'." ".
-    $filter_field." = ".$paramFilter['filter_value'] . _tr(ucfirst($paramFilter['filter_value_recordingfile'])) . " - ".
-    $msgLimit;
-    $smarty->assign("FILTER_SHOW"  , _tr("Show Filter"));
-    $smarty->assign("FILTER_MSG"  , $MsgFilter);
-    $smarty->assign("COLUMNS", $arrColumns);
-    $smarty->assign("CDR", json_encode($arrData));
-    $smarty->assign("DELMSG", _tr("message_alert"));
-    $smarty->assign("puedeBorrar", json_encode($bPuedeBorrar));
-    $lang = get_language();
-    $smarty->assign("LANG",$lang);
-    $smarty->assign("module_name","monitoring");
-    $content .= $oFilterForm->fetchForm("$local_templates_dir/filter.tpl", "", $paramFilter);
-    $content .= $smarty->fetch("$local_templates_dir/datatables.tpl");
-    return $content;
+            .kpi-card-info { flex: 1; }
+            .kpi-card-title { font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; }
+            .kpi-card-val { font-size: 22px; font-weight: 800; color: #0f172a; line-height: 1.2; }
+            .kpi-card-desc { font-size: 11px; color: #94a3b8; margin-top: 2px; }
+
+            .filter-card-box {
+                background: #ffffff;
+                border-radius: 12px;
+                padding: 16px 20px;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+                border: 1px solid #e2e8f0;
+                margin-bottom: 18px;
+            }
+            .filter-inline-row {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 12px;
+                align-items: flex-end;
+            }
+            .filter-field-group {
+                display: flex;
+                flex-direction: column;
+                gap: 4px;
+                flex: 1;
+                min-width: 140px;
+            }
+            .filter-field-group label {
+                font-size: 11px;
+                font-weight: 700;
+                color: #475569;
+            }
+            .filter-input {
+                padding: 7px 10px;
+                border-radius: 8px;
+                border: 1px solid #cbd5e1;
+                font-size: 12px;
+                color: #1e293b;
+                outline: none;
+                background: #ffffff;
+                transition: border-color 0.2s;
+            }
+            .filter-input:focus { border-color: #7c3aed; }
+
+            .filter-btn-row {
+                display: flex;
+                gap: 8px;
+                align-items: center;
+            }
+            .btn-action {
+                padding: 8px 16px;
+                border-radius: 8px;
+                font-size: 12px;
+                font-weight: 700;
+                border: none;
+                cursor: pointer;
+                transition: all 0.2s;
+                display: inline-flex;
+                align-items: center;
+                gap: 6px;
+            }
+            .btn-search {
+                background: linear-gradient(135deg, #7c3aed, #6d28d9);
+                color: #ffffff;
+                box-shadow: 0 2px 6px rgba(124,58,237,0.3);
+            }
+            .btn-search:hover { background: linear-gradient(135deg, #6d28d9, #5b21b6); }
+
+            .btn-delete-sel {
+                background: #ef4444;
+                color: #ffffff;
+            }
+            .btn-delete-sel:hover { background: #dc2626; }
+
+            .table-card-box {
+                background: #ffffff;
+                border-radius: 12px;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+                border: 1px solid #e2e8f0;
+                overflow: hidden;
+            }
+            .monitoring-table {
+                width: 100%;
+                border-collapse: collapse;
+                text-align: left;
+            }
+            .monitoring-table thead {
+                background: #334155;
+                color: #ffffff;
+            }
+            .monitoring-table th {
+                padding: 10px 14px;
+                font-size: 10px;
+                font-weight: 800;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+            }
+            .monitoring-table td {
+                padding: 10px 14px;
+                border-bottom: 1px solid #f1f5f9;
+                font-size: 12px;
+                vertical-align: middle;
+            }
+            .monitoring-table tbody tr:hover { background: #f8fafc; }
+
+            .pagination-bar {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 12px 16px;
+                background: #ffffff;
+                border-top: 1px solid #f1f5f9;
+            }
+            .pagination-info { font-size: 12px; color: #64748b; font-weight: 600; }
+            .pagination-btns { display: flex; gap: 6px; }
+            .page-link-btn {
+                padding: 5px 12px;
+                border-radius: 6px;
+                background: #f1f5f9;
+                color: #334155;
+                font-size: 12px;
+                font-weight: 700;
+                text-decoration: none;
+                border: 1px solid #cbd5e1;
+                transition: background 0.2s;
+            }
+            .page-link-btn:hover { background: #e2e8f0; }
+            .page-link-btn.disabled { opacity: 0.5; pointer-events: none; }
+
+            #audioModalMonitoring {
+                display: none;
+                position: fixed;
+                top: 0; left: 0; width: 100%; height: 100%;
+                background: rgba(15, 23, 42, 0.6);
+                backdrop-filter: blur(4px);
+                z-index: 99999;
+                align-items: center;
+                justify-content: center;
+            }
+            .modal-content-box {
+                background: #ffffff;
+                border-radius: 12px;
+                padding: 24px;
+                width: 420px;
+                box-shadow: 0 20px 25px -5px rgba(0,0,0,0.2);
+                text-align: center;
+            }
+        </style>
+    </head>
+    <body>
+        <form id="monitoringFormMain" method="POST" action="index.php?menu=<?php echo htmlspecialchars($module_name); ?>">
+            <input type="hidden" name="action_type" id="action_type" value="" />
+
+            <div class="monitoring-root">
+                <!-- Header Principal -->
+                <div class="monitoring-header">
+                    <div class="monitoring-title">
+                        <h2>Relatório de Gravações de Chamadas - IPbx Prisma</h2>
+                        <p>Consulta, reprodução e gerenciamento de áudios de chamadas gravadas no sistema</p>
+                    </div>
+                    <div class="monitoring-top-btns">
+                        <a href="modules/monitoring/help/index.html" target="_blank" class="btn-top btn-top-manual">📖 Manual</a>
+                        <button type="button" onclick="window.open('?menu=<?php echo htmlspecialchars($module_name); ?>&rawmode=yes', '_blank')" class="btn-top btn-top-expand">↗ Expandir Aba</button>
+                    </div>
+                </div>
+
+                <!-- Cards KPI Topo -->
+                <div class="kpi-grid">
+                    <div class="kpi-card-box">
+                        <div class="kpi-icon-circle kpi-icon-total">🎙️</div>
+                        <div class="kpi-card-info">
+                            <div class="kpi-card-title">Total Gravações</div>
+                            <div class="kpi-card-val"><?php echo number_format($totalCount, 0, ',', '.'); ?></div>
+                            <div class="kpi-card-desc">No período selecionado</div>
+                        </div>
+                    </div>
+                    <div class="kpi-card-box">
+                        <div class="kpi-icon-circle kpi-icon-inc">⬇️</div>
+                        <div class="kpi-card-info">
+                            <div class="kpi-card-title">Entrada</div>
+                            <div class="kpi-card-val"><?php echo number_format($incCount, 0, ',', '.'); ?></div>
+                            <div class="kpi-card-desc">Gravações receptivas</div>
+                        </div>
+                    </div>
+                    <div class="kpi-card-box">
+                        <div class="kpi-icon-circle kpi-icon-out">⬆️</div>
+                        <div class="kpi-card-info">
+                            <div class="kpi-card-title">Saída</div>
+                            <div class="kpi-card-val"><?php echo number_format($outCount, 0, ',', '.'); ?></div>
+                            <div class="kpi-card-desc">Gravações ativas</div>
+                        </div>
+                    </div>
+                    <div class="kpi-card-box">
+                        <div class="kpi-icon-circle kpi-icon-queue">👥</div>
+                        <div class="kpi-card-info">
+                            <div class="kpi-card-title">Fila / Grupo</div>
+                            <div class="kpi-card-val"><?php echo number_format($queueCount + $groupCount, 0, ',', '.'); ?></div>
+                            <div class="kpi-card-desc">Atendimento de grupo</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Card de Filtros Compacto -->
+                <div class="filter-card-box">
+                    <div class="filter-inline-row">
+                        <div class="filter-field-group">
+                            <label>📅 Data Inicial</label>
+                            <input type="date" name="date_start" value="<?php echo htmlspecialchars($date_start); ?>" class="filter-input" />
+                        </div>
+                        <div class="filter-field-group">
+                            <label>📅 Data Final</label>
+                            <input type="date" name="date_end" value="<?php echo htmlspecialchars($date_end); ?>" class="filter-input" />
+                        </div>
+                        <div class="filter-field-group">
+                            <label>📌 Campo Busca</label>
+                            <select name="filter_field" class="filter-input">
+                                <option value="src" <?php if ($filter_field == 'src') echo 'selected'; ?>>Origem (src / ramal)</option>
+                                <option value="dst" <?php if ($filter_field == 'dst') echo 'selected'; ?>>Destino (dst / número)</option>
+                            </select>
+                        </div>
+                        <div class="filter-field-group">
+                            <label>📞 Padrão / Número</label>
+                            <input type="text" name="filter_value" value="<?php echo htmlspecialchars($filter_value); ?>" placeholder="Ex: 5001 ou 99988..." class="filter-input" />
+                        </div>
+                        <div class="filter-field-group">
+                            <label>🏷️ Tipo Gravação</label>
+                            <select name="rec_type" class="filter-input">
+                                <option value="ALL" <?php if ($rec_type == 'ALL') echo 'selected'; ?>>-- Todos os Tipos --</option>
+                                <option value="incoming" <?php if ($rec_type == 'incoming') echo 'selected'; ?>>⬇️ Entrada (Incoming)</option>
+                                <option value="outgoing" <?php if ($rec_type == 'outgoing') echo 'selected'; ?>>⬆️ Saída (Outgoing)</option>
+                                <option value="queue" <?php if ($rec_type == 'queue') echo 'selected'; ?>>👥 Fila (Queue)</option>
+                                <option value="group" <?php if ($rec_type == 'group') echo 'selected'; ?>>👤+ Grupo (Group)</option>
+                            </select>
+                        </div>
+                        <div class="filter-field-group">
+                            <label>📊 Limite / Pág</label>
+                            <select name="limit" class="filter-input">
+                                <option value="20" <?php if ($limit == 20) echo 'selected'; ?>>20 por pág</option>
+                                <option value="50" <?php if ($limit == 50) echo 'selected'; ?>>50 por pág</option>
+                                <option value="100" <?php if ($limit == 100) echo 'selected'; ?>>100 por pág</option>
+                                <option value="1000" <?php if ($limit == 1000) echo 'selected'; ?>>1.000 (Geral)</option>
+                            </select>
+                        </div>
+                        <div class="filter-btn-row">
+                            <button type="submit" class="btn-action btn-search">🔍 Filtrar</button>
+                            <?php if ($bPuedeBorrar): ?>
+                                <button type="button" onclick="submitDeleteMonitoring()" class="btn-action btn-delete-sel">🗑️ Excluir Selecionadas</button>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tabela de Gravações -->
+                <div class="table-card-box">
+                    <table class="monitoring-table">
+                        <thead>
+                            <tr>
+                                <?php if ($bPuedeBorrar): ?>
+                                    <th style="width:30px; text-align:center;"><input type="checkbox" onclick="toggleSelectAllMonitoring(this)" /></th>
+                                <?php endif; ?>
+                                <th>ID Único</th>
+                                <th>Data / Hora</th>
+                                <th>Origem</th>
+                                <th>Destino</th>
+                                <th>Duração</th>
+                                <th>Tipo</th>
+                                <th>Gravação / Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php if (is_array($pageList) && count($pageList) > 0): ?>
+                                <?php foreach ($pageList as $value): ?>
+                                    <?php
+                                    $uniqueId  = $value['uniqueid'];
+                                    $calldate  = date('d/m/Y H:i:s', strtotime($value['calldate']));
+                                    $src       = !empty($value['cnum']) ? $value['cnum'] : $value['src'];
+                                    $dst       = !empty($value['dst']) ? $value['dst'] : '-';
+                                    $durSecs   = (int)$value['duration'];
+                                    $durText   = SecToHHMMSS($durSecs);
+
+                                    // Type Badge
+                                    $fname = basename($value['recordingfile']);
+                                    $recTypeTag = '';
+                                    if ($fname == 'deleted') {
+                                        $recTypeTag = '<span style="background: rgba(239,68,68,0.15); color: #ef4444; border: 1px solid rgba(239,68,68,0.4); border-radius: 12px; padding: 4px 10px; font-weight: 600; font-size: 11px;">🗑️ Excluída</span>';
+                                    } else {
+                                        $char = strtolower($fname[0]);
+                                        if ($char == 'o') {
+                                            $recTypeTag = '<span style="background: rgba(59,130,246,0.15); color: #2563eb; border: 1px solid rgba(96,165,250,0.4); border-radius: 12px; padding: 4px 10px; font-weight: 600; font-size: 11px; display: inline-flex; align-items: center; gap: 4px;"><i class="fa fa-arrow-up"></i> Saída</span>';
+                                        } elseif ($char == 'q') {
+                                            $recTypeTag = '<span style="background: rgba(168,85,247,0.15); color: #7c3aed; border: 1px solid rgba(192,132,252,0.4); border-radius: 12px; padding: 4px 10px; font-weight: 600; font-size: 11px; display: inline-flex; align-items: center; gap: 4px;"><i class="fa fa-users"></i> Fila</span>';
+                                        } elseif ($char == 'g' || $char == 'r') {
+                                            $recTypeTag = '<span style="background: rgba(234,179,8,0.15); color: #d97706; border: 1px solid rgba(253,224,71,0.4); border-radius: 12px; padding: 4px 10px; font-weight: 600; font-size: 11px; display: inline-flex; align-items: center; gap: 4px;"><i class="fa fa-user-plus"></i> Grupo</span>';
+                                        } else {
+                                            $recTypeTag = '<span style="background: rgba(34,197,94,0.15); color: #16a34a; border: 1px solid rgba(74,222,128,0.4); border-radius: 12px; padding: 4px 10px; font-weight: 600; font-size: 11px; display: inline-flex; align-items: center; gap: 4px;"><i class="fa fa-arrow-down"></i> Entrada</span>';
+                                        }
+                                    }
+
+                                    // Action buttons / Audio check
+                                    $recinfo = $pMonitoring->resolveRecordingPath($value['recordingfile']);
+                                    $actionHtml = '';
+                                    if ($fname == 'deleted') {
+                                        $actionHtml = '<span style="color:#ef4444; font-size:11px; font-weight:600;">Excluída</span>';
+                                    } elseif (is_null($recinfo['fullpath'])) {
+                                        $actionHtml = '<span style="color: #94a3b8; font-size: 11px; background: rgba(148,163,184,0.15); border: 1px solid rgba(148,163,184,0.3); border-radius: 12px; padding: 4px 10px; font-weight: 500; display: inline-flex; align-items: center; gap: 4px;"><i class="fa fa-microphone-slash"></i> Gravação Ausente</span>';
+                                    } else {
+                                        $urlparams = array(
+                                            'menu'     => $module_name,
+                                            'action'   => 'download',
+                                            'id'       => $uniqueId,
+                                            'namefile' => $fname,
+                                            'rawmode'  => 'yes',
+                                        );
+                                        $downloadUrl = 'index.php?' . http_build_query($urlparams);
+                                        $urlparamsStream = $urlparams;
+                                        $urlparamsStream['action'] = 'display_record';
+                                        $streamUrl = 'index.php?' . http_build_query($urlparamsStream);
+
+                                        $actionHtml = "<div style='display:inline-flex; gap:6px; align-items:center;'>".
+                                            "<button type='button' onclick=\"playMonitoringAudio('".htmlspecialchars($downloadUrl, ENT_QUOTES)."')\" style='background: linear-gradient(135deg, #7c3aed, #6d28d9); color: #ffffff; border: none; border-radius: 20px; padding: 4px 12px; font-weight: 700; font-size: 11px; cursor: pointer; box-shadow: 0 2px 6px rgba(124,58,237,0.3); transition: all 0.2s;'>▶ Ouvir</button>".
+                                            "<a href='".htmlspecialchars($downloadUrl, ENT_QUOTES)."' target='_blank' style='background: rgba(255,255,255,0.08); color: #6d28d9; border: 1px solid rgba(124,58,237,0.4); border-radius: 20px; padding: 3px 10px; font-weight: 600; font-size: 10px; text-decoration: none; transition: all 0.2s;'>⬇️ Baixar</a>".
+                                            "</div>";
+                                    }
+                                    ?>
+                                    <tr>
+                                        <?php if ($bPuedeBorrar): ?>
+                                            <td style="text-align:center;">
+                                                <input type="checkbox" name="selected_uniqueids[]" value="<?php echo htmlspecialchars($uniqueId); ?>" class="chk-mon-row" />
+                                            </td>
+                                        <?php endif; ?>
+                                        <td><span style="color:#64748b; font-size:11px; font-family:monospace; font-weight:bold;"><code><?php echo htmlspecialchars($uniqueId); ?></code></span></td>
+                                        <td><span style="color:#334155; font-size:11px; font-weight:600;">📅 <?php echo htmlspecialchars($calldate); ?></span></td>
+                                        <td><span style="font-weight:600; color:#1e293b;">📞 <?php echo htmlspecialchars($src); ?></span></td>
+                                        <td><span style="background:#ede9fe; color:#6d28d9; padding:3px 8px; border-radius:6px; font-weight:600; font-size:11px;">🎯 <?php echo htmlspecialchars($dst); ?></span></td>
+                                        <td><span style="color:#0f172a; font-weight:700; font-size:11px;">⏱️ <?php echo htmlspecialchars($durText); ?></span></td>
+                                        <td><?php echo $recTypeTag; ?></td>
+                                        <td><?php echo $actionHtml; ?></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            <?php else: ?>
+                                <tr>
+                                    <td colspan="<?php echo $bPuedeBorrar ? 8 : 7; ?>" style="text-align:center; padding:30px; color:#64748b;">
+                                        🎙️ Nenhuma gravação de chamada encontrada para os filtros selecionados.
+                                    </td>
+                                </tr>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+
+                    <!-- Barra de Paginação Executiva -->
+                    <div class="pagination-bar">
+                        <div class="pagination-info">
+                            Exibindo <?php echo count($pageList); ?> de <?php echo number_format($totalCount, 0, ',', '.'); ?> gravações (Página <?php echo $page; ?> de <?php echo $totalPages; ?>)
+                        </div>
+                        <div class="pagination-btns">
+                            <?php
+                            $navParams = array(
+                                'menu'         => $module_name,
+                                'date_start'   => $date_start,
+                                'date_end'     => $date_end,
+                                'filter_field' => $filter_field,
+                                'filter_value' => $filter_value,
+                                'rec_type'     => $rec_type,
+                                'limit'        => $limit
+                            );
+                            $prevPage = max(1, $page - 1);
+                            $nextPage = min($totalPages, $page + 1);
+
+                            $prevUrl = '?' . http_build_query(array_merge($navParams, array('page' => $prevPage)));
+                            $nextUrl = '?' . http_build_query(array_merge($navParams, array('page' => $nextPage)));
+                            ?>
+                            <a href="<?php echo $prevUrl; ?>" class="page-link-btn <?php if ($page <= 1) echo 'disabled'; ?>">◀ Anterior</a>
+                            <a href="<?php echo $nextUrl; ?>" class="page-link-btn <?php if ($page >= $totalPages) echo 'disabled'; ?>">Próxima ▶</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </form>
+
+        <!-- Modal Player de Audio -->
+        <div id="audioModalMonitoring">
+            <div class="modal-content-box">
+                <h4 style="margin:0 0 12px 0; color:#1e293b; font-size:15px; font-weight:800;">🎧 Reproduzindo Gravação de Chamada</h4>
+                <audio id="monAudioElement" controls style="width:100%; margin-bottom:15px;"></audio>
+                <button type="button" onclick="closeMonitoringAudioModal()" style="background:#64748b; color:#fff; border:none; padding:6px 16px; border-radius:6px; font-weight:bold; cursor:pointer;">Fechar</button>
+            </div>
+        </div>
+
+        <script>
+            function playMonitoringAudio(audioUrl) {
+                var modal = document.getElementById('audioModalMonitoring');
+                var audio = document.getElementById('monAudioElement');
+                audio.src = audioUrl;
+                modal.style.display = 'flex';
+                audio.play();
+            }
+            function closeMonitoringAudioModal() {
+                var modal = document.getElementById('audioModalMonitoring');
+                var audio = document.getElementById('monAudioElement');
+                audio.pause();
+                audio.currentTime = 0;
+                modal.style.display = 'none';
+            }
+            function toggleSelectAllMonitoring(master) {
+                var checkboxes = document.querySelectorAll('.chk-mon-row');
+                for (var i = 0; i < checkboxes.length; i++) {
+                    checkboxes[i].checked = master.checked;
+                }
+            }
+            function submitDeleteMonitoring() {
+                var checked = document.querySelectorAll('.chk-mon-row:checked');
+                if (checked.length === 0) {
+                    alert('Por favor, selecione ao menos uma gravação para excluir.');
+                    return;
+                }
+                if (confirm('Tem certeza de que deseja excluir as ' + checked.length + ' gravações selecionadas? Esta ação não pode ser desfeita.')) {
+                    document.getElementById('action_type').value = 'delete_records';
+                    document.getElementById('monitoringFormMain').submit();
+                }
+            }
+        </script>
+    </body>
+    </html>
+    <?php
+    return ob_get_clean();
 }
 
 function formatCallRecordingTuple($value)
