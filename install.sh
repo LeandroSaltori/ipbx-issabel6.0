@@ -354,20 +354,24 @@ if [ -d "$PANEL_SRC" ]; then
 fi
 
 # Implantação do Módulo Gerenciador de Nome dos Ramais (nome_ramais & ramais)
-if [ -d "$REPO_DIR/src/modules/nome_ramais" ]; then
-    log_info "Implantando Módulo Gerenciador de Nome dos Ramais (nome_ramais)..."
-    mkdir -p /var/www/html/nome_ramais
-    mkdir -p /var/www/html/ramais
-    mkdir -p /var/www/html/modules/nome_ramais
-    mkdir -p /var/www/html/modules/ramais
-    
+log_info "Implantando Módulo Gerenciador de Nome dos Ramais (nome_ramais)..."
+mkdir -p /var/www/html/nome_ramais
+mkdir -p /var/www/html/ramais
+mkdir -p /var/www/html/modules/nome_ramais
+mkdir -p /var/www/html/modules/ramais
+
+if [ -d "$REPO_DIR/src/nome_ramais" ]; then
+    /bin/cp -rf "$REPO_DIR/src/nome_ramais/"* /var/www/html/nome_ramais/
+    /bin/cp -rf "$REPO_DIR/src/nome_ramais/"* /var/www/html/modules/nome_ramais/ 2>/dev/null || true
+elif [ -d "$REPO_DIR/src/modules/nome_ramais" ]; then
     /bin/cp -rf "$REPO_DIR/src/modules/nome_ramais/"* /var/www/html/nome_ramais/
-    /bin/cp -rf "$REPO_DIR/src/modules/nome_ramais/"* /var/www/html/modules/nome_ramais/
-    
-    if [ -d "$REPO_DIR/src/ramais" ]; then
-        /bin/cp -rf "$REPO_DIR/src/ramais/"* /var/www/html/ramais/
-        /bin/cp -rf "$REPO_DIR/src/ramais/"* /var/www/html/modules/ramais/ 2>/dev/null || true
-    fi
+    /bin/cp -rf "$REPO_DIR/src/modules/nome_ramais/"* /var/www/html/modules/nome_ramais/ 2>/dev/null || true
+fi
+
+if [ -d "$REPO_DIR/src/ramais" ]; then
+    /bin/cp -rf "$REPO_DIR/src/ramais/"* /var/www/html/ramais/
+    /bin/cp -rf "$REPO_DIR/src/ramais/"* /var/www/html/modules/ramais/ 2>/dev/null || true
+fi
 
     # Garante permissões sudo para o usuário asterisk aplicar reload no Asterisk/Issabel
     echo "asterisk ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/asterisk 2>/dev/null || true
