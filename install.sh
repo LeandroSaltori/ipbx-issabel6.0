@@ -369,7 +369,23 @@ if [ -d "$REPO_DIR/src/modules/nome_ramais" ]; then
 
     chown -R asterisk:asterisk /var/www/html/ramais /var/www/html/nome_ramais /var/www/html/modules/nome_ramais /var/www/html/modules/ramais 2>/dev/null || true
     chmod -R 755 /var/www/html/ramais /var/www/html/nome_ramais /var/www/html/modules/nome_ramais /var/www/html/modules/ramais 2>/dev/null || true
-    log_success "Módulo Gerenciador de Nome dos Ramais implantado."
+
+    if command -v sqlite3 &>/dev/null; then
+        # Registra 'Nome Ramais' no menu PBX (pbxconfig)
+        sqlite3 /var/www/db/menu.db "DELETE FROM menu WHERE id = 'nome_ramais' OR Link LIKE '%nome_ramais%';" 2>/dev/null || true
+        sqlite3 /var/www/db/menu.db "INSERT INTO menu (id, IdParent, Link, Name, Type, order_no) VALUES ('nome_ramais', 'pbxconfig', 'nome_ramais/', 'Nome Ramais', 'framed', 15);" 2>/dev/null || true
+        
+        # Registra permissões de acesso para todos os grupos no acl.db
+        sqlite3 /var/www/db/acl.db "DELETE FROM acl_resource WHERE name = 'nome_ramais';" 2>/dev/null || true
+        sqlite3 /var/www/db/acl.db "INSERT INTO acl_resource (name, description) VALUES ('nome_ramais', 'Nome Ramais');" 2>/dev/null || true
+        sqlite3 /var/www/db/acl.db "DELETE FROM acl_group_permission WHERE id_resource IN (SELECT id FROM acl_resource WHERE name = 'nome_ramais');" 2>/dev/null || true
+        sqlite3 /var/www/db/acl.db "INSERT INTO acl_group_permission (id_action, id_group, id_resource) SELECT 1, g.id, r.id FROM acl_group g CROSS JOIN acl_resource r WHERE r.name = 'nome_ramais';" 2>/dev/null || true
+        
+        # Redireciona módulos legados de ramais caso existam (ex: myex_config ou ramais)
+        sqlite3 /var/www/db/menu.db "UPDATE menu SET Link = 'nome_ramais/', Type = 'framed' WHERE id = 'myex_config' OR id = 'ramais';" 2>/dev/null || true
+    fi
+
+    log_success "Módulo Gerenciador de Nome dos Ramais implantado e registrado no menu PBX."
 fi
 
 # ==============================================================================
