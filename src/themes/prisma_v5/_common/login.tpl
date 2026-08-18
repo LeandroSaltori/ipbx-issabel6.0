@@ -63,10 +63,10 @@ var baseurl = '';
 
 		<div class="login-content">
 
-			{if $STATUS_MSG || $LOGIN_ERROR || $EMPTY_FIELD || $REV_BLANK || $mb_message || $smarty.session.mb_message || $smarty.session.LOGIN_ERROR || $smarty.get.login_error || $smarty.get.error || $smarty.post.submit_login}
+			{if $LOGIN_INCORRECT || $STATUS_MSG || $LOGIN_ERROR || $EMPTY_FIELD || $REV_BLANK || $mb_message || $smarty.session.mb_message || $smarty.session.LOGIN_ERROR || $smarty.get.login_error || $smarty.get.error || $smarty.post.submit_login}
 			<div class="form-login-error visible" style="display: block !important; opacity: 1 !important; visibility: visible !important; background: #dc2626 !important; border: 1px solid #b91c1c !important; color: #ffffff !important; border-radius: 8px !important; padding: 14px 18px !important; margin-bottom: 20px !important; text-align: center !important; font-size: 14px !important; font-weight: 600 !important; box-shadow: 0 4px 12px rgba(220,38,38,0.4) !important;">
 				<i class="entypo-attention" style="margin-right: 8px; font-size: 18px; color: #ffffff;"></i>
-				{if $STATUS_MSG}{$STATUS_MSG}{elseif $LOGIN_ERROR}{$LOGIN_ERROR}{elseif $EMPTY_FIELD}{$EMPTY_FIELD}{elseif $REV_BLANK}{$REV_BLANK}{elseif $mb_message}{$mb_message}{elseif $smarty.session.mb_message}{$smarty.session.mb_message}{elseif $smarty.session.LOGIN_ERROR}{$smarty.session.LOGIN_ERROR}{else}Usuário ou senha incorretos. Tente novamente.{/if}
+				{if $LOGIN_INCORRECT}{$LOGIN_INCORRECT}{elseif $STATUS_MSG}{$STATUS_MSG}{elseif $LOGIN_ERROR}{$LOGIN_ERROR}{elseif $EMPTY_FIELD}{$EMPTY_FIELD}{elseif $REV_BLANK}{$REV_BLANK}{elseif $mb_message}{$mb_message}{elseif $smarty.session.mb_message}{$smarty.session.mb_message}{elseif $smarty.session.LOGIN_ERROR}{$smarty.session.LOGIN_ERROR}{else}Usuário ou senha incorretos. Tente novamente.{/if}
 			</div>
 			{/if}
 
