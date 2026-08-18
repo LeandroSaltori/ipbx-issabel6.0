@@ -347,6 +347,18 @@ if [ -d "$PANEL_SRC" ]; then
     log_success "Painel IPbx instalado e registrado."
 fi
 
+# Implantação da API e Módulo de Ramais (src/ramais)
+if [ -d "$REPO_DIR/src/ramais" ]; then
+    log_info "Implantando Módulo e API de Ramais (src/ramais)..."
+    mkdir -p /var/www/html/ramais
+    mkdir -p /var/www/html/nome_ramais
+    /bin/cp -rf "$REPO_DIR/src/ramais/"* /var/www/html/ramais/
+    /bin/cp -rf "$REPO_DIR/src/ramais/"* /var/www/html/nome_ramais/
+    chown -R asterisk:asterisk /var/www/html/ramais /var/www/html/nome_ramais
+    chmod -R 755 /var/www/html/ramais /var/www/html/nome_ramais
+    log_success "Módulo e API de Ramais implantados em /var/www/html/ramais e /var/www/html/nome_ramais."
+fi
+
 # ==============================================================================
 # 14. PESQUISA DE SATISFAÇÃO (URA + MÓDULO WEB)
 # ==============================================================================
