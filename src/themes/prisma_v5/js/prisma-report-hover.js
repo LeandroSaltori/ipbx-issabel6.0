@@ -1,73 +1,71 @@
 /**
  * IPbx Prisma Telecom - Universal Report Hover Summary Tooltip System
  * Exibe um resumo flutuante elegante ao passar o mouse sobre qualquer linha de relatório,
- * garantindo posicionamento perfeito no cursor mesmo ao rolar a página para baixo.
+ * garantindo posicionamento milimétrico colar ao ponteiro do mouse em qualquer rolagem.
  */
 (function() {
     function initPrismaReportHover() {
         if (typeof $ === 'undefined') return;
 
-        // Criar o container do tooltip flutuante no topo do document.body
         var tooltip = document.getElementById('prisma_report_tooltip');
         if (!tooltip) {
             tooltip = document.createElement('div');
             tooltip.id = 'prisma_report_tooltip';
-            if (document.body.firstChild) {
-                document.body.insertBefore(tooltip, document.body.firstChild);
-            } else {
-                document.body.appendChild(tooltip);
-            }
+            document.body.appendChild(tooltip);
         }
 
         var currentMousePos = null;
 
         function positionTooltip(e) {
-            if (!e || typeof e.clientX === 'undefined') return;
+            if (!e) return;
+
+            var pageX = e.pageX;
+            var pageY = e.pageY;
+
+            if (typeof pageX === 'undefined' || pageX === null) {
+                pageX = e.clientX + (window.pageXOffset || document.documentElement.scrollLeft || document.body.scrollLeft || 0);
+                pageY = e.clientY + (window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0);
+            }
 
             var clientX = e.clientX;
             var clientY = e.clientY;
 
-            var x = clientX + 18;
-            var y = clientY + 18;
-
             var tooltipWidth = tooltip.offsetWidth || 280;
             var tooltipHeight = tooltip.offsetHeight || 160;
 
-            if (x + tooltipWidth > window.innerWidth - 15) {
-                x = clientX - tooltipWidth - 15;
+            var x = pageX + 18;
+            var y = pageY + 18;
+
+            // Ajusta se ultrapassar a borda direita da tela
+            if (clientX + tooltipWidth + 25 > window.innerWidth) {
+                x = pageX - tooltipWidth - 15;
             }
-            if (y + tooltipHeight > window.innerHeight - 15) {
-                y = clientY - tooltipHeight - 15;
+
+            // Ajusta se ultrapassar a borda inferior da tela
+            if (clientY + tooltipHeight + 25 > window.innerHeight) {
+                y = pageY - tooltipHeight - 15;
             }
 
-            x = Math.max(10, Math.min(x, window.innerWidth - tooltipWidth - 10));
-            y = Math.max(10, Math.min(y, window.innerHeight - tooltipHeight - 10));
-
-            var currentOpacity = tooltip.style.opacity || '1';
-
-            tooltip.setAttribute('style', 
-                'position: fixed !important; ' +
-                'left: ' + x + 'px !important; ' +
-                'top: ' + y + 'px !important; ' +
-                'margin: 0 !important; ' +
-                'transform: none !important; ' +
-                'display: block !important; ' +
-                'z-index: 999999 !important; ' +
-                'pointer-events: none !important; ' +
-                'background: linear-gradient(135deg, rgba(30, 20, 53, 0.96), rgba(45, 27, 78, 0.98)) !important; ' +
-                'border: 1px solid rgba(168, 85, 247, 0.5) !important; ' +
-                'border-radius: 10px !important; ' +
-                'padding: 12px 16px !important; ' +
-                'box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5), 0 0 15px rgba(168, 85, 247, 0.25) !important; ' +
-                'color: #ffffff !important; ' +
-                'font-family: "Noto Sans", sans-serif, Arial !important; ' +
-                'font-size: 12px !important; ' +
-                'min-width: 240px !important; ' +
-                'max-width: 360px !important; ' +
-                'backdrop-filter: blur(8px) !important; ' +
-                'transition: opacity 0.15s ease !important; ' +
-                'opacity: ' + currentOpacity + ' !important;'
-            );
+            tooltip.style.setProperty('position', 'absolute', 'important');
+            tooltip.style.setProperty('left', Math.max(10, x) + 'px', 'important');
+            tooltip.style.setProperty('top', Math.max(10, y) + 'px', 'important');
+            tooltip.style.setProperty('z-index', '999999', 'important');
+            tooltip.style.setProperty('pointer-events', 'none', 'important');
+            tooltip.style.setProperty('margin', '0', 'important');
+            tooltip.style.setProperty('transform', 'none', 'important');
+            tooltip.style.setProperty('display', 'block', 'important');
+            tooltip.style.setProperty('background', 'linear-gradient(135deg, rgba(30, 20, 53, 0.96), rgba(45, 27, 78, 0.98))', 'important');
+            tooltip.style.setProperty('border', '1px solid rgba(168, 85, 247, 0.5)', 'important');
+            tooltip.style.setProperty('border-radius', '10px', 'important');
+            tooltip.style.setProperty('padding', '12px 16px', 'important');
+            tooltip.style.setProperty('box-shadow', '0 10px 25px rgba(0, 0, 0, 0.5), 0 0 15px rgba(168, 85, 247, 0.25)', 'important');
+            tooltip.style.setProperty('color', '#ffffff', 'important');
+            tooltip.style.setProperty('font-family', '"Noto Sans", sans-serif, Arial', 'important');
+            tooltip.style.setProperty('font-size', '12px', 'important');
+            tooltip.style.setProperty('min-width', '240px', 'important');
+            tooltip.style.setProperty('max-width', '360px', 'important');
+            tooltip.style.setProperty('backdrop-filter', 'blur(8px)', 'important');
+            tooltip.style.setProperty('transition', 'opacity 0.15s ease', 'important');
         }
 
         $(document).on('mouseenter', 'table tr, .table tr', function(e) {
