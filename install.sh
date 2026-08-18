@@ -171,9 +171,19 @@ if [ -d "$REPO_DIR/src/modules/asternic_cdr" ]; then
 
     # Registra o menu "Relatorio Geral" dentro da aba Reports (Relatórios)
     if command -v sqlite3 &>/dev/null; then
+        if [ -d /var/www/html/stats ]; then
+            R_LINK="/stats/"
+        elif [ -d /var/www/html/asternic ]; then
+            R_LINK="/asternic/"
+        elif [ -f /var/www/html/admin/config.php ]; then
+            R_LINK="admin/config.php?display=asternic_cdr"
+        else
+            R_LINK="index.php?menu=cdrreport"
+        fi
+
         sqlite3 /var/www/db/acl.db "INSERT OR IGNORE INTO acl_resource (name, description) VALUES ('relatorio_cdr', 'Relatorio Geral');" 2>/dev/null || true
-        sqlite3 /var/www/db/menu.db "DELETE FROM menu WHERE id = 'relatorio_cdr';" 2>/dev/null || true
-        sqlite3 /var/www/db/menu.db "INSERT INTO menu (id, IdParent, Link, Name, Type, order_no) VALUES ('relatorio_cdr', 'reports', 'admin/config.php?display=asternic_cdr', 'Relatorio Geral', 'framed', 10);" 2>/dev/null || true
+        sqlite3 /var/www/db/menu.db "DELETE FROM menu WHERE id = 'relatorio_cdr' OR id = 'relatorio_geral' OR id = 'asternic_cdr';" 2>/dev/null || true
+        sqlite3 /var/www/db/menu.db "INSERT INTO menu (id, IdParent, Link, Name, Type, order_no) VALUES ('relatorio_cdr', 'reports', '$R_LINK', 'Relatorio Geral', 'framed', 10);" 2>/dev/null || true
         sqlite3 /var/www/db/acl.db "INSERT OR IGNORE INTO acl_group_permission (id_action, id_group, id_resource) SELECT 1, 1, id FROM acl_resource WHERE name = 'relatorio_cdr';" 2>/dev/null || true
     fi
     log_success "Asternic CDR instalado e adicionado ao menu Relatórios."
@@ -460,7 +470,7 @@ if [ -d "$REPO_DIR/src/modules/pesquisa" ]; then
         else
             ASTERNIC_PATH="index.php?menu=cdrreport"
         fi
-        sqlite3 /var/www/db/menu.db "UPDATE menu SET Link = '$ASTERNIC_PATH' WHERE id = 'relatorio_geral' OR id = 'asternic_cdr' OR Link LIKE '%asternic%';" 2>/dev/null || true
+        sqlite3 /var/www/db/menu.db "UPDATE menu SET Link = '$ASTERNIC_PATH' WHERE id = 'relatorio_geral' OR id = 'asternic_cdr' OR id = 'relatorio_cdr' OR Link LIKE '%asternic%';" 2>/dev/null || true
         sqlite3 /var/www/db/menu.db "UPDATE menu SET Link = '/nome_ramais/' WHERE id = 'nome_ramais' OR id = 'ramais' OR Link LIKE '%nome_ramais%';" 2>/dev/null || true
         sqlite3 /var/www/db/menu.db "UPDATE menu SET Link = '/admin/config.php?display=blacklist' WHERE id = 'blacklist' OR Link LIKE '%blacklist%';" 2>/dev/null || true
     fi
