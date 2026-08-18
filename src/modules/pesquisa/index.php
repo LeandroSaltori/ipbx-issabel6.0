@@ -10,7 +10,7 @@
   +----------------------------------------------------------------------+
   | The Initial Developer of the Original Code is PaloSanto Solutions    |
   +----------------------------------------------------------------------+
-  $Id: index.php,v 16.0 2026-08-17 Prisma Telecom $ */
+  $Id: index.php,v 18.0 2026-08-18 Prisma Telecom $ */
 
 require_once "modules/agent_console/libs/issabel2.lib.php";
 include_once "libs/paloSantoDB.class.php";
@@ -158,7 +158,7 @@ function handleExportExcel($pPesquisa)
 
     $output = fopen('php://output', 'w');
     fprintf($output, chr(0xEF).chr(0xBB).chr(0xBF));
-    fputcsv($output, array('Operador / Ramal', 'Nome do Atendente', 'Fila', 'Data', 'Hora', 'Duracao', 'Telefone', 'Avaliacao', 'Problema Resolvido', 'Status Avaliacao'), ';');
+    fputcsv($output, array('Operador / Ramal', 'Nome do Atendente', 'Fila', 'Data', 'Hora', 'Duracao', 'Telefone', 'Avaliacao', 'Problema Resolvido'), ';');
 
     if (is_array($arrResult)) {
         foreach ($arrResult as $row) {
@@ -170,10 +170,6 @@ function handleExportExcel($pPesquisa)
             $val_telefone  = formatPhoneBr($raw_tel);
             $val_avaliacao = !empty($row['avaliacao']) ? $row['avaliacao'] : 'NÃO AVALIOU';
             $val_solucao   = !empty($row['solucao']) ? $row['solucao'] : 'NÃO AVALIOU';
-
-            $avUpper = strtoupper(trim($val_avaliacao));
-            $isEvaluated = !in_array($avUpper, array('NAO AVALIOU', 'NÃO AVALIOU', 'ABANDONOU', 'SEM RESPOSTA', 'DESISTIU', '0', ''));
-            $val_status_str = $isEvaluated ? 'Avaliado com Sucesso' : 'Cliente Desligou Sem Avaliar';
 
             $cdrInfo     = $pPesquisa->findCdrInfoForCall($raw_tel, !empty($row['data']) ? $row['data'] : '', $val_hora, $val_operador);
             $val_duracao = !empty($cdrInfo['duration_formatted']) ? $cdrInfo['duration_formatted'] : '-';
@@ -187,7 +183,7 @@ function handleExportExcel($pPesquisa)
                 $val_fila = '-';
             }
 
-            fputcsv($output, array($val_operador, $val_nome, $val_fila, $val_data, $val_hora, $val_duracao, $val_telefone, $val_avaliacao, $val_solucao, $val_status_str), ';');
+            fputcsv($output, array($val_operador, $val_nome, $val_fila, $val_data, $val_hora, $val_duracao, $val_telefone, $val_avaliacao, $val_solucao), ';');
         }
     }
     fclose($output);
@@ -246,7 +242,6 @@ function handleExportPdf($pPesquisa)
                     <th>Telefone</th>
                     <th>Avaliação</th>
                     <th>Problema Resolvido?</th>
-                    <th>Status</th>
                 </tr>
             </thead>
             <tbody>
@@ -261,9 +256,6 @@ function handleExportPdf($pPesquisa)
                 $val_telefone  = formatPhoneBr($raw_tel);
                 $val_avaliacao = !empty($row['avaliacao']) ? $row['avaliacao'] : 'NÃO AVALIOU';
                 $val_solucao   = !empty($row['solucao']) ? $row['solucao'] : 'NÃO AVALIOU';
-
-                $avUpper = strtoupper(trim($val_avaliacao));
-                $isEvaluated = !in_array($avUpper, array('NAO AVALIOU', 'NÃO AVALIOU', 'ABANDONOU', 'SEM RESPOSTA', 'DESISTIU', '0', ''));
 
                 $cdrInfo       = $pPesquisa->findCdrInfoForCall($raw_tel, !empty($row['data']) ? $row['data'] : '', $val_hora, $val_operador);
                 $val_duracao   = !empty($cdrInfo['duration_formatted']) ? $cdrInfo['duration_formatted'] : '-';
@@ -286,7 +278,6 @@ function handleExportPdf($pPesquisa)
                     <td>📞 <?php echo htmlspecialchars($val_telefone); ?></td>
                     <td><?php echo htmlspecialchars($val_avaliacao); ?></td>
                     <td><?php echo htmlspecialchars($val_solucao); ?></td>
-                    <td><?php echo $isEvaluated ? '✅ Avaliado' : '📵 Não Avaliou'; ?></td>
                 </tr>
                 <?php endforeach; ?>
             </tbody>
@@ -641,18 +632,6 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
             color: #0f172a;
             border-color: #cbd5e1;
         }
-
-        .status-icon-badge {
-            font-size: 18px;
-            cursor: help;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            transition: transform 0.2s;
-        }
-        .status-icon-badge:hover {
-            transform: scale(1.2);
-        }
     </style>
 
     <div class="pesquisa-root">
@@ -785,7 +764,6 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
                         <th>Telefone</th>
                         <th>Avaliação do Atendimento</th>
                         <th>Problema Resolvido?</th>
-                        <th style="text-align:center;">Status</th>
                         <th>Gravação</th>
                     </tr>
                 </thead>
@@ -885,13 +863,6 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
                                     }
                                     ?>
                                 </td>
-                                <td style="text-align:center;">
-                                    <?php if ($isEvaluated): ?>
-                                        <span title="Avaliado com Sucesso" class="status-icon-badge">✅</span>
-                                    <?php else: ?>
-                                        <span title="Cliente Desligou Sem Avaliar" class="status-icon-badge">📵</span>
-                                    <?php endif; ?>
-                                </td>
                                 <td>
                                     <?php if (!empty($recFile)): ?>
                                         <?php $fileEnc = urlencode($recFile); ?>
@@ -907,7 +878,7 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
                         <?php endforeach; ?>
                     <?php else: ?>
                         <tr>
-                            <td colspan="10" style="text-align:center; padding:25px; color:#64748b;">
+                            <td colspan="9" style="text-align:center; padding:25px; color:#64748b;">
                                 🚀 Nenhum registro encontrado para os filtros selecionados.
                             </td>
                         </tr>
