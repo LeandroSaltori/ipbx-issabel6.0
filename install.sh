@@ -826,7 +826,10 @@ log_success "User-Agent PJSIP configurado para IPbx-Prisma."
 # ==============================================================================
 # RECARGA DE SERVIÇOS E FINALIZAÇÃO
 # ==============================================================================
-log_info "Finalizando instalação e recarregando serviços..."
+log_info "Limpando cache de templates do Smarty e recarregando serviços..."
+rm -rf /var/www/html/var/templates_c/* 2>/dev/null || true
+rm -rf /tmp/smarty* 2>/dev/null || true
+
 asterisk -rx "module reload" 2>/dev/null || asterisk -rx "core reload" 2>/dev/null || true
 
 if systemctl is-active httpd &>/dev/null; then

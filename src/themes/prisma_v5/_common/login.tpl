@@ -63,7 +63,7 @@ var baseurl = '';
 
 		<div class="login-content">
 
-			{if $LOGIN_INCORRECT && $LOGIN_INCORRECT != ''}
+			{if $smarty.server.REQUEST_METHOD == 'POST' && $LOGIN_INCORRECT && $LOGIN_INCORRECT != ''}
 			<div id="login_error_alert" style="display: block !important; opacity: 1 !important; visibility: visible !important; background: rgba(220, 38, 38, 0.15) !important; border: 1px solid rgba(248, 113, 113, 0.4) !important; color: #fca5a5 !important; border-radius: 8px !important; padding: 12px 16px !important; margin-bottom: 20px !important; text-align: center !important; font-size: 14px !important; font-weight: 500 !important; line-height: 1.4 !important; backdrop-filter: blur(4px) !important; transition: opacity 1s ease-in-out;">
 				<i class="entypo-attention" style="margin-right: 6px; font-size: 16px; color: #f87171; vertical-align: middle;"></i>
 				<span style="vertical-align: middle;">Usuário ou senha incorretos. Tente novamente.</span>
