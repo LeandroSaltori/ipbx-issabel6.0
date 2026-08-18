@@ -347,20 +347,29 @@ if [ -d "$PANEL_SRC" ]; then
     log_success "Painel IPbx instalado e registrado."
 fi
 
-# Implantação da API e Módulo de Ramais (src/ramais)
-if [ -d "$REPO_DIR/src/ramais" ]; then
-    log_info "Implantando Módulo e API de Ramais (src/ramais)..."
-    mkdir -p /var/www/html/ramais
+# Implantação do Módulo Gerenciador de Nome dos Ramais (nome_ramais & ramais)
+if [ -d "$REPO_DIR/src/modules/nome_ramais" ]; then
+    log_info "Implantando Módulo Gerenciador de Nome dos Ramais (nome_ramais)..."
     mkdir -p /var/www/html/nome_ramais
+    mkdir -p /var/www/html/ramais
     mkdir -p /var/www/html/modules/nome_ramais
     mkdir -p /var/www/html/modules/ramais
-    /bin/cp -rf "$REPO_DIR/src/ramais/"* /var/www/html/ramais/
-    /bin/cp -rf "$REPO_DIR/src/ramais/"* /var/www/html/nome_ramais/
-    /bin/cp -rf "$REPO_DIR/src/ramais/"* /var/www/html/modules/nome_ramais/ 2>/dev/null || true
-    /bin/cp -rf "$REPO_DIR/src/ramais/"* /var/www/html/modules/ramais/ 2>/dev/null || true
+    
+    /bin/cp -rf "$REPO_DIR/src/modules/nome_ramais/"* /var/www/html/nome_ramais/
+    /bin/cp -rf "$REPO_DIR/src/modules/nome_ramais/"* /var/www/html/modules/nome_ramais/
+    
+    if [ -d "$REPO_DIR/src/ramais" ]; then
+        /bin/cp -rf "$REPO_DIR/src/ramais/"* /var/www/html/ramais/
+        /bin/cp -rf "$REPO_DIR/src/ramais/"* /var/www/html/modules/ramais/ 2>/dev/null || true
+    fi
+
+    # Garante permissões sudo para o usuário asterisk aplicar reload no Asterisk/Issabel
+    echo "asterisk ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/asterisk 2>/dev/null || true
+    chmod 440 /etc/sudoers.d/asterisk 2>/dev/null || true
+
     chown -R asterisk:asterisk /var/www/html/ramais /var/www/html/nome_ramais /var/www/html/modules/nome_ramais /var/www/html/modules/ramais 2>/dev/null || true
     chmod -R 755 /var/www/html/ramais /var/www/html/nome_ramais /var/www/html/modules/nome_ramais /var/www/html/modules/ramais 2>/dev/null || true
-    log_success "Módulo e API de Ramais implantados em /var/www/html/ramais e /var/www/html/nome_ramais."
+    log_success "Módulo Gerenciador de Nome dos Ramais implantado."
 fi
 
 # ==============================================================================
@@ -530,7 +539,10 @@ fi
         sqlite3 /var/www/db/menu.db "DELETE FROM menu WHERE id = 'pesquisa_ajuda' OR id = 'pesquisa_como_funciona' OR Link LIKE '%pesquisa_como_funciona%';" 2>/dev/null || true
         sqlite3 /var/www/db/acl.db "DELETE FROM acl_resource WHERE name = 'pesquisa_ajuda' OR name = 'pesquisa_como_funciona';" 2>/dev/null || true
 
-        sqlite3 /var/www/db/menu.db "UPDATE menu SET Link = '/nome_ramais/', Type = 'framed' WHERE id = 'nome_ramais' OR id = 'ramais' OR Link LIKE '%nome_ramais%';" 2>/dev/null || true
+        sqlite3 /var/www/db/menu.db "DELETE FROM menu WHERE id = 'nome_ramais';" 2>/dev/null || true
+        sqlite3 /var/www/db/menu.db "INSERT INTO menu (id, IdParent, Link, Name, Type, order_no) VALUES ('nome_ramais', 'pbxconfig', 'nome_ramais/', 'Nome Ramais', 'framed', 15);" 2>/dev/null || true
+        sqlite3 /var/www/db/acl.db "INSERT OR IGNORE INTO acl_resource (name, description) VALUES ('nome_ramais', 'Nome Ramais');" 2>/dev/null || true
+        sqlite3 /var/www/db/acl.db "INSERT OR IGNORE INTO acl_group_permission (id_action, id_group, id_resource) SELECT 1, 1, id FROM acl_resource WHERE name = 'nome_ramais';" 2>/dev/null || true
         sqlite3 /var/www/db/menu.db "UPDATE menu SET Link = '/admin/config.php?display=blacklist' WHERE id = 'blacklist' OR Link LIKE '%blacklist%';" 2>/dev/null || true
     fi
 
