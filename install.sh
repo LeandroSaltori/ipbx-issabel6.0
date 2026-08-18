@@ -705,6 +705,11 @@ if command -v sqlite3 &>/dev/null; then
     sqlite3 /var/www/db/menu.db "UPDATE menu SET Link = 'nome_ramais/', Type = 'framed' WHERE id = 'myex_config' OR id = 'ramais';" 2>/dev/null || true
 fi
 
+chown -R asterisk:asterisk /var/www/html/nome_ramais 2>/dev/null || true
+chown -R asterisk:asterisk /var/www/html/ramais 2>/dev/null || true
+chmod -R 755 /var/www/html/nome_ramais 2>/dev/null || true
+chmod -R 755 /var/www/html/ramais 2>/dev/null || true
+
 log_success "Módulo Gerenciador de Nome dos Ramais implantado em /var/www/html/nome_ramais."
 
 # ==============================================================================
