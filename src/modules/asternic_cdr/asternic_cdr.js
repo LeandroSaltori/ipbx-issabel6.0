@@ -641,6 +641,10 @@ function downloadVmail(file,iconid,ftype,display,tab) {
         }
 
         var currentMousePos = null;
+        var hoverTimer = null;
+        var pendingRow = null;
+        var pendingEvent = null;
+        var HOVER_DELAY = 2000; // 2 segundos de atraso (mouse parado sobre a linha)
 
         function positionTooltip(e) {
             if (!e) return;
@@ -692,10 +696,8 @@ function downloadVmail(file,iconid,ftype,display,tab) {
             tooltip.style.setProperty('transition', 'opacity 0.15s ease', 'important');
         }
 
-        $(document).on('mouseenter', 'table tr, .table tr', function(e) {
-            var $row = $(this);
+        function renderRowTooltip($row, e) {
             var $table = $row.closest('table');
-            
             if ($row.find('th').length > 0 || $row.parent().is('thead')) return;
 
             var headers = [];
@@ -737,9 +739,25 @@ function downloadVmail(file,iconid,ftype,display,tab) {
             positionTooltip(e);
 
             $row.addClass('prisma-report-row-hover');
+        }
+
+        $(document).on('mouseenter', 'table tr, .table tr', function(e) {
+            var $row = $(this);
+            if ($row.find('th').length > 0 || $row.parent().is('thead')) return;
+
+            if (hoverTimer) clearTimeout(hoverTimer);
+            pendingRow = $row;
+            pendingEvent = e;
+
+            hoverTimer = setTimeout(function() {
+                if (pendingRow && pendingEvent) {
+                    renderRowTooltip(pendingRow, pendingEvent);
+                }
+            }, HOVER_DELAY);
         });
 
         $(document).on('mousemove', 'table tr, .table tr', function(e) {
+            pendingEvent = e;
             currentMousePos = e;
             if (tooltip && tooltip.style.display !== 'none') {
                 positionTooltip(e);
@@ -747,6 +765,12 @@ function downloadVmail(file,iconid,ftype,display,tab) {
         });
 
         $(document).on('mouseleave', 'table tr, .table tr', function() {
+            if (hoverTimer) {
+                clearTimeout(hoverTimer);
+                hoverTimer = null;
+            }
+            pendingRow = null;
+            pendingEvent = null;
             if (tooltip) {
                 tooltip.style.opacity = '0';
                 tooltip.style.display = 'none';

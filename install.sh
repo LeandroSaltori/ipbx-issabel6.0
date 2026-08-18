@@ -760,7 +760,9 @@ if command -v yum &>/dev/null; then
 elif command -v dnf &>/dev/null; then
     dnf install -y net-tools tcpdump sngrep NetworkManager-tui 2>/dev/null || true
 fi
-log_success "Ferramentas net-tools (ifconfig/netstat), tcpdump, sngrep e nmtui (NetworkManager-tui) instaladas."
+systemctl enable NetworkManager 2>/dev/null || true
+systemctl start NetworkManager 2>/dev/null || true
+log_success "Ferramentas net-tools (ifconfig/netstat), tcpdump, sngrep e nmtui (NetworkManager-tui) instaladas e ativas."
 
 # ==============================================================================
 # 19. AJUSTES DE TEMPO E BIP DE TRANSFERÊNCIA
@@ -822,6 +824,22 @@ EOF
     fi
 fi
 log_success "User-Agent PJSIP configurado para IPbx-Prisma."
+
+# ==============================================================================
+# CONFIGURAÇÃO DE ATUALIZAÇÃO AUTOMÁTICA SEMANAL (CRON & LOGS)
+# ==============================================================================
+log_info "Configurando rotina de atualização semanal automática e registros de log..."
+if [ -f "$REPO_DIR/scripts/ipbx-autoupdate.sh" ]; then
+    /bin/cp -f "$REPO_DIR/scripts/ipbx-autoupdate.sh" /usr/local/bin/ipbx-autoupdate
+    chmod +x /usr/local/bin/ipbx-autoupdate
+    
+    # Registra no cron semanal (/etc/cron.weekly/ipbx-autoupdate)
+    /bin/cp -f "$REPO_DIR/scripts/ipbx-autoupdate.sh" /etc/cron.weekly/ipbx-autoupdate
+    chmod +x /etc/cron.weekly/ipbx-autoupdate
+    
+    log_success "Atualização automática semanal configurada em /etc/cron.weekly/ipbx-autoupdate."
+    log_info "Os logs de atualização serão gerados em $REPO_DIR/autoupdate.log e $REPO_DIR/autoupdate_last_status.txt."
+fi
 
 # ==============================================================================
 # RECARGA DE SERVIÇOS E FINALIZAÇÃO
