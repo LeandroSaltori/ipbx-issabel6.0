@@ -1,328 +1,297 @@
 <?php
-  /* vim: set expandtab tabstop=4 softtabstop=4 shiftwidth=4:
+/* vim: set expandtab tabstop=4 softtabstop=4 shiftwidth=4:
   Codificación: UTF-8
   +----------------------------------------------------------------------+
-  | Issabel version 1.4-1                                                |
+  | Issabel version 5.0 - Módulo Executivo de Resumo por Ramal           |
   | http://www.issabel.org                                               |
   +----------------------------------------------------------------------+
   | Copyright (c) 2006 Palosanto Solutions S. A.                         |
   +----------------------------------------------------------------------+
-  | The contents of this file are subject to the General Public License  |
-  | (GPL) Version 2 (the "License"); you may not use this file except in |
-  | compliance with the License. You may obtain a copy of the License at |
-  | http://www.opensource.org/licenses/gpl-license.php                   |
-  |                                                                      |
-  | Software distributed under the License is distributed on an "AS IS"  |
-  | basis, WITHOUT WARRANTY OF ANY KIND, either express or implied. See  |
-  | the License for the specific language governing rights and           |
-  | limitations under the License.                                       |
-  +----------------------------------------------------------------------+
-  | The Initial Developer of the Original Code is PaloSanto Solutions    |
-  +----------------------------------------------------------------------+
-  $Id: index.php,v 1.1 2009-01-06 09:01:38 bmacias bmacias@palosanto.com Exp $ */
-//include issabel framework
-include_once "libs/paloSantoGrid.class.php";
-include_once "libs/paloSantoForm.class.php";
-include_once "libs/misc.lib.php";
+  $Id: index.php,v 20.0 2026-08-18 Prisma Telecom $ */
+
+include_once "libs/paloSantoDB.class.php";
+include_once "libs/paloSantoConfig.class.php";
+require_once "libs/misc.lib.php";
+
+function formatSecsSum($sec) {
+    $sec = (int)$sec;
+    if ($sec <= 0) return '00:00';
+    $m = floor($sec / 60);
+    $s = $sec % 60;
+    if ($m >= 60) {
+        $h = floor($m / 60);
+        $m = $m % 60;
+        return sprintf('%02dh %02dm', $h, $m);
+    }
+    return sprintf('%02d:%02d', $m, $s);
+}
 
 function _moduleContent(&$smarty, $module_name)
 {
-    //include module files
-    include_once "modules/$module_name/configs/default.conf.php";
-    include_once "modules/$module_name/libs/paloSantoReportCall.class.php";
-    include_once "libs/paloSantoConfig.class.php";
-
-    $base_dir=dirname($_SERVER['SCRIPT_FILENAME']);
-
     load_language_module($module_name);
 
-    //global variables
-    global $arrConf;
-    global $arrConfModule;
-    $arrConf = array_merge($arrConf,$arrConfModule);
+    include_once "modules/$module_name/configs/default.conf.php";
+    include_once "modules/$module_name/libs/paloSantoReportCall.class.php";
 
-    //folder path for custom templates
-    $templates_dir=(isset($arrConf['templates_dir']))?$arrConf['templates_dir']:'themes';
-    $local_templates_dir="$base_dir/modules/$module_name/".$templates_dir.'/'.$arrConf['theme'];
+    $dsn  = generarDSNSistema('asteriskuser', 'asteriskcdrdb');
+    $pDB  = new paloDB($dsn);
+    $pReportCall = new paloSantoReportCall($pDB);
 
-    //conexion resource
-    $pConfig = new paloConfig("/etc", "amportal.conf", "=", "[[:space:]]*=[[:space:]]*");
-    $arrConfig = $pConfig->leer_configuracion(false);
-    $dsnAsteriskCdr = $arrConfig['AMPDBENGINE']['valor']."://".
-                      $arrConfig['AMPDBUSER']['valor']. ":".
-                      $arrConfig['AMPDBPASS']['valor']. "@".
-                      $arrConfig['AMPDBHOST']['valor']."/asteriskcdrdb";
+    $date_from = isset($_REQUEST['date_from']) ? trim($_REQUEST['date_from']) : date("Y-m-d");
+    $date_to   = isset($_REQUEST['date_to']) ? trim($_REQUEST['date_to']) : date("Y-m-d");
+    $search    = isset($_REQUEST['search']) ? trim($_REQUEST['search']) : '';
 
-    $pDB_cdr = new paloDB($dsnAsteriskCdr);//asteriskcdrdb -> CDR
-    $pDB_billing = new paloDB("sqlite3:///$arrConf[issabel_dbdir]/rate.db"); //sqlite3 -> rate.db
+    $date_ini = $date_from . " 00:00:00";
+    $date_end = $date_to . " 23:59:59";
 
-    //actions
-    $accion = getAction();
-    $content = "";
+    // Fetch summary per extension
+    $type = !empty($search) ? (is_numeric($search) ? 'Ext' : 'User') : NULL;
+    $rawReport = $pReportCall->ObtainReportCall(1000, 0, $date_ini, $date_end, $type, $search, 1, "asc");
+    if (!is_array($rawReport)) $rawReport = array();
 
-    switch($accion){
-        case 'graph':
-            $content = graphLinks($smarty, $module_name, $local_templates_dir);
-            break;
-        case 'imageTop10Salientes':
-        case 'imageTop10Entrantes':
-            // The following outputs image data directly and depends on rawmode=yes
-            executeImage($module_name, $accion);
-            $content = '';
-            break;
-        default:
-            $content = reportReportCall($smarty, $module_name, $local_templates_dir, $pDB_cdr, $pDB_billing, $arrConf);
-            break;
-    }
-    return $content;
-}
+    $totalDevices   = count($rawReport);
+    $totalInCalls   = 0;
+    $totalOutCalls  = 0;
+    $totalInDur     = 0;
+    $totalOutDur    = 0;
 
-function reportReportCall($smarty, $module_name, $local_templates_dir, &$pDB_cdr, &$pDB_billing , $arrConf)
-{
-    $pReportCall = new paloSantoReportCall($pDB_cdr, $pDB_billing);
+    $chartLabels    = array();
+    $chartTotal     = array();
+    $chartDur       = array();
 
-    //PARAMETERS
-    $type          = getParameter("option_fil");
-    $value_tmp     = getParameter("value_fil");
-    $date_ini_tmp  = getParameter("date_from");
-    $date_end_tmp  = getParameter("date_to");
-    $order_by_tmp  = getParameter("order_by");
-    $order_type_tmp= getParameter("order_type");
-    $action = getParameter("nav");
-    $start  = getParameter("start");
+    foreach ($rawReport as $k => $r) {
+        $inC  = (int)$r['num_incoming_call'];
+        $outC = (int)$r['num_outgoing_call'];
+        $inD  = (int)$r['duration_incoming_call'];
+        $outD = (int)$r['duration_outgoing_call'];
 
-    $value     = isset($value_tmp)   ?$value_tmp:"";
-    $order_by  = isset($order_by_tmp)?$order_by_tmp:1;
-    $order_type= isset($order_type_tmp)?$order_type_tmp:"asc";
-    $date_from = isset($date_ini_tmp)?$date_ini_tmp:date("d M Y");
-    $date_to   = isset($date_end_tmp)?$date_end_tmp:date("d M Y");
+        $rawReport[$k]['total_calls'] = $inC + $outC;
+        $rawReport[$k]['total_dur']   = $inD + $outD;
 
-    $date_ini  = translateDate($date_from)." 00:00:00";
-    $date_end  = translateDate($date_to)." 23:59:59";
-
-    //**********************************
-
-    //begin grid parameters
-    $oGrid  = new paloSantoGrid($smarty);
-
-    $limit  = 40;
-    $total  = $pReportCall->ObtainNumberDevices($type,$value);
-    $oGrid->setLimit($limit);
-    $oGrid->setTotal($total);
-
-    $oGrid->calculatePagination($action,$start);
-    $offset = $oGrid->getOffsetValue();
-    $end    = $oGrid->getEnd();
-    $urlFields = array(
-        'menu'          =>  $module_name,
-        'option_fil'    =>  $type,
-        'value_fil'     =>  $value,
-        'date_from'     =>  $date_from,
-        'date_to'       =>  $date_to,
-    );
-    $url = construirUrl($urlFields, array('nav', 'start'));
-    $urlFields['order_by'] = $order_by;
-    $urlFields['order_type'] = $order_type;
-
-    $smarty->assign("order_by", $order_by);
-    $smarty->assign("order_type", $order_type);
-
-    $arrData = null;
-    $arrResult = $pReportCall->ObtainReportCall($limit,$offset,$date_ini,$date_end,$type,$value,$order_by,$order_type);
-    if ($pReportCall->errMsg != '') {
-    	$smarty->assign('mb_message', $pReportCall->errMsg);
+        $totalInCalls  += $inC;
+        $totalOutCalls += $outC;
+        $totalInDur    += $inD;
+        $totalOutDur   += $outD;
     }
 
-    $order_type = ($order_type == "desc")?"asc":"desc";
+    // Sort by total calls descending for top charts
+    $sortedByCalls = $rawReport;
+    usort($sortedByCalls, function($a, $b) { return $b['total_calls'] - $a['total_calls']; });
 
-    if(is_array($arrResult) && $total>0){
-        foreach($arrResult as $key => $val){
-            $ext = $val['extension'];
+    $top10Calls = array_slice($sortedByCalls, 0, 10);
+    $top10Labels = array();
+    $top10In     = array();
+    $top10Out    = array();
 
-            $arrTmp[0] = $ext;
-            $arrTmp[1] = $val['user_name'];
-            $arrTmp[2] = $val['num_incoming_call'];
-            $arrTmp[3] = $val['num_outgoing_call'];
-            $arrTmp[4] = "<label style='color: green;' title='{$val['duration_incoming_call']} "._tr('seconds')."'>".$pReportCall->Sec2HHMMSS($val['duration_incoming_call'])."</label>";
-            $arrTmp[5] = "<label style='color: green;' title='{$val['duration_outgoing_call']} "._tr('seconds')."'>".$pReportCall->Sec2HHMMSS($val['duration_outgoing_call'])."</label>";
-            $arrTmp[6] = "<a href='javascript: popup_ventana(\"?menu=$module_name&action=graph&rawmode=yes&ext=$ext&dini=$date_ini&dfin=$date_end\");'>".
-                    ""._tr('Call Details')."</a>";
+    foreach ($top10Calls as $tc) {
+        $name = !empty($tc['user_name']) ? "{$tc['extension']} ({$tc['user_name']})" : "Ramal {$tc['extension']}";
+        $top10Labels[] = $name;
+        $top10In[]     = (int)$tc['num_incoming_call'];
+        $top10Out[]    = (int)$tc['num_outgoing_call'];
+    }
 
-            $arrData[] = $arrTmp;
+    ob_start();
+    ?>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    <style>
+        .sum-root { font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif; color: #1e293b; padding: 5px; }
+        .sum-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+        .sum-title h2 { margin: 0; font-size: 20px; font-weight: 800; color: #0f172a; letter-spacing: -0.3px; }
+        .sum-title p { margin: 1px 0 0 0; font-size: 11px; color: #64748b; }
+        .sum-top-btns { display: flex; gap: 8px; }
+        .btn-top { padding: 6px 12px; border-radius: 6px; font-weight: 700; font-size: 12px; text-decoration: none; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); transition: all 0.2s; }
+        .btn-top:hover { transform: translateY(-1px); opacity: 0.95; }
+        .btn-top-manual { background: #0284c7; color: #ffffff; }
+        .btn-top-expand { background: #0d9488; color: #ffffff; }
+
+        .filter-card-box { background: #ffffff; border-radius: 10px; padding: 12px 16px; margin-bottom: 15px; box-shadow: 0 1px 4px rgba(0,0,0,0.04); border: 1px solid #e2e8f0; }
+        .filter-inline-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; }
+        .filter-field-group { display: flex; flex-direction: column; flex: 1; min-width: 140px; }
+        .filter-field-group label { font-size: 10px; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 3px; }
+        .filter-input { padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12px; color: #0f172a; background: #ffffff; outline: none; height: 32px; box-sizing: border-box; transition: border-color 0.2s; }
+        .filter-input:focus { border-color: #6366f1; }
+        .filter-btn-row { display: flex; gap: 6px; align-items: center; }
+        .btn-action { height: 32px; padding: 0 14px; border-radius: 6px; font-weight: 700; font-size: 12px; border: none; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; gap: 5px; box-sizing: border-box; transition: all 0.2s; }
+        .btn-action:hover { opacity: 0.9; }
+        .btn-search { background: #4f46e5; color: #ffffff; }
+        .btn-reset { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
+
+        .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-bottom: 15px; }
+        .kpi-card-item { background: #ffffff; border-radius: 10px; padding: 14px 16px; box-shadow: 0 1px 4px rgba(0,0,0,0.04); border: 1px solid #f1f5f9; border-left: 5px solid #6366f1; display: flex; flex-direction: column; justify-content: space-between; }
+        .kpi-card-item.purple { border-left-color: #8b5cf6; }
+        .kpi-card-item.green { border-left-color: #10b981; }
+        .kpi-card-item.blue { border-left-color: #3b82f6; }
+        .kpi-card-item.amber { border-left-color: #f59e0b; }
+        .kpi-card-item.slate { border-left-color: #64748b; }
+        .kpi-card-title { font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+        .kpi-card-num { font-size: 24px; font-weight: 800; color: #0f172a; line-height: 1; }
+        .kpi-card-desc { font-size: 11px; color: #94a3b8; margin-top: 4px; }
+
+        .chart-card-box { background: #ffffff; border-radius: 10px; padding: 16px 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.04); border: 1px solid #e2e8f0; height: 260px; display: flex; flex-direction: column; margin-bottom: 15px; }
+        .chart-card-box h4 { margin: 0 0 10px 0; font-size: 12px; font-weight: 800; color: #334155; text-transform: uppercase; border-bottom: 1px solid #f1f5f9; padding-bottom: 4px; }
+        .chart-canvas-wrapper { position: relative; flex: 1; width: 100%; height: 100%; }
+
+        .table-card-box { background: #ffffff; border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.04); border: 1px solid #e2e8f0; overflow: hidden; }
+        .sum-table { width: 100%; border-collapse: collapse; text-align: left; }
+        .sum-table thead { background: #334155; color: #ffffff; }
+        .sum-table th { padding: 10px 14px; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; }
+        .sum-table td { padding: 10px 14px; border-bottom: 1px solid #f1f5f9; font-size: 12px; vertical-align: middle; }
+        .sum-table tbody tr:hover { background: #f8fafc; }
+    </style>
+
+    <div class="sum-root">
+        <!-- Header Principal -->
+        <div class="sum-header">
+            <div class="sum-title">
+                <h2>Resumo de Chamadas por Ramal - IPbx Prisma</h2>
+                <p>Consolidado de tráfego, volume de ligações entrantes/efetuadas e tempo de conversa por ramal</p>
+            </div>
+            <div class="sum-top-btns">
+                <a href="modules/summary_by_extension/help/index.html" target="_blank" class="btn-top btn-top-manual">📖 Manual</a>
+                <button onclick="window.open('?menu=<?php echo htmlspecialchars($module_name); ?>&rawmode=yes', '_blank')" class="btn-top btn-top-expand">↗ Expandir Aba</button>
+            </div>
+        </div>
+
+        <!-- Filtro Compacto -->
+        <div class="filter-card-box">
+            <form method="GET" action="index.php">
+                <input type="hidden" name="menu" value="<?php echo htmlspecialchars($module_name); ?>" />
+                <div class="filter-inline-row">
+                    <div class="filter-field-group">
+                        <label>📅 Data Inicial</label>
+                        <input type="date" name="date_from" value="<?php echo htmlspecialchars($date_from); ?>" class="filter-input" />
+                    </div>
+                    <div class="filter-field-group">
+                        <label>📅 Data Final</label>
+                        <input type="date" name="date_to" value="<?php echo htmlspecialchars($date_to); ?>" class="filter-input" />
+                    </div>
+                    <div class="filter-field-group">
+                        <label>🔍 Buscar Ramal / Nome</label>
+                        <input type="text" name="search" value="<?php echo htmlspecialchars($search); ?>" placeholder="Ex: 1001 ou Fulano..." class="filter-input" />
+                    </div>
+                    <div class="filter-btn-row">
+                        <button type="submit" class="btn-action btn-search">🔍 Filtrar Resumo</button>
+                        <a href="?menu=<?php echo htmlspecialchars($module_name); ?>" class="btn-action btn-reset">🔄 Reset</a>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <!-- Grid de 5 Cards KPIs -->
+        <div class="kpi-grid">
+            <div class="kpi-card-item purple">
+                <div class="kpi-card-title">👥 Total de Ramais</div>
+                <div class="kpi-card-num"><?php echo $totalDevices; ?></div>
+                <div class="kpi-card-desc">Ramais ativos com atividade</div>
+            </div>
+            <div class="kpi-card-item green">
+                <div class="kpi-card-title">📥 Chamadas Recebidas</div>
+                <div class="kpi-card-num"><?php echo number_format($totalInCalls, 0, ',', '.'); ?></div>
+                <div class="kpi-card-desc">Tempo: <?php echo formatSecsSum($totalInDur); ?></div>
+            </div>
+            <div class="kpi-card-item blue">
+                <div class="kpi-card-title">📤 Chamadas Efetuadas</div>
+                <div class="kpi-card-num"><?php echo number_format($totalOutCalls, 0, ',', '.'); ?></div>
+                <div class="kpi-card-desc">Tempo: <?php echo formatSecsSum($totalOutDur); ?></div>
+            </div>
+            <div class="kpi-card-item amber">
+                <div class="kpi-card-title">📋 Total de Ligações</div>
+                <div class="kpi-card-num"><?php echo number_format($totalInCalls + $totalOutCalls, 0, ',', '.'); ?></div>
+                <div class="kpi-card-desc">No período selecionado</div>
+            </div>
+            <div class="kpi-card-item slate">
+                <div class="kpi-card-title">⏱️ Duração Total</div>
+                <div class="kpi-card-num"><?php echo formatSecsSum($totalInDur + $totalOutDur); ?></div>
+                <div class="kpi-card-desc">Tempo acumulado geral</div>
+            </div>
+        </div>
+
+        <!-- Gráfico Top 10 -->
+        <div class="chart-card-box">
+            <h4>📊 Top 10 Ramais com Maior Volume de Ligações (Recebidas vs Efetuadas)</h4>
+            <div class="chart-canvas-wrapper">
+                <canvas id="chartSumTop10"></canvas>
+            </div>
+        </div>
+
+        <!-- Tabela Resumo -->
+        <div class="table-card-box">
+            <table class="sum-table">
+                <thead>
+                    <tr>
+                        <th>Ramal</th>
+                        <th>Atendente / Nome</th>
+                        <th>Recebidas (Qtd)</th>
+                        <th>Tempo Recebidas</th>
+                        <th>Efetuadas (Qtd)</th>
+                        <th>Tempo Efetuadas</th>
+                        <th>Total Ligações</th>
+                        <th>Tempo Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php if (count($rawReport) > 0): ?>
+                        <?php foreach ($rawReport as $r): ?>
+                            <tr>
+                                <td><span style="background:#e0e7ff; color:#4338ca; padding:3px 8px; border-radius:6px; font-weight:700; font-size:11px;">👤 <?php echo htmlspecialchars($r['extension']); ?></span></td>
+                                <td><span style="font-weight:600; color:#0f172a;"><?php echo htmlspecialchars(!empty($r['user_name']) ? $r['user_name'] : '-'); ?></span></td>
+                                <td><span style="color:#166534; font-weight:700;"><?php echo number_format($r['num_incoming_call'], 0, ',', '.'); ?></span></td>
+                                <td><span style="color:#64748b; font-size:11px;">⏱️ <?php echo formatSecsSum($r['duration_incoming_call']); ?></span></td>
+                                <td><span style="color:#1e40af; font-weight:700;"><?php echo number_format($r['num_outgoing_call'], 0, ',', '.'); ?></span></td>
+                                <td><span style="color:#64748b; font-size:11px;">⏱️ <?php echo formatSecsSum($r['duration_outgoing_call']); ?></span></td>
+                                <td><span style="color:#0f172a; font-weight:800;"><?php echo number_format($r['total_calls'], 0, ',', '.'); ?></span></td>
+                                <td><span style="color:#334155; font-weight:700; font-size:11px;">⏱️ <?php echo formatSecsSum($r['total_dur']); ?></span></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    <?php else: ?>
+                        <tr>
+                            <td colspan="8" style="text-align:center; padding:25px; color:#64748b;">
+                                🚀 Nenhum registro encontrado para os filtros selecionados.
+                            </td>
+                        </tr>
+                    <?php endif; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+    document.addEventListener("DOMContentLoaded", function() {
+        if (typeof Chart !== 'undefined') {
+            var ctx = document.getElementById('chartSumTop10').getContext('2d');
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: <?php echo json_encode($top10Labels); ?>,
+                    datasets: [
+                        {
+                            label: 'Recebidas',
+                            data: <?php echo json_encode($top10In); ?>,
+                            backgroundColor: '#10b981',
+                            borderRadius: 4
+                        },
+                        {
+                            label: 'Efetuadas',
+                            data: <?php echo json_encode($top10Out); ?>,
+                            backgroundColor: '#3b82f6',
+                            borderRadius: 4
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'top' } },
+                    scales: {
+                        y: { beginAtZero: true, grid: { color: '#f1f5f9' } },
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
         }
-    }
-    $img = "<img src='images/flecha_$order_type.png' border='0' align='absmiddle'>";
-
-    $leyend_1 = "<a class='link_summary_off' href='$url&amp;order_by=1&amp;order_type=asc'>"._tr("Extension")."</a>";
-    $leyend_2 = "<a class='link_summary_off' href='$url&amp;order_by=2&amp;order_type=asc'>"._tr("User name")."</a>";
-    $leyend_3 = "<a class='link_summary_off' href='$url&amp;order_by=3&amp;order_type=asc'>"._tr("Num. Incoming Calls")."</a>";
-    $leyend_4 = "<a class='link_summary_off' href='$url&amp;order_by=4&amp;order_type=asc'>"._tr("Num. Outgoing Calls")."</a>";
-    $leyend_5 = "<a class='link_summary_off' href='$url&amp;order_by=5&amp;order_type=asc'>"._tr("Sec. Incoming Calls")."</a>";
-    $leyend_6 = "<a class='link_summary_off' href='$url&amp;order_by=6&amp;order_type=asc'>"._tr("Sec. Outgoing Calls")."</a>";
-
-
-    if($order_by == 1)      $leyend_1 = "<a class='link_summary_on' href='$url&amp;order_by=1&amp;order_type=$order_type'>"._tr("Extension")."&nbsp;$img</a>";
-    else if($order_by == 2) $leyend_2 = "<a class='link_summary_on' href='$url&amp;order_by=2&amp;order_type=$order_type'>"._tr("User name")."&nbsp;$img</a>";
-    else if($order_by == 3) $leyend_3 = "<a class='link_summary_on' href='$url&amp;order_by=3&amp;order_type=$order_type'>"._tr("Num. Incoming Calls")."&nbsp;$img</a>";
-    else if($order_by == 4) $leyend_4 = "<a class='link_summary_on' href='$url&amp;order_by=4&amp;order_type=$order_type'>"._tr("Num. Outgoing Calls")."&nbsp;$img</a>";
-    else if($order_by == 5) $leyend_5 = "<a class='link_summary_on' href='$url&amp;order_by=5&amp;order_type=$order_type'>"._tr("Sec. Incoming Calls")."&nbsp;$img</a>";
-    else if($order_by == 6) $leyend_6 = "<a class='link_summary_on' href='$url&amp;order_by=6&amp;order_type=$order_type'>"._tr("Sec. Outgoing Calls")."&nbsp;$img</a>";
-
-    $arrGrid =
-        array("title"    => _tr("Summary by Extension"),
-              "icon"     => "images/list.png",
-              "width"    => "100%",
-              "start"    => ($total==0) ? 0 : $offset + 1,
-              "end"      => $end,
-              "total"    => $total,
-              "url"      => $urlFields,
-              "columns"  => array(
-		            0 => array("name"      => $leyend_1,
-                               "property1" => ""),
-		            1 => array("name"      => $leyend_2,
-                               "property1" => ""),
-		            2 => array("name"      => $leyend_3,
-                               "property1" => ""),
-                    3 => array("name"      => $leyend_4,
-                               "property1" => ""),
-                    4 => array("name"      => $leyend_5,
-                               "property1" => ""),
-                    5 => array("name"      => $leyend_6,
-                               "property1" => ""),
-                    6 => array("name"      => _tr("Details"),
-                               "property1" => ""),
-                                        )
-                    );
-
-    //begin section filter
-    $arrFormFilterReportCall = createFieldForm();
-    $oFilterForm = new paloForm($smarty, $arrFormFilterReportCall);
-    $_POST['option_fil'] = $type;
-    $_POST['value_fil'] = $value;
-    $_POST['date_from'] = $date_from;
-    $_POST['date_to']   = $date_to;
-    $smarty->assign("SHOW", _tr("Show"));
-
-    if($_POST["date_from"]==="")
-        $_POST["date_from"]  = " ";
-
-    if($_POST['date_to']==="")
-        $_POST['date_to']  = " ";
-
-    $oGrid->addFilterControl(_tr("Filter applied: ")._tr("Start Date")." = ".$date_from.", "._tr("End Date")." = ".
-    $date_to, $_POST, array("date_from" => date("d M Y"),"date_to" => date("d M Y")),true);
-
-    $valueType = "";
-    if(!is_null($type)){
-        if($type=="Ext")
-            $valueType=_tr("Extension");
-        else
-            $valueType=_tr("User");
-    }
-    $oGrid->addFilterControl(_tr("Filter applied: ").$valueType." = ".$value, $_POST, array("option_fil" => "Ext","value_fil" => ""));
-
-
-    $htmlFilter = $oFilterForm->fetchForm("$local_templates_dir/filter.tpl","",$_POST);
-    //end section filter
-
-    $oGrid->showFilter(trim($htmlFilter));
-    $contenidoModulo = $oGrid->fetchGrid($arrGrid, $arrData);
-
-    return $contenidoModulo;
-}
-
-function createFieldForm(){
-    $arrFormElements = array(
-            "option_fil"=> array( "LABEL"                  => _tr("Filter by"),
-                                  "REQUIRED"               => "no",
-                                  "INPUT_TYPE"             => "SELECT",
-                                  "INPUT_EXTRA_PARAM"      => array("Ext"=>_tr("Extension"),"User"=>_tr("User")),
-                                  "VALIDATION_TYPE"        => "text",
-                                  "EDITABLE"               => "yes",
-                                  "VALIDATION_EXTRA_PARAM" => ""),
-            "value_fil" => array( "LABEL"                  => "",
-                                  "REQUIRED"               => "no",
-                                  "INPUT_TYPE"             => "TEXT",
-                                  "INPUT_EXTRA_PARAM"      => "",
-                                  "VALIDATION_TYPE"        => "numeric",
-                                  "VALIDATION_EXTRA_PARAM" => ""),
-            "date_from" => array( "LABEL"                  => _tr("Start date"),
-                                  "REQUIRED"               => "yes",
-                                  "INPUT_TYPE"             => "DATE",
-                                  "INPUT_EXTRA_PARAM"      => array("FORMAT" => "%d %b %Y"),
-                                  "VALIDATION_TYPE"        => "ereg",
-                                  "VALIDATION_EXTRA_PARAM" => "^[[:digit:]]{1,2}[[:space:]]+[[:alnum:]]{3}[[:space:]]+[[:digit:]]{4}$"),
-            "date_to"   => array( "LABEL"                  => _tr("End date"),
-                                  "REQUIRED"               => "yes",
-                                  "INPUT_TYPE"             => "DATE",
-                                  "INPUT_EXTRA_PARAM"      => array("FORMAT" => "%d %b %Y"),
-                                  "VALIDATION_TYPE"        => "ereg",
-                                  "VALIDATION_EXTRA_PARAM" => "^[[:digit:]]{1,2}[[:space:]]+[[:alnum:]]{3}[[:space:]]+[[:digit:]]{4}$"),
-                    );
-    return $arrFormElements;
-}
-
-function graphLinks($smarty, $module_name, $local_templates_dir)
-{
-    $getParams = array('ext', 'dini', 'dfin');
-    foreach ($getParams as $k) if (!isset($_GET[$k])) $_GET[$k] = '';
-    $urlEntrantes = construirURL(array(
-        'module'    =>  $module_name,
-        'rawmode'   =>  'yes',
-        'action'    =>  'imageTop10Entrantes',
-        'ext'       =>  $_GET['ext'],
-        'dini'      =>  $_GET['dini'],
-        'dfin'      =>  $_GET['dfin'],
-    ));
-    $urlSalientes = construirURL(array(
-        'module'    =>  $module_name,
-        'rawmode'   =>  'yes',
-        'action'    =>  'imageTop10Salientes',
-        'ext'       =>  $_GET['ext'],
-        'dini'      =>  $_GET['dini'],
-        'dfin'      =>  $_GET['dfin'],
-    ));
-    $sPlantilla = <<<PLANTILLA_GRAPH
-<html>
-<head><title>Top 10</title></head>
-<body>
-<table width='100%' border='0' cellspacing='0' cellpadding='0' align='center'>
-<tr><td align='center'><img alt='imageTop10Entrantes' src='$urlEntrantes' /></td></tr>
-<tr><td align='center'><img alt='imageTop10Salientes' src='$urlSalientes' /></td></tr>
-</table>
-</body>
-</html>
-PLANTILLA_GRAPH;
-    return $sPlantilla;
-}
-
-function executeImage($module_name, $sImage)
-{
-    require_once "libs/paloSantoGraphImage.lib.php";
-
-    $arrParameterCallbyGraph = array();
-    $getParams = array('dini', 'dfin', 'ext');
-    foreach ($getParams as $k) $arrParameterCallbyGraph[] = isset($_GET[$k]) ? $_GET[$k] : '';
-
-    if ($sImage == 'imageTop10Entrantes')
-        displayGraph($module_name,"paloSantoReportCall","callbackTop10Entrantes",$arrParameterCallbyGraph);
-    if ($sImage == 'imageTop10Salientes')
-        displayGraph($module_name,"paloSantoReportCall","callbackTop10Salientes",$arrParameterCallbyGraph);
-}
-
-function getAction()
-{
-    if(getParameter("show")) //Get parameter by POST (submit)
-        return "show";
-    else if(getParameter("action")=="show") //Get parameter by GET (command pattern, links)
-        return "show";
-    else if(getParameter("action")=="graph") //Get parameter by GET (command pattern, links)
-        return "graph";
-    else if(getParameter("action")=="imageTop10Entrantes")
-        return "imageTop10Entrantes";
-    else if(getParameter("action")=="imageTop10Salientes")
-        return "imageTop10Salientes";
-    else
-        return "report";
+    });
+    </script>
+    <?php
+    return ob_get_clean();
 }
 ?>

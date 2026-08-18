@@ -453,6 +453,15 @@ if [ -d "$REPO_DIR/src/modules/graphic_report" ]; then
     chmod -R 755 /var/www/html/modules/graphic_report
     systemctl reload httpd 2>/dev/null || systemctl restart httpd 2>/dev/null || true
 fi
+
+# Implantação do Módulo Web do Resumo por Ramal (summary_by_extension)
+if [ -d "$REPO_DIR/src/modules/summary_by_extension" ]; then
+    mkdir -p /var/www/html/modules/summary_by_extension
+    /bin/cp -rf "$REPO_DIR/src/modules/summary_by_extension/"* /var/www/html/modules/summary_by_extension/
+    chown -R asterisk:asterisk /var/www/html/modules/summary_by_extension
+    chmod -R 755 /var/www/html/modules/summary_by_extension
+    systemctl reload httpd 2>/dev/null || systemctl restart httpd 2>/dev/null || true
+fi
     
     if command -v sqlite3 &>/dev/null; then
         # Cria a tabela no banco pesquisa.db (SQLite)
