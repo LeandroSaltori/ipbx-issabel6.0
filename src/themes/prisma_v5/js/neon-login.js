@@ -40,7 +40,6 @@ var neonLogin = neonLogin || {};
 			
 			submitHandler: function(form)
 			{
-				$(".login-page").addClass('logging-in');
 				form.submit();
 			}
 		});
