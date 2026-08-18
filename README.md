@@ -37,7 +37,7 @@ dnf update -y
 dnf install -y wget git
 
 # 3. Executar o instalador do Issabel 5
-wget -O - http://repo.issabel.org/issabel-netinstall.sh | bash
+curl http://repo.issabel.org/issabel5-netinstall.sh | bash
 ```
 
 ### Passo 2: Aplicação do Pacote IPBX Prisma Telecom
