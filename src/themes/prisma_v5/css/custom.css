@@ -7,3 +7,9 @@
 body {
 	
 }
+
+.prisma-report-row-hover {
+	background-color: rgba(124, 58, 237, 0.18) !important;
+	transition: background-color 0.15s ease-in-out;
+	cursor: pointer;
+}
