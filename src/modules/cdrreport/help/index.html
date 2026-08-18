@@ -197,6 +197,43 @@
             <li><code>t (Timeout)</code>: Tempo limite de digitação ou atendimento esgotado.</li>
             <li><code>i (Inválido)</code>: Opção inválida digitada pelo cliente no menu da URA.</li>
         </ul>
+
+        <h2>🚦 3. Status das Chamadas no CDR e Explicação de Múltiplas Linhas / Fila</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Selo do Status</th>
+                    <th>Nome no Banco</th>
+                    <th>Significado e Motivo</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><span class="badge badge-green">✅ Atendida</span></td>
+                    <td><code>ANSWERED</code></td>
+                    <td>A chamada foi completada e atendeu em um ramal ou atendente de fila.</td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-red">📵 Não Atendeu</span></td>
+                    <td><code>NO ANSWER</code></td>
+                    <td>O ramal ou membro da fila tocou durante o tempo limite sem receber resposta.</td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-yellow">🟡 Ocupado</span></td>
+                    <td><code>BUSY</code></td>
+                    <td>O ramal de destino estava em outra ligação no momento em que a chamada chegou.</td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-red">✖ CONGESTION</span></td>
+                    <td><code>CONGESTION</code></td>
+                    <td><strong>Desistência / Encerramento Prematuro em Filas:</strong> O chamador desligou a linha antes que qualquer ramal da fila atendesse, ou o PBX interrompeu a tentativa por falta de ramais disponíveis.</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="card" style="border-left-color: #f59e0b; background: #fffbeb;">
+            <strong>💡 Dica Didática para Chamadas em Filas e Grupos:</strong> Quando uma ligação entra em uma Fila ou Grupo de Busca e o cliente desliga antes de ser atendido, o PBX registra sub-tentativas para os ramais que estavam tocando (marcando <code>NO ANSWER</code> nas tentativas) e encerra o evento pai como <code>CONGESTION</code>. Todos os selos possuem <strong>tooltips explicativos multilinha</strong> ao passar o ponteiro do mouse por cima!
+        </div>
     </div>
 </body>
 </html>
