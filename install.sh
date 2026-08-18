@@ -352,10 +352,14 @@ if [ -d "$REPO_DIR/src/ramais" ]; then
     log_info "Implantando Módulo e API de Ramais (src/ramais)..."
     mkdir -p /var/www/html/ramais
     mkdir -p /var/www/html/nome_ramais
+    mkdir -p /var/www/html/modules/nome_ramais
+    mkdir -p /var/www/html/modules/ramais
     /bin/cp -rf "$REPO_DIR/src/ramais/"* /var/www/html/ramais/
     /bin/cp -rf "$REPO_DIR/src/ramais/"* /var/www/html/nome_ramais/
-    chown -R asterisk:asterisk /var/www/html/ramais /var/www/html/nome_ramais
-    chmod -R 755 /var/www/html/ramais /var/www/html/nome_ramais
+    /bin/cp -rf "$REPO_DIR/src/ramais/"* /var/www/html/modules/nome_ramais/ 2>/dev/null || true
+    /bin/cp -rf "$REPO_DIR/src/ramais/"* /var/www/html/modules/ramais/ 2>/dev/null || true
+    chown -R asterisk:asterisk /var/www/html/ramais /var/www/html/nome_ramais /var/www/html/modules/nome_ramais /var/www/html/modules/ramais 2>/dev/null || true
+    chmod -R 755 /var/www/html/ramais /var/www/html/nome_ramais /var/www/html/modules/nome_ramais /var/www/html/modules/ramais 2>/dev/null || true
     log_success "Módulo e API de Ramais implantados em /var/www/html/ramais e /var/www/html/nome_ramais."
 fi
 
@@ -526,7 +530,7 @@ fi
         sqlite3 /var/www/db/menu.db "DELETE FROM menu WHERE id = 'pesquisa_ajuda' OR id = 'pesquisa_como_funciona' OR Link LIKE '%pesquisa_como_funciona%';" 2>/dev/null || true
         sqlite3 /var/www/db/acl.db "DELETE FROM acl_resource WHERE name = 'pesquisa_ajuda' OR name = 'pesquisa_como_funciona';" 2>/dev/null || true
 
-        sqlite3 /var/www/db/menu.db "UPDATE menu SET Link = '/nome_ramais/' WHERE id = 'nome_ramais' OR id = 'ramais' OR Link LIKE '%nome_ramais%';" 2>/dev/null || true
+        sqlite3 /var/www/db/menu.db "UPDATE menu SET Link = '/nome_ramais/', Type = 'framed' WHERE id = 'nome_ramais' OR id = 'ramais' OR Link LIKE '%nome_ramais%';" 2>/dev/null || true
         sqlite3 /var/www/db/menu.db "UPDATE menu SET Link = '/admin/config.php?display=blacklist' WHERE id = 'blacklist' OR Link LIKE '%blacklist%';" 2>/dev/null || true
     fi
 
