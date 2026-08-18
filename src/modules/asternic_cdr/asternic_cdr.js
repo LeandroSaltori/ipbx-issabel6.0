@@ -633,30 +633,62 @@ function downloadVmail(file,iconid,ftype,display,tab) {
         if (!tooltip) {
             tooltip = document.createElement('div');
             tooltip.id = 'prisma_report_tooltip';
-            tooltip.style.cssText = 'position: fixed; display: none; z-index: 999999; pointer-events: none; ' +
-                'background: linear-gradient(135deg, rgba(30, 20, 53, 0.96), rgba(45, 27, 78, 0.98)); ' +
-                'border: 1px solid rgba(168, 85, 247, 0.5); border-radius: 10px; padding: 12px 16px; ' +
-                'box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5), 0 0 15px rgba(168, 85, 247, 0.25); ' +
-                'color: #ffffff; font-family: "Noto Sans", sans-serif, Arial; font-size: 12px; min-width: 240px; max-width: 360px; ' +
-                'backdrop-filter: blur(8px); transition: opacity 0.15s ease, transform 0.15s ease; opacity: 0;';
-            document.body.appendChild(tooltip);
+            if (document.body.firstChild) {
+                document.body.insertBefore(tooltip, document.body.firstChild);
+            } else {
+                document.body.appendChild(tooltip);
+            }
         }
 
+        var currentMousePos = null;
+
         function positionTooltip(e) {
-            var x = e.clientX + 18;
-            var y = e.clientY + 18;
+            if (!e || typeof e.clientX === 'undefined') return;
+
+            var clientX = e.clientX;
+            var clientY = e.clientY;
+
+            var x = clientX + 18;
+            var y = clientY + 18;
+
             var tooltipWidth = tooltip.offsetWidth || 280;
-            var tooltipHeight = tooltip.offsetHeight || 150;
+            var tooltipHeight = tooltip.offsetHeight || 160;
 
-            if (x + tooltipWidth > window.innerWidth - 10) {
-                x = e.clientX - tooltipWidth - 15;
+            if (x + tooltipWidth > window.innerWidth - 15) {
+                x = clientX - tooltipWidth - 15;
             }
-            if (y + tooltipHeight > window.innerHeight - 10) {
-                y = e.clientY - tooltipHeight - 15;
+            if (y + tooltipHeight > window.innerHeight - 15) {
+                y = clientY - tooltipHeight - 15;
             }
 
-            tooltip.style.left = Math.max(10, x) + 'px';
-            tooltip.style.top = Math.max(10, y) + 'px';
+            x = Math.max(10, Math.min(x, window.innerWidth - tooltipWidth - 10));
+            y = Math.max(10, Math.min(y, window.innerHeight - tooltipHeight - 10));
+
+            var currentOpacity = tooltip.style.opacity || '1';
+
+            tooltip.setAttribute('style', 
+                'position: fixed !important; ' +
+                'left: ' + x + 'px !important; ' +
+                'top: ' + y + 'px !important; ' +
+                'margin: 0 !important; ' +
+                'transform: none !important; ' +
+                'display: block !important; ' +
+                'z-index: 999999 !important; ' +
+                'pointer-events: none !important; ' +
+                'background: linear-gradient(135deg, rgba(30, 20, 53, 0.96), rgba(45, 27, 78, 0.98)) !important; ' +
+                'border: 1px solid rgba(168, 85, 247, 0.5) !important; ' +
+                'border-radius: 10px !important; ' +
+                'padding: 12px 16px !important; ' +
+                'box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5), 0 0 15px rgba(168, 85, 247, 0.25) !important; ' +
+                'color: #ffffff !important; ' +
+                'font-family: "Noto Sans", sans-serif, Arial !important; ' +
+                'font-size: 12px !important; ' +
+                'min-width: 240px !important; ' +
+                'max-width: 360px !important; ' +
+                'backdrop-filter: blur(8px) !important; ' +
+                'transition: opacity 0.15s ease !important; ' +
+                'opacity: ' + currentOpacity + ' !important;'
+            );
         }
 
         $(document).on('mouseenter', 'table tr, .table tr', function(e) {
@@ -699,15 +731,16 @@ function downloadVmail(file,iconid,ftype,display,tab) {
             html += '</div>';
 
             tooltip.innerHTML = html;
-            tooltip.style.display = 'block';
+            tooltip.style.opacity = '1';
+            currentMousePos = e;
             positionTooltip(e);
 
-            setTimeout(function() { tooltip.style.opacity = '1'; }, 10);
-            $row.css('background-color', 'rgba(124, 58, 237, 0.18)');
+            $row.addClass('prisma-report-row-hover');
         });
 
         $(document).on('mousemove', 'table tr, .table tr', function(e) {
-            if (tooltip && tooltip.style.display === 'block') {
+            currentMousePos = e;
+            if (tooltip && tooltip.style.display !== 'none') {
                 positionTooltip(e);
             }
         });
@@ -717,7 +750,13 @@ function downloadVmail(file,iconid,ftype,display,tab) {
                 tooltip.style.opacity = '0';
                 tooltip.style.display = 'none';
             }
-            $(this).css('background-color', '');
+            $(this).removeClass('prisma-report-row-hover');
+        });
+
+        $(window).on('scroll resize', function() {
+            if (currentMousePos && tooltip && tooltip.style.display !== 'none') {
+                positionTooltip(currentMousePos);
+            }
         });
     }
 
