@@ -435,6 +435,15 @@ if [ -d "$REPO_DIR/src/modules/cdrreport" ]; then
     chmod -R 755 /var/www/html/modules/cdrreport
     systemctl reload httpd 2>/dev/null || systemctl restart httpd 2>/dev/null || true
 fi
+
+# Implantação do Módulo Web de Uso de Canais (channelusage)
+if [ -d "$REPO_DIR/src/modules/channelusage" ]; then
+    mkdir -p /var/www/html/modules/channelusage
+    /bin/cp -rf "$REPO_DIR/src/modules/channelusage/"* /var/www/html/modules/channelusage/
+    chown -R asterisk:asterisk /var/www/html/modules/channelusage
+    chmod -R 755 /var/www/html/modules/channelusage
+    systemctl reload httpd 2>/dev/null || systemctl restart httpd 2>/dev/null || true
+fi
     
     if command -v sqlite3 &>/dev/null; then
         # Cria a tabela no banco pesquisa.db (SQLite)
