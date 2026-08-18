@@ -419,10 +419,24 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
     $limit = 20;
     $offset = ($page - 1) * $limit;
 
-    $oRG       = new RingGroup($pDB);
-    $dataRG    = $oRG->getRingGroup();
-    $oQueue    = new Queue($pDB);
-    $dataQueue = $oQueue->getQueue();
+    require_once "modules/$module_name/libs/ringgroup.php";
+    require_once "modules/$module_name/libs/queues.php";
+
+    $dsn_asterisk = generarDSNSistema('asteriskuser', 'asterisk');
+    $pDB_asterisk = new paloDB($dsn_asterisk);
+    $dataRG       = array();
+    $dataQueue    = array();
+
+    if (class_exists('RingGroup')) {
+        $oRG = new RingGroup($pDB_asterisk);
+        $resRG = $oRG->getRingGroup();
+        if (is_array($resRG)) $dataRG = $resRG;
+    }
+    if (class_exists('Queue')) {
+        $oQueue = new Queue($pDB_asterisk);
+        $resQ = $oQueue->getQueue();
+        if (is_array($resQ)) $dataQueue = $resQ;
+    }
     $groupsMap = $dataRG + $dataQueue;
 
     $paramFiltro = array(
