@@ -69,6 +69,9 @@ var baseurl = '';
 				<span style="vertical-align: middle;">Usuário ou senha incorretos. Tente novamente.</span>
 			</div>
 			<script type="text/javascript">
+				if (window.history && window.history.replaceState) {
+					window.history.replaceState(null, null, window.location.pathname);
+				}
 				setTimeout(function() {
 					var alertBox = document.getElementById('login_error_alert');
 					if (alertBox) {
