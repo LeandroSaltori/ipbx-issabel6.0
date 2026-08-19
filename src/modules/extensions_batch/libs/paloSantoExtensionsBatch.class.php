@@ -595,7 +595,7 @@ class paloSantoExtensionsBatch
         if ($extension['tech'] == 'iax2') $tabla = 'iax';
         $sqlleer = "SELECT COUNT(*) AS n FROM $tabla WHERE id = CAST(? AS CHAR) AND keyword = ?";
         $sqlupdate = "UPDATE $tabla SET data = ? WHERE id = CAST(? AS CHAR) AND keyword = ?";
-        $sqlinsert = "INSERT INTO $tabla (data, id, keyword) VALUES (?, ?, ?)";
+        $sqlinsert = "INSERT INTO $tabla (data, id, keyword, flags) VALUES (?, ?, ?, 0)";
 
         // Las propiedades a insertar o actualizar para la extensión
         $prop = array(
