@@ -772,32 +772,32 @@ class paloSantoExtensionsBatch
 
     private function _updateDirectDID($extension)
     {
-        if (!isset($extension['directdid'])) return TRUE;
+        if (!isset($extension['directdid']) || trim($extension['directdid']) == '') return TRUE;
 
         $tupla = $this->_DB->getFirstRowQuery(
-            'SELECT COUNT(*) AS n FROM incoming WHERE destination LIKE ?',
-            TRUE, array('%'.$extension['extension'].'%'));
+            "SELECT COUNT(*) AS n FROM incoming WHERE destination LIKE CONCAT('%', ?, '%')",
+            TRUE, array((string)$extension['extension']));
         if (!is_array($tupla)) {
             $this->errMsg = $this->_DB->errMsg;
             return FALSE;
         }
         if ($tupla['n'] > 0) {
-            $sql = 'UPDATE incoming SET extension = ?, description = ?, destination = ? '.
-                   'WHERE destination LIKE ? LIMIT 1';
+            $sql = "UPDATE incoming SET extension = ?, description = ?, destination = ? ".
+                   "WHERE destination LIKE CONCAT('%', ?, '%') LIMIT 1";
             $params = array(
-                $extension['directdid'],
-                $extension['directdid'],
-                'from-did-direct,'.$extension['extension'].',1',
-                '%'.$extension['extension'].'%');
+                (string)$extension['directdid'],
+                (string)$extension['directdid'],
+                'from-did-direct,'.(string)$extension['extension'].',1',
+                (string)$extension['extension']);
         } else {
             $sql = 'INSERT INTO incoming (cidnum, extension, description, destination, '.
                         'privacyman, alertinfo, ringing, grppre, delay_answer, '.
                         'pricid, pmmaxretries, pmminlength) '.
                    'VALUES ("", ?, ?, ?, 0, "", "", "", 0, "", "", "")';
             $params = array(
-                $extension['directdid'],
-                $extension['directdid'],
-                'from-did-direct,'.$extension['extension'].',1');
+                (string)$extension['directdid'],
+                (string)$extension['directdid'],
+                'from-did-direct,'.(string)$extension['extension'].',1');
         }
         if (!$this->_DB->genQuery($sql, $params)) {
             $this->errMsg = "Ext: {$extension['extension']} - "._tr('Error to insert or update Direct DID').': '.$this->_DB->errMsg;
