@@ -582,8 +582,8 @@ class paloSantoExtensionsBatch
     {
         /* Para la tecnología indicada, se borra la información de la misma
          * extensión que esté presente en la otra tecnología */
-        if ($extension['tech'] == 'sip' || $extension['tech'] == 'pjsip') $sqlborrar = 'DELETE FROM iax WHERE id = ?';
-        if ($extension['tech'] == 'iax2') $sqlborrar = 'DELETE FROM sip WHERE id = ?';
+        if ($extension['tech'] == 'sip' || $extension['tech'] == 'pjsip') $sqlborrar = 'DELETE FROM iax WHERE id = CAST(? AS CHAR)';
+        if ($extension['tech'] == 'iax2') $sqlborrar = 'DELETE FROM sip WHERE id = CAST(? AS CHAR)';
         if (!$this->_DB->genQuery($sqlborrar, array((string)$extension['extension']))) {
             $this->errMsg = $this->_DB->errMsg;
             return FALSE;
@@ -593,8 +593,8 @@ class paloSantoExtensionsBatch
         if ($extension['tech'] == 'sip') $tabla = 'sip';
         if ($extension['tech'] == 'pjsip') $tabla = 'sip';
         if ($extension['tech'] == 'iax2') $tabla = 'iax';
-        $sqlleer = "SELECT COUNT(*) AS n FROM $tabla WHERE id = ? AND keyword = ?";
-        $sqlupdate = "UPDATE $tabla SET data = ? WHERE id = ? AND keyword = ?";
+        $sqlleer = "SELECT COUNT(*) AS n FROM $tabla WHERE id = CAST(? AS CHAR) AND keyword = ?";
+        $sqlupdate = "UPDATE $tabla SET data = ? WHERE id = CAST(? AS CHAR) AND keyword = ?";
         $sqlinsert = "INSERT INTO $tabla (data, id, keyword) VALUES (?, ?, ?)";
 
         // Las propiedades a insertar o actualizar para la extensión
@@ -714,7 +714,7 @@ class paloSantoExtensionsBatch
     private function _updateUsers($extension)
     {
         $tupla = $this->_DB->getFirstRowQuery(
-            'SELECT COUNT(*) AS n FROM users WHERE extension = ?',
+            'SELECT COUNT(*) AS n FROM users WHERE extension = CAST(? AS CHAR)',
             TRUE, array((string)$extension['extension']));
         if (!is_array($tupla)) {
             $this->errMsg = $this->_DB->errMsg;
@@ -722,7 +722,7 @@ class paloSantoExtensionsBatch
         }
         $sql = ($tupla['n'] > 0)
             ? 'UPDATE users SET name = ?, voicemail = ?, recording = ?, outboundcid = ? '.
-              'WHERE extension = ?'
+              'WHERE extension = CAST(? AS CHAR)'
             : 'INSERT INTO users (password, ringtimer, noanswer, mohclass, sipname, '.
                     'name, voicemail, recording, outboundcid, extension) '.
               'VALUES ("", 0, "", "default", "", ?, ?, ?, ?, ?)';
@@ -748,14 +748,14 @@ class paloSantoExtensionsBatch
         if ($extension['tech'] == 'iax2') $dial = 'IAX2/'.$extension['extension'];
 
         $tupla = $this->_DB->getFirstRowQuery(
-            'SELECT COUNT(*) AS n FROM devices WHERE id = ?',
+            'SELECT COUNT(*) AS n FROM devices WHERE id = CAST(? AS CHAR)',
             TRUE, array((string)$extension['extension']));
         if (!is_array($tupla)) {
             $this->errMsg = $this->_DB->errMsg;
             return FALSE;
         }
         $sql = ($tupla['n'] > 0)
-            ? 'UPDATE devices SET tech = ?, dial = ?, description = ?, user = ? WHERE id = ?'
+            ? 'UPDATE devices SET tech = ?, dial = ?, description = ?, user = ? WHERE id = CAST(? AS CHAR)'
             : 'INSERT INTO devices (devicetype, emergency_cid, tech, dial, description, user, id) '.
               'VALUES ("fixed", "", ?, ?, ?, ?, ?)';
         $params = array(
