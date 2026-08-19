@@ -584,7 +584,7 @@ class paloSantoExtensionsBatch
          * extensión que esté presente en la otra tecnología */
         if ($extension['tech'] == 'sip' || $extension['tech'] == 'pjsip') $sqlborrar = 'DELETE FROM iax WHERE id = ?';
         if ($extension['tech'] == 'iax2') $sqlborrar = 'DELETE FROM sip WHERE id = ?';
-        if (!$this->_DB->genQuery($sqlborrar, array($extension['extension']))) {
+        if (!$this->_DB->genQuery($sqlborrar, array((string)$extension['extension']))) {
             $this->errMsg = $this->_DB->errMsg;
             return FALSE;
         }
@@ -600,19 +600,19 @@ class paloSantoExtensionsBatch
         // Las propiedades a insertar o actualizar para la extensión
         $prop = array(
             'callerid'      =>  'device <'.$extension['extension'].'>',
-            'account'       =>  $extension['extension'],
+            'account'       =>  (string)$extension['extension'],
             'mailbox'       =>  $extension['extension'].(($extension['voicemail'] == 'enable') ? '@default' : '@device'),
-            'accountcode'   =>  isset($extension['accountcode']) ? $extension['accountcode']:'',
-            'allow'         =>  isset($extension['allow']) ? $extension['allow'] : '',
-            'disallow'      =>  isset($extension['disallow']) ? $extension['disallow'] : '',
+            'accountcode'   =>  isset($extension['accountcode']) ? (string)$extension['accountcode']:'',
+            'allow'         =>  isset($extension['allow']) ? (string)$extension['allow'] : '',
+            'disallow'      =>  isset($extension['disallow']) ? (string)$extension['disallow'] : '',
             'qualify'       =>  'yes',
             'type'          =>  'friend',
             'host'          =>  'dynamic',
-            'context'       =>  $extension['context'],
-            'secret'        =>  $extension['secret'],
-            'deny'          =>  $extension['deny'],
-            'permit'        =>  $extension['permit'],
-            'nat'           =>  isset($extension['nat']) ? $extension['nat']:'',
+            'context'       =>  (string)$extension['context'],
+            'secret'        =>  (string)$extension['secret'],
+            'deny'          =>  (string)$extension['deny'],
+            'permit'        =>  (string)$extension['permit'],
+            'nat'           =>  isset($extension['nat']) ? (string)$extension['nat']:'',
 
             //IssabelPBX 2.11: recording ya no se usa en mysql sino en astdb
             //'record_out'    =>  $extension['record_out'],
@@ -621,7 +621,7 @@ class paloSantoExtensionsBatch
         if ($extension['tech'] == 'iax2') {
             $prop = array_merge($prop, array(
                 'dial'              =>  'IAX2/'.$extension['extension'],
-                'port'              =>  4569,
+                'port'              =>  '4569',
                 'requirecalltoken'  =>  'yes',
                 'setvar'            =>  'REALCALLERIDNUM='.$extension['extension'],
 
@@ -635,31 +635,31 @@ class paloSantoExtensionsBatch
 
             $prop = array_merge($prop, array(
                 'dial'                         =>  'PJSIP/'.$extension['extension'],
-                'pickupgroup'                  =>  isset($extension['pickupgroup']) ? $extension['pickupgroup'] : '',
-                'callgroup'                    =>  isset($extension['callgroup']) ? $extension['callgroup'] : '',
+                'pickupgroup'                  =>  isset($extension['pickupgroup']) ? (string)$extension['pickupgroup'] : '',
+                'callgroup'                    =>  isset($extension['callgroup']) ? (string)$extension['callgroup'] : '',
                 'rtp_symmetric'                =>  'yes',
                 'force_rport'                  =>  'yes',
                 'rewrite_contact'              =>  'yes',
                 'dtmfmode'                     =>  'rfc2833',
                 'qualifyfreq'                  =>  '60',
-                'transport'                    =>  isset($extension['transport']) ? $extension['transport']:'',
-                'dtls_cert_file'               =>  isset($extension['dtlscertfile']) ? $extension['dtlscertfile']:'',
-                'dtls_ca_file'                 =>  isset($extension['dtlscafile']) ? $extension['dtlscafile']:'',
-                'dtls_private_key'             =>  isset($extension['dtlsprivatekey']) ? $extension['dtlsprivatekey']:'',
-                'message_context'              =>  isset($extension['message_context']) ? $extension['message_context']:'',
-                'subscribe_context'            =>  isset($extension['subscribe_context']) ? $extension['subscribe_context']:'',
-                'allow_subscribe'              =>  isset($extension['allow_subscribe']) ? $extension['allow_subscribe']:'',
-                'max_contacts'                 =>  isset($extension['max_contacts']) ? $extension['max_contacts']:'',
-                'qualify_timeout'              =>  isset($extension['qualify_timeout']) ? $extension['qualify_timeout']:'3.0',
-                'authenticate_qualify'         =>  isset($extension['authenticate_qualify']) ? $extension['authenticate_qualify']:'',
-                'use_avpf'                     =>  isset($extension['avpf']) ? $extension['avpf']:'',
-                'ice_support'                  =>  isset($extension['icesupport']) ? $extension['icesupport']:'',
-                'rtcp_mux'                     =>  isset($extension['rtcp_mux']) ? $extension['rtcp_mux']:'',
-                'direct_media'                 =>  isset($extension['direct_media']) ? $extension['direct_media']:'',
-                'media_use_received_transport' =>  isset($extension['media_use_received_transport']) ? $extension['media_use_received_transport']:'',
-                'media_encryption'             =>  isset($extension['encryption']) ? $extension['encryption']:'no',
-                'dtls_verify'                  =>  isset($extension['dtlsverify']) ? $extension['dtlsverify']:'no',
-                'dtls_setup'                   =>  isset($extension['dtlssetup']) ? $extension['dtlssetup']:'',
+                'transport'                    =>  isset($extension['transport']) ? (string)$extension['transport']:'',
+                'dtls_cert_file'               =>  isset($extension['dtlscertfile']) ? (string)$extension['dtlscertfile']:'',
+                'dtls_ca_file'                 =>  isset($extension['dtlscafile']) ? (string)$extension['dtlscafile']:'',
+                'dtls_private_key'             =>  isset($extension['dtlsprivatekey']) ? (string)$extension['dtlsprivatekey']:'',
+                'message_context'              =>  isset($extension['message_context']) ? (string)$extension['message_context']:'',
+                'subscribe_context'            =>  isset($extension['subscribe_context']) ? (string)$extension['subscribe_context']:'',
+                'allow_subscribe'              =>  isset($extension['allow_subscribe']) ? (string)$extension['allow_subscribe']:'',
+                'max_contacts'                 =>  isset($extension['max_contacts']) ? (string)$extension['max_contacts']:'',
+                'qualify_timeout'              =>  isset($extension['qualify_timeout']) ? (string)$extension['qualify_timeout']:'3.0',
+                'authenticate_qualify'         =>  isset($extension['authenticate_qualify']) ? (string)$extension['authenticate_qualify']:'',
+                'use_avpf'                     =>  isset($extension['avpf']) ? (string)$extension['avpf']:'',
+                'ice_support'                  =>  isset($extension['icesupport']) ? (string)$extension['icesupport']:'',
+                'rtcp_mux'                     =>  isset($extension['rtcp_mux']) ? (string)$extension['rtcp_mux']:'',
+                'direct_media'                 =>  isset($extension['direct_media']) ? (string)$extension['direct_media']:'',
+                'media_use_received_transport' =>  isset($extension['media_use_received_transport']) ? (string)$extension['media_use_received_transport']:'',
+                'media_encryption'             =>  isset($extension['encryption']) ? (string)$extension['encryption']:'no',
+                'dtls_verify'                  =>  isset($extension['dtlsverify']) ? (string)$extension['dtlsverify']:'no',
+                'dtls_setup'                   =>  isset($extension['dtlssetup']) ? (string)$extension['dtlssetup']:'',
                 'trust_id_inbound'             =>  'yes',
                 'sendrpid'                     =>  'no',
             ));
@@ -668,9 +668,9 @@ class paloSantoExtensionsBatch
         } elseif ($extension['tech'] == 'sip') {
             $prop = array_merge($prop, array(
                 'dial'              =>  'SIP/'.$extension['extension'],
-                'port'              =>  isset($extension['port']) ? $extension['port'] : '5060',
-                'pickupgroup'       =>  isset($extension['pickupgroup']) ? $extension['pickupgroup'] : '',
-                'callgroup'         =>  isset($extension['callgroup']) ? $extension['callgroup'] : '',
+                'port'              =>  isset($extension['port']) ? (string)$extension['port'] : '5060',
+                'pickupgroup'       =>  isset($extension['pickupgroup']) ? (string)$extension['pickupgroup'] : '',
+                'callgroup'         =>  isset($extension['callgroup']) ? (string)$extension['callgroup'] : '',
                 'canreinvite'       =>  'no',
                 'dtmfmode'          =>  'rfc2833',
 
@@ -678,31 +678,31 @@ class paloSantoExtensionsBatch
                 'qualifyfreq'       =>  '60',
                 'trustrpid'         =>  'yes',
                 'sendrpid'          =>  'no',
-                'rtcp_mux'          =>  isset($extension['rtcp_mux']) ? $extension['rtcp_mux']:'',
-                'transport'         =>  isset($extension['transport']) ? $extension['transport']:'no',
-                'encryption'        =>  isset($extension['encryption']) ? $extension['encryption']:'no',
-                'icesupport'        =>  isset($extension['icesupport']) ? $extension['icesupport']:'',
-                'avpf'              =>  isset($extension['avpf']) ? $extension['avpf']:'',
-                'force_avp'         =>  isset($extension['force_avp']) ? $extension['force_avp']:'',
-                'dtlsenable'        =>  isset($extension['dtlsenable']) ? $extension['dtlsenable']:'',
-                'dtlsverify'        =>  isset($extension['dtlsverify']) ? $extension['dtlsverify']:'',
-                'dtlssetup'         =>  isset($extension['dtlssetup']) ? $extension['dtlssetup']:'',
-                'dtlscertfile'      =>  isset($extension['dtlscertfile']) ? $extension['dtlscertfile']:'',
-                'dtlscafile'        =>  isset($extension['dtlscafile']) ? $extension['dtlscafile']:'',
-                'dtlsprivatekey'    =>  isset($extension['dtlsprivatekey']) ? $extension['dtlsprivatekey']:'',
+                'rtcp_mux'          =>  isset($extension['rtcp_mux']) ? (string)$extension['rtcp_mux']:'',
+                'transport'         =>  isset($extension['transport']) ? (string)$extension['transport']:'no',
+                'encryption'        =>  isset($extension['encryption']) ? (string)$extension['encryption']:'no',
+                'icesupport'        =>  isset($extension['icesupport']) ? (string)$extension['icesupport']:'',
+                'avpf'              =>  isset($extension['avpf']) ? (string)$extension['avpf']:'',
+                'force_avp'         =>  isset($extension['force_avp']) ? (string)$extension['force_avp']:'',
+                'dtlsenable'        =>  isset($extension['dtlsenable']) ? (string)$extension['dtlsenable']:'',
+                'dtlsverify'        =>  isset($extension['dtlsverify']) ? (string)$extension['dtlsverify']:'no',
+                'dtlssetup'         =>  isset($extension['dtlssetup']) ? (string)$extension['dtlssetup']:'',
+                'dtlscertfile'      =>  isset($extension['dtlscertfile']) ? (string)$extension['dtlscertfile']:'',
+                'dtlscafile'        =>  isset($extension['dtlscafile']) ? (string)$extension['dtlscafile']:'',
+                'dtlsprivatekey'    =>  isset($extension['dtlsprivatekey']) ? (string)$extension['dtlsprivatekey']:'',
             ));
         }
 
         // Insertar o modificar todas las propiedades
         foreach ($prop as $k => $v) {
-            $tupla = $this->_DB->getFirstRowQuery($sqlleer, TRUE, array($extension['extension'], $k));
+            $tupla = $this->_DB->getFirstRowQuery($sqlleer, TRUE, array((string)$extension['extension'], (string)$k));
             if (!is_array($tupla)) {
                 $this->errMsg = $this->_DB->errMsg;
                 return FALSE;
             }
             $r = $this->_DB->genQuery(
                 (($tupla['n'] > 0) ? $sqlupdate : $sqlinsert),
-                array($v, $extension['extension'], $k));
+                array((string)$v, (string)$extension['extension'], (string)$k));
             if (!$r) {
                 $this->errMsg = "Ext: {$extension['extension']} - "._tr('Error updating Tech').': '.$this->_DB->errMsg;
                 return FALSE;
@@ -715,7 +715,7 @@ class paloSantoExtensionsBatch
     {
         $tupla = $this->_DB->getFirstRowQuery(
             'SELECT COUNT(*) AS n FROM users WHERE extension = ?',
-            TRUE, array($extension['extension']));
+            TRUE, array((string)$extension['extension']));
         if (!is_array($tupla)) {
             $this->errMsg = $this->_DB->errMsg;
             return FALSE;
@@ -727,13 +727,13 @@ class paloSantoExtensionsBatch
                     'name, voicemail, recording, outboundcid, extension) '.
               'VALUES ("", 0, "", "default", "", ?, ?, ?, ?, ?)';
         $params = array(
-            $extension['name'],
+            (string)$extension['name'],
             ($extension['voicemail'] == 'enable') ? 'default' : 'novm',
             //IssabelPBX 2.11: recording ya no se usa en mysql sino en astdb
             //'out='.$extension['record_out'].'|in='.$extension['record_in'],
             '',
-            isset($extension['outboundcid']) ? $extension['outboundcid'] : '',
-            $extension['extension']);
+            isset($extension['outboundcid']) ? (string)$extension['outboundcid'] : '',
+            (string)$extension['extension']);
         if (!$this->_DB->genQuery($sql, $params)) {
             $this->errMsg = "Ext: {$extension['extension']} - "._tr('Error updating Users').': '.$this->_DB->errMsg;
             return FALSE;
@@ -749,7 +749,7 @@ class paloSantoExtensionsBatch
 
         $tupla = $this->_DB->getFirstRowQuery(
             'SELECT COUNT(*) AS n FROM devices WHERE id = ?',
-            TRUE, array($extension['extension']));
+            TRUE, array((string)$extension['extension']));
         if (!is_array($tupla)) {
             $this->errMsg = $this->_DB->errMsg;
             return FALSE;
@@ -759,11 +759,11 @@ class paloSantoExtensionsBatch
             : 'INSERT INTO devices (devicetype, emergency_cid, tech, dial, description, user, id) '.
               'VALUES ("fixed", "", ?, ?, ?, ?, ?)';
         $params = array(
-            $extension['tech'],
-            $dial,
-            $extension['name'],
-            $extension['extension'],
-            $extension['extension']);
+            (string)$extension['tech'],
+            (string)$dial,
+            (string)$extension['name'],
+            (string)$extension['extension'],
+            (string)$extension['extension']);
         if (!$this->_DB->genQuery($sql, $params)) {
             $this->errMsg = "Ext: {$extension['extension']} - "._tr('Error updating Devices').': '.$this->_DB->errMsg;
             return FALSE;
