@@ -27,36 +27,57 @@ curl -sSL https://raw.githubusercontent.com/LeandroSaltori/ipbx-issabel6.0/main/
 
 ---
 
-## 📋 2. Passo a Passo do Apontamento de DNS
+## 🚪 2. Portas Obrigatórias de Rede e Firewall
 
-Antes de rodar o instalador na VPS, é **obrigatório** criar a entrada DNS no painel onde o domínio está registrado (Hostinger, Cloudflare, Registro.br, GoDaddy, etc.).
+Tanto na VPS quanto no Proxmox / Roteador do cliente, as seguintes portas precisam estar **liberadas e redirecionadas (NAT/Port Forward)** para a VM do Issabel:
 
-### Tabela de Configuração DNS:
+| Porta | Protocolo | Para que serve | Obrigatória para SSL? |
+| :--- | :--- | :--- | :---: |
+| **80** | TCP | Validação e emissão do certificado Let's Encrypt + Redirecionamento HTTP ➡️ HTTPS | **SIM (Crítica)** |
+| **443** | TCP | Acesso seguro à interface WEB do Issabel com cadeado verde | **SIM** |
+| **8089** | TCP / WSS | Conexão WebRTC segura para o **Webphone** funcionar sem travar microfone | Recomendada |
+| **5060** | UDP / TCP | Sinalização SIP de Ramais e Troncos | PBX |
+| **10000 a 20000** | UDP | Áudio das ligações (RTP / Voz bidirecional) | PBX |
 
-| Campo | O que preencher | Exemplo |
-| :--- | :--- | :--- |
-| **Tipo** | Selecione sempre **`A`** | `A` |
-| **Nome (Host / Subdomínio)** | O prefixo exclusivo do cliente | `jaguimar` ou `mineirao` |
-| **Valor (Aponta para / IP)** | O endereço IPv4 fixo da VPS do cliente | `187.127.56.37` |
-| **TTL** | Padrão | `14400` (ou `3600` / `Automático`) |
+> **⚠️ Atenção Proxmox:** Se a VM estiver atrás de um roteador/firewall (MikroTik, pfSense, modem da operadora), crie as regras de **NAT / Port Forward** direcionando as portas **80 e 443** externas para o IP local da VM (ex: `192.168.1.200`).
 
 ---
 
-### 🖥️ Exemplo Prático no Hostinger:
+## 📋 3. Passo a Passo do Apontamento de DNS no Hostinger
 
-1. Acesse o painel da **Hostinger** ➡️ **Domínios** ➡️ Selecione `ipbxprisma.cloud`
-2. No menu lateral esquerdo, clique em **DNS / Nameservers**
-3. Role até a seção **"Gerenciar registros DNS"**
-4. Preencha os campos:
+Toda a gestão é feita **100% dentro do painel da Hostinger onde você já tem o domínio `ipbxprisma.cloud`**, sem precisar de ferramentas externas:
+
+### A) Para VPS na Nuvem ou Proxmox com IP Fixo:
+
+1. Acesse o painel da **Hostinger** ➡️ **Domínios** ➡️ Selecione `ipbxprisma.cloud` ➡️ **DNS / Nameservers**
+2. Em **"Gerenciar registros DNS"**, adicione:
    - **Tipo:** `A`
-   - **Nome:** `jaguimar` *(o Hostinger completa automaticamente para `jaguimar.ipbxprisma.cloud`)*
-   - **Valor:** `187.127.56.37` *(coloque o IP da VPS)*
+   - **Nome:** `nome_do_cliente` (ex: `jaguimar`, `fullcont`, `mineirao`)
+   - **Valor:** `IP_Publico_da_VPS_ou_do_Cliente` (ex: `187.127.56.37`)
    - **TTL:** `14400`
-5. Clique no botão roxo **"Adicionar registro"**
+3. Clique em **"Adicionar registro"**
 
 ---
 
-## 🔍 3. Como Testar se o DNS já Propagou
+### B) Para Proxmox com IP Dinâmico (Substituindo a Winco 100% no Hostinger):
+
+Se o cliente no Proxmox não tiver IP fixo e usar um DDNS gratuito de roteador (ex: MikroTik Cloud `xxxxxx.sn.mynetname.net` ou similar):
+
+1. No painel da **Hostinger**, crie um registro do tipo **`CNAME`**:
+   - **Tipo:** `CNAME`
+   - **Nome:** `nome_do_cliente` (ex: `cliente01`)
+   - **Valor:** `xxxxxx.sn.mynetname.net` *(o endereço dinâmico do roteador do cliente)*
+   - **TTL:** `14400`
+2. Clique em **"Adicionar registro"**
+3. **Resultado:** Sempre que a internet do cliente mudar de IP, a Hostinger responde automaticamente com o novo IP!
+4. Na VM do Issabel, basta rodar o instalador SSL normalmente:
+   ```bash
+   curl -sSL https://raw.githubusercontent.com/LeandroSaltori/ipbx-issabel6.0/main/scripts/auto_dominio.sh | bash -s cliente01.ipbxprisma.cloud leandro@prismatelecom.com
+   ```
+
+---
+
+## 🔍 4. Como Testar se o DNS já Propagou
 
 Antes de rodar o comando SSL, você pode verificar no seu computador ou no terminal da VPS se o nome já responde para o IP correto:
 
