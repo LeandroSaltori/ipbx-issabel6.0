@@ -194,19 +194,37 @@ ipbx-issabel6.0/
 
 ---
 
+## 🛠️ Scripts Utilitários e Comandos Rápidos
+
+O repositório disponibiliza diversos scripts independentes na pasta [`scripts/`](./scripts/), que podem ser executados diretamente ou via seus comandos instalados no sistema:
+
+| Comando / Script | O que faz | Como executar avulso |
+| :--- | :--- | :--- |
+| **`ipbx-update`**<br>([`ipbx-menu.sh`](./ipbx-menu.sh)) | **Menu Interativo Modular:** Permite atualizar módulo por módulo com segurança e snapshots automáticos por data. | `ipbx-update`<br>*ou* `curl -sSL .../ipbx-menu.sh \| bash` |
+| **`ipbx-rollback`**<br>([`rollback.sh`](./rollback.sh)) | **Rollback por Data/Hora:** Restaura o PBX para o estado anterior exato de qualquer data/hora gravada. | `ipbx-rollback`<br>*ou* `ipbx-rollback --latest` |
+| **`ipbx-ssl`**<br>([`scripts/auto_dominio.sh`](./scripts/auto_dominio.sh)) | **Domínio e SSL Let's Encrypt:** Cria VirtualHost no Apache, emite certificado SSL gratuito e integra chaves com o Webphone WebRTC. | `bash scripts/auto_dominio.sh <dominio> <email>` |
+| **`ipbx-limpalogs`**<br>([`scripts/limpa_logs.sh`](./scripts/limpa_logs.sh)) | **Limpeza Segura de Logs e Disco:** Trunca logs >50MB, apaga logs antigos rotacionados e limpa cache Smarty. **Nunca apaga CDRs nem gravações.** | `bash scripts/limpa_logs.sh` |
+| **`monitor_prisma.sh`**<br>([`scripts/monitor_prisma.sh`](./scripts/monitor_prisma.sh)) | **Monitor de Segurança Telegram:** Detecta web shells/Emad em `/var/www/html/`, monitora Firewall (iptables/firewalld) e alerta novos usuários Web criados. | `bash scripts/monitor_prisma.sh` |
+| **`ipbx-autoupdate`**<br>([`scripts/ipbx-autoupdate.sh`](./scripts/ipbx-autoupdate.sh)) | **Atualização Automática Semanal:** Executado via cron semanal para sincronizar atualizações e gerar logs locais. | `bash scripts/ipbx-autoupdate.sh` |
+| **`motd.sh`**<br>([`scripts/motd.sh`](./scripts/motd.sh)) | **Banner do Terminal SSH:** Tela personalizada de boas-vindas ao logar como root no terminal. | `bash scripts/motd.sh` |
+
+---
+
 ## 🔍 Guia de Uso e Documentação por Módulo
 
-Para instruções específicas de configuração de módulos individuais, acesse a pasta [`docs/`](./docs/):
+Para instruções detalhadas de configuração de cada recurso, acesse os manuais na pasta [`docs/`](./docs/):
 
-- 🔒 [Configuração de Domínio e SSL Let's Encrypt](./docs/auto_dominio_ssl.md)
-- 🧹 [Limpeza de Logs e Otimização de Disco](./docs/limpa_logs.md)
-- 🚨 [Monitor de Segurança & Telegram](./docs/monitor_seguranca_telegram.md)
+- 🔒 [Configuração de Domínio e SSL Let's Encrypt (`auto_dominio.sh`)](./docs/auto_dominio_ssl.md)
+- 🧹 [Limpeza de Logs e Otimização de Disco (`limpa_logs.sh`)](./docs/limpa_logs.md)
+- 🚨 [Monitor de Segurança & Alertas Telegram (`monitor_prisma.sh`)](./docs/monitor_seguranca_telegram.md)
+- 🕵️ [Detecção e Remoção do Invasor Emad (`invador_emad.md`)](./docs/invador_emad.md)
 - 🔄 [Atualização Automática Semanal (Auto Update & Logs)](./docs/autoupdate.md)
 - 📊 [Asternic CDR - Relatórios de Chamadas](./docs/asternic_cdr.md)
 - 🎛️ [Painel IPbx - Monitoramento Visual de Ramais](./docs/painel_ipbx.md)
 - 📝 [Pesquisa de Satisfação WEB & URA](./docs/pesquisa_satisfacao_web.md)
 - 🗂️ [Servidor LDAP para Telefones IP](./docs/ldap_directory.md)
 - 📞 [Instalação TFTP](./docs/tftp_install.md)
+- 🔗 [Alteração de Links no Menu do Issabel](./docs/alterar_link.md)
 - 🔄 [Rollback Versionado por Data/Hora](#-rollback-versionado-restaurar-por-data)
 
 ---
