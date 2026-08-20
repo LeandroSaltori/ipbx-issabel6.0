@@ -105,7 +105,20 @@ if ! $FORCE && ! $DRY_RUN; then
     echo "   • Entradas de menu/ACL no Issabel → removidas"
     echo "   • Crontab (parselog, monitor_issabel, autoupdate) → removidos"
     echo ""
-    read -rp "$(echo -e "${RED}Deseja continuar com o ROLLBACK? (sim/nao): ${NC}")" CONFIRMA
+
+    # Detecta se está sendo executado via pipe (curl | bash) — nesse caso /dev/tty é necessário
+    if [ -t 0 ]; then
+        # stdin é terminal — lê normalmente
+        read -rp "$(echo -e "${RED}Deseja continuar com o ROLLBACK? (sim/nao): ${NC}")" CONFIRMA
+    elif [ -e /dev/tty ]; then
+        # stdin é pipe mas /dev/tty existe — lê do terminal real
+        read -rp "$(echo -e "${RED}Deseja continuar com o ROLLBACK? (sim/nao): ${NC}")" CONFIRMA < /dev/tty
+    else
+        # Sem terminal disponível — executa direto (comportamento --force)
+        log_warn "Sem terminal interativo detectado. Executando rollback automaticamente..."
+        CONFIRMA="sim"
+    fi
+
     if [[ "$CONFIRMA" != "sim" && "$CONFIRMA" != "s" && "$CONFIRMA" != "SIM" && "$CONFIRMA" != "S" ]]; then
         echo -e "${GREEN}Rollback cancelado pelo usuário.${NC}"
         exit 0
