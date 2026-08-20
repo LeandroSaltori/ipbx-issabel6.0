@@ -1194,6 +1194,17 @@ fi
 log_success "User-Agent PJSIP configurado para IPbx-Prisma."
 
 # ==============================================================================
+# IMPLANTAÇÃO DO COMANDO DE ROLLBACK (ipbx-rollback)
+# ==============================================================================
+log_info "Implantando comando de rollback no sistema..."
+if [ -f "$REPO_DIR/rollback.sh" ]; then
+    /bin/cp -f "$REPO_DIR/rollback.sh" /usr/local/bin/ipbx-rollback
+    chmod +x /usr/local/bin/ipbx-rollback
+    log_success "Comando de rollback disponível: ipbx-rollback"
+    log_info "Em caso de problemas, execute: ipbx-rollback"
+fi
+
+# ==============================================================================
 # CONFIGURAÇÃO DE ATUALIZAÇÃO AUTOMÁTICA SEMANAL (CRON & LOGS)
 # ==============================================================================
 log_info "Configurando rotina de atualização semanal automática e registros de log..."
