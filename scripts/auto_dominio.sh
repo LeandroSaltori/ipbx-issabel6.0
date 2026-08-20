@@ -54,16 +54,17 @@ prompt_read() {
 }
 
 if [ -z "$DOMINIO" ]; then
-    prompt_read "$(echo -e "${CYAN}Digite o domínio completo (ex: pbx.meudominio.com.br): ${NC}")" DOMINIO
+    prompt_read "$(echo -e "${CYAN}Digite o domínio completo (ex: jaguimar.ipbxprisma.cloud): ${NC}")" DOMINIO
 fi
 
 if [ -z "$EMAIL" ]; then
-    prompt_read "$(echo -e "${CYAN}Digite seu e-mail para avisos de renovação SSL: ${NC}")" EMAIL
+    prompt_read "$(echo -e "${CYAN}Digite seu e-mail [padrão: leandro@prismatelecom.com]: ${NC}")" EMAIL
+    EMAIL="${EMAIL:-leandro@prismatelecom.com}"
 fi
 
 # Validação dos parâmetros
-if [ -z "$DOMINIO" ] || [ -z "$EMAIL" ]; then
-    log_error "Domínio e E-mail são obrigatórios para emissão do SSL!"
+if [ -z "$DOMINIO" ]; then
+    log_error "O domínio é obrigatório para emissão do SSL!"
     exit 1
 fi
 
