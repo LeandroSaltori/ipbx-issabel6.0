@@ -22,6 +22,55 @@ curl -sSL https://raw.githubusercontent.com/LeandroSaltori/ipbx-issabel6.0/main/
 
 ---
 
+## 🎛️ Atualização Modular via Menu Interativo (Novo)
+
+Para ambientes em produção ou versões não-padrão do Issabel/Asterisk onde você prefere atualizar os módulos **um a um** com total controle:
+
+```bash
+# Se já executou a instalação ou possui o comando no sistema:
+ipbx-update
+
+# Ou execute diretamente via curl:
+curl -sSL https://raw.githubusercontent.com/LeandroSaltori/ipbx-issabel6.0/main/ipbx-menu.sh | bash
+```
+
+O menu interativo permite escolher exatamente o que deseja atualizar, recarrega os serviços e retorna ao menu para a próxima ação:
+
+```text
+╔══════════════════════════════════════════════════════════════════════╗
+║       IPBX PRISMA TELECOM - MENU DE ATUALIZAÇÃO MODULAR              ║
+╠══════════════════════════════════════════════════════════════════════╣
+║  APARÊNCIA E INTERFACE                                               ║
+║   [1]  Terminal (MOTD)              [2]  Tema e Favicon              ║
+║   [3]  Painel Admin                [4]  Traduções (lang)             ║
+║                                                                      ║
+║  MÓDULOS E FUNCIONALIDADES                                           ║
+║   [5]  Módulos Web (todos)         [6]  Agenda Telefônica            ║
+║   [7]  Webphone WebRTC             [8]  Click-to-Dial                ║
+║   [9]  Painel IPbx                 [10] Nome dos Ramais              ║
+║                                                                      ║
+║  RELATÓRIOS                                                          ║
+║   [11] Relatório Geral (CDR)       [12] Relatório de Filas           ║
+║   [13] Relatórios Extras           [14] Pesquisa de Satisfação       ║
+║                                                                      ║
+║  CALL CENTER E COMUNICAÇÃO                                           ║
+║   [15] Call Center                 [16] ChanSpy (Escuta)             ║
+║   [17] Mensagens Texto (PJSIP)     [18] Servidor LDAP                ║
+║                                                                      ║
+║  SISTEMA E CONFIGURAÇÕES                                             ║
+║   [19] Música de Espera (MOH)      [20] Telegram (Notificações)      ║
+║   [21] Ferramentas Diagnóstico     [22] Features Asterisk            ║
+║   [23] PJSIP User-Agent            [24] Auto-Update Semanal          ║
+║   [25] Web Developer               [26] Instalar Rollback            ║
+║                                                                      ║
+╠══════════════════════════════════════════════════════════════════════╣
+║   [A]  INSTALAR TUDO (igual ao install.sh completo)                  ║
+║   [0]  Sair                                                          ║
+╚══════════════════════════════════════════════════════════════════════╝
+```
+
+---
+
 ## 🐧 Instalação do Issabel 5 / 6 do Zero no Rocky Linux (Netinstall)
 
 Caso esteja configurando um servidor limpo a partir do **Rocky Linux 8 ou 9** do zero via terminal, siga o procedimento de instalação oficial e pós-customização:

@@ -614,6 +614,13 @@ fi
 log_step "12/12 - Recarregando serviços do sistema"
 
 if ! $DRY_RUN; then
+    # Garante integridade do diretório de logs CDR CSV do Asterisk
+    mkdir -p /var/log/asterisk/cdr-csv /var/log/asterisk/cdr-custom 2>/dev/null || true
+    touch /var/log/asterisk/cdr-csv/Master.csv 2>/dev/null || true
+    chown -R asterisk:asterisk /var/log/asterisk/cdr-csv /var/log/asterisk/cdr-custom 2>/dev/null || true
+    chmod 755 /var/log/asterisk/cdr-csv /var/log/asterisk/cdr-custom 2>/dev/null || true
+    chmod 664 /var/log/asterisk/cdr-csv/Master.csv 2>/dev/null || true
+
     # Limpa cache do Smarty
     rm -rf /var/www/html/var/templates_c/* 2>/dev/null || true
     rm -rf /tmp/smarty* 2>/dev/null || true

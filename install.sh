@@ -1194,14 +1194,19 @@ fi
 log_success "User-Agent PJSIP configurado para IPbx-Prisma."
 
 # ==============================================================================
-# IMPLANTAÇÃO DO COMANDO DE ROLLBACK (ipbx-rollback)
+# IMPLANTAÇÃO DO COMANDO DE ROLLBACK (ipbx-rollback) E MENU (ipbx-update)
 # ==============================================================================
-log_info "Implantando comando de rollback no sistema..."
+log_info "Implantando comandos auxiliares no sistema..."
 if [ -f "$REPO_DIR/rollback.sh" ]; then
     /bin/cp -f "$REPO_DIR/rollback.sh" /usr/local/bin/ipbx-rollback
     chmod +x /usr/local/bin/ipbx-rollback
     log_success "Comando de rollback disponível: ipbx-rollback"
-    log_info "Em caso de problemas, execute: ipbx-rollback"
+fi
+
+if [ -f "$REPO_DIR/ipbx-menu.sh" ]; then
+    /bin/cp -f "$REPO_DIR/ipbx-menu.sh" /usr/local/bin/ipbx-update
+    chmod +x /usr/local/bin/ipbx-update
+    log_success "Menu de atualização modular disponível: ipbx-update"
 fi
 
 # ==============================================================================
@@ -1224,6 +1229,12 @@ fi
 # RECARGA DE SERVIÇOS E FINALIZAÇÃO
 # ==============================================================================
 log_info "Limpando cache de templates do Smarty e recarregando serviços..."
+mkdir -p /var/log/asterisk/cdr-csv /var/log/asterisk/cdr-custom 2>/dev/null || true
+touch /var/log/asterisk/cdr-csv/Master.csv 2>/dev/null || true
+chown -R asterisk:asterisk /var/log/asterisk/cdr-csv /var/log/asterisk/cdr-custom 2>/dev/null || true
+chmod 755 /var/log/asterisk/cdr-csv /var/log/asterisk/cdr-custom 2>/dev/null || true
+chmod 664 /var/log/asterisk/cdr-csv/Master.csv 2>/dev/null || true
+
 rm -rf /var/www/html/var/templates_c/* 2>/dev/null || true
 rm -rf /tmp/smarty* 2>/dev/null || true
 
