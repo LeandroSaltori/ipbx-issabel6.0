@@ -98,63 +98,39 @@ curl -sSL https://raw.githubusercontent.com/LeandroSaltori/ipbx-issabel6.0/main/
 
 ---
 
-## 🛡️ Política de Segurança e Backup Automatizado (`_old`)
+## 🛡️ Política de Segurança e Snapshots com Data/Hora
 
-Para garantir total segurança e permitir a reversão se necessário, **nenhuma pasta nativa do Issabel é excluída**. 
+Em ambientes de produção, **nenhum dado de cliente, histórico de chamadas (CDR) ou gravação é apagado**. 
 
-Toda vez que o script atualiza uma pasta do sistema, a pasta nativa original é renomeada adicionando o sufixo `_old` (ou `_OLD`):
-
-| Diretório Original | Backup Automático Criado |
-| :--- | :--- |
-| `/var/www/html/admin` | `/var/www/html/admin_old` |
-| `/var/www/html/lang` | `/var/www/html/lang_old` |
-| `/var/www/html/modules` | `/var/www/html/modules_old` |
-| `/usr/local/sbin/motd.sh` | `/usr/local/sbin/motd_old.sh` |
-| `/var/www/html/admin/modules/asternic_cdr` | `/var/www/html/admin/modules/asternic_cdr_OLD` |
+A cada execução do `ipbx-update` (menu modular) ou do `install.sh`:
+1. Um snapshot completo e isolado é criado em `/var/backup/ipbx/backup_YYYY-MM-DD_HHMMSS/`.
+2. O snapshot guarda o estado exato dos arquivos web, bancos SQLite (`menu.db`, `acl.db`), configs do Asterisk (`.conf`) e agendamentos do crontab.
+3. Um arquivo `manifesto.txt` registra o módulo alterado, a data e a hora exatas.
+4. O link `/var/backup/ipbx/latest` aponta sempre para o ponto de restauração mais recente.
 
 ---
 
-## 🔄 Rollback Completo (Reverter Atualização)
+## 🔄 Rollback Versionado (Restaurar por Data)
 
-Se após a instalação ou atualização o sistema apresentar problemas, **é possível reverter TODAS as alterações** e restaurar o servidor ao estado original com um único comando:
+Se após qualquer alteração você precisar reverter o PBX para o estado anterior, basta executar:
 
 ```bash
 ipbx-rollback
 ```
 
-> **O comando `ipbx-rollback` é instalado automaticamente** junto com o `install.sh` e fica disponível em `/usr/local/bin/ipbx-rollback`.
-
-### Modos de Execução
+### Modos de Uso do Rollback
 
 | Comando | Descrição |
 | :--- | :--- |
-| `ipbx-rollback` | Rollback completo **interativo** (pede confirmação antes de executar) |
-| `ipbx-rollback --dry-run` | **Simula** o rollback sem alterar nada (mostra o que seria feito) |
-| `ipbx-rollback --force` | Rollback completo **sem confirmação** (execução direta) |
-| `ipbx-rollback --help` | Exibe a ajuda do comando |
+| `ipbx-rollback` | Abre a lista de datas disponíveis e permite escolher qual restaurar (ou ENTER para o último) |
+| `ipbx-rollback --latest` | Restaura imediatamente o snapshot **mais recente** |
+| `ipbx-rollback --list` | Apenas **lista** os pontos de restauração com data, hora e descrição |
+| `ipbx-rollback --dry-run` | **Simula** o que seria restaurado sem alterar nenhum arquivo |
 
-### O que o Rollback Reverte
-
-- ✅ **Pastas do sistema** → Restaura `/var/www/html/admin`, `lang`, `modules` a partir dos backups `_old`
-- ✅ **Dialplan Asterisk** → Remove ChanSpy, TextMessages, Pesquisa de Satisfação, atalho 8996
-- ✅ **Features Asterisk** → Remove ajustes de transferência e BIP
-- ✅ **User-Agent PJSIP** → Restaura para o padrão do Asterisk
-- ✅ **Menu e ACL do Issabel** → Remove todas as entradas de menu e permissões adicionadas
-- ✅ **Módulos Web** → Remove Webphone, Pesquisa, Relatório de Filas, Painel IPbx, etc.
-- ✅ **Servidor LDAP** → Desinstala o serviço e remove o binário
-- ✅ **Crontab** → Remove agendamentos do parselog, monitor Telegram e autoupdate
-- ✅ **MySQL/SQLite** → Remove tabelas e registros criados pela instalação
-- ✅ **Serviços** → Recarrega Asterisk, FreePBX/IssabelPBX e Apache
-
-> **⚠️ Importante:** O rollback cria backups `.pre_rollback` dos arquivos de configuração antes de alterá-los. O log completo fica em `/var/log/ipbx-rollback.log`.
-
-### Caso o comando `ipbx-rollback` não esteja disponível
-
-Se o comando não foi instalado (instalação antiga), execute diretamente:
-
-```bash
-curl -sSL https://raw.githubusercontent.com/LeandroSaltori/ipbx-issabel6.0/main/rollback.sh | bash
-```
+> **Caso o comando não esteja instalado:**
+> ```bash
+> curl -sSL https://raw.githubusercontent.com/LeandroSaltori/ipbx-issabel6.0/main/rollback.sh | bash
+> ```
 
 ---
 

@@ -90,19 +90,55 @@ if [ ! -f "$REPO_DIR/install.sh" ] || [ ! -d "$REPO_DIR/src" ]; then
     REPO_DIR="$TMP_REPO"
 fi
 
-# --- FUNÇÃO DE BACKUP COM SUFIXO _old ---
+# --- SISTEMA DE SNAPSHOT VERSIONADO POR DATA/HORA ---
+CURRENT_BACKUP_DIR=""
+
+create_snapshot() {
+    local module_name="$1"
+    local timestamp=$(date '+%Y-%m-%d_%H%M%S')
+    CURRENT_BACKUP_DIR="/var/backup/ipbx/backup_${timestamp}"
+
+    mkdir -p "$CURRENT_BACKUP_DIR/html" "$CURRENT_BACKUP_DIR/db" "$CURRENT_BACKUP_DIR/asterisk" 2>/dev/null || true
+
+    echo "$module_name - $(date '+%d/%m/%Y às %H:%M:%S')" > "$CURRENT_BACKUP_DIR/manifesto.txt"
+
+    # Snapshot dos bancos SQLite de menu e permissões
+    [ -f /var/www/db/menu.db ] && cp -pf /var/www/db/menu.db "$CURRENT_BACKUP_DIR/db/" 2>/dev/null || true
+    [ -f /var/www/db/acl.db ] && cp -pf /var/www/db/acl.db "$CURRENT_BACKUP_DIR/db/" 2>/dev/null || true
+
+    # Snapshot das configurações do Asterisk
+    for f in extensions_custom.conf extensions_override_issabelpbx.conf features_general_custom.conf pjsip.conf pjsip_custom.conf; do
+        [ -f "/etc/asterisk/$f" ] && cp -pf "/etc/asterisk/$f" "$CURRENT_BACKUP_DIR/asterisk/" 2>/dev/null || true
+    done
+
+    # Snapshot do Crontab
+    crontab -l > "$CURRENT_BACKUP_DIR/crontab.txt" 2>/dev/null || true
+
+    # Link simbólico para o snapshot mais recente
+    ln -sfn "$CURRENT_BACKUP_DIR" /var/backup/ipbx/latest 2>/dev/null || true
+
+    log_info "Ponto de restauração gravado em: $CURRENT_BACKUP_DIR"
+}
+
+# --- FUNÇÃO DE BACKUP COM PRESERVAÇÃO DE DADOS ---
 backup_and_deploy() {
     local src="$1"
     local dest="$2"
-    local backup="${dest}_old"
 
+    # Salva cópia exata no snapshot versionado com data
+    if [ -e "$dest" ] && [ -n "$CURRENT_BACKUP_DIR" ]; then
+        local rel_path="${dest#/var/www/html/}"
+        if [ "$rel_path" != "$dest" ]; then
+            mkdir -p "$CURRENT_BACKUP_DIR/html/$(dirname "$rel_path")" 2>/dev/null || true
+            cp -rpf "$dest" "$CURRENT_BACKUP_DIR/html/$rel_path" 2>/dev/null || true
+        fi
+    fi
+
+    # Mantém também backup _old legado
+    local backup="${dest}_old"
     if [ -e "$dest" ]; then
         if [ ! -e "$backup" ]; then
-            log_info "Backup criado: $dest -> $backup"
-            mv "$dest" "$backup"
-        else
-            log_warn "Backup $backup já existe. Preservando backup original."
-            rm -rf "$dest"
+            cp -rpf "$dest" "$backup" 2>/dev/null || true
         fi
     fi
 
@@ -999,37 +1035,36 @@ while true; do
     menu_read -r OPCAO
 
     case "$OPCAO" in
-        1)  update_motd ;;
-        2)  update_tema ;;
-        3)  update_admin ;;
-        4)  update_lang ;;
-        5)  update_modules ;;
-        6)  update_agenda ;;
-        7)  update_webphone ;;
-        8)  update_clicktodial ;;
-        9)  update_painel ;;
-        10) update_nome_ramais ;;
-        11) update_asternic_cdr ;;
-        12) update_relatorio_filas ;;
-        13) update_relatorios_extras ;;
-        14) update_pesquisa ;;
-        15) update_callcenter ;;
-        16) update_chanspy ;;
-        17) update_textmessages ;;
-        18) update_ldap ;;
-        19) update_moh ;;
-        20) update_telegram ;;
-        21) update_diagnostico ;;
-        22) update_features ;;
-        23) update_pjsip ;;
-        24) update_autoupdate ;;
-        25) update_developer ;;
+        1)  create_snapshot "Terminal (MOTD)"; update_motd; reload_services ;;
+        2)  create_snapshot "Tema e Favicon"; update_tema; reload_services ;;
+        3)  create_snapshot "Painel Admin"; update_admin; reload_services ;;
+        4)  create_snapshot "Traduções (lang)"; update_lang; reload_services ;;
+        5)  create_snapshot "Módulos Web"; update_modules; reload_services ;;
+        6)  create_snapshot "Agenda Telefônica"; update_agenda; reload_services ;;
+        7)  create_snapshot "Webphone WebRTC"; update_webphone; reload_services ;;
+        8)  create_snapshot "Click-to-Dial"; update_clicktodial; reload_services ;;
+        9)  create_snapshot "Painel IPbx"; update_painel; reload_services ;;
+        10) create_snapshot "Nome dos Ramais"; update_nome_ramais; reload_services ;;
+        11) create_snapshot "Relatório Geral (CDR)"; update_asternic_cdr; reload_services ;;
+        12) create_snapshot "Relatório de Filas"; update_relatorio_filas; reload_services ;;
+        13) create_snapshot "Relatórios Extras"; update_relatorios_extras; reload_services ;;
+        14) create_snapshot "Pesquisa de Satisfação"; update_pesquisa; reload_services ;;
+        15) create_snapshot "Call Center"; update_callcenter; reload_services ;;
+        16) create_snapshot "ChanSpy (Escuta)"; update_chanspy; reload_services ;;
+        17) create_snapshot "Mensagens Texto"; update_textmessages; reload_services ;;
+        18) create_snapshot "Servidor LDAP"; update_ldap; reload_services ;;
+        19) create_snapshot "Música de Espera"; update_moh; reload_services ;;
+        20) create_snapshot "Telegram (Notificações)"; update_telegram; reload_services ;;
+        21) create_snapshot "Ferramentas Diagnóstico"; update_diagnostico; reload_services ;;
+        22) create_snapshot "Features Asterisk"; update_features; reload_services ;;
+        23) create_snapshot "PJSIP User-Agent"; update_pjsip; reload_services ;;
+        24) create_snapshot "Auto-Update Semanal"; update_autoupdate; reload_services ;;
+        25) create_snapshot "Web Developer"; update_developer; reload_services ;;
         26) update_rollback ;;
-        [aA]) install_all ;;
+        [aA]) create_snapshot "Instalação Completa"; install_all ;;
         0)
             echo ""
             echo -e "${GREEN}Saindo do menu de atualização. Até logo!${NC}"
-            reload_services
             echo ""
             exit 0
             ;;

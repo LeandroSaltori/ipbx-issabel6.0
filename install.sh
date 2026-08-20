@@ -74,19 +74,57 @@ fi
 
 cd "$REPO_DIR"
 
-# --- FUNÇÃO DE BACKUP COM SUFIXO _old ---
+# --- SISTEMA DE SNAPSHOT VERSIONADO POR DATA/HORA ---
+CURRENT_BACKUP_DIR=""
+
+create_snapshot() {
+    local module_name="$1"
+    local timestamp=$(date '+%Y-%m-%d_%H%M%S')
+    CURRENT_BACKUP_DIR="/var/backup/ipbx/backup_${timestamp}"
+
+    mkdir -p "$CURRENT_BACKUP_DIR/html" "$CURRENT_BACKUP_DIR/db" "$CURRENT_BACKUP_DIR/asterisk" 2>/dev/null || true
+
+    echo "$module_name - $(date '+%d/%m/%Y às %H:%M:%S')" > "$CURRENT_BACKUP_DIR/manifesto.txt"
+
+    # Snapshot dos bancos SQLite de menu e permissões
+    [ -f /var/www/db/menu.db ] && cp -pf /var/www/db/menu.db "$CURRENT_BACKUP_DIR/db/" 2>/dev/null || true
+    [ -f /var/www/db/acl.db ] && cp -pf /var/www/db/acl.db "$CURRENT_BACKUP_DIR/db/" 2>/dev/null || true
+
+    # Snapshot das configurações do Asterisk
+    for f in extensions_custom.conf extensions_override_issabelpbx.conf features_general_custom.conf pjsip.conf pjsip_custom.conf; do
+        [ -f "/etc/asterisk/$f" ] && cp -pf "/etc/asterisk/$f" "$CURRENT_BACKUP_DIR/asterisk/" 2>/dev/null || true
+    done
+
+    # Snapshot do Crontab
+    crontab -l > "$CURRENT_BACKUP_DIR/crontab.txt" 2>/dev/null || true
+
+    # Link simbólico para o snapshot mais recente
+    ln -sfn "$CURRENT_BACKUP_DIR" /var/backup/ipbx/latest 2>/dev/null || true
+
+    log_info "Ponto de restauração com data/hora gravado em: $CURRENT_BACKUP_DIR"
+}
+
+create_snapshot "Instalação Completa - install.sh"
+
+# --- FUNÇÃO DE BACKUP COM PRESERVAÇÃO DE DADOS ---
 backup_and_deploy() {
     local src="$1"
     local dest="$2"
-    local backup="${dest}_old"
 
+    # Salva cópia no snapshot versionado com data
+    if [ -e "$dest" ] && [ -n "$CURRENT_BACKUP_DIR" ]; then
+        local rel_path="${dest#/var/www/html/}"
+        if [ "$rel_path" != "$dest" ]; then
+            mkdir -p "$CURRENT_BACKUP_DIR/html/$(dirname "$rel_path")" 2>/dev/null || true
+            cp -rpf "$dest" "$CURRENT_BACKUP_DIR/html/$rel_path" 2>/dev/null || true
+        fi
+    fi
+
+    # Mantém também backup _old legado
+    local backup="${dest}_old"
     if [ -e "$dest" ]; then
         if [ ! -e "$backup" ]; then
-            log_info "Backup criado: $dest -> $backup"
-            mv "$dest" "$backup"
-        else
-            log_warn "Backup $backup já existe. Preservando backup original."
-            rm -rf "$dest"
+            cp -rpf "$dest" "$backup" 2>/dev/null || true
         fi
     fi
 
