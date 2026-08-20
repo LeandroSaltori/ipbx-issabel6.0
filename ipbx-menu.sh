@@ -940,7 +940,56 @@ update_developer() {
     log_success "Ferramentas Web Developer instaladas."
 }
 
-# --- 26. ROLLBACK ---
+# --- 26. CONFIGURAR DOMÍNIO & SSL (LET'S ENCRYPT) ---
+update_ssl() {
+    log_info "Iniciando assistente de configuração de Domínio e Certificado SSL..."
+    if [ -f "$REPO_DIR/scripts/auto_dominio.sh" ]; then
+        /bin/cp -f "$REPO_DIR/scripts/auto_dominio.sh" /usr/local/bin/ipbx-ssl
+        chmod +x /usr/local/bin/ipbx-ssl
+        bash "$REPO_DIR/scripts/auto_dominio.sh"
+    else
+        log_error "Script scripts/auto_dominio.sh não encontrado no repositório."
+    fi
+}
+
+# --- 27. LIMPEZA DE LOGS & OTIMIZAÇÃO DE DISCO ---
+update_limpalogs() {
+    log_info "Executando limpeza de logs e otimização de disco..."
+    if [ -f "$REPO_DIR/scripts/limpa_logs.sh" ]; then
+        /bin/cp -f "$REPO_DIR/scripts/limpa_logs.sh" /usr/local/bin/ipbx-limpalogs
+        chmod +x /usr/local/bin/ipbx-limpalogs
+        bash "$REPO_DIR/scripts/limpa_logs.sh"
+
+        # Configura agendamento no crontab semanal
+        if ! crontab -l 2>/dev/null | grep -q "ipbx-limpalogs"; then
+            (crontab -l 2>/dev/null; echo "0 4 * * 0 /usr/local/bin/ipbx-limpalogs > /dev/null 2>&1") | crontab -
+            log_success "Agendamento de limpeza semanal configurado no crontab (Domingos às 04h)."
+        fi
+    else
+        log_error "Script scripts/limpa_logs.sh não encontrado no repositório."
+    fi
+}
+
+# --- 28. MONITOR DE SEGURANÇA & TELEGRAM (FIREWALL, INVASÃO E USUÁRIOS) ---
+update_monitor_prisma() {
+    log_info "Configurando Monitor de Segurança & Telegram (Firewall, Invasão e Usuários)..."
+    if [ -f "$REPO_DIR/scripts/monitor_prisma.sh" ]; then
+        /bin/cp -f "$REPO_DIR/scripts/monitor_prisma.sh" /usr/local/bin/monitor_issabel_users.sh
+        /bin/cp -f "$REPO_DIR/scripts/monitor_prisma.sh" /usr/local/bin/monitor_prisma.sh
+        chmod +x /usr/local/bin/monitor_issabel_users.sh /usr/local/bin/monitor_prisma.sh
+
+        if ! crontab -l 2>/dev/null | grep -q "monitor_issabel_users.sh"; then
+            (crontab -l 2>/dev/null; echo "* * * * * /usr/local/bin/monitor_issabel_users.sh") | crontab -
+            log_success "Monitor de segurança ativo no crontab (a cada minuto)."
+        else
+            log_info "Monitor de segurança já configurado no crontab."
+        fi
+    else
+        log_error "Script scripts/monitor_prisma.sh não encontrado no repositório."
+    fi
+}
+
+# --- 29. ROLLBACK ---
 update_rollback() {
     log_info "Implantando comando de rollback no sistema..."
     if [ -f "$REPO_DIR/rollback.sh" ]; then
@@ -969,7 +1018,7 @@ install_all() {
     update_lang
     update_modules
     update_moh
-    update_telegram
+    update_monitor_prisma
     update_painel
     update_nome_ramais
     update_pesquisa
@@ -982,6 +1031,7 @@ install_all() {
     update_features
     update_pjsip
     update_autoupdate
+    update_limpalogs
     update_rollback
     reload_services
     echo ""
@@ -1015,11 +1065,12 @@ show_menu() {
     echo -e "${BLUE}║${NC}   ${WHITE}[15]${NC} Call Center                 ${WHITE}[16]${NC} ChanSpy (Escuta)          ${BLUE}║${NC}"
     echo -e "${BLUE}║${NC}   ${WHITE}[17]${NC} Mensagens Texto (PJSIP)     ${WHITE}[18]${NC} Servidor LDAP             ${BLUE}║${NC}"
     echo -e "${BLUE}║${NC}                                                                    ${BLUE}║${NC}"
-    echo -e "${BLUE}║${NC}  ${GREEN}SISTEMA E CONFIGURAÇÕES${NC}                                          ${BLUE}║${NC}"
-    echo -e "${BLUE}║${NC}   ${WHITE}[19]${NC} Música de Espera (MOH)      ${WHITE}[20]${NC} Telegram (Notificações)   ${BLUE}║${NC}"
+    echo -e "${BLUE}║${NC}  ${GREEN}SISTEMA, SEGURANÇA E REDE${NC}                                        ${BLUE}║${NC}"
+    echo -e "${BLUE}║${NC}   ${WHITE}[19]${NC} Música de Espera (MOH)      ${WHITE}[20]${NC} Monitor Segurança Telegram ${BLUE}║${NC}"
     echo -e "${BLUE}║${NC}   ${WHITE}[21]${NC} Ferramentas Diagnóstico     ${WHITE}[22]${NC} Features Asterisk         ${BLUE}║${NC}"
     echo -e "${BLUE}║${NC}   ${WHITE}[23]${NC} PJSIP User-Agent            ${WHITE}[24]${NC} Auto-Update Semanal       ${BLUE}║${NC}"
-    echo -e "${BLUE}║${NC}   ${WHITE}[25]${NC} Web Developer               ${WHITE}[26]${NC} Instalar Rollback         ${BLUE}║${NC}"
+    echo -e "${BLUE}║${NC}   ${WHITE}[25]${NC} Web Developer               ${WHITE}[26]${NC} Configurar Domínio e SSL  ${BLUE}║${NC}"
+    echo -e "${BLUE}║${NC}   ${WHITE}[27]${NC} Limpeza de Logs e Disco     ${WHITE}[28]${NC} Instalar Rollback         ${BLUE}║${NC}"
     echo -e "${BLUE}║${NC}                                                                    ${BLUE}║${NC}"
     echo -e "${BLUE}╠══════════════════════════════════════════════════════════════════════╣${NC}"
     echo -e "${BLUE}║${NC}   ${YELLOW}[A]${NC}  ${YELLOW}INSTALAR TUDO${NC} (igual ao install.sh completo)                ${BLUE}║${NC}"
@@ -1054,13 +1105,15 @@ while true; do
         17) create_snapshot "Mensagens Texto"; update_textmessages; reload_services ;;
         18) create_snapshot "Servidor LDAP"; update_ldap; reload_services ;;
         19) create_snapshot "Música de Espera"; update_moh; reload_services ;;
-        20) create_snapshot "Telegram (Notificações)"; update_telegram; reload_services ;;
+        20) create_snapshot "Monitor Segurança Telegram"; update_monitor_prisma ;;
         21) create_snapshot "Ferramentas Diagnóstico"; update_diagnostico; reload_services ;;
         22) create_snapshot "Features Asterisk"; update_features; reload_services ;;
         23) create_snapshot "PJSIP User-Agent"; update_pjsip; reload_services ;;
         24) create_snapshot "Auto-Update Semanal"; update_autoupdate; reload_services ;;
         25) create_snapshot "Web Developer"; update_developer; reload_services ;;
-        26) update_rollback ;;
+        26) create_snapshot "Configuração Domínio SSL"; update_ssl; reload_services ;;
+        27) update_limpalogs ;;
+        28) update_rollback ;;
         [aA]) create_snapshot "Instalação Completa"; install_all ;;
         0)
             echo ""

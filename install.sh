@@ -358,19 +358,22 @@ if [ -d "$REPO_DIR/src/sounds/moh" ]; then
 fi
 
 # ==============================================================================
-# 12. NOTIFICAÇÕES TELEGRAM
+# 12. NOTIFICAÇÕES TELEGRAM & MONITOR DE SEGURANÇA
 # ==============================================================================
-log_info "12/20 - Configurando Notificações via Telegram..."
-TELEGRAM_SRC="$REPO_DIR/scripts/monitor_issabel_users.sh"
+log_info "12/20 - Configurando Monitor de Segurança e Notificações Telegram..."
+TELEGRAM_SRC="$REPO_DIR/scripts/monitor_prisma.sh"
+[ ! -f "$TELEGRAM_SRC" ] && TELEGRAM_SRC="$REPO_DIR/scripts/monitor_issabel_users.sh"
+
 if [ -f "$TELEGRAM_SRC" ]; then
     cp -f "$TELEGRAM_SRC" /usr/local/bin/monitor_issabel_users.sh
-    chmod +x /usr/local/bin/monitor_issabel_users.sh
+    cp -f "$TELEGRAM_SRC" /usr/local/bin/monitor_prisma.sh
+    chmod +x /usr/local/bin/monitor_issabel_users.sh /usr/local/bin/monitor_prisma.sh
     
     if ! crontab -l 2>/dev/null | grep -q "monitor_issabel_users.sh"; then
         (crontab -l 2>/dev/null; echo "* * * * * /usr/local/bin/monitor_issabel_users.sh") | crontab -
-        log_success "Agendamento de notificação Telegram criado no crontab."
+        log_success "Monitor de segurança ativo no crontab (Firewall, Invasão e Usuários)."
     else
-        log_info "Agendamento Telegram já existe no crontab."
+        log_info "Monitor de segurança já configurado no crontab."
     fi
 fi
 

@@ -147,9 +147,11 @@ ipbx-issabel6.0/
 │   ├── ldap_directory.md        # Guia do servidor LDAP de ramais
 │   └── tftp_install.md          # Instruções para servidor TFTP
 ├── scripts/                     # Scripts de automação e utilitários
+│   ├── auto_dominio.sh          # Assistente de Domínio e Certificado SSL Let's Encrypt + WebRTC
+│   ├── limpa_logs.sh            # Otimização de disco e limpeza segura de logs (preserva CDRs)
+│   ├── monitor_prisma.sh        # Monitor de segurança (Web shells/Emad, Firewall e Usuários WEB)
 │   ├── ipbx-autoupdate.sh       # Script de atualização semanal automática e registro de logs
 │   ├── motd.sh                  # Banner de boas-vindas do terminal SSH
-│   ├── monitor_issabel_users.sh # Alertas instantâneos no Telegram para novos usuários WEB
 │   └── update-addressbook       # Utilitário de sincronização da agenda
 ├── src/                         # Código-fonte, componentes e módulos
 │   ├── admin/                   # Interface administrativa customizada do Issabel
@@ -165,11 +167,12 @@ ipbx-issabel6.0/
 │   ├── sounds/                  # Áudios do sistema (MOH Músicas de Espera e URA Custom)
 │   ├── themes/                  # Temas visuais (Prisma v5)
 │   ├── webphone/                # Softphone WebRTC integrado no navegador
-│   ├── Agenda.php               # Agenda telefônica WEB
+│   ├── agenda.php               # Agenda telefônica WEB
 │   ├── favicon.ico              # Favicon customizado
 │   └── lang/                    # Arquivos de tradução pt-br
 ├── install.sh                   # Script mestre de instalação automatizada (20 etapas)
-├── rollback.sh                  # Script de rollback completo (reverte install.sh)
+├── ipbx-menu.sh                 # Menu interativo de atualização modular (ipbx-update)
+├── rollback.sh                  # Script de rollback versionado por data/hora (ipbx-rollback)
 ├── README.md                    # Manual mestre do repositório
 └── LICENSE                      # Licença open-source
 ```
@@ -183,8 +186,11 @@ ipbx-issabel6.0/
 3. 🛜 **NMTUI (NetworkManager-tui):** Interface amigável em modo texto no terminal para configuração rápida de placas de rede, IPs e Gateway.
 4. ⏱️ **Tempo de Transferência de Chamadas:** Aumentado o tempo limite de digitação de dígitos para 7 segundos (`transferdigittimeout = 7`) e tempo limite de resposta em transferência assistida para 30 segundos (`atxfernoanswertimeout = 30`).
 5. 🔔 **BIP de Transferência:** Tom de cortesia e BIP emitidos ao completar transferências (`courtesytone = beep` / `xfersound = beep`).
-6. 🔄 **Atualização Automática Semanal (Auto Update):** Rotina semanal (`scripts/ipbx-autoupdate.sh`) via cron (`/etc/cron.weekly/ipbx-autoupdate`). Atualiza o repositório via `git pull` e executa o `install.sh` com geração de logs detalhados na pasta do cliente (`autoupdate.log` e `autoupdate_last_status.txt`).
-7. ⏱️ **Resumo Flutuante com Retenção (2s Hover):** Os cards de resumo nos relatórios do sistema possuem um atraso de 2 segundos mantendo o mouse parado na linha antes de abrir, evitando popups acidentais durante a navegação.
+6. 🔒 **Domínio e SSL Automático (`auto_dominio.sh`):** Emite certificado SSL Let's Encrypt com 1 comando e sincroniza chaves WSS com o Webphone.
+7. 🧹 **Limpeza de Logs e Otimização de Disco (`limpa_logs.sh`):** Esvazia logs >50MB e limpa temporários sem apagar histórico CDR de ligações.
+8. 🚨 **Monitor de Segurança Telegram (`monitor_prisma.sh`):** Alertas em tempo real de web shells, queda de Firewall e novos usuários WEB.
+9. 🔄 **Atualização Automática Semanal (Auto Update):** Rotina semanal (`scripts/ipbx-autoupdate.sh`) via cron (`/etc/cron.weekly/ipbx-autoupdate`).
+10. ⏱️ **Resumo Flutuante com Retenção (2s Hover):** Os cards de resumo nos relatórios do sistema possuem um atraso de 2 segundos mantendo o mouse parado na linha antes de abrir, evitando popups acidentais durante a navegação.
 
 ---
 
@@ -192,14 +198,16 @@ ipbx-issabel6.0/
 
 Para instruções específicas de configuração de módulos individuais, acesse a pasta [`docs/`](./docs/):
 
+- 🔒 [Configuração de Domínio e SSL Let's Encrypt](./docs/auto_dominio_ssl.md)
+- 🧹 [Limpeza de Logs e Otimização de Disco](./docs/limpa_logs.md)
+- 🚨 [Monitor de Segurança & Telegram](./docs/monitor_seguranca_telegram.md)
 - 🔄 [Atualização Automática Semanal (Auto Update & Logs)](./docs/autoupdate.md)
 - 📊 [Asternic CDR - Relatórios de Chamadas](./docs/asternic_cdr.md)
 - 🎛️ [Painel IPbx - Monitoramento Visual de Ramais](./docs/painel_ipbx.md)
 - 📝 [Pesquisa de Satisfação WEB & URA](./docs/pesquisa_satisfacao_web.md)
-- 📲 [Monitoramento de Usuários via Telegram](./docs/telegram_monitor.md)
 - 🗂️ [Servidor LDAP para Telefones IP](./docs/ldap_directory.md)
 - 📞 [Instalação TFTP](./docs/tftp_install.md)
-- 🔄 [Rollback Completo (Reverter Atualização)](#-rollback-completo-reverter-atualização)
+- 🔄 [Rollback Versionado por Data/Hora](#-rollback-versionado-restaurar-por-data)
 
 ---
 
