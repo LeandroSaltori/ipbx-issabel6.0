@@ -157,6 +157,91 @@ function handleCdrAudioPlayback()
     }
 }
 
+if (!function_exists('serveStreamableAudioFile')) {
+    function serveStreamableAudioFile($filePath)
+    {
+        while (ob_get_level()) ob_end_clean();
+
+        if (empty($filePath) || !file_exists($filePath)) {
+            header("HTTP/1.1 404 Not Found");
+            die("404 Audio file not found");
+        }
+
+        $ext = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
+
+        // 1. SoX: PCM 16-bit WAV (8000Hz, Mono, Signed Integer)
+        $sox = trim(@shell_exec('which sox 2>/dev/null'));
+        if (empty($sox) && file_exists('/usr/bin/sox')) $sox = '/usr/bin/sox';
+        if (!empty($sox) && is_executable($sox)) {
+            header('Content-Type: audio/wav');
+            header('Content-Disposition: inline; filename="call_audio.wav"');
+            header('Cache-Control: no-cache, must-revalidate');
+            header('Pragma: no-cache');
+            passthru(escapeshellcmd($sox) . ' ' . escapeshellarg($filePath) . ' -t wav -e signed-integer -b 16 -r 8000 -c 1 - 2>/dev/null');
+            exit;
+        }
+
+        // 2. FFmpeg: PCM WAV
+        $ffmpeg = trim(@shell_exec('which ffmpeg 2>/dev/null'));
+        if (!empty($ffmpeg) && is_executable($ffmpeg)) {
+            header('Content-Type: audio/wav');
+            header('Content-Disposition: inline; filename="call_audio.wav"');
+            header('Cache-Control: no-cache, must-revalidate');
+            header('Pragma: no-cache');
+            passthru(escapeshellcmd($ffmpeg) . ' -i ' . escapeshellarg($filePath) . ' -f wav -acodec pcm_s16le -ar 8000 -ac 1 - 2>/dev/null');
+            exit;
+        }
+
+        // 3. LAME: MP3
+        $lame = trim(@shell_exec('which lame 2>/dev/null'));
+        if (!empty($lame) && is_executable($lame)) {
+            header('Content-Type: audio/mpeg');
+            header('Content-Disposition: inline; filename="call_audio.mp3"');
+            header('Cache-Control: no-cache, must-revalidate');
+            header('Pragma: no-cache');
+            passthru(escapeshellcmd($lame) . ' -b 64 ' . escapeshellarg($filePath) . ' - 2>/dev/null');
+            exit;
+        }
+
+        // 4. Fallback: Direct Streaming with HTTP Byte-Ranges
+        $fileSize = filesize($filePath);
+        $mime = ($ext === 'mp3') ? 'audio/mpeg' : (($ext === 'ogg') ? 'audio/ogg' : 'audio/wav');
+        $offset = 0;
+        $length = $fileSize;
+
+        if (isset($_SERVER['HTTP_RANGE'])) {
+            preg_match('/bytes=(\d+)-(\d+)?/', $_SERVER['HTTP_RANGE'], $matches);
+            $offset = intval($matches[1]);
+            $end = (isset($matches[2]) && $matches[2] !== '') ? intval($matches[2]) : ($fileSize - 1);
+            $length = $end - $offset + 1;
+            http_response_code(206);
+            header('HTTP/1.1 206 Partial Content');
+            header("Content-Range: bytes $offset-$end/$fileSize");
+        } else {
+            http_response_code(200);
+        }
+
+        header('Content-Type: ' . $mime);
+        header('Content-Length: ' . $length);
+        header('Content-Disposition: inline; filename="' . basename($filePath) . '"');
+        header('Accept-Ranges: bytes');
+        header('Cache-Control: no-cache, must-revalidate');
+
+        $fp = fopen($filePath, 'rb');
+        fseek($fp, $offset);
+        $bufferSize = 8192;
+        $bytesSent = 0;
+        while (!feof($fp) && $bytesSent < $length) {
+            $read = min($bufferSize, $length - $bytesSent);
+            echo fread($fp, $read);
+            flush();
+            $bytesSent += $read;
+        }
+        fclose($fp);
+        exit;
+    }
+}
+
 function renderCelDetailsHtml($pDB, $uniqueid)
 {
     while (ob_get_level()) ob_end_clean();
