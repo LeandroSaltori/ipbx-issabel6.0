@@ -148,11 +148,7 @@ function handleCdrAudioPlayback()
             readfile($filePath);
             exit;
         } else {
-            header('Content-Type: ' . $mime);
-            header('Content-Length: ' . filesize($filePath));
-            header('Accept-Ranges: bytes');
-            readfile($filePath);
-            exit;
+            serveStreamableAudioFile($filePath);
         }
     } else {
         header("HTTP/1.1 404 Not Found");
@@ -1066,7 +1062,10 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
         var audio = document.getElementById('cdrAudioElement');
         audio.src = '?menu=<?php echo htmlspecialchars($module_name); ?>&rawmode=yes&action=stream_audio&file=' + fileEnc;
         modal.style.display = 'flex';
-        audio.play();
+        var p = audio.play();
+        if (p !== undefined) {
+            p.catch(function(err) { console.log("Play audio error:", err); });
+        }
     }
     function closeCdrAudioModal() {
         var modal = document.getElementById('audioModalCdr');

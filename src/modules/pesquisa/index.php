@@ -123,11 +123,7 @@ function handleAudioPlayback()
             readfile($filePath);
             exit;
         } else {
-            header('Content-Type: ' . $mime);
-            header('Content-Length: ' . filesize($filePath));
-            header('Accept-Ranges: bytes');
-            readfile($filePath);
-            exit;
+            serveStreamableAudioFile($filePath);
         }
     } else {
         header("HTTP/1.1 404 Not Found");
@@ -929,7 +925,10 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
         var audio = document.getElementById('pesquisaAudioElement');
         audio.src = '?menu=<?php echo htmlspecialchars($module_name); ?>&rawmode=yes&action=stream_audio&file=' + fileEnc;
         modal.style.display = 'flex';
-        audio.play();
+        var p = audio.play();
+        if (p !== undefined) {
+            p.catch(function(err) { console.log("Play audio error:", err); });
+        }
     }
     function closeAudioModal() {
         var modal = document.getElementById('audioModalPesquisa');

@@ -70,7 +70,8 @@ function _moduleContent(&$smarty, $module_name)
         $h = 'downloadFile';
         break;
     case 'display_record':
-        $h = 'display_record';
+    case 'stream_audio':
+        $h = 'streamAudioFile';
         break;
     default:
         $h = 'reportMonitoring';
@@ -561,11 +562,11 @@ function renderFullMonitoringDashboard($smarty, $module_name, $local_templates_d
                                         );
                                         $downloadUrl = 'index.php?' . http_build_query($urlparams);
                                         $urlparamsStream = $urlparams;
-                                        $urlparamsStream['action'] = 'display_record';
+                                        $urlparamsStream['action'] = 'stream_audio';
                                         $streamUrl = 'index.php?' . http_build_query($urlparamsStream);
 
                                         $actionHtml = "<div style='display:inline-flex; gap:6px; align-items:center;'>".
-                                            "<button type='button' onclick=\"playMonitoringAudio('".htmlspecialchars($downloadUrl, ENT_QUOTES)."')\" style='background: linear-gradient(135deg, #7c3aed, #6d28d9); color: #ffffff; border: none; border-radius: 20px; padding: 4px 12px; font-weight: 700; font-size: 11px; cursor: pointer; box-shadow: 0 2px 6px rgba(124,58,237,0.3); transition: all 0.2s;'>▶ Ouvir</button>".
+                                            "<button type='button' onclick=\"playMonitoringAudio('".htmlspecialchars($streamUrl, ENT_QUOTES)."')\" style='background: linear-gradient(135deg, #7c3aed, #6d28d9); color: #ffffff; border: none; border-radius: 20px; padding: 4px 12px; font-weight: 700; font-size: 11px; cursor: pointer; box-shadow: 0 2px 6px rgba(124,58,237,0.3); transition: all 0.2s;'>▶ Ouvir</button>".
                                             "<a href='".htmlspecialchars($downloadUrl, ENT_QUOTES)."' target='_blank' style='background: rgba(255,255,255,0.08); color: #6d28d9; border: 1px solid rgba(124,58,237,0.4); border-radius: 20px; padding: 3px 10px; font-weight: 600; font-size: 10px; text-decoration: none; transition: all 0.2s;'>⬇️ Baixar</a>".
                                             "</div>";
                                     }
@@ -640,7 +641,10 @@ function renderFullMonitoringDashboard($smarty, $module_name, $local_templates_d
                 var audio = document.getElementById('monAudioElement');
                 audio.src = audioUrl;
                 modal.style.display = 'flex';
-                audio.play();
+                var p = audio.play();
+                if (p !== undefined) {
+                    p.catch(function(err) { console.log("Play audio error:", err); });
+                }
             }
             function closeMonitoringAudioModal() {
                 var modal = document.getElementById('audioModalMonitoring');
@@ -769,48 +773,121 @@ function downloadFile($smarty, $module_name, $local_templates_dir, &$pDB, $pACL,
     fclose($fp);
 }
 
-function display_record($smarty, $module_name, $local_templates_dir, &$pDB, $pACL, $arrConf, $user, $extension){
-    $file = getParameter("id");
+function streamAudioFile($smarty, $module_name, $local_templates_dir, &$pDB, $pACL,
+    $arrConf, $user, $extension)
+{
+    $record = getParameter("id");
     $namefile = getParameter('namefile');
-    $pMonitoring = new paloSantoMonitoring($pDB);
+    if (is_null($record) || !preg_match('/^[[:digit:]]+\.[[:digit:]]+$/', $record)) {
+        Header('HTTP/1.1 404 Not Found');
+        die("<b>404 "._tr("no_file")." </b>");
+    }
 
+    $pMonitoring = new paloSantoMonitoring($pDB);
     if (!hasModulePrivilege($user, $module_name, 'downloadany')) {
-        if(!$pMonitoring->recordBelongsToUser($file, $extension)){
-            return _tr("You are not authorized to listen this file");
+        if (!$pMonitoring->recordBelongsToUser($record, $extension)) {
+            Header('HTTP/1.1 403 Forbidden');
+            die("<b>403 "._tr("You are not authorized to download this file")." </b>");
         }
     }
 
-    $recinfo = $pMonitoring->getAudioByUniqueId($file, $namefile);
-    if (!is_array($recinfo)) {
-        return $pMonitoring->errMsg;
+    $filebyUid = $pMonitoring->getAudioByUniqueId($record, $namefile);
+    if (is_null($filebyUid) || count($filebyUid) <= 0 || $filebyUid['deleted'] || is_null($filebyUid['fullpath'])) {
+        Header('HTTP/1.1 404 Not Found');
+        die("<b>404 "._tr("no_file")." </b>");
     }
-    $ctype = is_null($recinfo['mimetype']) ? '' : $recinfo['mimetype'];
-    $audiourl = construirURL(array(
-        'menu'             =>  $module_name,
-        'action'           =>  'download',
-        'id'               =>  $file,
-        'namefile'         =>  $namefile,
-        'rawmode'          =>  'yes',
-        'issabelSession'   =>  session_id(),
-    ));
-    $sContenido=<<<contenido
-<!DOCTYPE html>
-<script>
-modal.style.display = "block";
-</script>
-<html>
-<head><title>Issabel</title></head>
-<body>
-    <audio src="$audiourl" controls autoplay>
-        <embed src="$audiourl" width="300" height="20" autoplay="true" loop="false" type="$ctype" />
-    </audio>
-    <br/>
-</body>
-</html>
-contenido;
-    $protocol = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http");
-    $sContenido=$protocol.'://'.$_SERVER["HTTP_HOST"].'/index.php'.$audiourl;
-    return $sContenido;
+
+    serveStreamableAudioFile($filebyUid['fullpath']);
+}
+
+function display_record($smarty, $module_name, $local_templates_dir, &$pDB, $pACL, $arrConf, $user, $extension)
+{
+    return streamAudioFile($smarty, $module_name, $local_templates_dir, $pDB, $pACL, $arrConf, $user, $extension);
+}
+
+if (!function_exists('serveStreamableAudioFile')) {
+    function serveStreamableAudioFile($filePath)
+    {
+        while (ob_get_level()) ob_end_clean();
+
+        if (empty($filePath) || !file_exists($filePath)) {
+            header("HTTP/1.1 404 Not Found");
+            die("404 Audio file not found");
+        }
+
+        $ext = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
+
+        // 1. SoX: PCM 16-bit WAV (8000Hz, Mono, Signed Integer)
+        $sox = trim(@shell_exec('which sox 2>/dev/null'));
+        if (empty($sox) && file_exists('/usr/bin/sox')) $sox = '/usr/bin/sox';
+        if (!empty($sox) && is_executable($sox)) {
+            header('Content-Type: audio/wav');
+            header('Content-Disposition: inline; filename="call_audio.wav"');
+            header('Cache-Control: no-cache, must-revalidate');
+            header('Pragma: no-cache');
+            passthru(escapeshellcmd($sox) . ' ' . escapeshellarg($filePath) . ' -t wav -e signed-integer -b 16 -r 8000 -c 1 - 2>/dev/null');
+            exit;
+        }
+
+        // 2. FFmpeg: PCM WAV
+        $ffmpeg = trim(@shell_exec('which ffmpeg 2>/dev/null'));
+        if (!empty($ffmpeg) && is_executable($ffmpeg)) {
+            header('Content-Type: audio/wav');
+            header('Content-Disposition: inline; filename="call_audio.wav"');
+            header('Cache-Control: no-cache, must-revalidate');
+            header('Pragma: no-cache');
+            passthru(escapeshellcmd($ffmpeg) . ' -i ' . escapeshellarg($filePath) . ' -f wav -acodec pcm_s16le -ar 8000 -ac 1 - 2>/dev/null');
+            exit;
+        }
+
+        // 3. LAME: MP3
+        $lame = trim(@shell_exec('which lame 2>/dev/null'));
+        if (!empty($lame) && is_executable($lame)) {
+            header('Content-Type: audio/mpeg');
+            header('Content-Disposition: inline; filename="call_audio.mp3"');
+            header('Cache-Control: no-cache, must-revalidate');
+            header('Pragma: no-cache');
+            passthru(escapeshellcmd($lame) . ' -b 64 ' . escapeshellarg($filePath) . ' - 2>/dev/null');
+            exit;
+        }
+
+        // 4. Fallback: Direct Streaming with HTTP Byte-Ranges
+        $fileSize = filesize($filePath);
+        $mime = ($ext === 'mp3') ? 'audio/mpeg' : (($ext === 'ogg') ? 'audio/ogg' : 'audio/wav');
+        $offset = 0;
+        $length = $fileSize;
+
+        if (isset($_SERVER['HTTP_RANGE'])) {
+            preg_match('/bytes=(\d+)-(\d+)?/', $_SERVER['HTTP_RANGE'], $matches);
+            $offset = intval($matches[1]);
+            $end = (isset($matches[2]) && $matches[2] !== '') ? intval($matches[2]) : ($fileSize - 1);
+            $length = $end - $offset + 1;
+            http_response_code(206);
+            header('HTTP/1.1 206 Partial Content');
+            header("Content-Range: bytes $offset-$end/$fileSize");
+        } else {
+            http_response_code(200);
+        }
+
+        header('Content-Type: ' . $mime);
+        header('Content-Length: ' . $length);
+        header('Content-Disposition: inline; filename="' . basename($filePath) . '"');
+        header('Accept-Ranges: bytes');
+        header('Cache-Control: no-cache, must-revalidate');
+
+        $fp = fopen($filePath, 'rb');
+        fseek($fp, $offset);
+        $bufferSize = 8192;
+        $bytesSent = 0;
+        while (!feof($fp) && $bytesSent < $length) {
+            $read = min($bufferSize, $length - $bytesSent);
+            echo fread($fp, $read);
+            flush();
+            $bytesSent += $read;
+        }
+        fclose($fp);
+        exit;
+    }
 }
 
 function deleteRecord($smarty, $module_name, $local_templates_dir, &$pDB, $pACL, $arrConf, $user, $extension, $arrUniqueids)
