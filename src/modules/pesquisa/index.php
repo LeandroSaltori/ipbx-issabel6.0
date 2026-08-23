@@ -961,24 +961,25 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
             bottom: -160px;
             left: 0 !important;
             right: 0 !important;
-            width: 100% !important;
+            width: 100vw !important;
             max-width: 100vw !important;
             box-sizing: border-box !important;
-            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
-            border-top: 2px solid #8b5cf6;
-            box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.5);
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%) !important;
+            border-top: 2px solid #8b5cf6 !important;
+            box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.5) !important;
             z-index: 2147483647 !important;
-            display: flex;
-            align-items: center;
-            padding: 10px 24px;
-            transition: bottom 0.35s cubic-bezier(0.16, 1, 0.3, 1);
-            color: #ffffff;
-            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            display: flex !important;
+            align-items: center !important;
+            padding: 10px 24px !important;
+            transition: bottom 0.35s cubic-bezier(0.16, 1, 0.3, 1) !important;
+            color: #ffffff !important;
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif !important;
             margin: 0 !important;
             transform: none !important;
         }
         .sticky-audio-bar.active {
             bottom: 0 !important;
+            display: flex !important;
         }
         .sticky-audio-inner {
             display: flex;
@@ -1569,6 +1570,7 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
 
             <script>
             var currentAudio = null;
+            setTimeout(ensureAudioBarInBody, 100);
 
             function getOrInitAudio() {
                 if (!currentAudio) {
@@ -1675,6 +1677,7 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
             }
 
             function formatSecondsToMmSs(secs) {
+                if (!secs || isNaN(secs) || !isFinite(secs) || secs < 0) return '00:00';
                 var m = Math.floor(secs / 60);
                 var s = Math.floor(secs % 60);
                 return (m < 10 ? '0' + m : m) + ':' + (s < 10 ? '0' + s : s);
@@ -1747,11 +1750,15 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
                         var cur = aud.currentTime || 0;
                         var dur = aud.duration || 0;
                         var bar = document.getElementById('stkProgressBar');
-                        if (bar && dur > 0) {
+                        if (bar && dur > 0 && isFinite(dur)) {
                             bar.value = (cur / dur) * 100;
                         }
                         var timeEl = document.getElementById('stkTime');
-                        if (timeEl) timeEl.textContent = formatSecondsToMmSs(cur) + ' / ' + formatSecondsToMmSs(dur);
+                        if (timeEl) {
+                            var curText = formatSecondsToMmSs(cur);
+                            var durText = (dur && isFinite(dur) && dur > 0) ? ' / ' + formatSecondsToMmSs(dur) : '';
+                            timeEl.textContent = curText + durText;
+                        }
                     });
 
                     aud.addEventListener('ended', function() {
