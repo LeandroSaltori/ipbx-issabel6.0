@@ -9,7 +9,9 @@
   +----------------------------------------------------------------------+
   $Id: index.php,v 20.0 2026-08-18 Prisma Telecom $ */
 
+include_once "libs/paloSantoGrid.class.php";
 include_once "libs/paloSantoDB.class.php";
+include_once "libs/paloSantoForm.class.php";
 include_once "libs/paloSantoConfig.class.php";
 require_once "libs/misc.lib.php";
 
@@ -298,10 +300,14 @@ function handleSaveAddressBook($arrConf = array())
 function _moduleContent(&$smarty, $module_name)
 {
     include_once "modules/$module_name/configs/default.conf.php";
+    load_language_module($module_name);
+
     global $arrConf;
     global $arrConfModule;
-    if (isset($arrConfModule) && is_array($arrConfModule)) $arrConf = array_merge($arrConf, $arrConfModule);
-    global $arrConf;
+    if (isset($arrConfModule) && is_array($arrConfModule)) {
+        $arrConf = array_merge($arrConf, $arrConfModule);
+    }
+
     if (isset($_REQUEST['action']) && $_REQUEST['action'] == 'save_address_book') {
         handleSaveAddressBook($arrConf);
         exit;
