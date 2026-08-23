@@ -139,5 +139,47 @@ $(document).ready(function(e) {
         <script type='text/javascript' src="{$WEBPATH}themes/{$THEMENAME}/js/neon-demo.js"></script>
         <script type='text/javascript' src="{$WEBPATH}themes/{$THEMENAME}/js/prisma-report-hover.js"></script>
     </div>
+
+    <!-- Global Sticky Bottom Audio Player for Issabel PBX Prisma -->
+    <div id="stickyBottomAudioPlayer" class="sticky-audio-bar">
+        <div class="sticky-audio-inner">
+            <div class="sticky-audio-info">
+                <div class="sticky-audio-icon">🎧</div>
+                <div class="sticky-audio-meta">
+                    <div class="sticky-audio-title">REPRODUZINDO GRAVAÇÃO</div>
+                    <div class="sticky-audio-numbers">
+                        <span id="stkCaller">📞 -</span> <i class="fa fa-arrow-right" style="font-size:10px; opacity:0.6;"></i> <span id="stkTarget">🎯 -</span>
+                        <span id="stkTime" class="sticky-audio-time">00:00</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Controles de Áudio Centrais -->
+            <div class="sticky-audio-controls">
+                <div class="sticky-audio-buttons">
+                    <button type="button" class="btn-audio-ctrl" onclick="stkSeekRelative(-5)" title="Voltar 5 segundos">⏮ -5s</button>
+                    <button type="button" id="stkPlayPauseBtn" class="btn-audio-ctrl btn-play-main" onclick="stkTogglePlay()">⏸ Pausar</button>
+                    <button type="button" class="btn-audio-ctrl" onclick="stkSeekRelative(5)" title="Avançar 5 segundos">+5s ⏭</button>
+                </div>
+                <div class="sticky-audio-progress-wrap">
+                    <input type="range" id="stkProgressBar" min="0" max="100" value="0" step="0.1" oninput="stkSeekTo(this.value)" />
+                </div>
+            </div>
+
+            <!-- Velocidade e Ações -->
+            <div class="sticky-audio-actions">
+                <div class="sticky-speed-selector">
+                    <button type="button" class="speed-btn active" onclick="stkSetSpeed(1.0, this)">1.0x</button>
+                    <button type="button" class="speed-btn" onclick="stkSetSpeed(1.25, this)">1.25x</button>
+                    <button type="button" class="speed-btn" onclick="stkSetSpeed(1.5, this)">1.5x</button>
+                    <button type="button" class="speed-btn" onclick="stkSetSpeed(2.0, this)">2.0x</button>
+                </div>
+                <a id="stkDownloadBtn" href="#" target="_blank" class="btn-audio-download" title="Baixar Áudio">⬇️</a>
+                <button type="button" class="btn-audio-close" onclick="closeStickyAudioPlayer()" title="Fechar Player">✖</button>
+            </div>
+        </div>
+        <audio id="stkAudioElement" preload="auto"></audio>
+    </div>
+
 </body>
 </html>
