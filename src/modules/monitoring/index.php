@@ -1219,6 +1219,48 @@ function renderFullMonitoringDashboard($smarty, $module_name, $local_templates_d
         </form>
 
         <!-- Modal Salvar na Agenda Pública -->
+    
+    <!-- Sticky Bottom Audio Player -->
+    <div id="stickyBottomAudioPlayer" class="sticky-audio-bar">
+        <div class="sticky-audio-inner">
+            <div class="sticky-audio-info">
+                <div class="sticky-audio-icon">🎧</div>
+                <div class="sticky-audio-meta">
+                    <div class="sticky-audio-title">REPRODUZINDO GRAVAÇÃO</div>
+                    <div class="sticky-audio-numbers">
+                        <span id="stkCaller">📞 -</span> <i class="fa fa-arrow-right" style="font-size:10px; opacity:0.6;"></i> <span id="stkTarget">🎯 -</span>
+                        <span id="stkTime" class="sticky-audio-time">00:00</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Controles de Áudio Centrais -->
+            <div class="sticky-audio-controls">
+                <div class="sticky-audio-buttons">
+                    <button type="button" class="btn-audio-ctrl" onclick="stkSeekRelative(-5)" title="Voltar 5 segundos">⏮ -5s</button>
+                    <button type="button" id="stkPlayPauseBtn" class="btn-audio-ctrl btn-play-main" onclick="stkTogglePlay()">⏸ Pausar</button>
+                    <button type="button" class="btn-audio-ctrl" onclick="stkSeekRelative(5)" title="Avançar 5 segundos">+5s ⏭</button>
+                </div>
+                <div class="sticky-audio-progress-wrap">
+                    <input type="range" id="stkProgressBar" min="0" max="100" value="0" step="0.1" oninput="stkSeekTo(this.value)" />
+                </div>
+            </div>
+
+            <!-- Velocidade e Ações -->
+            <div class="sticky-audio-actions">
+                <div class="sticky-speed-selector">
+                    <button type="button" class="speed-btn active" onclick="stkSetSpeed(1.0, this)">1.0x</button>
+                    <button type="button" class="speed-btn" onclick="stkSetSpeed(1.25, this)">1.25x</button>
+                    <button type="button" class="speed-btn" onclick="stkSetSpeed(1.5, this)">1.5x</button>
+                    <button type="button" class="speed-btn" onclick="stkSetSpeed(2.0, this)">2.0x</button>
+                </div>
+                <a id="stkDownloadBtn" href="#" target="_blank" class="btn-audio-download" title="Baixar Áudio">⬇️</a>
+                <button type="button" class="btn-audio-close" onclick="closeStickyAudioPlayer()" title="Fechar Player">✖</button>
+            </div>
+        </div>
+        <audio id="stkAudioElement" preload="auto"></audio>
+    </div>
+
     <div id="addressBookModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(15,23,42,0.65); backdrop-filter:blur(4px); z-index:2147483647; align-items:center; justify-content:center;">
         <div style="background:#ffffff; border-radius:14px; padding:24px; width:440px; max-width:92%; box-shadow:0 25px 50px -12px rgba(0,0,0,0.35); text-align:left; border:1px solid #e2e8f0; font-family:'Segoe UI', system-ui, sans-serif;">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; border-bottom:1px solid #f1f5f9; padding-bottom:10px;">
@@ -1287,11 +1329,14 @@ function renderFullMonitoringDashboard($smarty, $module_name, $local_templates_d
                 return currentAudio;
             }
 
-                                    function ensureAudioBarInBody() {
+                                                function ensureAudioBarInBody() {
                 var bar = document.getElementById('stickyBottomAudioPlayer');
                 if (bar && bar.parentElement !== document.body) {
                     document.body.appendChild(bar);
                 }
+            }
+            ensureAudioBarInBody();
+            document.addEventListener('DOMContentLoaded', ensureAudioBarInBody);
             }
             if (document.readyState === 'loading') {
                 document.addEventListener('DOMContentLoaded', ensureAudioBarInBody);
