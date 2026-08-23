@@ -127,7 +127,7 @@ function getCdr7DaysStatsMap($phoneNumbers = array(), $pDB = null) {
     $sevenDaysAgo = date('Y-m-d 00:00:00', strtotime('-7 days'));
     $inClause = "'" . implode("','", array_map('addslashes', $cleanList)) . "'";
 
-    // Quando o número é SRC no CDR -> Significa chamada recebida deste número (Entrada)
+    // Quando o número é SRC no CDR -> Chamadas recebidas deste número (Entrada) ou originadas por este ramal
     $sqlOrig = "SELECT src, count(*) as total FROM cdr WHERE calldate >= '$sevenDaysAgo' AND src IN ($inClause) GROUP BY src";
     $resOrig = @$pDB->fetchTable($sqlOrig, true);
     if (is_array($resOrig)) {
@@ -136,7 +136,7 @@ function getCdr7DaysStatsMap($phoneNumbers = array(), $pDB = null) {
         }
     }
 
-    // Quando o número é DST no CDR -> Significa que a empresa/ramal ligou para este número (Saída)
+    // Quando o número é DST no CDR -> Chamadas ligadas para este número (Saída) ou recebidas por este ramal
     $sqlRec = "SELECT dst, count(*) as total FROM cdr WHERE calldate >= '$sevenDaysAgo' AND dst IN ($inClause) GROUP BY dst";
     $resRec = @$pDB->fetchTable($sqlRec, true);
     if (is_array($resRec)) {
@@ -162,38 +162,6 @@ function getAsteriskExtensionNamesMap($pDB = null) {
     return $extMap;
 }
 
-function renderDirectionTrunkBadge($did, $raw_src, $val_dst, $channel = '', $dstchannel = '', $extNamesMap = array(), $groupsMap = array()) {
-    $cleanSrc = preg_replace('/\D/', '', $raw_src);
-    $cleanDst = preg_replace('/\D/', '', $val_dst);
-    $srcIsExt = (strlen($cleanSrc) >= 2 && strlen($cleanSrc) <= 5) || isset($extNamesMap[$raw_src]) || isset($extNamesMap[$cleanSrc]);
-    $dstIsExt = (strlen($cleanDst) >= 2 && strlen($cleanDst) <= 5) || isset($extNamesMap[$val_dst]) || isset($extNamesMap[$cleanDst]) || isset($groupsMap[$val_dst]);
-
-    // Extrai o nome do tronco
-    $trunkName = '';
-    $rawChannel = !empty($dstchannel) ? $dstchannel : $channel;
-    if (!empty($rawChannel) && $rawChannel != '-') {
-        if (preg_match('/^(?:SIP|PJSIP|IAX2|DAHDI|Khomp|Local)\/([^\/-]+)/i', $rawChannel, $m)) {
-            $candidate = trim($m[1]);
-            if (!is_numeric($candidate) || strlen($candidate) > 5) {
-                $trunkName = $candidate;
-            }
-        }
-    }
-
-    if (!empty($did) && $did != '-') {
-        return "<span title='📥 Entrada via Linha/DID: " . htmlspecialchars($did, ENT_QUOTES) . "' style='background:#f0fdf4; color:#166534; border:1px solid #bbf7d0; padding:4px 10px; border-radius:12px; font-weight:700; font-size:11px; display:inline-flex; align-items:center; gap:5px;'><i class='fa fa-arrow-down'></i> Entrada <span style='font-size:10px; color:#15803d; font-weight:600;'>(" . htmlspecialchars($did) . ")</span></span>";
-    } elseif ($srcIsExt && !$dstIsExt && !empty($val_dst) && $val_dst != '-') {
-        $sub = !empty($trunkName) ? " <span style='font-size:10px; color:#1e40af; font-weight:600;'>(" . htmlspecialchars($trunkName) . ")</span>" : "";
-        return "<span title='📤 Saída (Ramal para número externo)' style='background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; padding:4px 10px; border-radius:12px; font-weight:700; font-size:11px; display:inline-flex; align-items:center; gap:5px;'><i class='fa fa-arrow-up'></i> Saída$sub</span>";
-    } elseif ($srcIsExt && $dstIsExt) {
-        return "<span title='🏢 Chamada Interna (Ramal para Ramal)' style='background:#f8fafc; color:#475569; border:1px solid #e2e8f0; padding:4px 10px; border-radius:12px; font-weight:600; font-size:11px; display:inline-flex; align-items:center; gap:5px;'><i class='fa fa-phone'></i> Interno</span>";
-    } elseif (!empty($trunkName)) {
-        return "<span title='📥 Entrada via Tronco: " . htmlspecialchars($trunkName, ENT_QUOTES) . "' style='background:#f0fdf4; color:#166534; border:1px solid #bbf7d0; padding:4px 10px; border-radius:12px; font-weight:700; font-size:11px; display:inline-flex; align-items:center; gap:5px;'><i class='fa fa-arrow-down'></i> Entrada <span style='font-size:10px; color:#15803d; font-weight:600;'>(" . htmlspecialchars($trunkName) . ")</span></span>";
-    } else {
-        return "<span style='background:#f0fdf4; color:#166534; border:1px solid #bbf7d0; padding:4px 10px; border-radius:12px; font-weight:700; font-size:11px; display:inline-flex; align-items:center; gap:5px;'><i class='fa fa-arrow-down'></i> Entrada</span>";
-    }
-}
-
 function renderCallerWithContactBadge($raw_src, $val_src, $contactsMap = array(), $stats7d = array(), $extNamesMap = array()) {
     $raw_clean = preg_replace('/\D/', '', $raw_src);
     $contact = null;
@@ -206,13 +174,13 @@ function renderCallerWithContactBadge($raw_src, $val_src, $contactsMap = array()
     $fromClientCount = isset($stats7d[$raw_src]['recebidas_do_cliente']) ? $stats7d[$raw_src]['recebidas_do_cliente'] : (isset($stats7d[$raw_clean]['recebidas_do_cliente']) ? $stats7d[$raw_clean]['recebidas_do_cliente'] : 0);
     $toClientCount = isset($stats7d[$raw_src]['ligadas_para_o_cliente']) ? $stats7d[$raw_src]['ligadas_para_o_cliente'] : (isset($stats7d[$raw_clean]['ligadas_para_o_cliente']) ? $stats7d[$raw_clean]['ligadas_para_o_cliente'] : 0);
 
-    // 1. Se já for um contato cadastrado na Agenda Externa
+    // 1. Contato Salvo na Agenda Externa
     if ($contact && !empty($contact['fullName'])) {
         $tooltip = "📇 Contato: " . $contact['fullName'];
         if (!empty($contact['company'])) $tooltip .= "\n🏢 Empresa: " . $contact['company'];
         if (!empty($contact['email'])) $tooltip .= "\n📧 E-mail: " . $contact['email'];
         if (!empty($contact['notes'])) $tooltip .= "\n📝 Obs: " . $contact['notes'];
-        $tooltip .= "\n📊 Últimos 7 dias:\n  • ⬇️ Recebidas deste número (Entrada): $fromClientCount\n  • ⬆️ Ligadas para este número (Saída): $toClientCount";
+        $tooltip .= "\n📊 Atividade (Últimos 7 dias):\n  • ⬇️ Recebidas deste número: $fromClientCount\n  • ⬆️ Ligadas para este número: $toClientCount";
 
         return "<div style='display:inline-flex; align-items:center; gap:6px; flex-wrap:wrap;'>".
             "<span title='" . htmlspecialchars($tooltip, ENT_QUOTES) . "' style='background:rgba(37,99,235,0.08); color:#1d4ed8; padding:3px 8px; border-radius:6px; font-weight:700; font-size:11px; cursor:help; border:1px solid rgba(37,99,235,0.25); display:inline-flex; align-items:center; gap:4px;'>".
@@ -221,7 +189,7 @@ function renderCallerWithContactBadge($raw_src, $val_src, $contactsMap = array()
             "</div>";
     }
 
-    // 2. Verificar se é Ramal Interno (2 a 5 dígitos ou mapeado no PBX)
+    // 2. Ramal Interno (2 a 5 dígitos ou cadastrado no PBX)
     $isInternal = false;
     $extName = '';
     if (!empty($raw_src) && isset($extNamesMap[$raw_src])) {
@@ -236,18 +204,18 @@ function renderCallerWithContactBadge($raw_src, $val_src, $contactsMap = array()
 
     if ($isInternal) {
         $dispText = !empty($extName) ? "$val_src - $extName" : "$val_src";
-        $tooltip = "🏢 Ramal Interno: $dispText\n📊 Últimos 7 dias:\n  • ⬇️ Chamadas recebidas: $toClientCount\n  • ⬆️ Chamadas originadas: $fromClientCount";
+        $tooltip = "🏢 Ramal Interno: $dispText\n📊 Atividade (Últimos 7 dias):\n  • ⬇️ Chamadas atendidas pelo ramal: $toClientCount\n  • ⬆️ Chamadas originadas pelo ramal: $fromClientCount";
         return "<div style='display:inline-flex; align-items:center; gap:6px;'>".
-            "<span title='" . htmlspecialchars($tooltip, ENT_QUOTES) . "' style='background:#f1f5f9; color:#334155; padding:3px 8px; border-radius:6px; font-weight:600; font-size:11px; border:1px solid #e2e8f0; display:inline-flex; align-items:center; gap:4px;'>".
+            "<span title='" . htmlspecialchars($tooltip, ENT_QUOTES) . "' style='background:#f1f5f9; color:#334155; padding:3px 8px; border-radius:6px; font-weight:600; font-size:11px; border:1px solid #e2e8f0; display:inline-flex; align-items:center; gap:4px; cursor:help;'>".
             "👤 Ramal " . htmlspecialchars($dispText) .
             "</span>".
             "</div>";
     }
 
-    // 3. Número Externo (PSTN / Celular / Fixo) -> Exibe botão para Salvar na Agenda
-    $tooltip = "📞 Número Externo: $val_src\n📊 Últimos 7 dias:\n  • ⬇️ Recebidas deste número (Entrada): $fromClientCount\n  • ⬆️ Ligadas para este número (Saída): $toClientCount";
+    // 3. Número Externo Não Salvo (PSTN / Celular / Fixo) -> Destaque visual e Tooltip completo com 7 dias
+    $tooltip = "📞 Telefone Externo: $val_src\n📊 Atividade (Últimos 7 dias):\n  • ⬇️ Recebidas deste número: $fromClientCount\n  • ⬆️ Ligadas para este número: $toClientCount";
     $html = "<div style='display:inline-flex; align-items:center; gap:6px;'>".
-        "<span title='" . htmlspecialchars($tooltip, ENT_QUOTES) . "' style='font-weight:600; color:#1e293b; cursor:help;'>📞 " . htmlspecialchars($val_src) . "</span>";
+        "<span title='" . htmlspecialchars($tooltip, ENT_QUOTES) . "' style='background:#f8fafc; color:#1e293b; padding:3px 8px; border-radius:6px; font-weight:600; font-size:11px; border:1px solid #e2e8f0; display:inline-flex; align-items:center; gap:4px; cursor:help;'>📞 " . htmlspecialchars($val_src) . "</span>";
     if (!empty($raw_src) && $raw_src != '-') {
         $html .= "<button type='button' onclick=\"openAddressBookModal('" . htmlspecialchars($raw_src, ENT_QUOTES) . "')\" title='📇 Salvar na Agenda Pública\nClique para cadastrar este número na Agenda de Contatos Pública.' style='background:rgba(59,130,246,0.12); color:#2563eb; border:1px solid rgba(59,130,246,0.3); border-radius:50%; width:20px; height:20px; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; font-size:10px; transition:all 0.2s;' onmouseover=\"this.style.background='#2563eb'; this.style.color='#fff';\" onmouseout=\"this.style.background='rgba(59,130,246,0.12)'; this.style.color='#2563eb';\">📇</button>";
     }
@@ -1863,47 +1831,7 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
         </div>
     </div>
 
-    <!-- Sticky Bottom Audio Player Flutuante -->
-    <div id="stickyBottomAudioPlayer" class="sticky-audio-bar">
-        <div class="sticky-audio-inner">
-            <!-- Info da Chamada -->
-            <div class="sticky-audio-info">
-                <div class="sticky-audio-icon">🎧</div>
-                <div class="sticky-audio-details">
-                    <div class="sticky-audio-title">Reproduzindo Gravação</div>
-                    <div class="sticky-audio-meta">
-                        <span id="stkCaller">📞 -</span> ➔ <span id="stkTarget">🎯 -</span>
-                        <span id="stkTime" class="stk-time-badge">00:00 / 00:00</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Controles Centrais -->
-            <div class="sticky-audio-controls">
-                <div class="sticky-audio-buttons">
-                    <button type="button" class="btn-audio-ctrl" onclick="stkSeekRelative(-5)" title="Voltar 5 segundos">⏮ -5s</button>
-                    <button type="button" id="stkPlayPauseBtn" class="btn-audio-ctrl btn-play-main" onclick="stkTogglePlay()">⏸ Pausar</button>
-                    <button type="button" class="btn-audio-ctrl" onclick="stkSeekRelative(5)" title="Avançar 5 segundos">+5s ⏭</button>
-                </div>
-                <div class="sticky-audio-progress-wrap">
-                    <input type="range" id="stkProgressBar" min="0" max="100" value="0" step="0.1" oninput="stkSeekTo(this.value)" />
-                </div>
-            </div>
-
-            <!-- Velocidade e Ações -->
-            <div class="sticky-audio-actions">
-                <div class="sticky-speed-selector">
-                    <button type="button" class="speed-btn active" onclick="stkSetSpeed(1.0, this)">1.0x</button>
-                    <button type="button" class="speed-btn" onclick="stkSetSpeed(1.25, this)">1.25x</button>
-                    <button type="button" class="speed-btn" onclick="stkSetSpeed(1.5, this)">1.5x</button>
-                    <button type="button" class="speed-btn" onclick="stkSetSpeed(2.0, this)">2.0x</button>
-                </div>
-                <a id="stkDownloadBtn" href="#" target="_blank" class="btn-audio-download" title="Baixar Áudio">⬇️</a>
-                <button type="button" class="btn-audio-close" onclick="closeStickyAudioPlayer()" title="Fechar Player">✖</button>
-            </div>
-        </div>
-        <audio id="stkAudioElement" preload="auto"></audio>
-    </div>
+    
 
     <!-- Modal CEL Events -->
     <div id="celModalCdr" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(15,23,42,0.65); backdrop-filter:blur(4px); z-index:2147483647; align-items:center; justify-content:center;" onclick="if(event.target === this) closeCelModal();">
