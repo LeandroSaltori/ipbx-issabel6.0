@@ -61,6 +61,62 @@ function formatSecsCdr($sec) {
     return sprintf('%02d:%02d', $m, $s);
 }
 
+function handleSaveAddressBook($arrConf = array())
+{
+    while (ob_get_level()) ob_end_clean();
+    header('Content-Type: application/json; charset=utf-8');
+
+    $name      = isset($_POST['name']) ? trim($_POST['name']) : '';
+    $last_name = isset($_POST['last_name']) ? trim($_POST['last_name']) : '';
+    $telefono  = isset($_POST['phone']) ? trim($_POST['phone']) : '';
+    $company   = isset($_POST['company']) ? trim($_POST['company']) : '';
+    $email     = isset($_POST['email']) ? trim($_POST['email']) : '';
+    $notes     = isset($_POST['notes']) ? trim($_POST['notes']) : '';
+
+    if (empty($telefono)) {
+        echo json_encode(array('status' => 'error', 'message' => 'O número de telefone é obrigatório.'));
+        exit;
+    }
+    if (empty($name)) {
+        $name = $telefono;
+    }
+
+    $dbDir = isset($arrConf['issabel_dbdir']) ? $arrConf['issabel_dbdir'] : '/var/www/db';
+    if (!file_exists("{$dbDir}/address_book.db") && file_exists("/var/www/db/address_book.db")) {
+        $dbDir = '/var/www/db';
+    }
+    $dsn = "sqlite3:///{$dbDir}/address_book.db";
+    $pDB_addr = new paloDB($dsn);
+
+    if (!$pDB_addr->connStatus) {
+        echo json_encode(array('status' => 'error', 'message' => 'Erro ao conectar ao banco da Agenda: ' . $pDB_addr->errMsg));
+        exit;
+    }
+
+    $cleanPhone = preg_replace('/\D/', '', $telefono);
+    $checkSql = "SELECT id, name, last_name FROM contact WHERE (telefono = ? OR telefono = ?) AND directory = 'external' LIMIT 1";
+    $existing = $pDB_addr->getFirstRowQuery($checkSql, true, array($telefono, $cleanPhone));
+
+    if (!empty($existing) && isset($existing['id'])) {
+        $updateSql = "UPDATE contact SET name=?, last_name=?, company=?, email=?, notes=?, status='isPublic', directory='external' WHERE id=?";
+        $ok = $pDB_addr->genQuery($updateSql, array($name, $last_name, $company, $email, $notes, $existing['id']));
+        if ($ok) {
+            echo json_encode(array('status' => 'success', 'message' => "Contato '$name' atualizado com sucesso na Agenda Pública!"));
+        } else {
+            echo json_encode(array('status' => 'error', 'message' => 'Erro ao atualizar contato: ' . $pDB_addr->errMsg));
+        }
+    } else {
+        $insertSql = "INSERT INTO contact (name, last_name, telefono, cell_phone, home_phone, fax1, fax2, email, iduser, picture, province, city, address, company, company_contact, contact_rol, directory, notes, status, department, im) VALUES (?, ?, ?, '', '', '', '', ?, 1, '', '', '', '', ?, '', '', 'external', ?, 'isPublic', '', '')";
+        $ok = $pDB_addr->genQuery($insertSql, array($name, $last_name, $telefono, $email, $company, $notes));
+        if ($ok) {
+            echo json_encode(array('status' => 'success', 'message' => "Contato '$name' cadastrado com sucesso na Agenda Pública!"));
+        } else {
+            echo json_encode(array('status' => 'error', 'message' => 'Erro ao cadastrar contato: ' . $pDB_addr->errMsg));
+        }
+    }
+    exit;
+}
+
 function _moduleContent(&$smarty, $module_name)
 {
     require_once "modules/$module_name/libs/ringgroup.php";
@@ -77,6 +133,11 @@ function _moduleContent(&$smarty, $module_name)
     $dsn  = generarDSNSistema('asteriskuser', 'asteriskcdrdb');
     $pDB  = new paloDB($dsn);
     $oCDR = new paloSantoCDR($pDB);
+
+    if (isset($_REQUEST['action']) && $_REQUEST['action'] == 'save_address_book') {
+        handleSaveAddressBook($arrConf);
+        exit;
+    }
 
     if (isset($_GET['action']) && ($_GET['action'] == 'stream_audio' || $_GET['action'] == 'download_audio')) {
         handleCdrAudioPlayback();
@@ -1439,7 +1500,14 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
                             ?>
                             <tr>
                                 <td><span style='color:#334155; font-size:11px; font-weight:600;'>📅 <?php echo htmlspecialchars($val_data); ?></span></td>
-                                <td><span style='font-weight:600; color:#1e293b;'>📞 <?php echo htmlspecialchars($val_src); ?></span></td>
+                                <td>
+                                    <div style='display:inline-flex; align-items:center; gap:6px;'>
+                                        <span style='font-weight:600; color:#1e293b;'>📞 <?php echo htmlspecialchars($val_src); ?></span>
+                                        <?php if (!empty($raw_src) && $raw_src != '-'): ?>
+                                            <button type="button" onclick="openAddressBookModal('<?php echo htmlspecialchars($raw_src, ENT_QUOTES); ?>')" title="📇 Salvar na Agenda Pública&#10;Clique para cadastrar este número na Agenda de Contatos Pública." style="background:rgba(59,130,246,0.12); color:#2563eb; border:1px solid rgba(59,130,246,0.3); border-radius:50%; width:20px; height:20px; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; font-size:10px; transition:all 0.2s;" onmouseover="this.style.background='#2563eb'; this.style.color='#fff';" onmouseout="this.style.background='rgba(59,130,246,0.12)'; this.style.color='#2563eb';">📇</button>
+                                        <?php endif; ?>
+                                    </div>
+                                </td>
                                 <td><?php echo $val_rg_html; ?></td>
                                 <td><?php echo $val_dst_html; ?></td>
                                 <td>
@@ -1576,6 +1644,56 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
         </div>
     </div>
 
+    <!-- Modal Salvar na Agenda Pública -->
+    <div id="addressBookModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(15,23,42,0.65); backdrop-filter:blur(4px); z-index:2147483647; align-items:center; justify-content:center;">
+        <div style="background:#ffffff; border-radius:14px; padding:24px; width:440px; max-width:92%; box-shadow:0 25px 50px -12px rgba(0,0,0,0.35); text-align:left; border:1px solid #e2e8f0; font-family:'Segoe UI', system-ui, sans-serif;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; border-bottom:1px solid #f1f5f9; padding-bottom:10px;">
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <div style="background:#eff6ff; color:#2563eb; width:34px; height:34px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:16px;">📇</div>
+                    <h4 style="margin:0; font-size:16px; color:#0f172a; font-weight:800;">Cadastrar na Agenda Pública</h4>
+                </div>
+                <button type="button" onclick="closeAddressBookModal()" style="background:none; border:none; color:#94a3b8; font-size:18px; cursor:pointer; font-weight:bold;">✖</button>
+            </div>
+            <div style="background:#f0fdf4; border-left:4px solid #22c55e; padding:8px 12px; border-radius:6px; font-size:11px; color:#15803d; margin-bottom:14px;">
+                🌐 Este contato será cadastrado como <strong>Público</strong> e ficará visível para toda a empresa na Agenda.
+            </div>
+            <form id="formAddressBookModal" onsubmit="submitSaveAddressBook(event)">
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px;">
+                    <div>
+                        <label style="display:block; font-size:11px; font-weight:700; color:#334155; margin-bottom:4px;">Nome *</label>
+                        <input type="text" id="ab_name" required placeholder="Ex: João" style="width:100%; box-sizing:border-box; padding:7px 10px; border:1px solid #cbd5e1; border-radius:6px; font-size:12px;" />
+                    </div>
+                    <div>
+                        <label style="display:block; font-size:11px; font-weight:700; color:#334155; margin-bottom:4px;">Sobrenome</label>
+                        <input type="text" id="ab_last_name" placeholder="Ex: Silva" style="width:100%; box-sizing:border-box; padding:7px 10px; border:1px solid #cbd5e1; border-radius:6px; font-size:12px;" />
+                    </div>
+                </div>
+                <div style="margin-bottom:10px;">
+                    <label style="display:block; font-size:11px; font-weight:700; color:#334155; margin-bottom:4px;">Número / Telefone *</label>
+                    <input type="text" id="ab_phone" required style="width:100%; box-sizing:border-box; padding:7px 10px; border:1px solid #cbd5e1; border-radius:6px; font-size:12px; font-weight:bold; color:#0f172a; background:#f8fafc;" />
+                </div>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px;">
+                    <div>
+                        <label style="display:block; font-size:11px; font-weight:700; color:#334155; margin-bottom:4px;">Empresa</label>
+                        <input type="text" id="ab_company" placeholder="Ex: Acme Ltda" style="width:100%; box-sizing:border-box; padding:7px 10px; border:1px solid #cbd5e1; border-radius:6px; font-size:12px;" />
+                    </div>
+                    <div>
+                        <label style="display:block; font-size:11px; font-weight:700; color:#334155; margin-bottom:4px;">E-mail</label>
+                        <input type="email" id="ab_email" placeholder="cliente@empresa.com" style="width:100%; box-sizing:border-box; padding:7px 10px; border:1px solid #cbd5e1; border-radius:6px; font-size:12px;" />
+                    </div>
+                </div>
+                <div style="margin-bottom:16px;">
+                    <label style="display:block; font-size:11px; font-weight:700; color:#334155; margin-bottom:4px;">Observações</label>
+                    <textarea id="ab_notes" rows="2" placeholder="Informações adicionais..." style="width:100%; box-sizing:border-box; padding:7px 10px; border:1px solid #cbd5e1; border-radius:6px; font-size:12px; resize:vertical;"></textarea>
+                </div>
+                <div style="display:flex; justify-content:flex-end; gap:8px;">
+                    <button type="button" onclick="closeAddressBookModal()" style="background:#f1f5f9; color:#475569; border:1px solid #cbd5e1; padding:7px 16px; border-radius:6px; font-weight:bold; cursor:pointer; font-size:12px;">Cancelar</button>
+                    <button type="submit" id="btnSaveAb" style="background:#2563eb; color:#ffffff; border:none; padding:7px 20px; border-radius:6px; font-weight:bold; cursor:pointer; font-size:12px; box-shadow:0 2px 6px rgba(37,99,235,0.3);">💾 Salvar Contato</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script>
     var currentAudio = document.getElementById('stkAudioElement');
 
@@ -1687,11 +1805,60 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
         iframe.src = '?menu=<?php echo htmlspecialchars($module_name); ?>&rawmode=yes&uniqueid=' + uniqueId;
         modal.style.display = 'flex';
     }
-    function closeCelModal() {
-        var modal = document.getElementById('celModalCdr');
-        var iframe = document.getElementById('celIframeElement');
-        iframe.src = '';
-        modal.style.display = 'none';
+    function openAddressBookModal(phoneNumber) {
+        var modal = document.getElementById('addressBookModal');
+        if (modal && modal.parentElement !== document.body) {
+            document.body.appendChild(modal);
+        }
+        document.getElementById('ab_phone').value = phoneNumber || '';
+        document.getElementById('ab_name').value = '';
+        document.getElementById('ab_last_name').value = '';
+        document.getElementById('ab_company').value = '';
+        document.getElementById('ab_email').value = '';
+        document.getElementById('ab_notes').value = '';
+        modal.style.display = 'flex';
+        document.getElementById('ab_name').focus();
+    }
+
+    function closeAddressBookModal() {
+        document.getElementById('addressBookModal').style.display = 'none';
+    }
+
+    function submitSaveAddressBook(e) {
+        e.preventDefault();
+        var btn = document.getElementById('btnSaveAb');
+        btn.disabled = true;
+        btn.textContent = 'Salvando...';
+
+        var data = new FormData();
+        data.append('action', 'save_address_book');
+        data.append('phone', document.getElementById('ab_phone').value);
+        data.append('name', document.getElementById('ab_name').value);
+        data.append('last_name', document.getElementById('ab_last_name').value);
+        data.append('company', document.getElementById('ab_company').value);
+        data.append('email', document.getElementById('ab_email').value);
+        data.append('notes', document.getElementById('ab_notes').value);
+
+        fetch('index.php?menu=<?php echo htmlspecialchars($module_name); ?>&rawmode=yes', {
+            method: 'POST',
+            body: data
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(res) {
+            btn.disabled = false;
+            btn.textContent = '💾 Salvar Contato';
+            if (res.status === 'success') {
+                alert('✅ ' + res.message);
+                closeAddressBookModal();
+            } else {
+                alert('❌ ' + (res.message || 'Erro ao salvar contato.'));
+            }
+        })
+        .catch(function(err) {
+            btn.disabled = false;
+            btn.textContent = '💾 Salvar Contato';
+            alert('❌ Erro na comunicação com o servidor: ' + err);
+        });
     }
 
     document.addEventListener("DOMContentLoaded", function() {
