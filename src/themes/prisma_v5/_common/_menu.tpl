@@ -146,7 +146,7 @@ function removeNeoDisplayOnMouseOver(ref){
                         <!--<span>{$menu.description}</span>-->
 			<span>{$menu.Name}</span>
                     </a>
-                    <ul>
+                    <ul {if $idMenu eq $idMainMenuSelected}class="visible" style="display:block;"{/if}>
                         <!--recorremos el arreglo del menu nivel secundario-->
                         {foreach from=$menu.children key=idSubMenu item=subMenu}
                             {if $idSubMenu eq $idSubMenuSelected}

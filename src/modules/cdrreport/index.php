@@ -2157,6 +2157,86 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
                     });
                 }
             });
+        
+            // Inicializar Gráficos Chart.js do Relatório de Ligações
+            function initCdrCharts() {
+                if (typeof Chart === 'undefined') {
+                    setTimeout(initCdrCharts, 150);
+                    return;
+                }
+
+                var elHourly = document.getElementById('chartCdrHourly');
+                if (elHourly) {
+                    var ctxHourly = elHourly.getContext('2d');
+                    new Chart(ctxHourly, {
+                        type: 'bar',
+                        data: {
+                            labels: ['00h', '01h', '02h', '03h', '04h', '05h', '06h', '07h', '08h', '09h', '10h', '11h', '12h', '13h', '14h', '15h', '16h', '17h', '18h', '19h', '20h', '21h', '22h', '23h'],
+                            datasets: [{
+                                label: 'Chamadas',
+                                data: <?php echo json_encode(array_values($hourlyTraffic)); ?>,
+                                backgroundColor: '#6366f1',
+                                hoverBackgroundColor: '#4f46e5',
+                                borderRadius: 4
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { display: false }
+                            },
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    grid: { color: '#f1f5f9' },
+                                    ticks: { precision: 0 }
+                                },
+                                x: {
+                                    grid: { display: false }
+                                }
+                            }
+                        }
+                    });
+                }
+
+                var elStatus = document.getElementById('chartCdrStatus');
+                if (elStatus) {
+                    var ctxStatus = elStatus.getContext('2d');
+                    new Chart(ctxStatus, {
+                        type: 'doughnut',
+                        data: {
+                            labels: ['Atendidas', 'Não Atendidas', 'Ocupado', 'Falhas'],
+                            datasets: [{
+                                data: [<?php echo (int)$answeredCount; ?>, <?php echo (int)$noAnswerCount; ?>, <?php echo (int)$busyCount; ?>, <?php echo (int)$failedCount; ?>],
+                                backgroundColor: ['#10b981', '#ef4444', '#f59e0b', '#dc2626'],
+                                borderWidth: 2,
+                                borderColor: '#ffffff'
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    position: 'right',
+                                    labels: {
+                                        boxWidth: 12,
+                                        font: { size: 11, family: "'Segoe UI', sans-serif" }
+                                    }
+                                }
+                            }
+                        }
+                    });
+                }
+            }
+
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', initCdrCharts);
+            } else {
+                initCdrCharts();
+            }
+
         </script>
     <?php
     return ob_get_clean();

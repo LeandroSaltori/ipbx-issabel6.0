@@ -120,7 +120,7 @@ var public_vars = public_vars || {};
         // Close Sidebar if Tablet Screen is visible
         public_vars.$sidebarMenu.data('initial-state', (public_vars.$pageContainer.hasClass('sidebar-collapsed') ? 'closed' : 'open'));
         
-        if(is('tabletscreen'))
+        if(is('mobile-screen'))
         {
             hide_sidebar_menu(false);
         }
