@@ -939,10 +939,12 @@ function renderFullMonitoringDashboard($smarty, $module_name, $local_templates_d
             backdrop-filter: blur(6px) !important;
             -webkit-backdrop-filter: blur(6px) !important;
             z-index: 2147483647 !important;
-            display: none;
+            display: none !important;
             align-items: center !important;
             justify-content: center !important;
-            animation: audioFadeIn 0.2s ease-out !important;
+        }
+        .audio-modal-overlay.active {
+            display: flex !important;
         }
         @keyframes audioFadeIn { from { opacity: 0; } to { opacity: 1; } }
         .audio-modal-card {
@@ -1324,7 +1326,7 @@ function renderFullMonitoringDashboard($smarty, $module_name, $local_templates_d
         
         
         <!-- Modal Popup de Reprodução de Gravação -->
-        <div id="audioPlayerModal" class="audio-modal-overlay" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(15,23,42,0.75); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); z-index:2147483647; align-items:center; justify-content:center;" onclick="if(event.target === this) closeAudioPlayerModal();">
+        <div id="audioPlayerModal" class="audio-modal-overlay" onclick="if(event.target === this) closeAudioPlayerModal();">
             <div class="audio-modal-card" style="background:linear-gradient(145deg, #1e1b4b 0%, #0f172a 100%); border:1px solid rgba(139,92,246,0.4); border-radius:16px; box-shadow:0 25px 50px -12px rgba(0,0,0,0.8), 0 0 30px rgba(124,58,237,0.3); width:92%; max-width:520px; overflow:hidden; color:#ffffff; font-family:'Segoe UI', sans-serif;">
                 <!-- Header do Popup -->
                 <div class="audio-modal-header">
