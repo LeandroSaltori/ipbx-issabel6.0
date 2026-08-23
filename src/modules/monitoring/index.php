@@ -740,29 +740,35 @@ function renderFullMonitoringDashboard($smarty, $module_name, $local_templates_d
             /* Sticky Bottom Audio Player */
             .sticky-audio-bar {
             position: fixed !important;
-            bottom: 0 !important;
-            left: 0 !important;
+            bottom: -160px !important;
+            left: 280px !important;
             right: 0 !important;
-            width: 100vw !important;
-            max-width: 100vw !important;
+            width: auto !important;
             box-sizing: border-box !important;
             background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%) !important;
             border-top: 2px solid #8b5cf6 !important;
-            box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.6) !important;
-            z-index: 2147483647 !important;
+            border-left: 1px solid rgba(139, 92, 246, 0.3) !important;
+            box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.7) !important;
+            z-index: 9999 !important;
             display: flex !important;
             align-items: center !important;
             padding: 10px 24px !important;
             color: #ffffff !important;
             font-family: 'Segoe UI', system-ui, -apple-system, sans-serif !important;
             margin: 0 !important;
-            transform: translateY(150%) !important;
-            transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1) !important;
-            pointer-events: none !important;
+            transition: bottom 0.35s cubic-bezier(0.16, 1, 0.3, 1), left 0.2s ease !important;
+        }
+        .page-container.sidebar-collapsed .sticky-audio-bar,
+        body.sidebar-collapsed .sticky-audio-bar {
+            left: 65px !important;
         }
         .sticky-audio-bar.active {
-            transform: translateY(0) !important;
-            pointer-events: auto !important;
+            bottom: 0px !important;
+        }
+        @media (max-width: 767px) {
+            .sticky-audio-bar {
+                left: 0 !important;
+            }
         }
             .sticky-audio-inner {
                 display: flex;
