@@ -1899,11 +1899,17 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
         <audio id="stkAudioElement" preload="auto"></audio>
     </div>
 
-    <!-- Modal CEL Events -->
-    <div id="celModalCdr">
-        <div class="modal-content-box" style="width:820px; max-width:95%;">
-            <iframe id="celIframeElement" style="width:100%; height:450px; border:none; border-radius:8px;"></iframe>
-            <button onclick="closeCelModal()" style="background:#64748b; color:#fff; border:none; padding:6px 16px; border-radius:6px; font-weight:bold; cursor:pointer; margin-top:10px;">Fechar</button>
+        <!-- Modal CEL Events -->
+    <div id="celModalCdr" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(15,23,42,0.65); backdrop-filter:blur(4px); z-index:2147483647; align-items:center; justify-content:center;">
+        <div style="background:#ffffff; border-radius:14px; padding:20px; width:860px; max-width:95%; box-shadow:0 25px 50px -12px rgba(0,0,0,0.35); text-align:left; border:1px solid #e2e8f0; font-family:'Segoe UI', system-ui, sans-serif; position:relative;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; border-bottom:1px solid #f1f5f9; padding-bottom:8px;">
+                <h4 style="margin:0; font-size:16px; color:#0f172a; font-weight:800; display:flex; align-items:center; gap:8px;">📋 Histórico de Eventos da Chamada (CEL)</h4>
+                <button type="button" onclick="closeCelModal()" style="background:none; border:none; color:#94a3b8; font-size:18px; cursor:pointer; font-weight:bold; padding:4px 8px;">✖</button>
+            </div>
+            <iframe id="celIframeElement" style="width:100%; height:480px; border:none; border-radius:8px;"></iframe>
+            <div style="margin-top:12px; text-align:center;">
+                <button type="button" onclick="closeCelModal()" style="background:#475569; color:#fff; border:none; padding:7px 22px; border-radius:8px; font-weight:bold; cursor:pointer; font-size:12px; transition:background 0.2s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='#475569'">Fechar</button>
+            </div>
         </div>
     </div>
 
@@ -2071,8 +2077,19 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
                 return (m < 10 ? '0' + m : m) + ':' + (s < 10 ? '0' + s : s);
             }
 
+            
+            function closeCelModal() {
+                var modal = document.getElementById('celModalCdr');
+                if (modal) {
+                    modal.style.display = 'none';
+                    var iframe = document.getElementById('celIframeElement');
+                    if (iframe) iframe.src = 'about:blank';
+                }
+            }
+
             function openCelModal(uniqueId) {
                 var modal = document.getElementById('celModalCdr');
+                if (modal && modal.parentElement !== document.body) document.body.appendChild(modal);
                 var iframe = document.getElementById('celIframeElement');
                 iframe.src = '?menu=<?php echo htmlspecialchars($module_name); ?>&rawmode=yes&uniqueid=' + uniqueId;
                 modal.style.display = 'flex';

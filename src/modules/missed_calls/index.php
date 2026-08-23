@@ -297,6 +297,10 @@ function handleSaveAddressBook($arrConf = array())
 
 function _moduleContent(&$smarty, $module_name)
 {
+    include_once "modules/$module_name/configs/default.conf.php";
+    global $arrConf;
+    global $arrConfModule;
+    if (isset($arrConfModule) && is_array($arrConfModule)) $arrConf = array_merge($arrConf, $arrConfModule);
     global $arrConf;
     if (isset($_REQUEST['action']) && $_REQUEST['action'] == 'save_address_book') {
         handleSaveAddressBook($arrConf);
