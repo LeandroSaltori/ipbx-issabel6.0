@@ -611,7 +611,7 @@ function _moduleContent(&$smarty, $module_name)
     </div>
 
     <script>
-        function openAddressBookModal(phoneNumber, name, lastName, company, email, notes) {
+            function openAddressBookModal(phoneNumber, name, lastName, company, email, notes) {
         var modal = document.getElementById('addressBookModal');
         if (modal && modal.parentElement !== document.body) {
             document.body.appendChild(modal);

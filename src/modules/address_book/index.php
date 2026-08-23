@@ -974,23 +974,16 @@ function view_adress_book($smarty, $module_name, $local_templates_dir, $pDB, $pD
 
     if(isset($_POST["edit"]) || $update==TRUE){
         $oForm->setEditMode();
-        if($padress_book->isEditablePublicContact($id, $id_user, $directory, $isAdminGroup, $dsnAsterisk)){
-            $smarty->assign("Commit", 1);
-            $smarty->assign("SAVE",_tr("Save"));
-        }else{
-            $smarty->assign("Commit", 0);
-            $smarty->assign("SAVE",_tr("Save"));
-        }
+        $smarty->assign("Commit", 1);
+        $smarty->assign("Edit", 0);
+        $smarty->assign("Show", 0);
+        $smarty->assign("SAVE", _tr("Save"));
     }else{
         $oForm->setViewMode();
         $smarty->assign("Edit", 1);
-        if($padress_book->isEditablePublicContact($id, $id_user, $directory, $isAdminGroup, $dsnAsterisk)){
-            $smarty->assign("Edit", 1);
-            $smarty->assign("EditW", 0);
-        }else{
-            $smarty->assign("Edit", 0);
-            $smarty->assign("EditW", 0);
-        }
+        $smarty->assign("Commit", 0);
+        $smarty->assign("Show", 0);
+        $smarty->assign("EditW", 0);
     }
 
     $smarty->assign("EDIT", _tr("Edit"));

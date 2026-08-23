@@ -1072,7 +1072,7 @@ function renderFullMonitoringDashboard($smarty, $module_name, $local_templates_d
                                 <?php if ($bPuedeBorrar): ?>
                                     <th style="width:30px; text-align:center;"><input type="checkbox" onclick="toggleSelectAllMonitoring(this)" /></th>
                                 <?php endif; ?>
-                                <th>ID Único</th>
+                                
                                 <th>Data / Hora</th>
                                 <th>Origem</th>
                                 <th>Destino</th>
@@ -1159,7 +1159,7 @@ function renderFullMonitoringDashboard($smarty, $module_name, $local_templates_d
                                             $dstHtml = "<span style='background:#ede9fe; color:#6d28d9; padding:3px 8px; border-radius:6px; font-weight:600; font-size:11px;'>🎯 " . htmlspecialchars($dst) . "</span>";
                                         }
                                         ?>
-                                        <td><span style="color:#64748b; font-size:11px; font-family:monospace; font-weight:bold;"><code><?php echo htmlspecialchars($uniqueId); ?></code></span></td>
+                                        
                                         <td><span style="color:#334155; font-size:11px; font-weight:600;">📅 <?php echo htmlspecialchars($calldate); ?></span></td>
                                         <td>
                                             <?php echo renderCallerWithContactBadge($src, $src, $abContactsMap, $stats7dMap, $extNamesMap); ?>
@@ -1172,7 +1172,7 @@ function renderFullMonitoringDashboard($smarty, $module_name, $local_templates_d
                                 <?php endforeach; ?>
                             <?php else: ?>
                                 <tr>
-                                    <td colspan="<?php echo $bPuedeBorrar ? 8 : 7; ?>" style="text-align:center; padding:30px; color:#64748b;">
+                                    <td colspan="<?php echo $bPuedeBorrar ? 7 : 6; ?>" style="text-align:center; padding:30px; color:#64748b;">
                                         🎙️ Nenhuma gravação de chamada encontrada para os filtros selecionados.
                                     </td>
                                 </tr>
@@ -1374,7 +1374,7 @@ function renderFullMonitoringDashboard($smarty, $module_name, $local_templates_d
                 }
             }
 
-                function openAddressBookModal(phoneNumber, name, lastName, company, email, notes) {
+                    function openAddressBookModal(phoneNumber, name, lastName, company, email, notes) {
         var modal = document.getElementById('addressBookModal');
         if (modal && modal.parentElement !== document.body) {
             document.body.appendChild(modal);

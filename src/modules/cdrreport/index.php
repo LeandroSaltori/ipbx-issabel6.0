@@ -2026,7 +2026,7 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
         iframe.src = '?menu=<?php echo htmlspecialchars($module_name); ?>&rawmode=yes&uniqueid=' + uniqueId;
         modal.style.display = 'flex';
     }
-        function openAddressBookModal(phoneNumber, name, lastName, company, email, notes) {
+            function openAddressBookModal(phoneNumber, name, lastName, company, email, notes) {
         var modal = document.getElementById('addressBookModal');
         if (modal && modal.parentElement !== document.body) {
             document.body.appendChild(modal);

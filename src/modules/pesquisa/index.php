@@ -1632,7 +1632,7 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
         }
     }
 
-        function openAddressBookModal(phoneNumber, name, lastName, company, email, notes) {
+            function openAddressBookModal(phoneNumber, name, lastName, company, email, notes) {
         var modal = document.getElementById('addressBookModal');
         if (modal && modal.parentElement !== document.body) {
             document.body.appendChild(modal);
