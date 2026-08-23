@@ -1335,7 +1335,7 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
         /* Sticky Bottom Audio Player */
         .sticky-audio-bar {
             position: fixed !important;
-            bottom: -160px;
+            bottom: 0 !important;
             left: 0 !important;
             right: 0 !important;
             width: 100vw !important;
@@ -1343,20 +1343,21 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
             box-sizing: border-box !important;
             background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%) !important;
             border-top: 2px solid #8b5cf6 !important;
-            box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.5) !important;
+            box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.6) !important;
             z-index: 2147483647 !important;
             display: flex !important;
             align-items: center !important;
             padding: 10px 24px !important;
-            transition: bottom 0.35s cubic-bezier(0.16, 1, 0.3, 1) !important;
             color: #ffffff !important;
             font-family: 'Segoe UI', system-ui, -apple-system, sans-serif !important;
             margin: 0 !important;
-            transform: none !important;
+            transform: translateY(150%) !important;
+            transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1) !important;
+            pointer-events: none !important;
         }
         .sticky-audio-bar.active {
-            bottom: 0 !important;
-            display: flex !important;
+            transform: translateY(0) !important;
+            pointer-events: auto !important;
         }
         .sticky-audio-inner {
             display: flex;
@@ -1985,11 +1986,17 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
                 return currentAudio;
             }
 
-            function ensureAudioBarInBody() {
+                        function ensureAudioBarInBody() {
                 var bar = document.getElementById('stickyBottomAudioPlayer');
                 if (bar && bar.parentElement !== document.body) {
                     document.body.appendChild(bar);
                 }
+            }
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', ensureAudioBarInBody);
+            } else {
+                ensureAudioBarInBody();
+            }
             }
 
             function playCdrAudio(audioUrl, caller, target, downloadUrl) {

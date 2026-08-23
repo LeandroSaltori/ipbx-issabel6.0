@@ -739,29 +739,31 @@ function renderFullMonitoringDashboard($smarty, $module_name, $local_templates_d
 
             /* Sticky Bottom Audio Player */
             .sticky-audio-bar {
-                position: fixed !important;
-                bottom: -160px;
-                left: 0 !important;
-                right: 0 !important;
-                width: 100% !important;
-                max-width: 100vw !important;
-                box-sizing: border-box !important;
-                background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
-                border-top: 2px solid #8b5cf6;
-                box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.5);
-                z-index: 2147483647 !important;
-                display: flex;
-                align-items: center;
-                padding: 10px 24px;
-                transition: bottom 0.35s cubic-bezier(0.16, 1, 0.3, 1);
-                color: #ffffff;
-                font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-                margin: 0 !important;
-                transform: none !important;
-            }
-            .sticky-audio-bar.active {
-                bottom: 0 !important;
-            }
+            position: fixed !important;
+            bottom: 0 !important;
+            left: 0 !important;
+            right: 0 !important;
+            width: 100vw !important;
+            max-width: 100vw !important;
+            box-sizing: border-box !important;
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%) !important;
+            border-top: 2px solid #8b5cf6 !important;
+            box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.6) !important;
+            z-index: 2147483647 !important;
+            display: flex !important;
+            align-items: center !important;
+            padding: 10px 24px !important;
+            color: #ffffff !important;
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif !important;
+            margin: 0 !important;
+            transform: translateY(150%) !important;
+            transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1) !important;
+            pointer-events: none !important;
+        }
+        .sticky-audio-bar.active {
+            transform: translateY(0) !important;
+            pointer-events: auto !important;
+        }
             .sticky-audio-inner {
                 display: flex;
                 align-items: center;
@@ -1325,11 +1327,17 @@ function renderFullMonitoringDashboard($smarty, $module_name, $local_templates_d
                 return currentAudio;
             }
 
-            function ensureAudioBarInBody() {
+                        function ensureAudioBarInBody() {
                 var bar = document.getElementById('stickyBottomAudioPlayer');
                 if (bar && bar.parentElement !== document.body) {
                     document.body.appendChild(bar);
                 }
+            }
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', ensureAudioBarInBody);
+            } else {
+                ensureAudioBarInBody();
+            }
             }
 
             function playMonitoringAudio(audioUrl, caller, target, downloadUrl) {
