@@ -611,7 +611,62 @@ function renderCelDetailsHtml($pDB, $uniqueid)
             .badge-evt { padding:3px 8px; border-radius:6px; font-weight:bold; font-size:10px; display:inline-block; cursor:help; }
             .exten-badge { background:#f1f5f9; color:#334155; padding:2px 6px; border-radius:4px; font-family:monospace; font-weight:bold; font-size:11px; }
         #prisma_report_tooltip, .prisma_report_tooltip { display: none !important; opacity: 0 !important; visibility: hidden !important; pointer-events: none !important; }
-</style>
+
+        /* Modal Popup de Reprodução de Áudio */
+        .audio-modal-overlay {
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            background: rgba(15, 23, 42, 0.75) !important;
+            backdrop-filter: blur(6px) !important;
+            -webkit-backdrop-filter: blur(6px) !important;
+            z-index: 2147483647 !important;
+            display: none;
+            align-items: center !important;
+            justify-content: center !important;
+            animation: audioFadeIn 0.2s ease-out !important;
+        }
+        @keyframes audioFadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .audio-modal-card {
+            background: linear-gradient(145deg, #1e1b4b 0%, #0f172a 100%) !important;
+            border: 1px solid rgba(139, 92, 246, 0.4) !important;
+            border-radius: 16px !important;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8), 0 0 30px rgba(124, 58, 237, 0.3) !important;
+            width: 92% !important;
+            max-width: 520px !important;
+            overflow: hidden !important;
+            color: #ffffff !important;
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif !important;
+            animation: audioPopIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
+        }
+        @keyframes audioPopIn { from { transform: scale(0.92) translateY(10px); opacity: 0; } to { transform: scale(1) translateY(0); opacity: 1; } }
+        .audio-modal-header { padding: 16px 20px !important; background: rgba(255, 255, 255, 0.05) !important; border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important; display: flex !important; justify-content: space-between !important; align-items: center !important; }
+        .audio-modal-title-box { display: flex !important; align-items: center !important; gap: 12px !important; }
+        .audio-modal-icon { font-size: 24px !important; background: rgba(124, 58, 237, 0.3) !important; border: 1px solid rgba(139, 92, 246, 0.4) !important; padding: 8px !important; border-radius: 10px !important; display: flex !important; align-items: center !important; justify-content: center !important; }
+        .audio-modal-title { margin: 0 !important; font-size: 16px !important; font-weight: 800 !important; color: #f8fafc !important; letter-spacing: -0.2px !important; }
+        .audio-modal-meta { margin-top: 3px !important; font-size: 12px !important; color: #cbd5e1 !important; font-weight: 600 !important; }
+        .audio-modal-close-btn { background: rgba(255, 255, 255, 0.1) !important; color: #e2e8f0 !important; border: 1px solid rgba(255, 255, 255, 0.15) !important; font-size: 15px !important; font-weight: bold !important; cursor: pointer !important; width: 32px !important; height: 32px !important; border-radius: 8px !important; display: flex !important; align-items: center !important; justify-content: center !important; transition: all 0.15s ease !important; }
+        .audio-modal-close-btn:hover { background: #ef4444 !important; border-color: #dc2626 !important; color: #ffffff !important; transform: scale(1.05) !important; }
+        .audio-modal-body { padding: 20px !important; }
+        .audio-progress-container { margin-bottom: 18px !important; }
+        .audio-time-row { display: flex !important; justify-content: space-between !important; font-size: 12px !important; color: #94a3b8 !important; font-weight: 700 !important; margin-bottom: 6px !important; }
+        .audio-range-slider { width: 100% !important; height: 6px !important; border-radius: 3px !important; background: rgba(255, 255, 255, 0.2) !important; outline: none !important; cursor: pointer !important; accent-color: #8b5cf6 !important; }
+        .audio-controls-row { display: flex !important; justify-content: center !important; align-items: center !important; gap: 14px !important; margin-bottom: 20px !important; }
+        .btn-audio-ctrl { background: rgba(255, 255, 255, 0.1) !important; color: #ffffff !important; border: 1px solid rgba(255, 255, 255, 0.15) !important; padding: 8px 14px !important; border-radius: 8px !important; font-size: 13px !important; font-weight: 700 !important; cursor: pointer !important; transition: all 0.15s ease !important; }
+        .btn-audio-ctrl:hover { background: rgba(255, 255, 255, 0.2) !important; transform: translateY(-1px) !important; }
+        .btn-play-main { background: linear-gradient(135deg, #7c3aed 0%, #6366f1 100%) !important; border: none !important; padding: 10px 24px !important; font-size: 14px !important; box-shadow: 0 4px 12px rgba(124, 58, 237, 0.4) !important; }
+        .btn-play-main:hover { background: linear-gradient(135deg, #6d28d9 0%, #4f46e5 100%) !important; box-shadow: 0 6px 16px rgba(124, 58, 237, 0.5) !important; }
+        .audio-footer-row { display: flex !important; justify-content: space-between !important; align-items: center !important; padding-top: 14px !important; border-top: 1px solid rgba(255, 255, 255, 0.1) !important; flex-wrap: wrap !important; gap: 10px !important; }
+        .audio-speed-group { display: flex !important; align-items: center !important; gap: 5px !important; }
+        .speed-label { font-size: 11px !important; color: #94a3b8 !important; font-weight: 600 !important; margin-right: 2px !important; }
+        .speed-btn { background: rgba(255, 255, 255, 0.08) !important; border: 1px solid rgba(255, 255, 255, 0.12) !important; color: #94a3b8 !important; border-radius: 6px !important; font-size: 11px !important; font-weight: 700 !important; padding: 4px 8px !important; cursor: pointer !important; transition: all 0.15s !important; }
+        .speed-btn.active, .speed-btn:hover { background: #8b5cf6 !important; border-color: #8b5cf6 !important; color: #ffffff !important; }
+        .btn-audio-download { background: rgba(16, 185, 129, 0.2) !important; border: 1px solid rgba(16, 185, 129, 0.4) !important; color: #34d399 !important; padding: 6px 12px !important; border-radius: 6px !important; font-size: 11px !important; font-weight: 700 !important; text-decoration: none !important; display: inline-flex !important; align-items: center !important; gap: 4px !important; transition: all 0.15s !important; }
+        .btn-audio-download:hover { background: #10b981 !important; color: #ffffff !important; }
+
+    </style>
     </head>
     <body>
         <div class="cel-header">
@@ -816,7 +871,62 @@ function handleCdrExportPdf($oCDR, $module_name)
             tr:nth-child(even) { background:#f8fafc; }
             @media print { .no-print { display:none; } }
         #prisma_report_tooltip, .prisma_report_tooltip { display: none !important; opacity: 0 !important; visibility: hidden !important; pointer-events: none !important; }
-</style>
+
+        /* Modal Popup de Reprodução de Áudio */
+        .audio-modal-overlay {
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            background: rgba(15, 23, 42, 0.75) !important;
+            backdrop-filter: blur(6px) !important;
+            -webkit-backdrop-filter: blur(6px) !important;
+            z-index: 2147483647 !important;
+            display: none;
+            align-items: center !important;
+            justify-content: center !important;
+            animation: audioFadeIn 0.2s ease-out !important;
+        }
+        @keyframes audioFadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .audio-modal-card {
+            background: linear-gradient(145deg, #1e1b4b 0%, #0f172a 100%) !important;
+            border: 1px solid rgba(139, 92, 246, 0.4) !important;
+            border-radius: 16px !important;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8), 0 0 30px rgba(124, 58, 237, 0.3) !important;
+            width: 92% !important;
+            max-width: 520px !important;
+            overflow: hidden !important;
+            color: #ffffff !important;
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif !important;
+            animation: audioPopIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
+        }
+        @keyframes audioPopIn { from { transform: scale(0.92) translateY(10px); opacity: 0; } to { transform: scale(1) translateY(0); opacity: 1; } }
+        .audio-modal-header { padding: 16px 20px !important; background: rgba(255, 255, 255, 0.05) !important; border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important; display: flex !important; justify-content: space-between !important; align-items: center !important; }
+        .audio-modal-title-box { display: flex !important; align-items: center !important; gap: 12px !important; }
+        .audio-modal-icon { font-size: 24px !important; background: rgba(124, 58, 237, 0.3) !important; border: 1px solid rgba(139, 92, 246, 0.4) !important; padding: 8px !important; border-radius: 10px !important; display: flex !important; align-items: center !important; justify-content: center !important; }
+        .audio-modal-title { margin: 0 !important; font-size: 16px !important; font-weight: 800 !important; color: #f8fafc !important; letter-spacing: -0.2px !important; }
+        .audio-modal-meta { margin-top: 3px !important; font-size: 12px !important; color: #cbd5e1 !important; font-weight: 600 !important; }
+        .audio-modal-close-btn { background: rgba(255, 255, 255, 0.1) !important; color: #e2e8f0 !important; border: 1px solid rgba(255, 255, 255, 0.15) !important; font-size: 15px !important; font-weight: bold !important; cursor: pointer !important; width: 32px !important; height: 32px !important; border-radius: 8px !important; display: flex !important; align-items: center !important; justify-content: center !important; transition: all 0.15s ease !important; }
+        .audio-modal-close-btn:hover { background: #ef4444 !important; border-color: #dc2626 !important; color: #ffffff !important; transform: scale(1.05) !important; }
+        .audio-modal-body { padding: 20px !important; }
+        .audio-progress-container { margin-bottom: 18px !important; }
+        .audio-time-row { display: flex !important; justify-content: space-between !important; font-size: 12px !important; color: #94a3b8 !important; font-weight: 700 !important; margin-bottom: 6px !important; }
+        .audio-range-slider { width: 100% !important; height: 6px !important; border-radius: 3px !important; background: rgba(255, 255, 255, 0.2) !important; outline: none !important; cursor: pointer !important; accent-color: #8b5cf6 !important; }
+        .audio-controls-row { display: flex !important; justify-content: center !important; align-items: center !important; gap: 14px !important; margin-bottom: 20px !important; }
+        .btn-audio-ctrl { background: rgba(255, 255, 255, 0.1) !important; color: #ffffff !important; border: 1px solid rgba(255, 255, 255, 0.15) !important; padding: 8px 14px !important; border-radius: 8px !important; font-size: 13px !important; font-weight: 700 !important; cursor: pointer !important; transition: all 0.15s ease !important; }
+        .btn-audio-ctrl:hover { background: rgba(255, 255, 255, 0.2) !important; transform: translateY(-1px) !important; }
+        .btn-play-main { background: linear-gradient(135deg, #7c3aed 0%, #6366f1 100%) !important; border: none !important; padding: 10px 24px !important; font-size: 14px !important; box-shadow: 0 4px 12px rgba(124, 58, 237, 0.4) !important; }
+        .btn-play-main:hover { background: linear-gradient(135deg, #6d28d9 0%, #4f46e5 100%) !important; box-shadow: 0 6px 16px rgba(124, 58, 237, 0.5) !important; }
+        .audio-footer-row { display: flex !important; justify-content: space-between !important; align-items: center !important; padding-top: 14px !important; border-top: 1px solid rgba(255, 255, 255, 0.1) !important; flex-wrap: wrap !important; gap: 10px !important; }
+        .audio-speed-group { display: flex !important; align-items: center !important; gap: 5px !important; }
+        .speed-label { font-size: 11px !important; color: #94a3b8 !important; font-weight: 600 !important; margin-right: 2px !important; }
+        .speed-btn { background: rgba(255, 255, 255, 0.08) !important; border: 1px solid rgba(255, 255, 255, 0.12) !important; color: #94a3b8 !important; border-radius: 6px !important; font-size: 11px !important; font-weight: 700 !important; padding: 4px 8px !important; cursor: pointer !important; transition: all 0.15s !important; }
+        .speed-btn.active, .speed-btn:hover { background: #8b5cf6 !important; border-color: #8b5cf6 !important; color: #ffffff !important; }
+        .btn-audio-download { background: rgba(16, 185, 129, 0.2) !important; border: 1px solid rgba(16, 185, 129, 0.4) !important; color: #34d399 !important; padding: 6px 12px !important; border-radius: 6px !important; font-size: 11px !important; font-weight: 700 !important; text-decoration: none !important; display: inline-flex !important; align-items: center !important; gap: 4px !important; transition: all 0.15s !important; }
+        .btn-audio-download:hover { background: #10b981 !important; color: #ffffff !important; }
+
+    </style>
     </head>
     <body onload="window.print();">
         <div class="no-print" style="margin-bottom:15px;">
@@ -1518,7 +1628,62 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
             color: #ffffff;
         }
     #prisma_report_tooltip, .prisma_report_tooltip { display: none !important; opacity: 0 !important; visibility: hidden !important; pointer-events: none !important; }
-</style>
+
+        /* Modal Popup de Reprodução de Áudio */
+        .audio-modal-overlay {
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            background: rgba(15, 23, 42, 0.75) !important;
+            backdrop-filter: blur(6px) !important;
+            -webkit-backdrop-filter: blur(6px) !important;
+            z-index: 2147483647 !important;
+            display: none;
+            align-items: center !important;
+            justify-content: center !important;
+            animation: audioFadeIn 0.2s ease-out !important;
+        }
+        @keyframes audioFadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .audio-modal-card {
+            background: linear-gradient(145deg, #1e1b4b 0%, #0f172a 100%) !important;
+            border: 1px solid rgba(139, 92, 246, 0.4) !important;
+            border-radius: 16px !important;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8), 0 0 30px rgba(124, 58, 237, 0.3) !important;
+            width: 92% !important;
+            max-width: 520px !important;
+            overflow: hidden !important;
+            color: #ffffff !important;
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif !important;
+            animation: audioPopIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
+        }
+        @keyframes audioPopIn { from { transform: scale(0.92) translateY(10px); opacity: 0; } to { transform: scale(1) translateY(0); opacity: 1; } }
+        .audio-modal-header { padding: 16px 20px !important; background: rgba(255, 255, 255, 0.05) !important; border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important; display: flex !important; justify-content: space-between !important; align-items: center !important; }
+        .audio-modal-title-box { display: flex !important; align-items: center !important; gap: 12px !important; }
+        .audio-modal-icon { font-size: 24px !important; background: rgba(124, 58, 237, 0.3) !important; border: 1px solid rgba(139, 92, 246, 0.4) !important; padding: 8px !important; border-radius: 10px !important; display: flex !important; align-items: center !important; justify-content: center !important; }
+        .audio-modal-title { margin: 0 !important; font-size: 16px !important; font-weight: 800 !important; color: #f8fafc !important; letter-spacing: -0.2px !important; }
+        .audio-modal-meta { margin-top: 3px !important; font-size: 12px !important; color: #cbd5e1 !important; font-weight: 600 !important; }
+        .audio-modal-close-btn { background: rgba(255, 255, 255, 0.1) !important; color: #e2e8f0 !important; border: 1px solid rgba(255, 255, 255, 0.15) !important; font-size: 15px !important; font-weight: bold !important; cursor: pointer !important; width: 32px !important; height: 32px !important; border-radius: 8px !important; display: flex !important; align-items: center !important; justify-content: center !important; transition: all 0.15s ease !important; }
+        .audio-modal-close-btn:hover { background: #ef4444 !important; border-color: #dc2626 !important; color: #ffffff !important; transform: scale(1.05) !important; }
+        .audio-modal-body { padding: 20px !important; }
+        .audio-progress-container { margin-bottom: 18px !important; }
+        .audio-time-row { display: flex !important; justify-content: space-between !important; font-size: 12px !important; color: #94a3b8 !important; font-weight: 700 !important; margin-bottom: 6px !important; }
+        .audio-range-slider { width: 100% !important; height: 6px !important; border-radius: 3px !important; background: rgba(255, 255, 255, 0.2) !important; outline: none !important; cursor: pointer !important; accent-color: #8b5cf6 !important; }
+        .audio-controls-row { display: flex !important; justify-content: center !important; align-items: center !important; gap: 14px !important; margin-bottom: 20px !important; }
+        .btn-audio-ctrl { background: rgba(255, 255, 255, 0.1) !important; color: #ffffff !important; border: 1px solid rgba(255, 255, 255, 0.15) !important; padding: 8px 14px !important; border-radius: 8px !important; font-size: 13px !important; font-weight: 700 !important; cursor: pointer !important; transition: all 0.15s ease !important; }
+        .btn-audio-ctrl:hover { background: rgba(255, 255, 255, 0.2) !important; transform: translateY(-1px) !important; }
+        .btn-play-main { background: linear-gradient(135deg, #7c3aed 0%, #6366f1 100%) !important; border: none !important; padding: 10px 24px !important; font-size: 14px !important; box-shadow: 0 4px 12px rgba(124, 58, 237, 0.4) !important; }
+        .btn-play-main:hover { background: linear-gradient(135deg, #6d28d9 0%, #4f46e5 100%) !important; box-shadow: 0 6px 16px rgba(124, 58, 237, 0.5) !important; }
+        .audio-footer-row { display: flex !important; justify-content: space-between !important; align-items: center !important; padding-top: 14px !important; border-top: 1px solid rgba(255, 255, 255, 0.1) !important; flex-wrap: wrap !important; gap: 10px !important; }
+        .audio-speed-group { display: flex !important; align-items: center !important; gap: 5px !important; }
+        .speed-label { font-size: 11px !important; color: #94a3b8 !important; font-weight: 600 !important; margin-right: 2px !important; }
+        .speed-btn { background: rgba(255, 255, 255, 0.08) !important; border: 1px solid rgba(255, 255, 255, 0.12) !important; color: #94a3b8 !important; border-radius: 6px !important; font-size: 11px !important; font-weight: 700 !important; padding: 4px 8px !important; cursor: pointer !important; transition: all 0.15s !important; }
+        .speed-btn.active, .speed-btn:hover { background: #8b5cf6 !important; border-color: #8b5cf6 !important; color: #ffffff !important; }
+        .btn-audio-download { background: rgba(16, 185, 129, 0.2) !important; border: 1px solid rgba(16, 185, 129, 0.4) !important; color: #34d399 !important; padding: 6px 12px !important; border-radius: 6px !important; font-size: 11px !important; font-weight: 700 !important; text-decoration: none !important; display: inline-flex !important; align-items: center !important; gap: 4px !important; transition: all 0.15s !important; }
+        .btn-audio-download:hover { background: #10b981 !important; color: #ffffff !important; }
+
+    </style>
 
     <div class="cdr-root">
         <!-- Header Principal -->
@@ -1858,9 +2023,10 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
     </div>
 
     
+        
         <!-- Modal Popup de Reprodução de Gravação -->
-        <div id="audioPlayerModal" class="audio-modal-overlay" style="display:none;" onclick="if(event.target === this) closeAudioPlayerModal();">
-            <div class="audio-modal-card">
+        <div id="audioPlayerModal" class="audio-modal-overlay" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(15,23,42,0.75); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); z-index:2147483647; align-items:center; justify-content:center;" onclick="if(event.target === this) closeAudioPlayerModal();">
+            <div class="audio-modal-card" style="background:linear-gradient(145deg, #1e1b4b 0%, #0f172a 100%); border:1px solid rgba(139,92,246,0.4); border-radius:16px; box-shadow:0 25px 50px -12px rgba(0,0,0,0.8), 0 0 30px rgba(124,58,237,0.3); width:92%; max-width:520px; overflow:hidden; color:#ffffff; font-family:'Segoe UI', sans-serif;">
                 <!-- Header do Popup -->
                 <div class="audio-modal-header">
                     <div class="audio-modal-title-box">
@@ -1908,6 +2074,7 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
             </div>
             <audio id="stkAudioElement" preload="auto"></audio>
         </div>
+
 
 
         <!-- Modal CEL Events -->
