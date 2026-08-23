@@ -15,6 +15,24 @@ include_once "libs/paloSantoForm.class.php";
 include_once "libs/paloSantoConfig.class.php";
 require_once "libs/misc.lib.php";
 
+function formatPhoneBrMc($num) {
+    if (empty($num) || $num == '-') return '-';
+    $clean = preg_replace('/[^0-9]/', '', $num);
+    
+    if (strlen($clean) >= 12 && substr($clean, 0, 2) === '00') {
+        $clean = substr($clean, 2);
+    } elseif (strlen($clean) >= 11 && substr($clean, 0, 1) === '0') {
+        $clean = substr($clean, 1);
+    }
+
+    if (strlen($clean) == 11) {
+        return sprintf('(%s) %s-%s', substr($clean, 0, 2), substr($clean, 2, 5), substr($clean, 7, 4));
+    } elseif (strlen($clean) == 10) {
+        return sprintf('(%s) %s-%s', substr($clean, 0, 2), substr($clean, 2, 4), substr($clean, 6, 4));
+    }
+    return $num;
+}
+
 function formatSecsMc($sec) {
     $sec = (int)$sec;
     if ($sec <= 0) return '00:00';
@@ -696,17 +714,24 @@ function _moduleContent(&$smarty, $module_name)
         });
     }
 
-    document.addEventListener("DOMContentLoaded", function() {
-        if (typeof Chart !== 'undefined') {
-            var ctxHourly = document.getElementById('chartMcHourly').getContext('2d');
+    function initMcCharts() {
+        if (typeof Chart === 'undefined') {
+            setTimeout(initMcCharts, 150);
+            return;
+        }
+
+        var elHourly = document.getElementById('chartMcHourly');
+        if (elHourly) {
+            var ctxHourly = elHourly.getContext('2d');
             new Chart(ctxHourly, {
                 type: 'bar',
                 data: {
                     labels: ['00h','01h','02h','03h','04h','05h','06h','07h','08h','09h','10h','11h','12h','13h','14h','15h','16h','17h','18h','19h','20h','21h','22h','23h'],
                     datasets: [{
                         label: 'Chamadas Perdidas',
-                        data: <?php echo json_encode($hourlyLost); ?>,
+                        data: <?php echo json_encode(array_values($hourlyLost)); ?>,
                         backgroundColor: '#ef4444',
+                        hoverBackgroundColor: '#dc2626',
                         borderRadius: 4
                     }]
                 },
@@ -715,19 +740,22 @@ function _moduleContent(&$smarty, $module_name)
                     maintainAspectRatio: false,
                     plugins: { legend: { display: false } },
                     scales: {
-                        y: { beginAtZero: true, grid: { color: '#f1f5f9' } },
+                        y: { beginAtZero: true, grid: { color: '#f1f5f9' }, ticks: { precision: 0 } },
                         x: { grid: { display: false } }
                     }
                 }
             });
+        }
 
-            var ctxReason = document.getElementById('chartMcReason').getContext('2d');
+        var elReason = document.getElementById('chartMcReason');
+        if (elReason) {
+            var ctxReason = elReason.getContext('2d');
             new Chart(ctxReason, {
                 type: 'doughnut',
                 data: {
                     labels: ['Não Atendeu', 'Ocupado', 'Falha'],
                     datasets: [{
-                        data: [<?php echo "$noAnsCount, $busyCount, $failCount"; ?>],
+                        data: [<?php echo (int)$noAnsCount; ?>, <?php echo (int)$busyCount; ?>, <?php echo (int)$failCount; ?>],
                         backgroundColor: ['#ef4444', '#f59e0b', '#dc2626'],
                         borderWidth: 2,
                         borderColor: '#ffffff'
@@ -736,11 +764,22 @@ function _moduleContent(&$smarty, $module_name)
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    plugins: { legend: { position: 'right' } }
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                            labels: { boxWidth: 12, font: { size: 11, family: "'Segoe UI', sans-serif" } }
+                        }
+                    }
                 }
             });
         }
-    });
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initMcCharts);
+    } else {
+        initMcCharts();
+    }
     </script>
     <?php
     return ob_get_clean();
