@@ -422,11 +422,39 @@ function _moduleContent(&$smarty, $module_name)
         .kpi-card-num { font-size: 24px; font-weight: 800; color: #0f172a; line-height: 1; }
         .kpi-card-desc { font-size: 11px; color: #94a3b8; margin-top: 4px; }
 
-        .charts-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 15px; margin-bottom: 15px; }
+        .charts-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
         @media (max-width: 900px) { .charts-grid { grid-template-columns: 1fr; } }
-        .chart-card-box { background: #ffffff; border-radius: 10px; padding: 16px 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.04); border: 1px solid #e2e8f0; height: 260px; display: flex; flex-direction: column; margin-bottom: 15px; }
-        .chart-card-box h4 { margin: 0 0 10px 0; font-size: 12px; font-weight: 800; color: #334155; text-transform: uppercase; border-bottom: 1px solid #f1f5f9; padding-bottom: 4px; }
-        .chart-canvas-wrapper { position: relative; flex: 1; width: 100%; height: 100%; }
+
+        .chart-card-box {
+            background: #ffffff;
+            border-radius: 10px;
+            padding: 14px 16px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+            border: 1px solid #f1f5f9;
+            height: 220px;
+            display: flex;
+            flex-direction: column;
+        }
+        .chart-card-box h4 {
+            margin: 0 0 8px 0;
+            font-size: 12px;
+            font-weight: 800;
+            color: #334155;
+            text-transform: uppercase;
+            border-bottom: 1px solid #f1f5f9;
+            padding-bottom: 4px;
+        }
+        .chart-canvas-wrapper {
+            position: relative;
+            flex: 1;
+            width: 100%;
+            height: 100%;
+        }
 
         .table-card-box { background: #ffffff; border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.04); border: 1px solid #e2e8f0; overflow: hidden; }
         .mc-table { width: 100%; border-collapse: collapse; text-align: left; }
@@ -515,18 +543,18 @@ function _moduleContent(&$smarty, $module_name)
             </div>
         </div>
 
-        <!-- Gráficos -->
+                <!-- Gráficos -->
         <div class="charts-grid">
-            <div class="chart-card-box" title="📊 Perdidas por Horário&#10;Gráfico de barras indicando a quantidade de chamadas perdidas hora a hora.">
-                <h4>📊 Volume de Chamadas Perdidas por Horário</h4>
+            <div class="chart-card-box" title="📊 Volume por Horário&#10;Gráfico de barras indicando a quantidade de chamadas perdidas hora a hora para identificação de picos.">
+                <h4>📊 Volume de Chamadas Perdidas por Horário (00h - 23h)</h4>
                 <div class="chart-canvas-wrapper">
-                    <canvas id="chartMcHourly" style="width:100%; height:180px; max-height:200px;"></canvas>
+                    <canvas id="chartMcHourly"></canvas>
                 </div>
             </div>
-            <div class="chart-card-box" title="🚦 Motivo do Não Atendimento&#10;Gráfico de rosca demonstrando a divisão entre Não Atendeu, Ocupado e Falha.">
+            <div class="chart-card-box" title="🚦 Motivo do Não Atendimento&#10;Gráfico de rosca demonstrando o percentual de Não Atendeu, Ocupado e Falha.">
                 <h4>🚦 Motivo do Não Atendimento</h4>
                 <div class="chart-canvas-wrapper">
-                    <canvas id="chartMcReason" style="width:100%; height:180px; max-height:200px;"></canvas>
+                    <canvas id="chartMcReason"></canvas>
                 </div>
             </div>
         </div>
@@ -648,160 +676,143 @@ function _moduleContent(&$smarty, $module_name)
 
     <script>
             function openAddressBookModal(phoneNumber, name, lastName, company, email, notes) {
-        var modal = document.getElementById('addressBookModal');
-        if (modal && modal.parentElement !== document.body) {
-            document.body.appendChild(modal);
-        }
-        document.getElementById('ab_phone').value = phoneNumber || '';
-        document.getElementById('ab_name').value = name || '';
-        document.getElementById('ab_last_name').value = lastName || '';
-        document.getElementById('ab_company').value = company || '';
-        document.getElementById('ab_email').value = email || '';
-        document.getElementById('ab_notes').value = notes || '';
-        modal.style.display = 'flex';
-        document.getElementById('ab_name').focus();
-    }
-        document.getElementById('ab_phone').value = phoneNumber || '';
-        document.getElementById('ab_name').value = '';
-        document.getElementById('ab_last_name').value = '';
-        document.getElementById('ab_company').value = '';
-        document.getElementById('ab_email').value = '';
-        document.getElementById('ab_notes').value = '';
-        modal.style.display = 'flex';
-        document.getElementById('ab_name').focus();
-    }
-
-    function closeAddressBookModal() {
-        document.getElementById('addressBookModal').style.display = 'none';
-    }
-
-    function submitSaveAddressBook(e) {
-        e.preventDefault();
-        var btn = document.getElementById('btnSaveAb');
-        btn.disabled = true;
-        btn.textContent = 'Salvando...';
-
-        var data = new FormData();
-        data.append('action', 'save_address_book');
-        data.append('phone', document.getElementById('ab_phone').value);
-        data.append('name', document.getElementById('ab_name').value);
-        data.append('last_name', document.getElementById('ab_last_name').value);
-        data.append('company', document.getElementById('ab_company').value);
-        data.append('email', document.getElementById('ab_email').value);
-        data.append('notes', document.getElementById('ab_notes').value);
-
-        fetch('index.php?menu=<?php echo htmlspecialchars($module_name); ?>&rawmode=yes', {
-            method: 'POST',
-            body: data
-        })
-        .then(function(r) { return r.json(); })
-        .then(function(res) {
-            btn.disabled = false;
-            btn.textContent = '💾 Salvar Contato';
-            if (res.status === 'success') {
-                alert('✅ ' + res.message);
-                closeAddressBookModal();
-            } else if (res.status === 'exists') {
-                alert('⚠️ ' + res.message);
-            } else {
-                alert('❌ ' + (res.message || 'Erro ao salvar contato.'));
+                var modal = document.getElementById('addressBookModal');
+                if (modal && modal.parentElement !== document.body) {
+                    document.body.appendChild(modal);
+                }
+                document.getElementById('ab_phone').value = phoneNumber || '';
+                document.getElementById('ab_name').value = name || '';
+                document.getElementById('ab_last_name').value = lastName || '';
+                document.getElementById('ab_company').value = company || '';
+                document.getElementById('ab_email').value = email || '';
+                document.getElementById('ab_notes').value = notes || '';
+                modal.style.display = 'flex';
+                document.getElementById('ab_name').focus();
             }
-        })
-        .catch(function(err) {
-            btn.disabled = false;
-            btn.textContent = '💾 Salvar Contato';
-            alert('❌ Erro na comunicação com o servidor: ' + err);
-        });
-    }
 
-    function loadChartJsAndInitMc() {
-        if (typeof Chart === 'undefined') {
-            var script = document.createElement('script');
-            script.src = 'https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js';
-            script.onload = function() { initMcCharts(); };
-            document.head.appendChild(script);
-        } else {
-            initMcCharts();
-        }
-    }
+            function closeAddressBookModal() {
+                document.getElementById('addressBookModal').style.display = 'none';
+            }
 
-    function initMcCharts() {
-        if (typeof Chart === 'undefined') {
-            setTimeout(initMcCharts, 150);
-            return;
-        }
+            function submitSaveAddressBook(e) {
+                e.preventDefault();
+                var btn = document.getElementById('btnSaveAb');
+                btn.disabled = true;
+                btn.textContent = 'Salvando...';
 
-        try {
-            var elHourly = document.getElementById('chartMcHourly');
-            if (elHourly) {
-                var ctxHourly = elHourly.getContext('2d');
-                new Chart(ctxHourly, {
-                    type: 'bar',
-                    data: {
-                        labels: ['00h','01h','02h','03h','04h','05h','06h','07h','08h','09h','10h','11h','12h','13h','14h','15h','16h','17h','18h','19h','20h','21h','22h','23h'],
-                        datasets: [{
-                            label: 'Chamadas Perdidas',
-                            data: <?php echo json_encode(array_values($hourlyLost)); ?>,
-                            backgroundColor: '#ef4444',
-                            hoverBackgroundColor: '#dc2626',
-                            borderRadius: 4
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        legend: { display: false },
-                        plugins: { legend: { display: false } },
-                        scales: {
-                            y: { beginAtZero: true, grid: { color: '#f1f5f9' }, ticks: { precision: 0 } },
-                            yAxes: [{ ticks: { beginAtZero: true, precision: 0 }, gridLines: { color: '#f1f5f9' } }],
-                            x: { grid: { display: false } },
-                            xAxes: [{ gridLines: { display: false } }]
-                        }
+                var data = new FormData();
+                data.append('action', 'save_address_book');
+                data.append('phone', document.getElementById('ab_phone').value);
+                data.append('name', document.getElementById('ab_name').value);
+                data.append('last_name', document.getElementById('ab_last_name').value);
+                data.append('company', document.getElementById('ab_company').value);
+                data.append('email', document.getElementById('ab_email').value);
+                data.append('notes', document.getElementById('ab_notes').value);
+
+                fetch('index.php?menu=<?php echo htmlspecialchars($module_name); ?>&rawmode=yes', {
+                    method: 'POST',
+                    body: data
+                })
+                .then(function(r) { return r.json(); })
+                .then(function(res) {
+                    btn.disabled = false;
+                    btn.textContent = '💾 Salvar Contato';
+                    if (res.status === 'success') {
+                        alert('✅ ' + res.message);
+                        closeAddressBookModal();
+                        window.location.reload();
+                    } else if (res.status === 'exists') {
+                        alert('⚠️ ' + res.message);
+                    } else {
+                        alert('❌ ' + (res.message || 'Erro ao salvar contato.'));
                     }
+                })
+                .catch(function(err) {
+                    btn.disabled = false;
+                    btn.textContent = '💾 Salvar Contato';
+                    alert('❌ Erro na comunicação com o servidor: ' + err);
                 });
             }
-        } catch(e) { console.error("Erro ao criar chartMcHourly:", e); }
 
-        try {
-            var elReason = document.getElementById('chartMcReason');
-            if (elReason) {
-                var ctxReason = elReason.getContext('2d');
-                new Chart(ctxReason, {
-                    type: 'doughnut',
-                    data: {
-                        labels: ['Não Atendeu', 'Ocupado', 'Falha'],
-                        datasets: [{
-                            data: [<?php echo (int)$noAnsCount; ?>, <?php echo (int)$busyCount; ?>, <?php echo (int)$failCount; ?>],
-                            backgroundColor: ['#ef4444', '#f59e0b', '#dc2626'],
-                            borderWidth: 2,
-                            borderColor: '#ffffff'
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        legend: { position: 'right' },
-                        plugins: {
-                            legend: {
-                                position: 'right',
-                                labels: { boxWidth: 12, font: { size: 11, family: "'Segoe UI', sans-serif" } }
+            // Inicializar Gráficos Chart.js do Relatório de Chamadas Perdidas
+            function initMcCharts() {
+                if (typeof Chart === 'undefined') {
+                    setTimeout(initMcCharts, 150);
+                    return;
+                }
+
+                var elHourly = document.getElementById('chartMcHourly');
+                if (elHourly) {
+                    var ctxHourly = elHourly.getContext('2d');
+                    new Chart(ctxHourly, {
+                        type: 'bar',
+                        data: {
+                            labels: ['00h', '01h', '02h', '03h', '04h', '05h', '06h', '07h', '08h', '09h', '10h', '11h', '12h', '13h', '14h', '15h', '16h', '17h', '18h', '19h', '20h', '21h', '22h', '23h'],
+                            datasets: [{
+                                label: 'Perdidas',
+                                data: <?php echo json_encode(array_values($hourlyLost)); ?>,
+                                backgroundColor: '#ef4444',
+                                hoverBackgroundColor: '#dc2626',
+                                borderRadius: 4
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { display: false }
+                            },
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    grid: { color: '#f1f5f9' },
+                                    ticks: { precision: 0 }
+                                },
+                                x: {
+                                    grid: { display: false }
+                                }
                             }
                         }
-                    }
-                });
-            }
-        } catch(e) { console.error("Erro ao criar chartMcReason:", e); }
-    }
+                    });
+                }
 
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', loadChartJsAndInitMc);
-    } else {
-        loadChartJsAndInitMc();
-    } else {
-        initMcCharts();
-    }
-    </script>
+                var elReason = document.getElementById('chartMcReason');
+                if (elReason) {
+                    var ctxReason = elReason.getContext('2d');
+                    new Chart(ctxReason, {
+                        type: 'doughnut',
+                        data: {
+                            labels: ['Não Atendeu', 'Ocupado', 'Falha'],
+                            datasets: [{
+                                data: [<?php echo (int)$noAnsCount; ?>, <?php echo (int)$busyCount; ?>, <?php echo (int)$failCount; ?>],
+                                backgroundColor: ['#ef4444', '#f59e0b', '#dc2626'],
+                                borderWidth: 2,
+                                borderColor: '#ffffff'
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    position: 'right',
+                                    labels: {
+                                        boxWidth: 12,
+                                        font: { size: 11, family: "'Segoe UI', sans-serif" }
+                                    }
+                                }
+                            }
+                        }
+                    });
+                }
+            }
+
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', initMcCharts);
+            } else {
+                initMcCharts();
+            }
+        </script>
     <?php
     return ob_get_clean();
 }
