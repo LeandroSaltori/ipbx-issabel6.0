@@ -129,7 +129,23 @@ function getCdr7DaysStatsMap($phoneNumbers = array(), $pDB = null) {
     return $stats;
 }
 
-function renderCallerWithContactBadge($raw_src, $val_src, $contactsMap = array(), $stats7d = array()) {
+
+function getAsteriskExtensionNamesMap($pDB = null) {
+    static $extMap = null;
+    if ($extMap !== null) return $extMap;
+    $extMap = array();
+    if (!is_object($pDB)) return $extMap;
+    $sql = "SELECT extension, name FROM asterisk.users WHERE extension IS NOT NULL AND extension != ''";
+    $res = @$pDB->fetchTable($sql, true);
+    if (is_array($res)) {
+        foreach ($res as $row) {
+            $extMap[$row['extension']] = $row['name'];
+        }
+    }
+    return $extMap;
+}
+
+function renderCallerWithContactBadge($raw_src, $val_src, $contactsMap = array(), $stats7d = array(), $extNamesMap = array()) {
     $raw_clean = preg_replace('/\D/', '', $raw_src);
     $contact = null;
     if (isset($contactsMap[$raw_src])) {
@@ -141,6 +157,7 @@ function renderCallerWithContactBadge($raw_src, $val_src, $contactsMap = array()
     $origCount = isset($stats7d[$raw_src]['originadas']) ? $stats7d[$raw_src]['originadas'] : (isset($stats7d[$raw_clean]['originadas']) ? $stats7d[$raw_clean]['originadas'] : 0);
     $recCount = isset($stats7d[$raw_src]['recebidas']) ? $stats7d[$raw_src]['recebidas'] : (isset($stats7d[$raw_clean]['recebidas']) ? $stats7d[$raw_clean]['recebidas'] : 0);
 
+    // 1. Se já for um contato cadastrado na Agenda Externa
     if ($contact && !empty($contact['fullName'])) {
         $tooltip = "📇 Contato: " . $contact['fullName'];
         if (!empty($contact['company'])) $tooltip .= "\n🏢 Empresa: " . $contact['company'];
@@ -148,22 +165,47 @@ function renderCallerWithContactBadge($raw_src, $val_src, $contactsMap = array()
         if (!empty($contact['notes'])) $tooltip .= "\n📝 Obs: " . $contact['notes'];
         $tooltip .= "\n📊 Últimos 7 dias:\n  • ⬇️ Recebidas deste número: $recCount\n  • ⬆️ Ligadas para este número: $origCount";
 
-        $html = "<div style='display:inline-flex; align-items:center; gap:6px; flex-wrap:wrap;'>".
+        return "<div style='display:inline-flex; align-items:center; gap:6px; flex-wrap:wrap;'>".
             "<span title='" . htmlspecialchars($tooltip, ENT_QUOTES) . "' style='background:rgba(37,99,235,0.08); color:#1d4ed8; padding:3px 8px; border-radius:6px; font-weight:700; font-size:11px; cursor:help; border:1px solid rgba(37,99,235,0.25); display:inline-flex; align-items:center; gap:4px;'>".
             "👤 " . htmlspecialchars($contact['fullName']) . " <span style='color:#64748b; font-size:10px; font-weight:normal;'>(" . htmlspecialchars($val_src) . ")</span>".
             "</span>".
             "</div>";
-    } else {
-        $tooltip = "📞 Número: $val_src\n📊 Últimos 7 dias:\n  • ⬇️ Recebidas deste número: $recCount\n  • ⬆️ Ligadas para este número: $origCount";
-        $html = "<div style='display:inline-flex; align-items:center; gap:6px;'>".
-            "<span title='" . htmlspecialchars($tooltip, ENT_QUOTES) . "' style='font-weight:600; color:#1e293b; cursor:help;'>📞 " . htmlspecialchars($val_src) . "</span>";
-        if (!empty($raw_src) && $raw_src != '-') {
-            $html .= "<button type='button' onclick=\"openAddressBookModal('" . htmlspecialchars($raw_src, ENT_QUOTES) . "')\" title='📇 Salvar na Agenda Pública\nClique para cadastrar este número na Agenda de Contatos Pública.' style='background:rgba(59,130,246,0.12); color:#2563eb; border:1px solid rgba(59,130,246,0.3); border-radius:50%; width:20px; height:20px; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; font-size:10px; transition:all 0.2s;' onmouseover=\"this.style.background='#2563eb'; this.style.color='#fff';\" onmouseout=\"this.style.background='rgba(59,130,246,0.12)'; this.style.color='#2563eb';\">📇</button>";
-        }
-        $html .= "</div>";
     }
+
+    // 2. Verificar se é Ramal Interno (2 a 5 dígitos ou mapeado no PBX)
+    $isInternal = false;
+    $extName = '';
+    if (!empty($raw_src) && isset($extNamesMap[$raw_src])) {
+        $isInternal = true;
+        $extName = $extNamesMap[$raw_src];
+    } elseif (!empty($raw_clean) && isset($extNamesMap[$raw_clean])) {
+        $isInternal = true;
+        $extName = $extNamesMap[$raw_clean];
+    } elseif (strlen($raw_clean) >= 2 && strlen($raw_clean) <= 5 && !empty($raw_clean)) {
+        $isInternal = true;
+    }
+
+    if ($isInternal) {
+        $dispText = !empty($extName) ? "$val_src - $extName" : "$val_src";
+        $tooltip = "🏢 Ramal Interno: $dispText\n📊 Últimos 7 dias:\n  • ⬇️ Chamadas recebidas: $recCount\n  • ⬆️ Chamadas originadas: $origCount";
+        return "<div style='display:inline-flex; align-items:center; gap:6px;'>".
+            "<span title='" . htmlspecialchars($tooltip, ENT_QUOTES) . "' style='background:#f1f5f9; color:#334155; padding:3px 8px; border-radius:6px; font-weight:600; font-size:11px; border:1px solid #e2e8f0; display:inline-flex; align-items:center; gap:4px;'>".
+            "👤 Ramal " . htmlspecialchars($dispText) .
+            "</span>".
+            "</div>";
+    }
+
+    // 3. Número Externo (PSTN / Celular / Fixo) -> Exibe botão para Salvar na Agenda
+    $tooltip = "📞 Número Externo: $val_src\n📊 Últimos 7 dias:\n  • ⬇️ Recebidas deste número: $recCount\n  • ⬆️ Ligadas para este número: $origCount";
+    $html = "<div style='display:inline-flex; align-items:center; gap:6px;'>".
+        "<span title='" . htmlspecialchars($tooltip, ENT_QUOTES) . "' style='font-weight:600; color:#1e293b; cursor:help;'>📞 " . htmlspecialchars($val_src) . "</span>";
+    if (!empty($raw_src) && $raw_src != '-') {
+        $html .= "<button type='button' onclick=\"openAddressBookModal('" . htmlspecialchars($raw_src, ENT_QUOTES) . "')\" title='📇 Salvar na Agenda Pública\nClique para cadastrar este número na Agenda de Contatos Pública.' style='background:rgba(59,130,246,0.12); color:#2563eb; border:1px solid rgba(59,130,246,0.3); border-radius:50%; width:20px; height:20px; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; font-size:10px; transition:all 0.2s;' onmouseover=\"this.style.background='#2563eb'; this.style.color='#fff';\" onmouseout=\"this.style.background='rgba(59,130,246,0.12)'; this.style.color='#2563eb';\">📇</button>";
+    }
+    $html .= "</div>";
     return $html;
 }
+
 
 function handleSaveAddressBook($arrConf = array())
 {
@@ -1293,7 +1335,7 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
                                 <td><span style='color:#64748b; font-size:11px;'>🕒 <?php echo htmlspecialchars($val_hora); ?></span></td>
                                 <td><span style='color:#0f172a; font-weight:600; font-size:11px;'>⏱️ <?php echo htmlspecialchars($val_duracao); ?></span></td>
                                 <td>
-                                    <?php echo renderCallerWithContactBadge($raw_tel, $val_telefone, $abContactsMap, $stats7dMap); ?>
+                                    <?php echo renderCallerWithContactBadge($raw_tel, $val_telefone, $abContactsMap, $stats7dMap, $extNamesMap); ?>
                                 </td>
                                 <td>
                                     <?php
