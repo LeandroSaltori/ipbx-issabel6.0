@@ -256,15 +256,15 @@ function renderCelDetailsHtml($pDB, $uniqueid)
     $arrEvents = $pDB->fetchTable($sPeticionSQL, FALSE, array($linkedId));
 
     $evtMap = array(
-        'CHAN_START'    => array('label' => '🚀 Início Canal', 'color' => '#dbeafe', 'text' => '#1e40af', 'desc' => '🚀 CHAN_START: A chamada iniciou o processamento na central PBX.'),
-        'ANSWER'        => array('label' => '📞 Atendida', 'color' => '#dcfce7', 'text' => '#15803d', 'desc' => '📞 ANSWER: A ligação foi atendida com sucesso pelo destinatário.'),
-        'HANGUP'        => array('label' => '📴 Desconectada', 'color' => '#fee2e2', 'text' => '#b91c1c', 'desc' => '📴 HANGUP: Uma das partes (origem ou destino) desligou a chamada.'),
-        'CHAN_END'      => array('label' => '🏁 Fim Canal', 'color' => '#f1f5f9', 'text' => '#475569', 'desc' => '🏁 CHAN_END: O canal telefônico específico foi encerrado.'),
-        'LINKEDID_END'  => array('label' => '🔚 Fim Ligação', 'color' => '#e0e7ff', 'text' => '#4338ca', 'desc' => '🔚 LINKEDID_END: Todos os canais vinculados a esta chamada foram finalizados.'),
-        'BRIDGE_ENTER'  => array('label' => '🤝 Conversa Conectada', 'color' => '#fef3c7', 'text' => '#b45309', 'desc' => '🤝 BRIDGE_ENTER: Os canais de áudio foram conectados e a conversa começou.'),
-        'BRIDGE_EXIT'   => array('label' => '🔌 Conversa Encerrada', 'color' => '#fee2e2', 'text' => '#991b1b', 'desc' => '🔌 BRIDGE_EXIT: Desconexão da ponte de áudio entre as partes.'),
-        'APP_START'     => array('label' => '⚙️ Início App', 'color' => '#f3e8ff', 'text' => '#6b21a8', 'desc' => '⚙️ APP_START: Início da execução de uma aplicação do PBX (URA, Fila, Discagem).'),
-        'APP_END'       => array('label' => '⚙️ Fim App', 'color' => '#f3e8ff', 'text' => '#581c87', 'desc' => '⚙️ APP_END: Término da execução da aplicação do PBX.')
+        'CHAN_START'    => array('icon' => '🚀', 'label' => 'Início de Canal', 'color' => '#dbeafe', 'text' => '#1e40af', 'desc' => 'Canal telefônico criado e processamento iniciado no PBX.'),
+        'ANSWER'        => array('icon' => '📞', 'label' => 'Atendida', 'color' => '#dcfce7', 'text' => '#15803d', 'desc' => 'Ligação atendida com sucesso pelo destinatário.'),
+        'HANGUP'        => array('icon' => '📴', 'label' => 'Desconectada', 'color' => '#fee2e2', 'text' => '#b91c1c', 'desc' => 'Canal ou parte da chamada foi desconectada.'),
+        'CHAN_END'      => array('icon' => '🏁', 'label' => 'Fim Canal', 'color' => '#f1f5f9', 'text' => '#475569', 'desc' => 'Canal individual encerrado.'),
+        'LINKEDID_END'  => array('icon' => '🔚', 'label' => 'Fim da Ligação', 'color' => '#e0e7ff', 'text' => '#4338ca', 'desc' => 'Todos os canais vinculados à chamada foram finalizados.'),
+        'BRIDGE_ENTER'  => array('icon' => '🤝', 'label' => 'Conversa Conectada', 'color' => '#fef3c7', 'text' => '#b45309', 'desc' => 'Ponte de áudio conectada, conversa em andamento.'),
+        'BRIDGE_EXIT'   => array('icon' => '🔌', 'label' => 'Conversa Encerrada', 'color' => '#fee2e2', 'text' => '#991b1b', 'desc' => 'Ponte de áudio desconectada entre as partes.'),
+        'APP_START'     => array('icon' => '⚙️', 'label' => 'Início Aplicação', 'color' => '#f3e8ff', 'text' => '#6b21a8', 'desc' => 'Execução de aplicação PBX (Dial, Queue, URA, etc).'),
+        'APP_END'       => array('icon' => '⚙️', 'label' => 'Fim Aplicação', 'color' => '#f3e8ff', 'text' => '#581c87', 'desc' => 'Término da execução da aplicação PBX.')
     );
 
     ?>
@@ -273,81 +273,140 @@ function renderCelDetailsHtml($pDB, $uniqueid)
     <head>
         <meta charset="UTF-8">
         <style>
-            body { font-family:'Segoe UI', sans-serif; font-size:12px; color:#1e293b; padding:15px; margin:0; background:#f8fafc; }
-            .cel-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
-            h3 { margin:0; font-size:14px; color:#0f172a; font-weight:800; }
+            body { font-family:'Segoe UI', system-ui, sans-serif; font-size:12px; color:#1e293b; padding:15px; margin:0; background:#f8fafc; }
+            .cel-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
+            h3 { margin:0; font-size:15px; color:#0f172a; font-weight:800; }
+            .tab-nav { display:flex; gap:8px; margin-bottom:12px; }
+            .tab-btn { background:#f1f5f9; color:#475569; border:1px solid #cbd5e1; border-radius:6px; padding:6px 14px; font-weight:700; font-size:11px; cursor:pointer; transition:all 0.2s; }
+            .tab-btn.active { background:#7c3aed; color:#fff; border-color:#7c3aed; }
             .cel-info-banner { background:#eff6ff; border-left:4px solid #3b82f6; padding:10px 14px; border-radius:6px; font-size:11px; color:#1e3a8a; margin-bottom:12px; line-height:1.4; }
+            
+            /* Timeline Styling */
+            .timeline-container { position:relative; padding:10px 0 10px 24px; }
+            .timeline-container::before { content:''; position:absolute; top:0; bottom:0; left:9px; width:2px; background:#e2e8f0; }
+            .timeline-item { position:relative; margin-bottom:16px; }
+            .timeline-point { position:absolute; left:-24px; top:2px; width:20px; height:20px; border-radius:50%; background:#7c3aed; color:#fff; display:flex; align-items:center; justify-content:center; font-size:11px; box-shadow:0 0 0 3px #f8fafc; }
+            .timeline-card { background:#ffffff; border:1px solid #e2e8f0; border-radius:8px; padding:10px 14px; box-shadow:0 1px 3px rgba(0,0,0,0.05); }
+            .timeline-card-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; }
+            .timeline-card-title { font-weight:700; font-size:12px; color:#0f172a; display:flex; align-items:center; gap:6px; }
+            .timeline-time { font-family:monospace; font-size:11px; color:#64748b; font-weight:600; }
+            .timeline-card-body { font-size:11px; color:#475569; line-height:1.4; }
+
+            /* Table Styling */
             table { width:100%; border-collapse:collapse; background:#ffffff; border-radius:8px; overflow:hidden; box-shadow:0 1px 3px rgba(0,0,0,0.05); border:1px solid #e2e8f0; }
             th { background:#334155; color:#ffffff; padding:8px 10px; font-size:10px; text-transform:uppercase; text-align:left; letter-spacing:0.5px; }
             td { padding:8px 10px; border-bottom:1px solid #f1f5f9; font-size:11px; vertical-align:middle; }
             tr:nth-child(even) { background:#f8fafc; }
-            .badge-evt { padding:3px 8px; border-radius:6px; font-weight:bold; font-size:10px; display:inline-block; cursor:help; transition:all 0.2s; }
-            .exten-badge { background:#f1f5f9; color:#334155; padding:2px 6px; border-radius:4px; font-family:monospace; font-weight:bold; font-size:11px; cursor:help; }
+            .badge-evt { padding:3px 8px; border-radius:6px; font-weight:bold; font-size:10px; display:inline-block; cursor:help; }
+            .exten-badge { background:#f1f5f9; color:#334155; padding:2px 6px; border-radius:4px; font-family:monospace; font-weight:bold; font-size:11px; }
         </style>
     </head>
     <body>
         <div class="cel-header">
-            <h3>📋 Log de Eventos Asterisk (CEL - LinkedID: <?php echo htmlspecialchars($linkedId); ?>)</h3>
+            <h3>📋 Histórico de Eventos da Chamada (CEL)</h3>
+            <div class="tab-nav">
+                <button type="button" class="tab-btn active" onclick="switchCelTab('timeline')">⏱️ Linha do Tempo</button>
+                <button type="button" class="tab-btn" onclick="switchCelTab('table')">📋 Tabela Técnica</button>
+            </div>
         </div>
         <div class="cel-info-banner">
-            💡 <strong>O que é o CEL?</strong> É o "raio-X" da ligação que registra cada evento da chamada. Passe o ponteiro do mouse sobre os nomes dos <strong>Eventos</strong> e <strong>Exten</strong> para ver a explicação detalhada de cada etapa.
+            💡 <strong>Raio-X da Chamada (LinkedID: <?php echo htmlspecialchars($linkedId); ?>)</strong>: Acompanhe a sequência de passos da ligação desde o momento em que entrou na central até a finalização.
         </div>
-        <table>
-            <thead>
-                <tr>
-                    <th>Data / Hora</th>
-                    <th>Evento Asterisk</th>
-                    <th>Nome Caller</th>
-                    <th>Origem (Num)</th>
-                    <th>DNID</th>
-                    <th>Exten (Contexto)</th>
-                    <th>Aplicação PBX</th>
-                    <th>UniqueID</th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php if (is_array($arrEvents) && count($arrEvents) > 0): ?>
-                    <?php foreach ($arrEvents as $ev): ?>
-                        <?php
-                        $evtRaw = trim($ev[1]);
-                        if (isset($evtMap[$evtRaw])) {
-                            $eInfo = $evtMap[$evtRaw];
-                            $evtHtml = "<span title='" . htmlspecialchars($eInfo['desc'], ENT_QUOTES) . "' class='badge-evt' style='background:{$eInfo['color']}; color:{$eInfo['text']};'>{$eInfo['label']}</span>";
-                        } else {
-                            $evtHtml = "<span title='Evento técnico Asterisk: $evtRaw' class='badge-evt' style='background:#e0e7ff; color:#4338ca;'>$evtRaw</span>";
-                        }
 
-                        $extRaw = trim($ev[5]);
-                        if ($extRaw == 's') {
-                            $extHtml = "<span title='Extensão s (Start): Ponto inicial do atendimento da URA ou rota de entrada.' class='exten-badge'>s (Start URA)</span>";
-                        } elseif ($extRaw == 'h') {
-                            $extHtml = "<span title='Extensão h (Hangup): Etapa de pós-atendimento realizada após o desligamento.' class='exten-badge'>h (Hangup)</span>";
-                        } elseif ($extRaw == 't') {
-                            $extHtml = "<span title='Extensão t (Timeout): Tempo limite de atendimento ou digitação esgotado.' class='exten-badge'>t (Timeout)</span>";
-                        } elseif ($extRaw == 'i') {
-                            $extHtml = "<span title='Extensão i (Invalid): Opção inválida digitada pelo cliente.' class='exten-badge'>i (Inválido)</span>";
-                        } elseif (!empty($extRaw)) {
-                            $extHtml = "<span title='Ramal, número de destino ou opção digitada: $extRaw' class='exten-badge'>$extRaw</span>";
-                        } else {
-                            $extHtml = "<span style='color:#cbd5e1;'>-</span>";
-                        }
-                        ?>
-                        <tr>
-                            <td><span style="color:#334155; font-weight:600; font-size:10px;">📅 <?php echo htmlspecialchars($ev[0]); ?></span></td>
-                            <td><?php echo $evtHtml; ?></td>
-                            <td><?php echo htmlspecialchars(!empty($ev[2]) ? $ev[2] : '-'); ?></td>
-                            <td><span style="font-weight:600; color:#0f172a;">📞 <?php echo htmlspecialchars(!empty($ev[3]) ? $ev[3] : '-'); ?></span></td>
-                            <td><?php echo htmlspecialchars(!empty($ev[4]) ? $ev[4] : '-'); ?></td>
-                            <td><?php echo $extHtml; ?></td>
-                            <td><code><?php echo htmlspecialchars(!empty($ev[6]) ? $ev[6] : '-'); ?></code></td>
-                            <td><small style="color:#94a3b8; font-size:10px;"><?php echo htmlspecialchars($ev[7]); ?></small></td>
-                        </tr>
-                    <?php endforeach; ?>
-                <?php else: ?>
-                    <tr><td colspan="8" style="text-align:center; color:#64748b; padding:15px;">Nenhum evento registrado para esta chamada.</td></tr>
-                <?php endif; ?>
-            </tbody>
-        </table>
+        <!-- View 1: Linha do Tempo Visual -->
+        <div id="celViewTimeline" class="timeline-container">
+            <?php if (is_array($arrEvents) && count($arrEvents) > 0): ?>
+                <?php foreach ($arrEvents as $ev): ?>
+                    <?php
+                    $timeStr = !empty($ev[0]) ? date('H:i:s', strtotime($ev[0])) : '-';
+                    $evtRaw  = trim($ev[1]);
+                    $caller  = !empty($ev[3]) ? $ev[3] : (!empty($ev[2]) ? $ev[2] : 'Desconhecido');
+                    $exten   = !empty($ev[5]) ? $ev[5] : '';
+                    $app     = !empty($ev[6]) ? $ev[6] : '';
+
+                    $eInfo = isset($evtMap[$evtRaw]) ? $evtMap[$evtRaw] : array('icon'=>'📌', 'label'=>$evtRaw, 'color'=>'#e0e7ff', 'text'=>'#4338ca', 'desc'=>'Evento: '.$evtRaw);
+                    ?>
+                    <div class="timeline-item">
+                        <div class="timeline-point" style="background:<?php echo $eInfo['text']; ?>;"><?php echo $eInfo['icon']; ?></div>
+                        <div class="timeline-card">
+                            <div class="timeline-card-head">
+                                <div class="timeline-card-title">
+                                    <span style="background:<?php echo $eInfo['color']; ?>; color:<?php echo $eInfo['text']; ?>; padding:2px 8px; border-radius:4px; font-size:10px; font-weight:800;"><?php echo $eInfo['label']; ?></span>
+                                    <?php if (!empty($app)): ?>
+                                        <code style="color:#6b21a8; font-size:11px;">[<?php echo htmlspecialchars($app); ?>]</code>
+                                    <?php endif; ?>
+                                </div>
+                                <div class="timeline-time">🕒 <?php echo htmlspecialchars($timeStr); ?> (<?php echo date('d/m/Y', strtotime($ev[0])); ?>)</div>
+                            </div>
+                            <div class="timeline-card-body">
+                                <div><strong>Origem / Caller:</strong> 📞 <?php echo htmlspecialchars($caller); ?> <?php if (!empty($exten)) echo "➔ <strong>Destino/Exten:</strong> 🎯 <span class='exten-badge'>".htmlspecialchars($exten)."</span>"; ?></div>
+                                <div style="color:#64748b; margin-top:2px; font-size:10px;"><?php echo htmlspecialchars($eInfo['desc']); ?></div>
+                            </div>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
+            <?php else: ?>
+                <div style="text-align:center; padding:25px; color:#64748b;">Nenhum evento registrado para esta chamada.</div>
+            <?php endif; ?>
+        </div>
+
+        <!-- View 2: Tabela Técnica -->
+        <div id="celViewTable" style="display:none;">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Data / Hora</th>
+                        <th>Evento Asterisk</th>
+                        <th>Nome Caller</th>
+                        <th>Origem (Num)</th>
+                        <th>DNID</th>
+                        <th>Exten</th>
+                        <th>Aplicação</th>
+                        <th>UniqueID</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php if (is_array($arrEvents) && count($arrEvents) > 0): ?>
+                        <?php foreach ($arrEvents as $ev): ?>
+                            <?php
+                            $evtRaw = trim($ev[1]);
+                            $eInfo  = isset($evtMap[$evtRaw]) ? $evtMap[$evtRaw] : array('label'=>$evtRaw, 'color'=>'#e0e7ff', 'text'=>'#4338ca', 'desc'=>'Evento: '.$evtRaw);
+                            ?>
+                            <tr>
+                                <td><span style="color:#334155; font-weight:600; font-size:10px;">📅 <?php echo htmlspecialchars($ev[0]); ?></span></td>
+                                <td><span class="badge-evt" style="background:<?php echo $eInfo['color']; ?>; color:<?php echo $eInfo['text']; ?>;"><?php echo $eInfo['label']; ?></span></td>
+                                <td><?php echo htmlspecialchars(!empty($ev[2]) ? $ev[2] : '-'); ?></td>
+                                <td><span style="font-weight:600; color:#0f172a;">📞 <?php echo htmlspecialchars(!empty($ev[3]) ? $ev[3] : '-'); ?></span></td>
+                                <td><?php echo htmlspecialchars(!empty($ev[4]) ? $ev[4] : '-'); ?></td>
+                                <td><span class="exten-badge"><?php echo htmlspecialchars(!empty($ev[5]) ? $ev[5] : '-'); ?></span></td>
+                                <td><code><?php echo htmlspecialchars(!empty($ev[6]) ? $ev[6] : '-'); ?></code></td>
+                                <td><small style="color:#94a3b8; font-size:10px;"><?php echo htmlspecialchars($ev[7]); ?></small></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+                </tbody>
+            </table>
+        </div>
+
+        <script>
+            function switchCelTab(tab) {
+                var btnTl = document.querySelectorAll('.tab-btn')[0];
+                var btnTb = document.querySelectorAll('.tab-btn')[1];
+                var viewTl = document.getElementById('celViewTimeline');
+                var viewTb = document.getElementById('celViewTable');
+                if (tab === 'timeline') {
+                    btnTl.classList.add('active');
+                    btnTb.classList.remove('active');
+                    viewTl.style.display = 'block';
+                    viewTb.style.display = 'none';
+                } else {
+                    btnTb.classList.add('active');
+                    btnTl.classList.remove('active');
+                    viewTb.style.display = 'block';
+                    viewTl.style.display = 'none';
+                }
+            }
+        </script>
     </body>
     </html>
     <?php
@@ -495,6 +554,8 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
     $field_pattern = isset($_REQUEST['field_pattern']) ? trim($_REQUEST['field_pattern']) : '';
     $status        = isset($_REQUEST['status']) ? trim($_REQUEST['status']) : 'ALL';
     $ringgroup     = isset($_REQUEST['ringgroup']) ? trim($_REQUEST['ringgroup']) : '';
+    $call_scope    = isset($_REQUEST['call_scope']) ? trim($_REQUEST['call_scope']) : 'ALL';
+    $only_recorded = isset($_REQUEST['only_recorded']) ? (int)$_REQUEST['only_recorded'] : 0;
 
     $page  = isset($_REQUEST['page']) ? max(1, (int)$_REQUEST['page']) : 1;
     $limit = 20;
@@ -533,9 +594,72 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
 
     $arrResultAll = $oCDR->listarCDRs($paramFiltro, 100000, 0, true);
     $rawList      = is_array($arrResultAll['cdrs']) ? $arrResultAll['cdrs'] : array();
-    $totalCount   = count($rawList);
 
-    $pageList = array_slice($rawList, $offset, $limit);
+    // Helper to check if a call is internal (Ramal para Ramal)
+    $fnIsInternalCdr = function($src, $dst, $did) {
+        if (!empty($did) && $did != '-') return false;
+        $s = preg_replace('/\D/', '', (string)$src);
+        $d = preg_replace('/\D/', '', (string)$dst);
+        return (!empty($s) && strlen($s) <= 5 && !empty($d) && strlen($d) <= 5);
+    };
+
+    $filteredList = array();
+    foreach ($rawList as $r) {
+        $srcNum = !empty($r[1]) ? $r[1] : '';
+        $dstNum = !empty($r[2]) ? $r[2] : '';
+        $didNum = !empty($r[16]) ? $r[16] : '';
+        $isInternal = $fnIsInternalCdr($srcNum, $dstNum, $didNum);
+
+        if ($call_scope == 'internal' && !$isInternal) {
+            continue;
+        }
+        if ($call_scope == 'external' && $isInternal) {
+            continue;
+        }
+
+        if ($only_recorded == 1) {
+            $recFile  = !empty($r[9]) ? $r[9] : '';
+            $uniqueId = !empty($r[6]) ? $r[6] : '';
+            if (empty($recFile) && !empty($uniqueId)) {
+                $globRes = glob("/var/spool/asterisk/monitor/*{$uniqueId}*");
+                if (empty($globRes)) {
+                    $globRes = glob("/var/spool/asterisk/monitor/*/*/*/*{$uniqueId}*");
+                }
+                if (!empty($globRes) && isset($globRes[0])) {
+                    $recFile = basename($globRes[0]);
+                }
+            }
+            if (empty($recFile)) {
+                continue;
+            }
+            $hasAudio = false;
+            $checkPaths = array(
+                "/var/spool/asterisk/monitor/$recFile",
+                "/var/spool/asterisk/monitor/" . date('Y/m/d/') . $recFile,
+                "/var/spool/asterisk/monitor/" . date('Y/m/') . $recFile
+            );
+            foreach ($checkPaths as $cp) {
+                if (file_exists($cp) && filesize($cp) > 44) {
+                    $hasAudio = true;
+                    break;
+                }
+            }
+            if (!$hasAudio) {
+                $findP = trim(shell_exec("find /var/spool/asterisk/monitor/ -name " . escapeshellarg($recFile) . " 2>/dev/null | head -n 1"));
+                if (!empty($findP) && file_exists($findP) && filesize($findP) > 44) {
+                    $hasAudio = true;
+                }
+            }
+            if (!$hasAudio) {
+                continue;
+            }
+        }
+
+        $filteredList[] = $r;
+    }
+
+    $totalCount = count($filteredList);
+    $pageList   = array_slice($filteredList, $offset, $limit);
     $totalPages = max(1, ceil($totalCount / $limit));
 
     // Stats Computation
@@ -546,7 +670,7 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
     $totalDuration  = 0;
     $hourlyTraffic  = array_fill(0, 24, 0);
 
-    foreach ($rawList as $r) {
+    foreach ($filteredList as $r) {
         $st = strtoupper(trim($r[5]));
         $dur = (int)$r[8];
         $totalDuration += $dur;
@@ -853,7 +977,7 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
         .status-badge-busy { background:#fef3c7; color:#b45309; border:1px solid #fde68a; padding:3px 8px; border-radius:6px; font-weight:bold; font-size:10px; display:inline-flex; align-items:center; gap:3px; }
         .status-badge-fail { background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5; padding:3px 8px; border-radius:6px; font-weight:bold; font-size:10px; display:inline-flex; align-items:center; gap:3px; }
 
-        #audioModalCdr, #celModalCdr {
+        #celModalCdr {
             display: none;
             position: fixed;
             top: 0; left: 0; width: 100%; height: 100%;
@@ -870,6 +994,191 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
             width: 420px;
             box-shadow: 0 20px 25px -5px rgba(0,0,0,0.2);
             text-align: center;
+        }
+
+        /* Sticky Bottom Audio Player */
+        .sticky-audio-bar {
+            position: fixed;
+            bottom: -140px;
+            left: 0;
+            right: 0;
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+            border-top: 2px solid #8b5cf6;
+            box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.45);
+            z-index: 999999;
+            display: flex;
+            align-items: center;
+            padding: 10px 24px;
+            transition: bottom 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+            color: #ffffff;
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+        }
+        .sticky-audio-bar.active {
+            bottom: 0;
+        }
+        .sticky-audio-inner {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        .sticky-audio-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-width: 250px;
+        }
+        .sticky-audio-icon {
+            font-size: 24px;
+            background: rgba(139, 92, 246, 0.25);
+            border: 1px solid rgba(139, 92, 246, 0.4);
+            border-radius: 50%;
+            width: 42px;
+            height: 42px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .sticky-audio-title {
+            font-size: 11px;
+            font-weight: 700;
+            color: #a78bfa;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .sticky-audio-meta {
+            font-size: 13px;
+            font-weight: 600;
+            color: #f8fafc;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 2px;
+        }
+        .stk-time-badge {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            color: #38bdf8;
+            font-family: monospace;
+        }
+        .sticky-audio-controls {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            flex: 1;
+            max-width: 520px;
+            gap: 6px;
+        }
+        .sticky-audio-buttons {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .btn-audio-ctrl {
+            background: rgba(255, 255, 255, 0.1);
+            color: #f8fafc;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 4px 12px;
+            border-radius: 16px;
+            font-size: 11px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-audio-ctrl:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateY(-1px);
+        }
+        .btn-play-main {
+            background: #7c3aed;
+            color: #ffffff;
+            border: none;
+            padding: 6px 18px;
+            border-radius: 20px;
+            font-size: 12px;
+            box-shadow: 0 2px 8px rgba(124, 58, 237, 0.4);
+        }
+        .sticky-audio-progress-wrap {
+            width: 100%;
+        }
+        .sticky-audio-progress-wrap input[type="range"] {
+            width: 100%;
+            accent-color: #a855f7;
+            height: 6px;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        .sticky-audio-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-width: 260px;
+            justify-content: flex-end;
+        }
+        .sticky-speed-selector {
+            display: flex;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 18px;
+            padding: 2px;
+            gap: 2px;
+        }
+        .sticky-speed-selector .speed-btn {
+            background: transparent;
+            border: none;
+            color: #94a3b8;
+            padding: 3px 8px;
+            border-radius: 14px;
+            font-size: 10px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .sticky-speed-selector .speed-btn.active, .sticky-speed-selector .speed-btn:hover {
+            background: #8b5cf6;
+            color: #ffffff;
+        }
+        .btn-audio-download {
+            background: rgba(59, 130, 246, 0.2);
+            color: #60a5fa;
+            border: 1px solid rgba(59, 130, 246, 0.4);
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-decoration: none;
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+        .btn-audio-download:hover {
+            background: #3b82f6;
+            color: #ffffff;
+        }
+        .btn-audio-close {
+            background: rgba(239, 68, 68, 0.2);
+            color: #f87171;
+            border: 1px solid rgba(239, 68, 68, 0.4);
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: bold;
+            transition: all 0.2s;
+        }
+        .btn-audio-close:hover {
+            background: #ef4444;
+            color: #ffffff;
         }
     </style>
 
@@ -936,6 +1245,20 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
                                 <?php endforeach; ?>
                             <?php endif; ?>
                         </select>
+                    </div>
+                    <div class="filter-field-group" title="🌐 Escopo da Chamada&#10;Filtre entre ligações que utilizaram troncos externos ou apenas ramal para ramal.">
+                        <label>🌐 Escopo</label>
+                        <select name="call_scope" class="filter-input">
+                            <option value="ALL" <?php if ($call_scope == 'ALL') echo 'selected'; ?>>-- Todas (Internas/Externas) --</option>
+                            <option value="external" <?php if ($call_scope == 'external') echo 'selected'; ?>>🌐 Apenas Externas (PSTN/DID)</option>
+                            <option value="internal" <?php if ($call_scope == 'internal') echo 'selected'; ?>>🏢 Apenas Internas (Ramal-Ramal)</option>
+                        </select>
+                    </div>
+                    <div class="filter-field-group" style="align-self:flex-end; padding-bottom:6px;">
+                        <label style="cursor:pointer; display:flex; align-items:center; gap:6px; font-weight:700; color:#7c3aed; font-size:12px; margin:0;">
+                            <input type="checkbox" name="only_recorded" value="1" <?php if ($only_recorded == 1) echo 'checked'; ?> style="width:16px; height:16px; cursor:pointer;" />
+                            🎯 Apenas com Gravação
+                        </label>
                     </div>
                     <div class="filter-btn-row">
                         <button type="submit" class="btn-action btn-search" title="🔍 Filtrar Resultados&#10;Buscar ligações no banco CDR com base nos critérios informados.">🔍 Filtrar</button>
@@ -1034,6 +1357,27 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
                                 }
                             }
 
+                            $hasValidAudio = false;
+                            if (!empty($recFile)) {
+                                $checkPaths = array(
+                                    "/var/spool/asterisk/monitor/$recFile",
+                                    "/var/spool/asterisk/monitor/" . date('Y/m/d/') . $recFile,
+                                    "/var/spool/asterisk/monitor/" . date('Y/m/') . $recFile
+                                );
+                                foreach ($checkPaths as $cp) {
+                                    if (file_exists($cp) && filesize($cp) > 44) {
+                                        $hasValidAudio = true;
+                                        break;
+                                    }
+                                }
+                                if (!$hasValidAudio) {
+                                    $findP = trim(shell_exec("find /var/spool/asterisk/monitor/ -name " . escapeshellarg($recFile) . " 2>/dev/null | head -n 1"));
+                                    if (!empty($findP) && file_exists($findP) && filesize($findP) > 44) {
+                                        $hasValidAudio = true;
+                                    }
+                                }
+                            }
+
                             if (!empty($raw_rg) && isset($groupsMap[$raw_rg])) {
                                 $fullName = "$raw_rg - " . $groupsMap[$raw_rg];
                                 $val_rg_html = "<span title='" . htmlspecialchars($fullName, ENT_QUOTES) . "' class='queue-badge-compact'>🏢 $raw_rg</span>";
@@ -1066,14 +1410,18 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
                                 <td><span style='color:#0f172a; font-weight:700; font-size:11px;'>⏱️ <?php echo htmlspecialchars($val_dur); ?></span></td>
                                 <td><span style='color:#64748b; font-size:11px;'><code><?php echo htmlspecialchars($did); ?></code></span></td>
                                 <td>
-                                    <?php if (!empty($recFile)): ?>
-                                        <?php $fileEnc = urlencode($recFile); ?>
+                                    <?php if (!empty($recFile) && $hasValidAudio): ?>
+                                        <?php 
+                                        $fileEnc = urlencode($recFile);
+                                        $streamUrl = "?menu=" . htmlspecialchars($module_name) . "&rawmode=yes&action=stream_audio&file=" . $fileEnc;
+                                        $downUrl   = "?menu=" . htmlspecialchars($module_name) . "&rawmode=yes&action=download_audio&file=" . $fileEnc;
+                                        ?>
                                         <div style="display:flex; gap:6px; align-items:center;">
-                                            <button type="button" onclick="playCdrAudio('<?php echo $fileEnc; ?>')" style="background: linear-gradient(135deg, #7c3aed, #6d28d9); color: #ffffff; border: none; padding: 4px 10px; border-radius: 20px; font-weight: 700; font-size: 10px; cursor: pointer; box-shadow: 0 2px 6px rgba(124,58,237,0.3); transition: all 0.2s;" title="🎧 Ouvir Gravação">▶ Ouvir</button>
-                                            <a href="?menu=<?php echo htmlspecialchars($module_name); ?>&rawmode=yes&action=download_audio&file=<?php echo $fileEnc; ?>" target="_blank" style="background: rgba(255,255,255,0.08); color: #6d28d9; border: 1px solid rgba(124,58,237,0.4); padding: 3px 9px; border-radius: 20px; font-weight: 600; font-size: 10px; text-decoration: none; transition: all 0.2s;" title="⬇️ Baixar Arquivo de Áudio">⬇️ Baixar</a>
+                                            <button type="button" onclick="playCdrAudio('<?php echo htmlspecialchars($streamUrl, ENT_QUOTES); ?>', '<?php echo htmlspecialchars($raw_src, ENT_QUOTES); ?>', '<?php echo htmlspecialchars($val_dst, ENT_QUOTES); ?>', '<?php echo htmlspecialchars($downUrl, ENT_QUOTES); ?>')" style="background: linear-gradient(135deg, #7c3aed, #6d28d9); color: #ffffff; border: none; padding: 4px 10px; border-radius: 20px; font-weight: 700; font-size: 10px; cursor: pointer; box-shadow: 0 2px 6px rgba(124,58,237,0.3); transition: all 0.2s;" title="🎧 Ouvir Gravação">▶ Ouvir</button>
+                                            <a href="<?php echo htmlspecialchars($downUrl, ENT_QUOTES); ?>" target="_blank" style="background: rgba(255,255,255,0.08); color: #6d28d9; border: 1px solid rgba(124,58,237,0.4); padding: 3px 9px; border-radius: 20px; font-weight: 600; font-size: 10px; text-decoration: none; transition: all 0.2s;" title="⬇️ Baixar Arquivo de Áudio">⬇️ Baixar</a>
                                         </div>
                                     <?php else: ?>
-                                        <span style="color:#cbd5e1; font-size:10px;">Sem áudio</span>
+                                        <span title="Gravação de chamadas desativada para este ramal nas configurações do PBX" style="color:#94a3b8; font-size:10px; background:rgba(148,163,184,0.15); border:1px solid rgba(148,163,184,0.3); border-radius:12px; padding:3px 8px; font-weight:500; display:inline-flex; align-items:center; gap:4px;"><i class="fa fa-microphone-slash"></i> Ramal sem gravação</span>
                                     <?php endif; ?>
                                 </td>
                                 <td>
@@ -1109,7 +1457,9 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
                         'field_name' => $field_name,
                         'field_pattern' => $field_pattern,
                         'status' => $status,
-                        'ringgroup' => $ringgroup
+                        'ringgroup' => $ringgroup,
+                        'call_scope' => $call_scope,
+                        'only_recorded' => $only_recorded
                     );
                     $prevPage = max(1, $page - 1);
                     $nextPage = min($totalPages, $page + 1);
@@ -1124,39 +1474,147 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
         </div>
     </div>
 
-    <!-- Modal Player de Audio -->
-    <div id="audioModalCdr">
-        <div class="modal-content-box">
-            <h4 style="margin:0 0 12px 0; color:#1e293b; font-size:15px;">🎧 Reproduzindo Gravação</h4>
-            <audio id="cdrAudioElement" controls style="width:100%; margin-bottom:15px;"></audio>
-            <button onclick="closeCdrAudioModal()" style="background:#64748b; color:#fff; border:none; padding:6px 16px; border-radius:6px; font-weight:bold; cursor:pointer;">Fechar</button>
+    <!-- Sticky Bottom Audio Player Flutuante -->
+    <div id="stickyBottomAudioPlayer" class="sticky-audio-bar">
+        <div class="sticky-audio-inner">
+            <!-- Info da Chamada -->
+            <div class="sticky-audio-info">
+                <div class="sticky-audio-icon">🎧</div>
+                <div class="sticky-audio-details">
+                    <div class="sticky-audio-title">Reproduzindo Gravação</div>
+                    <div class="sticky-audio-meta">
+                        <span id="stkCaller">📞 -</span> ➔ <span id="stkTarget">🎯 -</span>
+                        <span id="stkTime" class="stk-time-badge">00:00 / 00:00</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Controles Centrais -->
+            <div class="sticky-audio-controls">
+                <div class="sticky-audio-buttons">
+                    <button type="button" class="btn-audio-ctrl" onclick="stkSeekRelative(-5)" title="Voltar 5 segundos">⏮ -5s</button>
+                    <button type="button" id="stkPlayPauseBtn" class="btn-audio-ctrl btn-play-main" onclick="stkTogglePlay()">⏸ Pausar</button>
+                    <button type="button" class="btn-audio-ctrl" onclick="stkSeekRelative(5)" title="Avançar 5 segundos">+5s ⏭</button>
+                </div>
+                <div class="sticky-audio-progress-wrap">
+                    <input type="range" id="stkProgressBar" min="0" max="100" value="0" step="0.1" oninput="stkSeekTo(this.value)" />
+                </div>
+            </div>
+
+            <!-- Velocidade e Ações -->
+            <div class="sticky-audio-actions">
+                <div class="sticky-speed-selector">
+                    <button type="button" class="speed-btn active" onclick="stkSetSpeed(1.0, this)">1.0x</button>
+                    <button type="button" class="speed-btn" onclick="stkSetSpeed(1.25, this)">1.25x</button>
+                    <button type="button" class="speed-btn" onclick="stkSetSpeed(1.5, this)">1.5x</button>
+                    <button type="button" class="speed-btn" onclick="stkSetSpeed(2.0, this)">2.0x</button>
+                </div>
+                <a id="stkDownloadBtn" href="#" target="_blank" class="btn-audio-download" title="Baixar Áudio">⬇️</a>
+                <button type="button" class="btn-audio-close" onclick="closeStickyAudioPlayer()" title="Fechar Player">✖</button>
+            </div>
         </div>
+        <audio id="stkAudioElement" preload="auto"></audio>
     </div>
 
     <!-- Modal CEL Events -->
     <div id="celModalCdr">
-        <div class="modal-content-box" style="width:780px; max-width:95%;">
-            <iframe id="celIframeElement" style="width:100%; height:380px; border:none; border-radius:8px;"></iframe>
+        <div class="modal-content-box" style="width:820px; max-width:95%;">
+            <iframe id="celIframeElement" style="width:100%; height:450px; border:none; border-radius:8px;"></iframe>
             <button onclick="closeCelModal()" style="background:#64748b; color:#fff; border:none; padding:6px 16px; border-radius:6px; font-weight:bold; cursor:pointer; margin-top:10px;">Fechar</button>
         </div>
     </div>
 
     <script>
-    function playCdrAudio(fileEnc) {
-        var modal = document.getElementById('audioModalCdr');
-        var audio = document.getElementById('cdrAudioElement');
-        audio.src = '?menu=<?php echo htmlspecialchars($module_name); ?>&rawmode=yes&action=stream_audio&file=' + fileEnc;
-        modal.style.display = 'flex';
-        var p = audio.play();
+    var currentAudio = document.getElementById('stkAudioElement');
+
+    function playCdrAudio(audioUrl, caller, target, downloadUrl) {
+        var bar = document.getElementById('stickyBottomAudioPlayer');
+        document.getElementById('stkCaller').textContent = '📞 ' + (caller || '-');
+        document.getElementById('stkTarget').textContent = '🎯 ' + (target || '-');
+        document.getElementById('stkDownloadBtn').href = downloadUrl || audioUrl;
+        
+        currentAudio.src = audioUrl;
+        bar.classList.add('active');
+        
+        var p = currentAudio.play();
         if (p !== undefined) {
-            p.catch(function(err) { console.log("Play audio error:", err); });
+            p.then(function() {
+                updatePlayPauseButton(true);
+            }).catch(function(err) {
+                console.log("Audio play error:", err);
+                updatePlayPauseButton(false);
+            });
         }
     }
-    function closeCdrAudioModal() {
-        var modal = document.getElementById('audioModalCdr');
-        var audio = document.getElementById('cdrAudioElement');
-        audio.pause();
-        modal.style.display = 'none';
+
+    function updatePlayPauseButton(isPlaying) {
+        var btn = document.getElementById('stkPlayPauseBtn');
+        if (isPlaying) {
+            btn.innerHTML = '⏸ Pausar';
+            btn.style.background = '#e11d48';
+        } else {
+            btn.innerHTML = '▶ Continuar';
+            btn.style.background = '#7c3aed';
+        }
+    }
+
+    function stkTogglePlay() {
+        if (currentAudio.paused) {
+            currentAudio.play();
+            updatePlayPauseButton(true);
+        } else {
+            currentAudio.pause();
+            updatePlayPauseButton(false);
+        }
+    }
+
+    function stkSeekRelative(seconds) {
+        if (currentAudio) {
+            currentAudio.currentTime = Math.max(0, Math.min(currentAudio.duration || 0, currentAudio.currentTime + seconds));
+        }
+    }
+
+    function stkSeekTo(val) {
+        if (currentAudio && currentAudio.duration) {
+            currentAudio.currentTime = (val / 100) * currentAudio.duration;
+        }
+    }
+
+    function stkSetSpeed(speed, btn) {
+        if (currentAudio) {
+            currentAudio.playbackRate = speed;
+            var pills = document.querySelectorAll('.sticky-speed-selector .speed-btn');
+            pills.forEach(function(p) { p.classList.remove('active'); });
+            if (btn) btn.classList.add('active');
+        }
+    }
+
+    function closeStickyAudioPlayer() {
+        if (currentAudio) {
+            currentAudio.pause();
+            currentAudio.currentTime = 0;
+        }
+        document.getElementById('stickyBottomAudioPlayer').classList.remove('active');
+    }
+
+    currentAudio.addEventListener('timeupdate', function() {
+        var cur = currentAudio.currentTime || 0;
+        var dur = currentAudio.duration || 0;
+        var bar = document.getElementById('stkProgressBar');
+        if (dur > 0) {
+            bar.value = (cur / dur) * 100;
+        }
+        document.getElementById('stkTime').textContent = formatSecondsToMmSs(cur) + ' / ' + formatSecondsToMmSs(dur);
+    });
+
+    currentAudio.addEventListener('ended', function() {
+        updatePlayPauseButton(false);
+    });
+
+    function formatSecondsToMmSs(secs) {
+        var m = Math.floor(secs / 60);
+        var s = Math.floor(secs % 60);
+        return (m < 10 ? '0' + m : m) + ':' + (s < 10 ? '0' + s : s);
     }
 
     function openCelModal(uniqueId) {

@@ -698,7 +698,13 @@ function getContent(&$smarty, $iss_module_name, $withList)
 
             $query = "SELECT `data` FROM `module_xml` WHERE `id` = 'mod_serialized'";
             $module_serialized = $pDB->getFirstRowQuery($query, false, array());
-            $unserialized = unserialize($module_serialized[0]);
+            $unserialized = !empty($module_serialized[0]) ? @unserialize($module_serialized[0]) : false;
+
+            if (empty($unserialized) || !is_array($unserialized)) {
+                if (function_exists('module_getinfo')) {
+                    $unserialized = module_getinfo();
+                }
+            }
 
             $allprivs    = array();
             $id_resource = $pACL->getIdResource('pbxadmin');

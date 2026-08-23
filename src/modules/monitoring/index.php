@@ -109,6 +109,8 @@ function renderFullMonitoringDashboard($smarty, $module_name, $local_templates_d
     $filter_field  = isset($_REQUEST['filter_field']) ? trim($_REQUEST['filter_field']) : 'src';
     $filter_value  = isset($_REQUEST['filter_value']) ? trim($_REQUEST['filter_value']) : '';
     $rec_type      = isset($_REQUEST['rec_type']) ? trim($_REQUEST['rec_type']) : 'ALL';
+    $call_scope    = isset($_REQUEST['call_scope']) ? trim($_REQUEST['call_scope']) : 'ALL';
+    $only_recorded = isset($_REQUEST['only_recorded']) ? (int)$_REQUEST['only_recorded'] : 0;
     $page          = isset($_REQUEST['page']) ? max(1, (int)$_REQUEST['page']) : 1;
     $limit         = isset($_REQUEST['limit']) ? (int)$_REQUEST['limit'] : 20;
     if ($limit <= 0) $limit = 20;
@@ -128,7 +130,43 @@ function renderFullMonitoringDashboard($smarty, $module_name, $local_templates_d
     // Query All records for KPI stats
     $arrResultAll = $pMonitoring->getMonitoring($param, 100000, 0);
     $rawList      = is_array($arrResultAll) ? $arrResultAll : array();
-    $totalCount   = count($rawList);
+
+    // Helper to check if a call is internal (Ramal para Ramal)
+    $fnIsInternal = function($src, $dst) {
+        $s = preg_replace('/\D/', '', (string)$src);
+        $d = preg_replace('/\D/', '', (string)$dst);
+        return (!empty($s) && strlen($s) <= 5 && !empty($d) && strlen($d) <= 5);
+    };
+
+    // Filter by Scope (Internas / Externas) & Only Recorded
+    $filteredList = array();
+    foreach ($rawList as $r) {
+        $srcNum = !empty($r['cnum']) ? $r['cnum'] : $r['src'];
+        $dstNum = !empty($r['dst']) ? $r['dst'] : '';
+        $isInternal = $fnIsInternal($srcNum, $dstNum);
+
+        if ($call_scope == 'internal' && !$isInternal) {
+            continue;
+        }
+        if ($call_scope == 'external' && $isInternal) {
+            continue;
+        }
+
+        if ($only_recorded == 1) {
+            $fname = basename($r['recordingfile']);
+            if ($fname == 'deleted' || empty($fname)) {
+                continue;
+            }
+            $recinfo = $pMonitoring->resolveRecordingPath($r['recordingfile']);
+            if (is_null($recinfo['fullpath']) || !file_exists($recinfo['fullpath']) || filesize($recinfo['fullpath']) <= 44) {
+                continue;
+            }
+        }
+
+        $filteredList[] = $r;
+    }
+
+    $totalCount   = count($filteredList);
 
     // KPI Stat Counters
     $incCount = 0;
@@ -136,7 +174,7 @@ function renderFullMonitoringDashboard($smarty, $module_name, $local_templates_d
     $queueCount = 0;
     $groupCount = 0;
 
-    foreach ($rawList as $r) {
+    foreach ($filteredList as $r) {
         $fname = basename($r['recordingfile']);
         if ($fname != 'deleted' && !empty($fname)) {
             $char = strtolower($fname[0]);
@@ -148,7 +186,7 @@ function renderFullMonitoringDashboard($smarty, $module_name, $local_templates_d
     }
 
     $offset = ($page - 1) * $limit;
-    $pageList = array_slice($rawList, $offset, $limit);
+    $pageList = array_slice($filteredList, $offset, $limit);
     $totalPages = max(1, ceil($totalCount / $limit));
 
     ob_start();
@@ -376,23 +414,189 @@ function renderFullMonitoringDashboard($smarty, $module_name, $local_templates_d
             .page-link-btn:hover { background: #e2e8f0; }
             .page-link-btn.disabled { opacity: 0.5; pointer-events: none; }
 
-            #audioModalMonitoring {
-                display: none;
+            /* Sticky Bottom Audio Player */
+            .sticky-audio-bar {
                 position: fixed;
-                top: 0; left: 0; width: 100%; height: 100%;
-                background: rgba(15, 23, 42, 0.6);
-                backdrop-filter: blur(4px);
-                z-index: 99999;
+                bottom: -140px;
+                left: 0;
+                right: 0;
+                background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+                border-top: 2px solid #8b5cf6;
+                box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.45);
+                z-index: 999999;
+                display: flex;
+                align-items: center;
+                padding: 10px 24px;
+                transition: bottom 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+                color: #ffffff;
+                font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            }
+            .sticky-audio-bar.active {
+                bottom: 0;
+            }
+            .sticky-audio-inner {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                width: 100%;
+                gap: 20px;
+                flex-wrap: wrap;
+            }
+            .sticky-audio-info {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                min-width: 250px;
+            }
+            .sticky-audio-icon {
+                font-size: 24px;
+                background: rgba(139, 92, 246, 0.25);
+                border: 1px solid rgba(139, 92, 246, 0.4);
+                border-radius: 50%;
+                width: 42px;
+                height: 42px;
+                display: flex;
                 align-items: center;
                 justify-content: center;
             }
-            .modal-content-box {
-                background: #ffffff;
+            .sticky-audio-title {
+                font-size: 11px;
+                font-weight: 700;
+                color: #a78bfa;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+            }
+            .sticky-audio-meta {
+                font-size: 13px;
+                font-weight: 600;
+                color: #f8fafc;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                margin-top: 2px;
+            }
+            .stk-time-badge {
+                background: rgba(255, 255, 255, 0.1);
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                padding: 2px 8px;
                 border-radius: 12px;
-                padding: 24px;
-                width: 420px;
-                box-shadow: 0 20px 25px -5px rgba(0,0,0,0.2);
-                text-align: center;
+                font-size: 11px;
+                color: #38bdf8;
+                font-family: monospace;
+            }
+            .sticky-audio-controls {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                flex: 1;
+                max-width: 520px;
+                gap: 6px;
+            }
+            .sticky-audio-buttons {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+            }
+            .btn-audio-ctrl {
+                background: rgba(255, 255, 255, 0.1);
+                color: #f8fafc;
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                padding: 4px 12px;
+                border-radius: 16px;
+                font-size: 11px;
+                font-weight: 700;
+                cursor: pointer;
+                transition: all 0.2s;
+            }
+            .btn-audio-ctrl:hover {
+                background: rgba(255, 255, 255, 0.2);
+                transform: translateY(-1px);
+            }
+            .btn-play-main {
+                background: #7c3aed;
+                color: #ffffff;
+                border: none;
+                padding: 6px 18px;
+                border-radius: 20px;
+                font-size: 12px;
+                box-shadow: 0 2px 8px rgba(124, 58, 237, 0.4);
+            }
+            .sticky-audio-progress-wrap {
+                width: 100%;
+            }
+            .sticky-audio-progress-wrap input[type="range"] {
+                width: 100%;
+                accent-color: #a855f7;
+                height: 6px;
+                border-radius: 3px;
+                cursor: pointer;
+            }
+            .sticky-audio-actions {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                min-width: 260px;
+                justify-content: flex-end;
+            }
+            .sticky-speed-selector {
+                display: flex;
+                background: rgba(255, 255, 255, 0.08);
+                border: 1px solid rgba(255, 255, 255, 0.15);
+                border-radius: 18px;
+                padding: 2px;
+                gap: 2px;
+            }
+            .sticky-speed-selector .speed-btn {
+                background: transparent;
+                border: none;
+                color: #94a3b8;
+                padding: 3px 8px;
+                border-radius: 14px;
+                font-size: 10px;
+                font-weight: 700;
+                cursor: pointer;
+                transition: all 0.2s;
+            }
+            .sticky-speed-selector .speed-btn.active, .sticky-speed-selector .speed-btn:hover {
+                background: #8b5cf6;
+                color: #ffffff;
+            }
+            .btn-audio-download {
+                background: rgba(59, 130, 246, 0.2);
+                color: #60a5fa;
+                border: 1px solid rgba(59, 130, 246, 0.4);
+                width: 32px;
+                height: 32px;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                text-decoration: none;
+                font-size: 13px;
+                transition: all 0.2s;
+            }
+            .btn-audio-download:hover {
+                background: #3b82f6;
+                color: #ffffff;
+            }
+            .btn-audio-close {
+                background: rgba(239, 68, 68, 0.2);
+                color: #f87171;
+                border: 1px solid rgba(239, 68, 68, 0.4);
+                width: 32px;
+                height: 32px;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                cursor: pointer;
+                font-size: 12px;
+                font-weight: bold;
+                transition: all 0.2s;
+            }
+            .btn-audio-close:hover {
+                background: #ef4444;
+                color: #ffffff;
             }
         </style>
     </head>
@@ -482,6 +686,14 @@ function renderFullMonitoringDashboard($smarty, $module_name, $local_templates_d
                             </select>
                         </div>
                         <div class="filter-field-group">
+                            <label>🌐 Escopo Chamada</label>
+                            <select name="call_scope" class="filter-input">
+                                <option value="ALL" <?php if ($call_scope == 'ALL') echo 'selected'; ?>>-- Todas (Internas/Externas) --</option>
+                                <option value="external" <?php if ($call_scope == 'external') echo 'selected'; ?>>🌐 Apenas Externas (PSTN/DID)</option>
+                                <option value="internal" <?php if ($call_scope == 'internal') echo 'selected'; ?>>🏢 Apenas Internas (Ramal-Ramal)</option>
+                            </select>
+                        </div>
+                        <div class="filter-field-group">
                             <label>📊 Limite / Pág</label>
                             <select name="limit" class="filter-input">
                                 <option value="20" <?php if ($limit == 20) echo 'selected'; ?>>20 por pág</option>
@@ -489,6 +701,12 @@ function renderFullMonitoringDashboard($smarty, $module_name, $local_templates_d
                                 <option value="100" <?php if ($limit == 100) echo 'selected'; ?>>100 por pág</option>
                                 <option value="1000" <?php if ($limit == 1000) echo 'selected'; ?>>1.000 (Geral)</option>
                             </select>
+                        </div>
+                        <div class="filter-field-group" style="align-self:flex-end; padding-bottom:6px;">
+                            <label style="cursor:pointer; display:flex; align-items:center; gap:6px; font-weight:700; color:#7c3aed; font-size:12px; margin:0;">
+                                <input type="checkbox" name="only_recorded" value="1" <?php if ($only_recorded == 1) echo 'checked'; ?> style="width:16px; height:16px; cursor:pointer;" />
+                                🎯 Apenas com Gravação
+                            </label>
                         </div>
                         <div class="filter-btn-row">
                             <button type="submit" class="btn-action btn-search">🔍 Filtrar</button>
@@ -550,8 +768,8 @@ function renderFullMonitoringDashboard($smarty, $module_name, $local_templates_d
                                     $actionHtml = '';
                                     if ($fname == 'deleted') {
                                         $actionHtml = '<span style="color:#ef4444; font-size:11px; font-weight:600;">Excluída</span>';
-                                    } elseif (is_null($recinfo['fullpath'])) {
-                                        $actionHtml = '<span style="color: #94a3b8; font-size: 11px; background: rgba(148,163,184,0.15); border: 1px solid rgba(148,163,184,0.3); border-radius: 12px; padding: 4px 10px; font-weight: 500; display: inline-flex; align-items: center; gap: 4px;"><i class="fa fa-microphone-slash"></i> Gravação Ausente</span>';
+                                    } elseif (is_null($recinfo['fullpath']) || !file_exists($recinfo['fullpath']) || filesize($recinfo['fullpath']) <= 44) {
+                                        $actionHtml = '<span title="Gravação de chamadas desativada para este ramal nas configurações do PBX" style="color: #94a3b8; font-size: 11px; background: rgba(148,163,184,0.15); border: 1px solid rgba(148,163,184,0.3); border-radius: 12px; padding: 4px 10px; font-weight: 500; display: inline-flex; align-items: center; gap: 4px;"><i class="fa fa-microphone-slash"></i> Ramal sem gravação</span>';
                                     } else {
                                         $urlparams = array(
                                             'menu'     => $module_name,
@@ -566,7 +784,7 @@ function renderFullMonitoringDashboard($smarty, $module_name, $local_templates_d
                                         $streamUrl = 'index.php?' . http_build_query($urlparamsStream);
 
                                         $actionHtml = "<div style='display:inline-flex; gap:6px; align-items:center;'>".
-                                            "<button type='button' onclick=\"playMonitoringAudio('".htmlspecialchars($streamUrl, ENT_QUOTES)."')\" style='background: linear-gradient(135deg, #7c3aed, #6d28d9); color: #ffffff; border: none; border-radius: 20px; padding: 4px 12px; font-weight: 700; font-size: 11px; cursor: pointer; box-shadow: 0 2px 6px rgba(124,58,237,0.3); transition: all 0.2s;'>▶ Ouvir</button>".
+                                            "<button type='button' onclick=\"playMonitoringAudio('".htmlspecialchars($streamUrl, ENT_QUOTES)."', '".htmlspecialchars($src, ENT_QUOTES)."', '".htmlspecialchars($dst, ENT_QUOTES)."', '".htmlspecialchars($downloadUrl, ENT_QUOTES)."')\" style='background: linear-gradient(135deg, #7c3aed, #6d28d9); color: #ffffff; border: none; border-radius: 20px; padding: 4px 12px; font-weight: 700; font-size: 11px; cursor: pointer; box-shadow: 0 2px 6px rgba(124,58,237,0.3); transition: all 0.2s;'>▶ Ouvir</button>".
                                             "<a href='".htmlspecialchars($downloadUrl, ENT_QUOTES)."' target='_blank' style='background: rgba(255,255,255,0.08); color: #6d28d9; border: 1px solid rgba(124,58,237,0.4); border-radius: 20px; padding: 3px 10px; font-weight: 600; font-size: 10px; text-decoration: none; transition: all 0.2s;'>⬇️ Baixar</a>".
                                             "</div>";
                                     }
@@ -610,6 +828,8 @@ function renderFullMonitoringDashboard($smarty, $module_name, $local_templates_d
                                 'filter_field' => $filter_field,
                                 'filter_value' => $filter_value,
                                 'rec_type'     => $rec_type,
+                                'call_scope'   => $call_scope,
+                                'only_recorded'=> $only_recorded,
                                 'limit'        => $limit
                             );
                             $prevPage = max(1, $page - 1);
@@ -626,39 +846,148 @@ function renderFullMonitoringDashboard($smarty, $module_name, $local_templates_d
             </div>
         </form>
 
-        <!-- Modal Player de Audio -->
-        <div id="audioModalMonitoring">
-            <div class="modal-content-box">
-                <h4 style="margin:0 0 12px 0; color:#1e293b; font-size:15px; font-weight:800;">🎧 Reproduzindo Gravação de Chamada</h4>
-                <audio id="monAudioElement" controls style="width:100%; margin-bottom:15px;"></audio>
-                <button type="button" onclick="closeMonitoringAudioModal()" style="background:#64748b; color:#fff; border:none; padding:6px 16px; border-radius:6px; font-weight:bold; cursor:pointer;">Fechar</button>
+        <!-- Sticky Bottom Audio Player Flutuante -->
+        <div id="stickyBottomAudioPlayer" class="sticky-audio-bar">
+            <div class="sticky-audio-inner">
+                <!-- Info da Chamada -->
+                <div class="sticky-audio-info">
+                    <div class="sticky-audio-icon">🎧</div>
+                    <div class="sticky-audio-details">
+                        <div class="sticky-audio-title">Reproduzindo Gravação</div>
+                        <div class="sticky-audio-meta">
+                            <span id="stkCaller">📞 -</span> ➔ <span id="stkTarget">🎯 -</span>
+                            <span id="stkTime" class="stk-time-badge">00:00 / 00:00</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Controles de Áudio Centrais -->
+                <div class="sticky-audio-controls">
+                    <div class="sticky-audio-buttons">
+                        <button type="button" class="btn-audio-ctrl" onclick="stkSeekRelative(-5)" title="Voltar 5 segundos">⏮ -5s</button>
+                        <button type="button" id="stkPlayPauseBtn" class="btn-audio-ctrl btn-play-main" onclick="stkTogglePlay()">⏸ Pausar</button>
+                        <button type="button" class="btn-audio-ctrl" onclick="stkSeekRelative(5)" title="Avançar 5 segundos">+5s ⏭</button>
+                    </div>
+                    <div class="sticky-audio-progress-wrap">
+                        <input type="range" id="stkProgressBar" min="0" max="100" value="0" step="0.1" oninput="stkSeekTo(this.value)" />
+                    </div>
+                </div>
+
+                <!-- Velocidade e Ações Extras -->
+                <div class="sticky-audio-actions">
+                    <div class="sticky-speed-selector">
+                        <button type="button" class="speed-btn active" onclick="stkSetSpeed(1.0, this)">1.0x</button>
+                        <button type="button" class="speed-btn" onclick="stkSetSpeed(1.25, this)">1.25x</button>
+                        <button type="button" class="speed-btn" onclick="stkSetSpeed(1.5, this)">1.5x</button>
+                        <button type="button" class="speed-btn" onclick="stkSetSpeed(2.0, this)">2.0x</button>
+                    </div>
+                    <a id="stkDownloadBtn" href="#" target="_blank" class="btn-audio-download" title="Baixar Áudio">⬇️</a>
+                    <button type="button" class="btn-audio-close" onclick="closeStickyAudioPlayer()" title="Fechar Player">✖</button>
+                </div>
             </div>
+            <audio id="stkAudioElement" preload="auto"></audio>
         </div>
 
         <script>
-            function playMonitoringAudio(audioUrl) {
-                var modal = document.getElementById('audioModalMonitoring');
-                var audio = document.getElementById('monAudioElement');
-                audio.src = audioUrl;
-                modal.style.display = 'flex';
-                var p = audio.play();
+            var currentAudio = document.getElementById('stkAudioElement');
+
+            function playMonitoringAudio(audioUrl, caller, target, downloadUrl) {
+                var bar = document.getElementById('stickyBottomAudioPlayer');
+                document.getElementById('stkCaller').textContent = '📞 ' + (caller || '-');
+                document.getElementById('stkTarget').textContent = '🎯 ' + (target || '-');
+                document.getElementById('stkDownloadBtn').href = downloadUrl || audioUrl;
+                
+                currentAudio.src = audioUrl;
+                bar.classList.add('active');
+                
+                var p = currentAudio.play();
                 if (p !== undefined) {
-                    p.catch(function(err) { console.log("Play audio error:", err); });
+                    p.then(function() {
+                        updatePlayPauseButton(true);
+                    }).catch(function(err) {
+                        console.log("Audio play error:", err);
+                        updatePlayPauseButton(false);
+                    });
                 }
             }
-            function closeMonitoringAudioModal() {
-                var modal = document.getElementById('audioModalMonitoring');
-                var audio = document.getElementById('monAudioElement');
-                audio.pause();
-                audio.currentTime = 0;
-                modal.style.display = 'none';
+
+            function updatePlayPauseButton(isPlaying) {
+                var btn = document.getElementById('stkPlayPauseBtn');
+                if (isPlaying) {
+                    btn.innerHTML = '⏸ Pausar';
+                    btn.style.background = '#e11d48';
+                } else {
+                    btn.innerHTML = '▶ Continuar';
+                    btn.style.background = '#7c3aed';
+                }
             }
+
+            function stkTogglePlay() {
+                if (currentAudio.paused) {
+                    currentAudio.play();
+                    updatePlayPauseButton(true);
+                } else {
+                    currentAudio.pause();
+                    updatePlayPauseButton(false);
+                }
+            }
+
+            function stkSeekRelative(seconds) {
+                if (currentAudio) {
+                    currentAudio.currentTime = Math.max(0, Math.min(currentAudio.duration || 0, currentAudio.currentTime + seconds));
+                }
+            }
+
+            function stkSeekTo(val) {
+                if (currentAudio && currentAudio.duration) {
+                    currentAudio.currentTime = (val / 100) * currentAudio.duration;
+                }
+            }
+
+            function stkSetSpeed(speed, btn) {
+                if (currentAudio) {
+                    currentAudio.playbackRate = speed;
+                    var pills = document.querySelectorAll('.sticky-speed-selector .speed-btn');
+                    pills.forEach(function(p) { p.classList.remove('active'); });
+                    if (btn) btn.classList.add('active');
+                }
+            }
+
+            function closeStickyAudioPlayer() {
+                if (currentAudio) {
+                    currentAudio.pause();
+                    currentAudio.currentTime = 0;
+                }
+                document.getElementById('stickyBottomAudioPlayer').classList.remove('active');
+            }
+
+            currentAudio.addEventListener('timeupdate', function() {
+                var cur = currentAudio.currentTime || 0;
+                var dur = currentAudio.duration || 0;
+                var bar = document.getElementById('stkProgressBar');
+                if (dur > 0) {
+                    bar.value = (cur / dur) * 100;
+                }
+                document.getElementById('stkTime').textContent = formatSecondsToMmSs(cur) + ' / ' + formatSecondsToMmSs(dur);
+            });
+
+            currentAudio.addEventListener('ended', function() {
+                updatePlayPauseButton(false);
+            });
+
+            function formatSecondsToMmSs(secs) {
+                var m = Math.floor(secs / 60);
+                var s = Math.floor(secs % 60);
+                return (m < 10 ? '0' + m : m) + ':' + (s < 10 ? '0' + s : s);
+            }
+
             function toggleSelectAllMonitoring(master) {
                 var checkboxes = document.querySelectorAll('.chk-mon-row');
                 for (var i = 0; i < checkboxes.length; i++) {
                     checkboxes[i].checked = master.checked;
                 }
             }
+
             function submitDeleteMonitoring() {
                 var checked = document.querySelectorAll('.chk-mon-row:checked');
                 if (checked.length === 0) {

@@ -675,23 +675,189 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
         .page-link-btn:hover { background: #e2e8f0; }
         .page-link-btn.disabled { opacity: 0.5; pointer-events: none; }
 
-        #audioModalPesquisa {
-            display: none;
+        /* Sticky Bottom Audio Player */
+        .sticky-audio-bar {
             position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(15, 23, 42, 0.6);
-            backdrop-filter: blur(4px);
-            z-index: 99999;
+            bottom: -140px;
+            left: 0;
+            right: 0;
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+            border-top: 2px solid #8b5cf6;
+            box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.45);
+            z-index: 999999;
+            display: flex;
+            align-items: center;
+            padding: 10px 24px;
+            transition: bottom 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+            color: #ffffff;
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+        }
+        .sticky-audio-bar.active {
+            bottom: 0;
+        }
+        .sticky-audio-inner {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        .sticky-audio-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-width: 250px;
+        }
+        .sticky-audio-icon {
+            font-size: 24px;
+            background: rgba(139, 92, 246, 0.25);
+            border: 1px solid rgba(139, 92, 246, 0.4);
+            border-radius: 50%;
+            width: 42px;
+            height: 42px;
+            display: flex;
             align-items: center;
             justify-content: center;
         }
-        .audio-modal-content {
-            background: #ffffff;
+        .sticky-audio-title {
+            font-size: 11px;
+            font-weight: 700;
+            color: #a78bfa;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .sticky-audio-meta {
+            font-size: 13px;
+            font-weight: 600;
+            color: #f8fafc;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 2px;
+        }
+        .stk-time-badge {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 2px 8px;
             border-radius: 12px;
-            padding: 24px;
-            width: 380px;
-            box-shadow: 0 20px 25px -5px rgba(0,0,0,0.2);
-            text-align: center;
+            font-size: 11px;
+            color: #38bdf8;
+            font-family: monospace;
+        }
+        .sticky-audio-controls {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            flex: 1;
+            max-width: 520px;
+            gap: 6px;
+        }
+        .sticky-audio-buttons {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .btn-audio-ctrl {
+            background: rgba(255, 255, 255, 0.1);
+            color: #f8fafc;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 4px 12px;
+            border-radius: 16px;
+            font-size: 11px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-audio-ctrl:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateY(-1px);
+        }
+        .btn-play-main {
+            background: #7c3aed;
+            color: #ffffff;
+            border: none;
+            padding: 6px 18px;
+            border-radius: 20px;
+            font-size: 12px;
+            box-shadow: 0 2px 8px rgba(124, 58, 237, 0.4);
+        }
+        .sticky-audio-progress-wrap {
+            width: 100%;
+        }
+        .sticky-audio-progress-wrap input[type="range"] {
+            width: 100%;
+            accent-color: #a855f7;
+            height: 6px;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        .sticky-audio-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-width: 260px;
+            justify-content: flex-end;
+        }
+        .sticky-speed-selector {
+            display: flex;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 18px;
+            padding: 2px;
+            gap: 2px;
+        }
+        .sticky-speed-selector .speed-btn {
+            background: transparent;
+            border: none;
+            color: #94a3b8;
+            padding: 3px 8px;
+            border-radius: 14px;
+            font-size: 10px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .sticky-speed-selector .speed-btn.active, .sticky-speed-selector .speed-btn:hover {
+            background: #8b5cf6;
+            color: #ffffff;
+        }
+        .btn-audio-download {
+            background: rgba(59, 130, 246, 0.2);
+            color: #60a5fa;
+            border: 1px solid rgba(59, 130, 246, 0.4);
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-decoration: none;
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+        .btn-audio-download:hover {
+            background: #3b82f6;
+            color: #ffffff;
+        }
+        .btn-audio-close {
+            background: rgba(239, 68, 68, 0.2);
+            color: #f87171;
+            border: 1px solid rgba(239, 68, 68, 0.4);
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: bold;
+            transition: all 0.2s;
+        }
+        .btn-audio-close:hover {
+            background: #ef4444;
+            color: #ffffff;
         }
 
         .queue-badge-compact {
@@ -945,14 +1111,40 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
                                     ?>
                                 </td>
                                 <td>
-                                    <?php if (!empty($recFile)): ?>
-                                        <?php $fileEnc = urlencode($recFile); ?>
-                                        <div style="display:flex; gap:4px; align-items:center;">
-                                            <button type="button" onclick="playPesquisaAudio('<?php echo $fileEnc; ?>')" style="background:#0284c7; color:#ffffff; border:none; padding:3px 10px; border-radius:12px; font-weight:700; font-size:10px; cursor:pointer;">▶ Play</button>
-                                            <a href="?menu=<?php echo htmlspecialchars($module_name); ?>&rawmode=yes&action=download_audio&file=<?php echo $fileEnc; ?>" target="_blank" style="background:#16a34a; color:#ffffff; padding:3px 10px; border-radius:12px; font-weight:700; font-size:10px; text-decoration:none;">Baixar</a>
+                                    <?php
+                                    $hasValidAudio = false;
+                                    if (!empty($recFile)) {
+                                        $checkPaths = array(
+                                            "/var/spool/asterisk/monitor/$recFile",
+                                            "/var/spool/asterisk/monitor/" . date('Y/m/d/') . $recFile,
+                                            "/var/spool/asterisk/monitor/" . date('Y/m/') . $recFile
+                                        );
+                                        foreach ($checkPaths as $cp) {
+                                            if (file_exists($cp) && filesize($cp) > 44) {
+                                                $hasValidAudio = true;
+                                                break;
+                                            }
+                                        }
+                                        if (!$hasValidAudio) {
+                                            $findP = trim(shell_exec("find /var/spool/asterisk/monitor/ -name " . escapeshellarg($recFile) . " 2>/dev/null | head -n 1"));
+                                            if (!empty($findP) && file_exists($findP) && filesize($findP) > 44) {
+                                                $hasValidAudio = true;
+                                            }
+                                        }
+                                    }
+                                    ?>
+                                    <?php if (!empty($recFile) && $hasValidAudio): ?>
+                                        <?php 
+                                        $fileEnc = urlencode($recFile);
+                                        $streamUrl = "?menu=" . htmlspecialchars($module_name) . "&rawmode=yes&action=stream_audio&file=" . $fileEnc;
+                                        $downUrl   = "?menu=" . htmlspecialchars($module_name) . "&rawmode=yes&action=download_audio&file=" . $fileEnc;
+                                        ?>
+                                        <div style="display:flex; gap:6px; align-items:center;">
+                                            <button type="button" onclick="playPesquisaAudio('<?php echo htmlspecialchars($streamUrl, ENT_QUOTES); ?>', '<?php echo htmlspecialchars($val_telefone, ENT_QUOTES); ?>', '<?php echo htmlspecialchars($val_disp_op, ENT_QUOTES); ?>', '<?php echo htmlspecialchars($downUrl, ENT_QUOTES); ?>')" style="background: linear-gradient(135deg, #7c3aed, #6d28d9); color: #ffffff; border: none; padding: 4px 10px; border-radius: 20px; font-weight: 700; font-size: 10px; cursor: pointer; box-shadow: 0 2px 6px rgba(124,58,237,0.3); transition: all 0.2s;">▶ Ouvir</button>
+                                            <a href="<?php echo htmlspecialchars($downUrl, ENT_QUOTES); ?>" target="_blank" style="background: rgba(255,255,255,0.08); color: #6d28d9; border: 1px solid rgba(124,58,237,0.4); padding: 3px 9px; border-radius: 20px; font-weight: 600; font-size: 10px; text-decoration: none; transition: all 0.2s;">⬇️ Baixar</a>
                                         </div>
                                     <?php else: ?>
-                                        <span style="color:#cbd5e1; font-size:10px;">Sem áudio</span>
+                                        <span title="Gravação de chamadas desativada para este ramal nas configurações do PBX" style="color:#94a3b8; font-size:10px; background:rgba(148,163,184,0.15); border:1px solid rgba(148,163,184,0.3); border-radius:12px; padding:3px 8px; font-weight:500; display:inline-flex; align-items:center; gap:4px;"><i class="fa fa-microphone-slash"></i> Ramal sem gravação</span>
                                     <?php endif; ?>
                                 </td>
                             </tr>
@@ -995,31 +1187,139 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
         </div>
     </div>
 
-    <!-- Modal Player de Audio -->
-    <div id="audioModalPesquisa">
-        <div class="audio-modal-content">
-            <h4 style="margin:0 0 12px 0; color:#1e293b; font-size:15px;">🎧 Reproduzindo Gravação</h4>
-            <audio id="pesquisaAudioElement" controls style="width:100%; margin-bottom:15px;"></audio>
-            <button onclick="closeAudioModal()" style="background:#64748b; color:#fff; border:none; padding:6px 16px; border-radius:6px; font-weight:bold; cursor:pointer;">Fechar</button>
+    <!-- Sticky Bottom Audio Player Flutuante -->
+    <div id="stickyBottomAudioPlayer" class="sticky-audio-bar">
+        <div class="sticky-audio-inner">
+            <!-- Info da Chamada -->
+            <div class="sticky-audio-info">
+                <div class="sticky-audio-icon">🎧</div>
+                <div class="sticky-audio-details">
+                    <div class="sticky-audio-title">Reproduzindo Pesquisa de Áudio</div>
+                    <div class="sticky-audio-meta">
+                        <span id="stkCaller">📞 -</span> ➔ <span id="stkTarget">👤 -</span>
+                        <span id="stkTime" class="stk-time-badge">00:00 / 00:00</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Controles Centrais -->
+            <div class="sticky-audio-controls">
+                <div class="sticky-audio-buttons">
+                    <button type="button" class="btn-audio-ctrl" onclick="stkSeekRelative(-5)" title="Voltar 5 segundos">⏮ -5s</button>
+                    <button type="button" id="stkPlayPauseBtn" class="btn-audio-ctrl btn-play-main" onclick="stkTogglePlay()">⏸ Pausar</button>
+                    <button type="button" class="btn-audio-ctrl" onclick="stkSeekRelative(5)" title="Avançar 5 segundos">+5s ⏭</button>
+                </div>
+                <div class="sticky-audio-progress-wrap">
+                    <input type="range" id="stkProgressBar" min="0" max="100" value="0" step="0.1" oninput="stkSeekTo(this.value)" />
+                </div>
+            </div>
+
+            <!-- Velocidade e Ações -->
+            <div class="sticky-audio-actions">
+                <div class="sticky-speed-selector">
+                    <button type="button" class="speed-btn active" onclick="stkSetSpeed(1.0, this)">1.0x</button>
+                    <button type="button" class="speed-btn" onclick="stkSetSpeed(1.25, this)">1.25x</button>
+                    <button type="button" class="speed-btn" onclick="stkSetSpeed(1.5, this)">1.5x</button>
+                    <button type="button" class="speed-btn" onclick="stkSetSpeed(2.0, this)">2.0x</button>
+                </div>
+                <a id="stkDownloadBtn" href="#" target="_blank" class="btn-audio-download" title="Baixar Áudio">⬇️</a>
+                <button type="button" class="btn-audio-close" onclick="closeStickyAudioPlayer()" title="Fechar Player">✖</button>
+            </div>
         </div>
+        <audio id="stkAudioElement" preload="auto"></audio>
     </div>
 
     <script>
-    function playPesquisaAudio(fileEnc) {
-        var modal = document.getElementById('audioModalPesquisa');
-        var audio = document.getElementById('pesquisaAudioElement');
-        audio.src = '?menu=<?php echo htmlspecialchars($module_name); ?>&rawmode=yes&action=stream_audio&file=' + fileEnc;
-        modal.style.display = 'flex';
-        var p = audio.play();
+    var currentAudio = document.getElementById('stkAudioElement');
+
+    function playPesquisaAudio(audioUrl, caller, target, downloadUrl) {
+        var bar = document.getElementById('stickyBottomAudioPlayer');
+        document.getElementById('stkCaller').textContent = '📞 ' + (caller || '-');
+        document.getElementById('stkTarget').textContent = '👤 ' + (target || '-');
+        document.getElementById('stkDownloadBtn').href = downloadUrl || audioUrl;
+        
+        currentAudio.src = audioUrl;
+        bar.classList.add('active');
+        
+        var p = currentAudio.play();
         if (p !== undefined) {
-            p.catch(function(err) { console.log("Play audio error:", err); });
+            p.then(function() {
+                updatePlayPauseButton(true);
+            }).catch(function(err) {
+                console.log("Audio play error:", err);
+                updatePlayPauseButton(false);
+            });
         }
     }
-    function closeAudioModal() {
-        var modal = document.getElementById('audioModalPesquisa');
-        var audio = document.getElementById('pesquisaAudioElement');
-        audio.pause();
-        modal.style.display = 'none';
+
+    function updatePlayPauseButton(isPlaying) {
+        var btn = document.getElementById('stkPlayPauseBtn');
+        if (isPlaying) {
+            btn.innerHTML = '⏸ Pausar';
+            btn.style.background = '#e11d48';
+        } else {
+            btn.innerHTML = '▶ Continuar';
+            btn.style.background = '#7c3aed';
+        }
+    }
+
+    function stkTogglePlay() {
+        if (currentAudio.paused) {
+            currentAudio.play();
+            updatePlayPauseButton(true);
+        } else {
+            currentAudio.pause();
+            updatePlayPauseButton(false);
+        }
+    }
+
+    function stkSeekRelative(seconds) {
+        if (currentAudio) {
+            currentAudio.currentTime = Math.max(0, Math.min(currentAudio.duration || 0, currentAudio.currentTime + seconds));
+        }
+    }
+
+    function stkSeekTo(val) {
+        if (currentAudio && currentAudio.duration) {
+            currentAudio.currentTime = (val / 100) * currentAudio.duration;
+        }
+    }
+
+    function stkSetSpeed(speed, btn) {
+        if (currentAudio) {
+            currentAudio.playbackRate = speed;
+            var pills = document.querySelectorAll('.sticky-speed-selector .speed-btn');
+            pills.forEach(function(p) { p.classList.remove('active'); });
+            if (btn) btn.classList.add('active');
+        }
+    }
+
+    function closeStickyAudioPlayer() {
+        if (currentAudio) {
+            currentAudio.pause();
+            currentAudio.currentTime = 0;
+        }
+        document.getElementById('stickyBottomAudioPlayer').classList.remove('active');
+    }
+
+    currentAudio.addEventListener('timeupdate', function() {
+        var cur = currentAudio.currentTime || 0;
+        var dur = currentAudio.duration || 0;
+        var bar = document.getElementById('stkProgressBar');
+        if (dur > 0) {
+            bar.value = (cur / dur) * 100;
+        }
+        document.getElementById('stkTime').textContent = formatSecondsToMmSs(cur) + ' / ' + formatSecondsToMmSs(dur);
+    });
+
+    currentAudio.addEventListener('ended', function() {
+        updatePlayPauseButton(false);
+    });
+
+    function formatSecondsToMmSs(secs) {
+        var m = Math.floor(secs / 60);
+        var s = Math.floor(secs % 60);
+        return (m < 10 ? '0' + m : m) + ':' + (s < 10 ? '0' + s : s);
     }
 
     document.addEventListener("DOMContentLoaded", function() {

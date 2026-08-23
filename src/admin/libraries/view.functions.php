@@ -50,7 +50,11 @@ function set_language() {
         _bind_textdomain_codeset('amp', 'utf8');
         _textdomain('amp');
 
-        if (!$issabelpbx_conf->conf_setting_exists('LANGUAGE')) {
+        if (!is_object($issabelpbx_conf) && class_exists('issabelpbx_conf')) {
+            $issabelpbx_conf =& issabelpbx_conf::create();
+        }
+
+        if (is_object($issabelpbx_conf) && !$issabelpbx_conf->conf_setting_exists('LANGUAGE')) {
             $value = $_COOKIE['lang'];
             $set['value'] = $value;
             $set['defaultval'] = 'en_US';
