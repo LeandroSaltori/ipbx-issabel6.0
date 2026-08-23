@@ -141,3 +141,18 @@ body {
     font-size: 12px;
 }
 .btn-audio-close { background: rgba(239, 68, 68, 0.2); border-color: rgba(239, 68, 68, 0.4); color: #f87171; }
+
+/* Automatic clearance so table rows and pagination are NEVER covered by audio player */
+.monitoring-root,
+.cdr-root,
+.pesquisa-root,
+.neo-table-box,
+.table-card,
+#main-content-table {
+    padding-bottom: 100px !important;
+}
+
+body.audio-bar-active,
+.page-container.audio-bar-active {
+    padding-bottom: 100px !important;
+}

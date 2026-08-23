@@ -20,13 +20,21 @@
         var pendingEvent = null;
         var HOVER_DELAY = 1200; // Delay suave
 
-        function isOverSpecificTooltip(e) {
+                function isOverSpecificTooltip(e) {
             if (!e || !e.target) return false;
             var el = e.target;
-            // Se o mouse estiver sobre o contato, ramal, botão de agenda ou qualquer elemento com title próprio
-            if (el.closest('[title]') || el.closest('.contact-badge') || el.closest('button') || el.closest('a')) {
+            // Suprime quando sobre contato, ramal, botões, links, checkboxes ou player de áudio
+            if (el.closest('[title]') || 
+                el.closest('.contact-badge') || 
+                el.closest('button') || 
+                el.closest('a') || 
+                el.closest('input') || 
+                el.closest('.sticky-audio-bar') ||
+                el.closest('#stickyBottomAudioPlayer')) {
                 return true;
             }
+            return false;
+        }
             return false;
         }
 
@@ -41,56 +49,29 @@
             }
         }
 
-        function positionTooltip(e) {
+                function positionTooltip(e) {
             if (!e || !tooltip) return;
 
             var pageX = e.pageX;
             var pageY = e.pageY;
-
-            if (typeof pageX === 'undefined' || pageX === null) {
-                pageX = e.clientX + (window.pageXOffset || document.documentElement.scrollLeft || document.body.scrollLeft || 0);
-                pageY = e.clientY + (window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0);
-            }
-
-            var clientX = e.clientX;
             var clientY = e.clientY;
+            var winHeight = window.innerHeight || $(window).height();
 
-            var tooltipWidth = tooltip.offsetWidth || 280;
-            var tooltipHeight = tooltip.offsetHeight || 160;
-
-            var x = pageX + 18;
-            var y = pageY + 18;
-
-            // Ajusta se ultrapassar a borda direita da tela
-            if (clientX + tooltipWidth + 25 > window.innerWidth) {
-                x = pageX - tooltipWidth - 15;
+            // Se o cursor estiver próximo ao rodapé (últimos 160px da tela), posiciona o tooltip para cima do cursor
+            if (clientY > (winHeight - 180)) {
+                var tooltipHeight = tooltip.offsetHeight || 120;
+                tooltip.style.top = (pageY - tooltipHeight - 15) + 'px';
+            } else {
+                tooltip.style.top = (pageY + 15) + 'px';
             }
 
-            // Ajusta se ultrapassar a borda inferior da tela
-            if (clientY + tooltipHeight + 25 > window.innerHeight) {
-                y = pageY - tooltipHeight - 15;
+            var tooltipWidth = tooltip.offsetWidth || 340;
+            var winWidth = $(window).width();
+            if (pageX + tooltipWidth + 30 > winWidth) {
+                tooltip.style.left = (pageX - tooltipWidth - 15) + 'px';
+            } else {
+                tooltip.style.left = (pageX + 15) + 'px';
             }
-
-            tooltip.style.setProperty('position', 'absolute', 'important');
-            tooltip.style.setProperty('left', Math.max(10, x) + 'px', 'important');
-            tooltip.style.setProperty('top', Math.max(10, y) + 'px', 'important');
-            tooltip.style.setProperty('z-index', '999999', 'important');
-            tooltip.style.setProperty('pointer-events', 'none', 'important');
-            tooltip.style.setProperty('margin', '0', 'important');
-            tooltip.style.setProperty('transform', 'none', 'important');
-            tooltip.style.setProperty('display', 'block', 'important');
-            tooltip.style.setProperty('background', 'linear-gradient(135deg, rgba(30, 20, 53, 0.96), rgba(45, 27, 78, 0.98))', 'important');
-            tooltip.style.setProperty('border', '1px solid rgba(168, 85, 247, 0.5)', 'important');
-            tooltip.style.setProperty('border-radius', '10px', 'important');
-            tooltip.style.setProperty('padding', '12px 16px', 'important');
-            tooltip.style.setProperty('box-shadow', '0 10px 25px rgba(0, 0, 0, 0.5), 0 0 15px rgba(168, 85, 247, 0.25)', 'important');
-            tooltip.style.setProperty('color', '#ffffff', 'important');
-            tooltip.style.setProperty('font-family', '"Noto Sans", sans-serif, Arial', 'important');
-            tooltip.style.setProperty('font-size', '12px', 'important');
-            tooltip.style.setProperty('min-width', '240px', 'important');
-            tooltip.style.setProperty('max-width', '360px', 'important');
-            tooltip.style.setProperty('backdrop-filter', 'blur(8px)', 'important');
-            tooltip.style.setProperty('transition', 'opacity 0.15s ease', 'important');
         }
 
         function renderRowTooltip($row, e) {
