@@ -1586,7 +1586,7 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
                 return currentAudio;
             }
 
-                        function ensureAudioBarInBody() {
+                                    function ensureAudioBarInBody() {
                 var bar = document.getElementById('stickyBottomAudioPlayer');
                 if (bar && bar.parentElement !== document.body) {
                     document.body.appendChild(bar);
@@ -1596,7 +1596,6 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
                 document.addEventListener('DOMContentLoaded', ensureAudioBarInBody);
             } else {
                 ensureAudioBarInBody();
-            }
             }
 
             function playPesquisaAudio(audioUrl, caller, target, downloadUrl) {

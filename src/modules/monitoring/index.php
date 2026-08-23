@@ -1327,7 +1327,7 @@ function renderFullMonitoringDashboard($smarty, $module_name, $local_templates_d
                 return currentAudio;
             }
 
-                        function ensureAudioBarInBody() {
+                                    function ensureAudioBarInBody() {
                 var bar = document.getElementById('stickyBottomAudioPlayer');
                 if (bar && bar.parentElement !== document.body) {
                     document.body.appendChild(bar);
@@ -1337,7 +1337,6 @@ function renderFullMonitoringDashboard($smarty, $module_name, $local_templates_d
                 document.addEventListener('DOMContentLoaded', ensureAudioBarInBody);
             } else {
                 ensureAudioBarInBody();
-            }
             }
 
             function playMonitoringAudio(audioUrl, caller, target, downloadUrl) {

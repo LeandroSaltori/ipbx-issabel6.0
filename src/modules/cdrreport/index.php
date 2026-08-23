@@ -1986,7 +1986,7 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
                 return currentAudio;
             }
 
-                        function ensureAudioBarInBody() {
+                                    function ensureAudioBarInBody() {
                 var bar = document.getElementById('stickyBottomAudioPlayer');
                 if (bar && bar.parentElement !== document.body) {
                     document.body.appendChild(bar);
@@ -1996,7 +1996,6 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
                 document.addEventListener('DOMContentLoaded', ensureAudioBarInBody);
             } else {
                 ensureAudioBarInBody();
-            }
             }
 
             function playCdrAudio(audioUrl, caller, target, downloadUrl) {
