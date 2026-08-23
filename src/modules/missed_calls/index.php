@@ -520,13 +520,13 @@ function _moduleContent(&$smarty, $module_name)
             <div class="chart-card-box" title="📊 Perdidas por Horário&#10;Gráfico de barras indicando a quantidade de chamadas perdidas hora a hora.">
                 <h4>📊 Volume de Chamadas Perdidas por Horário</h4>
                 <div class="chart-canvas-wrapper">
-                    <canvas id="chartMcHourly"></canvas>
+                    <canvas id="chartMcHourly" style="width:100%; height:180px; max-height:200px;"></canvas>
                 </div>
             </div>
             <div class="chart-card-box" title="🚦 Motivo do Não Atendimento&#10;Gráfico de rosca demonstrando a divisão entre Não Atendeu, Ocupado e Falha.">
                 <h4>🚦 Motivo do Não Atendimento</h4>
                 <div class="chart-canvas-wrapper">
-                    <canvas id="chartMcReason"></canvas>
+                    <canvas id="chartMcReason" style="width:100%; height:180px; max-height:200px;"></canvas>
                 </div>
             </div>
         </div>
@@ -714,69 +714,90 @@ function _moduleContent(&$smarty, $module_name)
         });
     }
 
+    function loadChartJsAndInitMc() {
+        if (typeof Chart === 'undefined') {
+            var script = document.createElement('script');
+            script.src = 'https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js';
+            script.onload = function() { initMcCharts(); };
+            document.head.appendChild(script);
+        } else {
+            initMcCharts();
+        }
+    }
+
     function initMcCharts() {
         if (typeof Chart === 'undefined') {
             setTimeout(initMcCharts, 150);
             return;
         }
 
-        var elHourly = document.getElementById('chartMcHourly');
-        if (elHourly) {
-            var ctxHourly = elHourly.getContext('2d');
-            new Chart(ctxHourly, {
-                type: 'bar',
-                data: {
-                    labels: ['00h','01h','02h','03h','04h','05h','06h','07h','08h','09h','10h','11h','12h','13h','14h','15h','16h','17h','18h','19h','20h','21h','22h','23h'],
-                    datasets: [{
-                        label: 'Chamadas Perdidas',
-                        data: <?php echo json_encode(array_values($hourlyLost)); ?>,
-                        backgroundColor: '#ef4444',
-                        hoverBackgroundColor: '#dc2626',
-                        borderRadius: 4
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        y: { beginAtZero: true, grid: { color: '#f1f5f9' }, ticks: { precision: 0 } },
-                        x: { grid: { display: false } }
-                    }
-                }
-            });
-        }
-
-        var elReason = document.getElementById('chartMcReason');
-        if (elReason) {
-            var ctxReason = elReason.getContext('2d');
-            new Chart(ctxReason, {
-                type: 'doughnut',
-                data: {
-                    labels: ['Não Atendeu', 'Ocupado', 'Falha'],
-                    datasets: [{
-                        data: [<?php echo (int)$noAnsCount; ?>, <?php echo (int)$busyCount; ?>, <?php echo (int)$failCount; ?>],
-                        backgroundColor: ['#ef4444', '#f59e0b', '#dc2626'],
-                        borderWidth: 2,
-                        borderColor: '#ffffff'
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            position: 'right',
-                            labels: { boxWidth: 12, font: { size: 11, family: "'Segoe UI', sans-serif" } }
+        try {
+            var elHourly = document.getElementById('chartMcHourly');
+            if (elHourly) {
+                var ctxHourly = elHourly.getContext('2d');
+                new Chart(ctxHourly, {
+                    type: 'bar',
+                    data: {
+                        labels: ['00h','01h','02h','03h','04h','05h','06h','07h','08h','09h','10h','11h','12h','13h','14h','15h','16h','17h','18h','19h','20h','21h','22h','23h'],
+                        datasets: [{
+                            label: 'Chamadas Perdidas',
+                            data: <?php echo json_encode(array_values($hourlyLost)); ?>,
+                            backgroundColor: '#ef4444',
+                            hoverBackgroundColor: '#dc2626',
+                            borderRadius: 4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        legend: { display: false },
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            y: { beginAtZero: true, grid: { color: '#f1f5f9' }, ticks: { precision: 0 } },
+                            yAxes: [{ ticks: { beginAtZero: true, precision: 0 }, gridLines: { color: '#f1f5f9' } }],
+                            x: { grid: { display: false } },
+                            xAxes: [{ gridLines: { display: false } }]
                         }
                     }
-                }
-            });
-        }
+                });
+            }
+        } catch(e) { console.error("Erro ao criar chartMcHourly:", e); }
+
+        try {
+            var elReason = document.getElementById('chartMcReason');
+            if (elReason) {
+                var ctxReason = elReason.getContext('2d');
+                new Chart(ctxReason, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['Não Atendeu', 'Ocupado', 'Falha'],
+                        datasets: [{
+                            data: [<?php echo (int)$noAnsCount; ?>, <?php echo (int)$busyCount; ?>, <?php echo (int)$failCount; ?>],
+                            backgroundColor: ['#ef4444', '#f59e0b', '#dc2626'],
+                            borderWidth: 2,
+                            borderColor: '#ffffff'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        legend: { position: 'right' },
+                        plugins: {
+                            legend: {
+                                position: 'right',
+                                labels: { boxWidth: 12, font: { size: 11, family: "'Segoe UI', sans-serif" } }
+                            }
+                        }
+                    }
+                });
+            }
+        } catch(e) { console.error("Erro ao criar chartMcReason:", e); }
     }
 
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initMcCharts);
+        document.addEventListener('DOMContentLoaded', loadChartJsAndInitMc);
+    } else {
+        loadChartJsAndInitMc();
     } else {
         initMcCharts();
     }
