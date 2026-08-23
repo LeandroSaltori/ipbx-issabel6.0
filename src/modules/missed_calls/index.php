@@ -410,7 +410,7 @@ function _moduleContent(&$smarty, $module_name)
         .badge-noans { background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; padding: 3px 8px; border-radius: 6px; font-weight: bold; font-size: 10px; }
         .badge-busy { background: #fef3c7; color: #b45309; border: 1px solid #fde68a; padding: 3px 8px; border-radius: 6px; font-weight: bold; font-size: 10px; }
         .badge-fail { background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; padding: 3px 8px; border-radius: 6px; font-weight: bold; font-size: 10px; }
-    #prisma_report_tooltip, .prisma_report_tooltip { display: none !important; opacity: 0 !important; visibility: hidden !important; pointer-events: none !important; }
+    
 </style>
 
     <div class="mc-root">

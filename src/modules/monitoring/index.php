@@ -926,7 +926,7 @@ function renderFullMonitoringDashboard($smarty, $module_name, $local_templates_d
                 background: #ef4444;
                 color: #ffffff;
             }
-        #prisma_report_tooltip, .prisma_report_tooltip { display: none !important; opacity: 0 !important; visibility: hidden !important; pointer-events: none !important; }
+        
 </style>
     </head>
     <body>

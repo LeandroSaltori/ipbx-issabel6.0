@@ -13,4 +13,4 @@ body {
 	transition: background-color 0.15s ease-in-out;
 	cursor: pointer;
 }
-#prisma_report_tooltip, .prisma_report_tooltip { display: none !important; opacity: 0 !important; visibility: hidden !important; pointer-events: none !important; }
+

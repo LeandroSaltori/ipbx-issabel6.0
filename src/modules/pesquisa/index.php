@@ -582,7 +582,7 @@ function handleExportPdf($pPesquisa)
             td { padding:8px; border-bottom:1px solid #e2e8f0; }
             tr:nth-child(even) { background:#f8fafc; }
             @media print { .no-print { display:none; } }
-        #prisma_report_tooltip, .prisma_report_tooltip { display: none !important; opacity: 0 !important; visibility: hidden !important; pointer-events: none !important; }
+        
 </style>
     </head>
     <body onload="window.print();">
@@ -1164,7 +1164,7 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
             color: #0f172a;
             border-color: #cbd5e1;
         }
-    #prisma_report_tooltip, .prisma_report_tooltip { display: none !important; opacity: 0 !important; visibility: hidden !important; pointer-events: none !important; }
+    
 </style>
 
     <div class="pesquisa-root">
