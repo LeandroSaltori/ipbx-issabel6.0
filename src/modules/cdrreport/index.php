@@ -162,6 +162,38 @@ function getAsteriskExtensionNamesMap($pDB = null) {
     return $extMap;
 }
 
+function renderDirectionTrunkBadge($did, $raw_src, $val_dst, $channel = '', $dstchannel = '', $extNamesMap = array(), $groupsMap = array()) {
+    $cleanSrc = preg_replace('/\D/', '', $raw_src);
+    $cleanDst = preg_replace('/\D/', '', $val_dst);
+    $srcIsExt = (strlen($cleanSrc) >= 2 && strlen($cleanSrc) <= 5) || isset($extNamesMap[$raw_src]) || isset($extNamesMap[$cleanSrc]);
+    $dstIsExt = (strlen($cleanDst) >= 2 && strlen($cleanDst) <= 5) || isset($extNamesMap[$val_dst]) || isset($extNamesMap[$cleanDst]) || isset($groupsMap[$val_dst]);
+
+    // Extrai o nome do tronco
+    $trunkName = '';
+    $rawChannel = !empty($dstchannel) ? $dstchannel : $channel;
+    if (!empty($rawChannel) && $rawChannel != '-') {
+        if (preg_match('/^(?:SIP|PJSIP|IAX2|DAHDI|Khomp|Local)\/([^\/-]+)/i', $rawChannel, $m)) {
+            $candidate = trim($m[1]);
+            if (!is_numeric($candidate) || strlen($candidate) > 5) {
+                $trunkName = $candidate;
+            }
+        }
+    }
+
+    if (!empty($did) && $did != '-') {
+        return "<span title='📥 Entrada via Linha/DID: " . htmlspecialchars($did, ENT_QUOTES) . "' style='background:#f0fdf4; color:#166534; border:1px solid #bbf7d0; padding:4px 10px; border-radius:12px; font-weight:700; font-size:11px; display:inline-flex; align-items:center; gap:5px;'><i class='fa fa-arrow-down'></i> Entrada <span style='font-size:10px; color:#15803d; font-weight:600;'>(" . htmlspecialchars($did) . ")</span></span>";
+    } elseif ($srcIsExt && !$dstIsExt && !empty($val_dst) && $val_dst != '-') {
+        $sub = !empty($trunkName) ? " <span style='font-size:10px; color:#1e40af; font-weight:600;'>(" . htmlspecialchars($trunkName) . ")</span>" : "";
+        return "<span title='📤 Saída (Ramal para número externo)' style='background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; padding:4px 10px; border-radius:12px; font-weight:700; font-size:11px; display:inline-flex; align-items:center; gap:5px;'><i class='fa fa-arrow-up'></i> Saída$sub</span>";
+    } elseif ($srcIsExt && $dstIsExt) {
+        return "<span title='🏢 Chamada Interna (Ramal para Ramal)' style='background:#f8fafc; color:#475569; border:1px solid #e2e8f0; padding:4px 10px; border-radius:12px; font-weight:600; font-size:11px; display:inline-flex; align-items:center; gap:5px;'><i class='fa fa-phone'></i> Interno</span>";
+    } elseif (!empty($trunkName)) {
+        return "<span title='📥 Entrada via Tronco: " . htmlspecialchars($trunkName, ENT_QUOTES) . "' style='background:#f0fdf4; color:#166534; border:1px solid #bbf7d0; padding:4px 10px; border-radius:12px; font-weight:700; font-size:11px; display:inline-flex; align-items:center; gap:5px;'><i class='fa fa-arrow-down'></i> Entrada <span style='font-size:10px; color:#15803d; font-weight:600;'>(" . htmlspecialchars($trunkName) . ")</span></span>";
+    } else {
+        return "<span style='background:#f0fdf4; color:#166534; border:1px solid #bbf7d0; padding:4px 10px; border-radius:12px; font-weight:700; font-size:11px; display:inline-flex; align-items:center; gap:5px;'><i class='fa fa-arrow-down'></i> Entrada</span>";
+    }
+}
+
 function renderCallerWithContactBadge($raw_src, $val_src, $contactsMap = array(), $stats7d = array(), $extNamesMap = array()) {
     $raw_clean = preg_replace('/\D/', '', $raw_src);
     $contact = null;
@@ -578,7 +610,8 @@ function renderCelDetailsHtml($pDB, $uniqueid)
             tr:nth-child(even) { background:#f8fafc; }
             .badge-evt { padding:3px 8px; border-radius:6px; font-weight:bold; font-size:10px; display:inline-block; cursor:help; }
             .exten-badge { background:#f1f5f9; color:#334155; padding:2px 6px; border-radius:4px; font-family:monospace; font-weight:bold; font-size:11px; }
-        </style>
+        #prisma_report_tooltip, .prisma_report_tooltip { display: none !important; opacity: 0 !important; visibility: hidden !important; pointer-events: none !important; }
+</style>
     </head>
     <body>
         <div class="cel-header">
@@ -782,7 +815,8 @@ function handleCdrExportPdf($oCDR, $module_name)
             td { padding:8px; border-bottom:1px solid #e2e8f0; }
             tr:nth-child(even) { background:#f8fafc; }
             @media print { .no-print { display:none; } }
-        </style>
+        #prisma_report_tooltip, .prisma_report_tooltip { display: none !important; opacity: 0 !important; visibility: hidden !important; pointer-events: none !important; }
+</style>
     </head>
     <body onload="window.print();">
         <div class="no-print" style="margin-bottom:15px;">
@@ -1483,7 +1517,8 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
             background: #ef4444;
             color: #ffffff;
         }
-    </style>
+    #prisma_report_tooltip, .prisma_report_tooltip { display: none !important; opacity: 0 !important; visibility: hidden !important; pointer-events: none !important; }
+</style>
 
     <div class="cdr-root">
         <!-- Header Principal -->
@@ -1649,7 +1684,7 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
                         <th title="🎯 Destino&#10;Ramal, número externo ou DID direcionado.">Destino</th>
                         <th title="🚦 Status da Chamada&#10;Classificação do resultado da ligação (Atendida, Não Atendeu, Ocupado ou Falha).">Status</th>
                         <th title="⏱️ Duração da Conversa&#10;Tempo total de fala formatado em minutos e segundos.">Duração</th>
-                        <th title="📟 DID / Tronco&#10;Número de linha direta por onde a ligação entrou na central.">DID / Tronco</th>
+                        <th title="📟 Direção / Tronco&#10;Identificação do sentido da chamada (Entrada com DID, Saída com Tronco ou Interna).">Direção / Tronco</th>
                         <th title="🎧 Gravação de Áudio&#10;Clique em Play para escutar no player ou Baixar para obter o áudio.">Gravação</th>
                         <th title="📋 Histórico CEL&#10;Clique em CEL para abrir a janela de raio-X do histórico de eventos da chamada no Asterisk.">Eventos</th>
                     </tr>
@@ -1750,20 +1785,9 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
                                 <td><span style='color:#0f172a; font-weight:700; font-size:11px;'>⏱️ <?php echo htmlspecialchars($val_dur); ?></span></td>
                                 <td>
                                     <?php
-                                    $cleanSrc = preg_replace('/\D/', '', $raw_src);
-                                    $cleanDst = preg_replace('/\D/', '', $val_dst);
-                                    $srcIsExt = (strlen($cleanSrc) >= 2 && strlen($cleanSrc) <= 5) || isset($extNamesMap[$raw_src]) || isset($extNamesMap[$cleanSrc]);
-                                    $dstIsExt = (strlen($cleanDst) >= 2 && strlen($cleanDst) <= 5) || isset($extNamesMap[$val_dst]) || isset($extNamesMap[$cleanDst]) || isset($groupsMap[$val_dst]);
-
-                                    if (!empty($did) && $did != '-') {
-                                        echo "<span title='📥 Chamada de Entrada via Linha/DID: " . htmlspecialchars($did, ENT_QUOTES) . "' style='background:#f0fdf4; color:#166534; border:1px solid #bbf7d0; padding:3px 8px; border-radius:6px; font-weight:700; font-size:11px; display:inline-flex; align-items:center; gap:4px;'><i class='fa fa-hashtag'></i> " . htmlspecialchars($did) . "</span>";
-                                    } elseif ($srcIsExt && !$dstIsExt && !empty($val_dst) && $val_dst != '-') {
-                                        echo "<span title='📤 Chamada Sainte (Ramal discou para número externo)' style='background:#eff6ff; color:#1e40af; border:1px solid #bfdbfe; padding:3px 8px; border-radius:6px; font-weight:600; font-size:11px; display:inline-flex; align-items:center; gap:4px;'><i class='fa fa-arrow-up'></i> Saída</span>";
-                                    } elseif ($srcIsExt && $dstIsExt) {
-                                        echo "<span title='🏢 Chamada Interna (Ramal para Ramal)' style='background:#f8fafc; color:#475569; border:1px solid #e2e8f0; padding:3px 8px; border-radius:6px; font-weight:600; font-size:11px; display:inline-flex; align-items:center; gap:4px;'><i class='fa fa-phone'></i> Interno</span>";
-                                    } else {
-                                        echo "<span style='color:#94a3b8; font-size:11px;'>-</span>";
-                                    }
+                                    $channel = !empty($r[3]) ? $r[3] : '';
+                                    $dstchannel = !empty($r[4]) ? $r[4] : '';
+                                    echo renderDirectionTrunkBadge($did, $raw_src, $val_dst, $channel, $dstchannel, $extNamesMap, $groupsMap);
                                     ?>
                                 </td>
                                 <td>
