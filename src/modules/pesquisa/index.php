@@ -677,23 +677,28 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
 
         /* Sticky Bottom Audio Player */
         .sticky-audio-bar {
-            position: fixed;
-            bottom: -140px;
-            left: 0;
-            right: 0;
+            position: fixed !important;
+            bottom: -160px;
+            left: 0 !important;
+            right: 0 !important;
+            width: 100% !important;
+            max-width: 100vw !important;
+            box-sizing: border-box !important;
             background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
             border-top: 2px solid #8b5cf6;
-            box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.45);
-            z-index: 999999;
+            box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.5);
+            z-index: 2147483647 !important;
             display: flex;
             align-items: center;
             padding: 10px 24px;
             transition: bottom 0.35s cubic-bezier(0.16, 1, 0.3, 1);
             color: #ffffff;
             font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            margin: 0 !important;
+            transform: none !important;
         }
         .sticky-audio-bar.active {
-            bottom: 0;
+            bottom: 0 !important;
         }
         .sticky-audio-inner {
             display: flex;
@@ -1232,7 +1237,19 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
     <script>
     var currentAudio = document.getElementById('stkAudioElement');
 
+    function ensureAudioBarInBody() {
+        var bar = document.getElementById('stickyBottomAudioPlayer');
+        if (bar && bar.parentElement !== document.body) {
+            document.body.appendChild(bar);
+        }
+    }
+
+    document.addEventListener("DOMContentLoaded", function() {
+        ensureAudioBarInBody();
+    });
+
     function playPesquisaAudio(audioUrl, caller, target, downloadUrl) {
+        ensureAudioBarInBody();
         var bar = document.getElementById('stickyBottomAudioPlayer');
         document.getElementById('stkCaller').textContent = '📞 ' + (caller || '-');
         document.getElementById('stkTarget').textContent = '👤 ' + (target || '-');

@@ -556,6 +556,11 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
     $ringgroup     = isset($_REQUEST['ringgroup']) ? trim($_REQUEST['ringgroup']) : '';
     $call_scope    = isset($_REQUEST['call_scope']) ? trim($_REQUEST['call_scope']) : 'ALL';
     $only_recorded = isset($_REQUEST['only_recorded']) ? (int)$_REQUEST['only_recorded'] : 0;
+    $min_duration  = isset($_REQUEST['min_duration']) ? (int)$_REQUEST['min_duration'] : 0;
+    $hide_zero     = isset($_REQUEST['hide_zero']) ? (int)$_REQUEST['hide_zero'] : 0;
+    if ($hide_zero == 1 && $min_duration < 1) {
+        $min_duration = 1;
+    }
 
     $page  = isset($_REQUEST['page']) ? max(1, (int)$_REQUEST['page']) : 1;
     $limit = 20;
@@ -614,6 +619,11 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
             continue;
         }
         if ($call_scope == 'external' && $isInternal) {
+            continue;
+        }
+
+        $durSecs = (int)$r[8];
+        if ($min_duration > 0 && $durSecs < $min_duration) {
             continue;
         }
 
@@ -998,23 +1008,28 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
 
         /* Sticky Bottom Audio Player */
         .sticky-audio-bar {
-            position: fixed;
-            bottom: -140px;
-            left: 0;
-            right: 0;
+            position: fixed !important;
+            bottom: -160px;
+            left: 0 !important;
+            right: 0 !important;
+            width: 100% !important;
+            max-width: 100vw !important;
+            box-sizing: border-box !important;
             background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
             border-top: 2px solid #8b5cf6;
-            box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.45);
-            z-index: 999999;
+            box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.5);
+            z-index: 2147483647 !important;
             display: flex;
             align-items: center;
             padding: 10px 24px;
             transition: bottom 0.35s cubic-bezier(0.16, 1, 0.3, 1);
             color: #ffffff;
             font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            margin: 0 !important;
+            transform: none !important;
         }
         .sticky-audio-bar.active {
-            bottom: 0;
+            bottom: 0 !important;
         }
         .sticky-audio-inner {
             display: flex;
@@ -1254,6 +1269,25 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
                             <option value="internal" <?php if ($call_scope == 'internal') echo 'selected'; ?>>🏢 Apenas Internas (Ramal-Ramal)</option>
                         </select>
                     </div>
+                    <div class="filter-field-group" title="⏱️ Duração Mínima&#10;Filtre chamadas que duraram pelo menos a quantidade de tempo selecionada.">
+                        <label>⏱️ Duração Mínima</label>
+                        <select name="min_duration" class="filter-input">
+                            <option value="0" <?php if ($min_duration == 0) echo 'selected'; ?>>-- Qualquer Duração --</option>
+                            <option value="1" <?php if ($min_duration == 1) echo 'selected'; ?>>🚫 Ocultar Zeradas (> 0s)</option>
+                            <option value="10" <?php if ($min_duration == 10) echo 'selected'; ?>>≥ 10 segundos</option>
+                            <option value="30" <?php if ($min_duration == 30) echo 'selected'; ?>>≥ 30 segundos</option>
+                            <option value="60" <?php if ($min_duration == 60) echo 'selected'; ?>>≥ 1 minuto</option>
+                            <option value="120" <?php if ($min_duration == 120) echo 'selected'; ?>>≥ 2 minutos</option>
+                            <option value="300" <?php if ($min_duration == 300) echo 'selected'; ?>>≥ 5 minutos</option>
+                            <option value="600" <?php if ($min_duration == 600) echo 'selected'; ?>>≥ 10 minutos</option>
+                        </select>
+                    </div>
+                    <div class="filter-field-group" style="align-self:flex-end; padding-bottom:6px;">
+                        <label style="cursor:pointer; display:flex; align-items:center; gap:6px; font-weight:700; color:#ef4444; font-size:12px; margin:0;" title="Ocultar do relatório todas as ligações que registraram 0 segundos">
+                            <input type="checkbox" name="hide_zero" value="1" <?php if ($hide_zero == 1 || $min_duration > 0) echo 'checked'; ?> style="width:16px; height:16px; cursor:pointer;" />
+                            🚫 Ocultar Zeradas (0s)
+                        </label>
+                    </div>
                     <div class="filter-field-group" style="align-self:flex-end; padding-bottom:6px;">
                         <label style="cursor:pointer; display:flex; align-items:center; gap:6px; font-weight:700; color:#7c3aed; font-size:12px; margin:0;">
                             <input type="checkbox" name="only_recorded" value="1" <?php if ($only_recorded == 1) echo 'checked'; ?> style="width:16px; height:16px; cursor:pointer;" />
@@ -1459,7 +1493,9 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
                         'status' => $status,
                         'ringgroup' => $ringgroup,
                         'call_scope' => $call_scope,
-                        'only_recorded' => $only_recorded
+                        'only_recorded' => $only_recorded,
+                        'min_duration' => $min_duration,
+                        'hide_zero' => $hide_zero
                     );
                     $prevPage = max(1, $page - 1);
                     $nextPage = min($totalPages, $page + 1);
@@ -1527,7 +1563,19 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
     <script>
     var currentAudio = document.getElementById('stkAudioElement');
 
+    function ensureAudioBarInBody() {
+        var bar = document.getElementById('stickyBottomAudioPlayer');
+        if (bar && bar.parentElement !== document.body) {
+            document.body.appendChild(bar);
+        }
+    }
+
+    document.addEventListener("DOMContentLoaded", function() {
+        ensureAudioBarInBody();
+    });
+
     function playCdrAudio(audioUrl, caller, target, downloadUrl) {
+        ensureAudioBarInBody();
         var bar = document.getElementById('stickyBottomAudioPlayer');
         document.getElementById('stkCaller').textContent = '📞 ' + (caller || '-');
         document.getElementById('stkTarget').textContent = '🎯 ' + (target || '-');
