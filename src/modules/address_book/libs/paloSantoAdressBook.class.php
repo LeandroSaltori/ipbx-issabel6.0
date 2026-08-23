@@ -128,8 +128,8 @@ a array with the field "total" containing the total of records.
     {
         if($id=='null') { return; }
         if($directory == "external"){
-            $where = "id=? and (iduser=? or status='isPublic') and directory='external'";
-            $params = array($id, $id_user);
+            $where = "id=? and directory='external'";
+            $params = array($id);
 
             $query   = "SELECT *, telefono work_phone FROM contact WHERE $where";
 
@@ -187,12 +187,12 @@ a array with the field "total" containing the total of records.
         return $result;
     }
 
-    function deleteContact($id, $id_user)
+    function deleteContact($id, $id_user=null)
     {
-        $params = array($id, $id_user);
-        $query = "DELETE FROM contact WHERE id=? and iduser=?";
+        $params = array($id);
+        $query = "DELETE FROM contact WHERE id=?";
         $result = $this->_DB->genQuery($query, $params);
-        if($result[0] > 0)
+        if($result)
             return true;
         else return false;
     }
@@ -420,8 +420,8 @@ a array with the field "total" containing the total of records.
         //solo lo hacen usuarios del grupo administrador
 
         if($directory == "external"){
-            $params = array($id, $id_user);
-            $query   = "SELECT * FROM contact WHERE id=? and iduser=? ";
+            $params = array($id);
+            $query   = "SELECT * FROM contact WHERE id=? ";
 
             $result=$this->_DB->getFirstRowQuery($query, true, $params);
             if(!$result && $result==null && count($result) < 1)
