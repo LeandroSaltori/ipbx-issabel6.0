@@ -1749,11 +1749,22 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
                                 </td>
                                 <td><span style='color:#0f172a; font-weight:700; font-size:11px;'>⏱️ <?php echo htmlspecialchars($val_dur); ?></span></td>
                                 <td>
-                                    <?php if (!empty($did) && $did != '-'): ?>
-                                        <span style='color:#475569; font-size:11px; font-weight:600;'>📟 <?php echo htmlspecialchars($did); ?></span>
-                                    <?php else: ?>
-                                        <span style='color:#cbd5e1;'>-</span>
-                                    <?php endif; ?>
+                                    <?php
+                                    $cleanSrc = preg_replace('/\D/', '', $raw_src);
+                                    $cleanDst = preg_replace('/\D/', '', $val_dst);
+                                    $srcIsExt = (strlen($cleanSrc) >= 2 && strlen($cleanSrc) <= 5) || isset($extNamesMap[$raw_src]) || isset($extNamesMap[$cleanSrc]);
+                                    $dstIsExt = (strlen($cleanDst) >= 2 && strlen($cleanDst) <= 5) || isset($extNamesMap[$val_dst]) || isset($extNamesMap[$cleanDst]) || isset($groupsMap[$val_dst]);
+
+                                    if (!empty($did) && $did != '-') {
+                                        echo "<span title='📥 Chamada de Entrada via Linha/DID: " . htmlspecialchars($did, ENT_QUOTES) . "' style='background:#f0fdf4; color:#166534; border:1px solid #bbf7d0; padding:3px 8px; border-radius:6px; font-weight:700; font-size:11px; display:inline-flex; align-items:center; gap:4px;'><i class='fa fa-hashtag'></i> " . htmlspecialchars($did) . "</span>";
+                                    } elseif ($srcIsExt && !$dstIsExt && !empty($val_dst) && $val_dst != '-') {
+                                        echo "<span title='📤 Chamada Sainte (Ramal discou para número externo)' style='background:#eff6ff; color:#1e40af; border:1px solid #bfdbfe; padding:3px 8px; border-radius:6px; font-weight:600; font-size:11px; display:inline-flex; align-items:center; gap:4px;'><i class='fa fa-arrow-up'></i> Saída</span>";
+                                    } elseif ($srcIsExt && $dstIsExt) {
+                                        echo "<span title='🏢 Chamada Interna (Ramal para Ramal)' style='background:#f8fafc; color:#475569; border:1px solid #e2e8f0; padding:3px 8px; border-radius:6px; font-weight:600; font-size:11px; display:inline-flex; align-items:center; gap:4px;'><i class='fa fa-phone'></i> Interno</span>";
+                                    } else {
+                                        echo "<span style='color:#94a3b8; font-size:11px;'>-</span>";
+                                    }
+                                    ?>
                                 </td>
                                 <td>
                                     <?php if (!empty($recFile) && $hasValidAudio): ?>
