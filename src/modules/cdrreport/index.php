@@ -555,9 +555,10 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
     $status        = isset($_REQUEST['status']) ? trim($_REQUEST['status']) : 'ALL';
     $ringgroup     = isset($_REQUEST['ringgroup']) ? trim($_REQUEST['ringgroup']) : '';
     $call_scope    = isset($_REQUEST['call_scope']) ? trim($_REQUEST['call_scope']) : 'ALL';
-    $only_recorded = isset($_REQUEST['only_recorded']) ? (int)$_REQUEST['only_recorded'] : 0;
-    $min_duration  = isset($_REQUEST['min_duration']) ? (int)$_REQUEST['min_duration'] : 0;
-    $hide_zero     = isset($_REQUEST['hide_zero']) ? (int)$_REQUEST['hide_zero'] : 0;
+    $isFirstLoad   = !isset($_REQUEST['filter_applied']) && !isset($_REQUEST['page']);
+    $only_recorded = isset($_REQUEST['only_recorded']) ? (int)$_REQUEST['only_recorded'] : ($isFirstLoad ? 1 : 0);
+    $hide_zero     = isset($_REQUEST['hide_zero']) ? (int)$_REQUEST['hide_zero'] : ($isFirstLoad ? 1 : 0);
+    $min_duration  = isset($_REQUEST['min_duration']) ? (int)$_REQUEST['min_duration'] : ($isFirstLoad ? 1 : 0);
     if ($hide_zero == 1 && $min_duration < 1) {
         $min_duration = 1;
     }
@@ -1214,6 +1215,7 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
         <div class="filter-card-box">
             <form method="GET" action="index.php">
                 <input type="hidden" name="menu" value="<?php echo htmlspecialchars($module_name); ?>" />
+                <input type="hidden" name="filter_applied" value="1" />
                 <div class="filter-inline-row">
                     <div class="filter-field-group" title="📅 Data Inicial do Período&#10;Selecione a data de início da busca de chamadas no CDR.">
                         <label>📅 Data Inicial</label>
@@ -1420,12 +1422,18 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
                             } else {
                                 $val_rg_html = "<span style='color:#cbd5e1;'>-</span>";
                             }
+
+                            if (!empty($val_dst) && isset($groupsMap[$val_dst])) {
+                                $val_dst_html = "<span title='🏢 Fila: " . htmlspecialchars($val_dst . " - " . $groupsMap[$val_dst], ENT_QUOTES) . "' style='background:#ede9fe; color:#6d28d9; padding:3px 8px; border-radius:6px; font-weight:700; font-size:11px; cursor:help; border:1px solid #ddd6fe; display:inline-flex; align-items:center; gap:4px;'><i class='fa fa-users'></i> " . htmlspecialchars($val_dst) . "</span>";
+                            } else {
+                                $val_dst_html = "<span style='background:#ede9fe; color:#6d28d9; padding:3px 8px; border-radius:6px; font-weight:600; font-size:11px;'>🎯 " . htmlspecialchars($val_dst) . "</span>";
+                            }
                             ?>
                             <tr>
                                 <td><span style='color:#334155; font-size:11px; font-weight:600;'>📅 <?php echo htmlspecialchars($val_data); ?></span></td>
                                 <td><span style='font-weight:600; color:#1e293b;'>📞 <?php echo htmlspecialchars($val_src); ?></span></td>
                                 <td><?php echo $val_rg_html; ?></td>
-                                <td><span style='background:#ede9fe; color:#6d28d9; padding:3px 8px; border-radius:6px; font-weight:600; font-size:11px;'>🎯 <?php echo htmlspecialchars($val_dst); ?></span></td>
+                                <td><?php echo $val_dst_html; ?></td>
                                 <td>
                                     <?php
                                     if ($raw_st == 'ANSWERED') {

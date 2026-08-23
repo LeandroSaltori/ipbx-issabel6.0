@@ -106,13 +106,38 @@ function renderFullMonitoringDashboard($smarty, $module_name, $local_templates_d
     $date_start    = $date_start_ts ? date("Y-m-d", $date_start_ts) : date("Y-m-d");
     $date_end      = $date_end_ts ? date("Y-m-d", $date_end_ts) : date("Y-m-d");
 
+    // Load Queue and RingGroup definitions for names mapping
+    $dsn_asterisk = generarDSNSistema('asteriskuser', 'asterisk');
+    $pDB_asterisk = new paloDB($dsn_asterisk);
+    $dataRG       = array();
+    $dataQueue    = array();
+
+    if (file_exists("modules/cdrreport/libs/ringgroup.php")) {
+        require_once "modules/cdrreport/libs/ringgroup.php";
+        if (class_exists('RingGroup')) {
+            $oRG = new RingGroup($pDB_asterisk);
+            $resRG = $oRG->getRingGroup();
+            if (is_array($resRG)) $dataRG = $resRG;
+        }
+    }
+    if (file_exists("modules/cdrreport/libs/queues.php")) {
+        require_once "modules/cdrreport/libs/queues.php";
+        if (class_exists('Queue')) {
+            $oQueue = new Queue($pDB_asterisk);
+            $resQ = $oQueue->getQueue();
+            if (is_array($resQ)) $dataQueue = $resQ;
+        }
+    }
+    $groupsMap = $dataRG + $dataQueue;
+
     $filter_field  = isset($_REQUEST['filter_field']) ? trim($_REQUEST['filter_field']) : 'src';
     $filter_value  = isset($_REQUEST['filter_value']) ? trim($_REQUEST['filter_value']) : '';
     $rec_type      = isset($_REQUEST['rec_type']) ? trim($_REQUEST['rec_type']) : 'ALL';
     $call_scope    = isset($_REQUEST['call_scope']) ? trim($_REQUEST['call_scope']) : 'ALL';
-    $only_recorded = isset($_REQUEST['only_recorded']) ? (int)$_REQUEST['only_recorded'] : 0;
-    $min_duration  = isset($_REQUEST['min_duration']) ? (int)$_REQUEST['min_duration'] : 0;
-    $hide_zero     = isset($_REQUEST['hide_zero']) ? (int)$_REQUEST['hide_zero'] : 0;
+    $isFirstLoad   = !isset($_REQUEST['filter_applied']) && !isset($_REQUEST['page']);
+    $only_recorded = isset($_REQUEST['only_recorded']) ? (int)$_REQUEST['only_recorded'] : ($isFirstLoad ? 1 : 0);
+    $hide_zero     = isset($_REQUEST['hide_zero']) ? (int)$_REQUEST['hide_zero'] : ($isFirstLoad ? 1 : 0);
+    $min_duration  = isset($_REQUEST['min_duration']) ? (int)$_REQUEST['min_duration'] : ($isFirstLoad ? 1 : 0);
     if ($hide_zero == 1 && $min_duration < 1) {
         $min_duration = 1;
     }
@@ -619,6 +644,7 @@ function renderFullMonitoringDashboard($smarty, $module_name, $local_templates_d
     <body>
         <form id="monitoringFormMain" method="POST" action="index.php?menu=<?php echo htmlspecialchars($module_name); ?>">
             <input type="hidden" name="action_type" id="action_type" value="" />
+            <input type="hidden" name="filter_applied" value="1" />
 
             <div class="monitoring-root">
                 <!-- Header Principal -->
@@ -830,10 +856,17 @@ function renderFullMonitoringDashboard($smarty, $module_name, $local_templates_d
                                                 <input type="checkbox" name="selected_uniqueids[]" value="<?php echo htmlspecialchars($uniqueId); ?>" class="chk-mon-row" />
                                             </td>
                                         <?php endif; ?>
+                                        <?php
+                                        if (!empty($dst) && isset($groupsMap[$dst])) {
+                                            $dstHtml = "<span title='🏢 Fila: " . htmlspecialchars($dst . " - " . $groupsMap[$dst], ENT_QUOTES) . "' style='background:#ede9fe; color:#6d28d9; padding:3px 8px; border-radius:6px; font-weight:700; font-size:11px; cursor:help; border:1px solid #ddd6fe; display:inline-flex; align-items:center; gap:4px;'><i class='fa fa-users'></i> " . htmlspecialchars($dst) . "</span>";
+                                        } else {
+                                            $dstHtml = "<span style='background:#ede9fe; color:#6d28d9; padding:3px 8px; border-radius:6px; font-weight:600; font-size:11px;'>🎯 " . htmlspecialchars($dst) . "</span>";
+                                        }
+                                        ?>
                                         <td><span style="color:#64748b; font-size:11px; font-family:monospace; font-weight:bold;"><code><?php echo htmlspecialchars($uniqueId); ?></code></span></td>
                                         <td><span style="color:#334155; font-size:11px; font-weight:600;">📅 <?php echo htmlspecialchars($calldate); ?></span></td>
                                         <td><span style="font-weight:600; color:#1e293b;">📞 <?php echo htmlspecialchars($src); ?></span></td>
-                                        <td><span style="background:#ede9fe; color:#6d28d9; padding:3px 8px; border-radius:6px; font-weight:600; font-size:11px;">🎯 <?php echo htmlspecialchars($dst); ?></span></td>
+                                        <td><?php echo $dstHtml; ?></td>
                                         <td><span style="color:#0f172a; font-weight:700; font-size:11px;">⏱️ <?php echo htmlspecialchars($durText); ?></span></td>
                                         <td><?php echo $recTypeTag; ?></td>
                                         <td><?php echo $actionHtml; ?></td>
