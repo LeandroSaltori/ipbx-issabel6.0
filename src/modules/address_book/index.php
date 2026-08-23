@@ -353,14 +353,14 @@ function report_adress_book($smarty, $module_name, $local_templates_dir, $pDB, $
 	}else
 	    $smarty->assign("mb_message", "<b>"._tr("contact_admin")."</b>");
     }
-    if(getParameter('select_directory_type') != null && getParameter('select_directory_type')=='external')
+    if(getParameter('select_directory_type') != null && getParameter('select_directory_type')=='internal')
     {
-        $smarty->assign("external_sel",'selected=selected');
-        $directory_type = 'external';
-    }
-    else{
         $smarty->assign("internal_sel",'selected=selected');
         $directory_type = 'internal';
+    }
+    else{
+        $smarty->assign("external_sel",'selected=selected');
+        $directory_type = 'external';
     }
     $_POST['select_directory_type'] = $directory_type;
 
@@ -415,7 +415,7 @@ function report_adress_book($smarty, $module_name, $local_templates_dir, $pDB, $
     $startDate = $endDate = date("Y-m-d H:i:s");
     $oGrid  = new paloSantoGrid($smarty);
 
-    $oGrid->addFilterControl(_tr("Filter applied ")._tr("Phone Directory")." =  $directory_type ", $arrFilter, array("select_directory_type" => "internal"),true);
+    $oGrid->addFilterControl(_tr("Filter applied ")._tr("Phone Directory")." =  $directory_type ", $arrFilter, array("select_directory_type" => "external"),true);
     $oGrid->addFilterControl(_tr("Filter applied ").$field." = $namePattern", $arrFilter, array("field" => "name","pattern" => ""));
 
     $htmlFilter = $oFilterForm->fetchForm("$local_templates_dir/filter_adress_book.tpl", "", $arrFilter);
@@ -491,7 +491,7 @@ function report_adress_book($smarty, $module_name, $local_templates_dir, $pDB, $
             }
 
 
-            $arrTmp[2]  = ($directory_type=='external')?"<a href='?menu=$module_name&action=show&type=".$directory_type."&id=".$adress_book['id']."'>".htmlspecialchars($adress_book['last_name'], ENT_QUOTES, "UTF-8")." ".htmlspecialchars($adress_book['name'], ENT_QUOTES, "UTF-8")."</a>":"<a href='?menu=$module_name&action=show&type=".$directory_type."&id=".$adress_book['id']."'>".$adress_book['description']."</a>";
+            $arrTmp[2]  = ($directory_type=='external')?"<a href='?menu=$module_name&action=show&type=".$directory_type."&id=".$adress_book['id']."'>".htmlspecialchars(trim($adress_book['name'].' '.$adress_book['last_name']), ENT_QUOTES, "UTF-8")."</a>":"<a href='?menu=$module_name&action=show&type=".$directory_type."&id=".$adress_book['id']."'>".$adress_book['description']."</a>";
             $arrTmp[3]  = ($directory_type=='external')?$adress_book['work_phone']:$adress_book['id'];
             $arrTmp[4]  = $email;
             $arrTmp[5]  = "<a href='#' onclick='callContact({$adress_book['id']},\"{$directory_type}\");'><img border=0 src='/modules/$module_name/images/call.png' /></a>";

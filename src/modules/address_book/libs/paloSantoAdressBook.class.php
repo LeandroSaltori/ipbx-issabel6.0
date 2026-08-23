@@ -79,7 +79,7 @@ a array with the field "total" containing the total of records.
         }
 
         if (count($whereFields) > 0) $sql .= ' WHERE '.implode(' AND ', $whereFields);
-        $sql .= ' ORDER BY last_name, name';
+        $sql .= ' ORDER BY name, last_name';
 
         if (!is_null($limit)) {
         	$sql .= ' LIMIT ?';
