@@ -127,7 +127,7 @@ function getCdr7DaysStatsMap($phoneNumbers = array(), $pDB = null) {
     $sevenDaysAgo = date('Y-m-d 00:00:00', strtotime('-7 days'));
     $inClause = "'" . implode("','", array_map('addslashes', $cleanList)) . "'";
 
-    // Quando o número é SRC no CDR -> Chamadas recebidas deste número (Entrada) ou originadas por este ramal
+    // Quando o número é SRC no CDR -> Significa chamada recebida deste número (Entrada)
     $sqlOrig = "SELECT src, count(*) as total FROM cdr WHERE calldate >= '$sevenDaysAgo' AND src IN ($inClause) GROUP BY src";
     $resOrig = @$pDB->fetchTable($sqlOrig, true);
     if (is_array($resOrig)) {
@@ -136,7 +136,7 @@ function getCdr7DaysStatsMap($phoneNumbers = array(), $pDB = null) {
         }
     }
 
-    // Quando o número é DST no CDR -> Chamadas ligadas para este número (Saída) ou recebidas por este ramal
+    // Quando o número é DST no CDR -> Significa que a empresa/ramal ligou para este número (Saída)
     $sqlRec = "SELECT dst, count(*) as total FROM cdr WHERE calldate >= '$sevenDaysAgo' AND dst IN ($inClause) GROUP BY dst";
     $resRec = @$pDB->fetchTable($sqlRec, true);
     if (is_array($resRec)) {
@@ -162,6 +162,38 @@ function getAsteriskExtensionNamesMap($pDB = null) {
     return $extMap;
 }
 
+function renderDirectionTrunkBadge($did, $raw_src, $val_dst, $channel = '', $dstchannel = '', $extNamesMap = array(), $groupsMap = array()) {
+    $cleanSrc = preg_replace('/\D/', '', $raw_src);
+    $cleanDst = preg_replace('/\D/', '', $val_dst);
+    $srcIsExt = (strlen($cleanSrc) >= 2 && strlen($cleanSrc) <= 5) || isset($extNamesMap[$raw_src]) || isset($extNamesMap[$cleanSrc]);
+    $dstIsExt = (strlen($cleanDst) >= 2 && strlen($cleanDst) <= 5) || isset($extNamesMap[$val_dst]) || isset($extNamesMap[$cleanDst]) || isset($groupsMap[$val_dst]);
+
+    // Extrai o nome do tronco
+    $trunkName = '';
+    $rawChannel = !empty($dstchannel) ? $dstchannel : $channel;
+    if (!empty($rawChannel) && $rawChannel != '-') {
+        if (preg_match('/^(?:SIP|PJSIP|IAX2|DAHDI|Khomp|Local)\/([^\/-]+)/i', $rawChannel, $m)) {
+            $candidate = trim($m[1]);
+            if (!is_numeric($candidate) || strlen($candidate) > 5) {
+                $trunkName = $candidate;
+            }
+        }
+    }
+
+    if (!empty($did) && $did != '-') {
+        return "<span title='📥 Entrada via Linha/DID: " . htmlspecialchars($did, ENT_QUOTES) . "' style='background:#f0fdf4; color:#166534; border:1px solid #bbf7d0; padding:4px 10px; border-radius:12px; font-weight:700; font-size:11px; display:inline-flex; align-items:center; gap:5px;'><i class='fa fa-arrow-down'></i> Entrada <span style='font-size:10px; color:#15803d; font-weight:600;'>(" . htmlspecialchars($did) . ")</span></span>";
+    } elseif ($srcIsExt && !$dstIsExt && !empty($val_dst) && $val_dst != '-') {
+        $sub = !empty($trunkName) ? " <span style='font-size:10px; color:#1e40af; font-weight:600;'>(" . htmlspecialchars($trunkName) . ")</span>" : "";
+        return "<span title='📤 Saída (Ramal para número externo)' style='background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; padding:4px 10px; border-radius:12px; font-weight:700; font-size:11px; display:inline-flex; align-items:center; gap:5px;'><i class='fa fa-arrow-up'></i> Saída$sub</span>";
+    } elseif ($srcIsExt && $dstIsExt) {
+        return "<span title='🏢 Chamada Interna (Ramal para Ramal)' style='background:#f8fafc; color:#475569; border:1px solid #e2e8f0; padding:4px 10px; border-radius:12px; font-weight:600; font-size:11px; display:inline-flex; align-items:center; gap:5px;'><i class='fa fa-phone'></i> Interno</span>";
+    } elseif (!empty($trunkName)) {
+        return "<span title='📥 Entrada via Tronco: " . htmlspecialchars($trunkName, ENT_QUOTES) . "' style='background:#f0fdf4; color:#166534; border:1px solid #bbf7d0; padding:4px 10px; border-radius:12px; font-weight:700; font-size:11px; display:inline-flex; align-items:center; gap:5px;'><i class='fa fa-arrow-down'></i> Entrada <span style='font-size:10px; color:#15803d; font-weight:600;'>(" . htmlspecialchars($trunkName) . ")</span></span>";
+    } else {
+        return "<span style='background:#f0fdf4; color:#166534; border:1px solid #bbf7d0; padding:4px 10px; border-radius:12px; font-weight:700; font-size:11px; display:inline-flex; align-items:center; gap:5px;'><i class='fa fa-arrow-down'></i> Entrada</span>";
+    }
+}
+
 function renderCallerWithContactBadge($raw_src, $val_src, $contactsMap = array(), $stats7d = array(), $extNamesMap = array()) {
     $raw_clean = preg_replace('/\D/', '', $raw_src);
     $contact = null;
@@ -174,13 +206,13 @@ function renderCallerWithContactBadge($raw_src, $val_src, $contactsMap = array()
     $fromClientCount = isset($stats7d[$raw_src]['recebidas_do_cliente']) ? $stats7d[$raw_src]['recebidas_do_cliente'] : (isset($stats7d[$raw_clean]['recebidas_do_cliente']) ? $stats7d[$raw_clean]['recebidas_do_cliente'] : 0);
     $toClientCount = isset($stats7d[$raw_src]['ligadas_para_o_cliente']) ? $stats7d[$raw_src]['ligadas_para_o_cliente'] : (isset($stats7d[$raw_clean]['ligadas_para_o_cliente']) ? $stats7d[$raw_clean]['ligadas_para_o_cliente'] : 0);
 
-    // 1. Contato Salvo na Agenda Externa
+    // 1. Se já for um contato cadastrado na Agenda Externa
     if ($contact && !empty($contact['fullName'])) {
         $tooltip = "📇 Contato: " . $contact['fullName'];
         if (!empty($contact['company'])) $tooltip .= "\n🏢 Empresa: " . $contact['company'];
         if (!empty($contact['email'])) $tooltip .= "\n📧 E-mail: " . $contact['email'];
         if (!empty($contact['notes'])) $tooltip .= "\n📝 Obs: " . $contact['notes'];
-        $tooltip .= "\n📊 Atividade (Últimos 7 dias):\n  • ⬇️ Recebidas deste número: $fromClientCount\n  • ⬆️ Ligadas para este número: $toClientCount";
+        $tooltip .= "\n📊 Últimos 7 dias:\n  • ⬇️ Recebidas deste número (Entrada): $fromClientCount\n  • ⬆️ Ligadas para este número (Saída): $toClientCount";
 
         return "<div style='display:inline-flex; align-items:center; gap:6px; flex-wrap:wrap;'>".
             "<span title='" . htmlspecialchars($tooltip, ENT_QUOTES) . "' style='background:rgba(37,99,235,0.08); color:#1d4ed8; padding:3px 8px; border-radius:6px; font-weight:700; font-size:11px; cursor:help; border:1px solid rgba(37,99,235,0.25); display:inline-flex; align-items:center; gap:4px;'>".
@@ -189,7 +221,7 @@ function renderCallerWithContactBadge($raw_src, $val_src, $contactsMap = array()
             "</div>";
     }
 
-    // 2. Ramal Interno (2 a 5 dígitos ou cadastrado no PBX)
+    // 2. Verificar se é Ramal Interno (2 a 5 dígitos ou mapeado no PBX)
     $isInternal = false;
     $extName = '';
     if (!empty($raw_src) && isset($extNamesMap[$raw_src])) {
@@ -204,18 +236,18 @@ function renderCallerWithContactBadge($raw_src, $val_src, $contactsMap = array()
 
     if ($isInternal) {
         $dispText = !empty($extName) ? "$val_src - $extName" : "$val_src";
-        $tooltip = "🏢 Ramal Interno: $dispText\n📊 Atividade (Últimos 7 dias):\n  • ⬇️ Chamadas atendidas pelo ramal: $toClientCount\n  • ⬆️ Chamadas originadas pelo ramal: $fromClientCount";
+        $tooltip = "🏢 Ramal Interno: $dispText\n📊 Últimos 7 dias:\n  • ⬇️ Chamadas recebidas: $toClientCount\n  • ⬆️ Chamadas originadas: $fromClientCount";
         return "<div style='display:inline-flex; align-items:center; gap:6px;'>".
-            "<span title='" . htmlspecialchars($tooltip, ENT_QUOTES) . "' style='background:#f1f5f9; color:#334155; padding:3px 8px; border-radius:6px; font-weight:600; font-size:11px; border:1px solid #e2e8f0; display:inline-flex; align-items:center; gap:4px; cursor:help;'>".
+            "<span title='" . htmlspecialchars($tooltip, ENT_QUOTES) . "' style='background:#f1f5f9; color:#334155; padding:3px 8px; border-radius:6px; font-weight:600; font-size:11px; border:1px solid #e2e8f0; display:inline-flex; align-items:center; gap:4px;'>".
             "👤 Ramal " . htmlspecialchars($dispText) .
             "</span>".
             "</div>";
     }
 
-    // 3. Número Externo Não Salvo (PSTN / Celular / Fixo) -> Destaque visual e Tooltip completo com 7 dias
-    $tooltip = "📞 Telefone Externo: $val_src\n📊 Atividade (Últimos 7 dias):\n  • ⬇️ Recebidas deste número: $fromClientCount\n  • ⬆️ Ligadas para este número: $toClientCount";
+    // 3. Número Externo (PSTN / Celular / Fixo) -> Exibe botão para Salvar na Agenda
+    $tooltip = "📞 Número Externo: $val_src\n📊 Últimos 7 dias:\n  • ⬇️ Recebidas deste número (Entrada): $fromClientCount\n  • ⬆️ Ligadas para este número (Saída): $toClientCount";
     $html = "<div style='display:inline-flex; align-items:center; gap:6px;'>".
-        "<span title='" . htmlspecialchars($tooltip, ENT_QUOTES) . "' style='background:#f8fafc; color:#1e293b; padding:3px 8px; border-radius:6px; font-weight:600; font-size:11px; border:1px solid #e2e8f0; display:inline-flex; align-items:center; gap:4px; cursor:help;'>📞 " . htmlspecialchars($val_src) . "</span>";
+        "<span title='" . htmlspecialchars($tooltip, ENT_QUOTES) . "' style='font-weight:600; color:#1e293b; cursor:help;'>📞 " . htmlspecialchars($val_src) . "</span>";
     if (!empty($raw_src) && $raw_src != '-') {
         $html .= "<button type='button' onclick=\"openAddressBookModal('" . htmlspecialchars($raw_src, ENT_QUOTES) . "')\" title='📇 Salvar na Agenda Pública\nClique para cadastrar este número na Agenda de Contatos Pública.' style='background:rgba(59,130,246,0.12); color:#2563eb; border:1px solid rgba(59,130,246,0.3); border-radius:50%; width:20px; height:20px; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; font-size:10px; transition:all 0.2s;' onmouseover=\"this.style.background='#2563eb'; this.style.color='#fff';\" onmouseout=\"this.style.background='rgba(59,130,246,0.12)'; this.style.color='#2563eb';\">📇</button>";
     }
@@ -578,7 +610,7 @@ function renderCelDetailsHtml($pDB, $uniqueid)
             tr:nth-child(even) { background:#f8fafc; }
             .badge-evt { padding:3px 8px; border-radius:6px; font-weight:bold; font-size:10px; display:inline-block; cursor:help; }
             .exten-badge { background:#f1f5f9; color:#334155; padding:2px 6px; border-radius:4px; font-family:monospace; font-weight:bold; font-size:11px; }
-        
+        #prisma_report_tooltip, .prisma_report_tooltip { display: none !important; opacity: 0 !important; visibility: hidden !important; pointer-events: none !important; }
 </style>
     </head>
     <body>
@@ -666,10 +698,6 @@ function renderCelDetailsHtml($pDB, $uniqueid)
                     <?php endif; ?>
                 </tbody>
             </table>
-        </div>
-
-        <div style="text-align:center; padding:15px 0 10px 0;">
-            <button type="button" onclick="if(window.parent && window.parent.closeCelModal){ window.parent.closeCelModal(); } else { window.close(); }" style="background:#475569; color:#ffffff; border:none; padding:8px 26px; border-radius:8px; font-weight:bold; cursor:pointer; font-size:13px; box-shadow:0 2px 6px rgba(0,0,0,0.15); transition:background 0.2s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='#475569'">Fechar</button>
         </div>
 
         <script>
@@ -787,7 +815,7 @@ function handleCdrExportPdf($oCDR, $module_name)
             td { padding:8px; border-bottom:1px solid #e2e8f0; }
             tr:nth-child(even) { background:#f8fafc; }
             @media print { .no-print { display:none; } }
-        
+        #prisma_report_tooltip, .prisma_report_tooltip { display: none !important; opacity: 0 !important; visibility: hidden !important; pointer-events: none !important; }
 </style>
     </head>
     <body onload="window.print();">
@@ -1303,35 +1331,27 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
         /* Sticky Bottom Audio Player */
         .sticky-audio-bar {
             position: fixed !important;
-            bottom: -160px !important;
+            bottom: -160px;
             left: 280px !important;
             right: 0 !important;
-            width: auto !important;
+            width: 100% !important;
+            max-width: 100vw !important;
             box-sizing: border-box !important;
-            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%) !important;
-            border-top: 2px solid #8b5cf6 !important;
-            border-left: 1px solid rgba(139, 92, 246, 0.3) !important;
-            box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.7) !important;
-            z-index: 9999 !important;
-            display: flex !important;
-            align-items: center !important;
-            padding: 10px 24px !important;
-            color: #ffffff !important;
-            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif !important;
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+            border-top: 2px solid #8b5cf6;
+            box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.5);
+            z-index: 2147483647 !important;
+            display: flex;
+            align-items: center;
+            padding: 10px 24px;
+            transition: bottom 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+            color: #ffffff;
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
             margin: 0 !important;
-            transition: bottom 0.35s cubic-bezier(0.16, 1, 0.3, 1), left 0.2s ease !important;
-        }
-        .page-container.sidebar-collapsed .sticky-audio-bar,
-        body.sidebar-collapsed .sticky-audio-bar {
-            left: 65px !important;
+            transform: none !important;
         }
         .sticky-audio-bar.active {
-            bottom: 0px !important;
-        }
-        @media (max-width: 767px) {
-            .sticky-audio-bar {
-                left: 0 !important;
-            }
+            bottom: 0 !important;
         }
         .sticky-audio-inner {
             display: flex;
@@ -1497,7 +1517,7 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
             background: #ef4444;
             color: #ffffff;
         }
-    
+    #prisma_report_tooltip, .prisma_report_tooltip { display: none !important; opacity: 0 !important; visibility: hidden !important; pointer-events: none !important; }
 </style>
 
     <div class="cdr-root">
@@ -1837,39 +1857,22 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
         </div>
     </div>
 
-    
-
-    <!-- Modal CEL Events -->
-    <div id="celModalCdr" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(15,23,42,0.65); backdrop-filter:blur(4px); z-index:2147483647; align-items:center; justify-content:center;" onclick="if(event.target === this) closeCelModal();">
-        <div class="modal-content-box" style="background:#ffffff; border-radius:14px; padding:20px; width:860px; max-width:95%; box-shadow:0 25px 50px -12px rgba(0,0,0,0.35); text-align:center; border:1px solid #e2e8f0; position:relative;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; border-bottom:1px solid #f1f5f9; padding-bottom:8px;">
-                <h4 style="margin:0; font-size:16px; color:#0f172a; font-weight:800; display:flex; align-items:center; gap:8px;">📋 Histórico de Eventos da Chamada (CEL)</h4>
-                <button type="button" onclick="closeCelModal()" style="background:none; border:none; color:#94a3b8; font-size:18px; cursor:pointer; font-weight:bold;">✖</button>
-            </div>
-            <iframe id="celIframeElement" style="width:100%; height:480px; border:none; border-radius:8px;"></iframe>
-            <div style="margin-top:12px; text-align:center;">
-                <button type="button" onclick="closeCelModal()" style="background:#475569; color:#fff; border:none; padding:7px 22px; border-radius:8px; font-weight:bold; cursor:pointer; font-size:12px; transition:background 0.2s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='#475569'">Fechar</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Modal Salvar na Agenda Pública -->
-    
-    <!-- Sticky Bottom Audio Player -->
+    <!-- Sticky Bottom Audio Player Flutuante -->
     <div id="stickyBottomAudioPlayer" class="sticky-audio-bar">
         <div class="sticky-audio-inner">
+            <!-- Info da Chamada -->
             <div class="sticky-audio-info">
                 <div class="sticky-audio-icon">🎧</div>
-                <div class="sticky-audio-meta">
-                    <div class="sticky-audio-title">REPRODUZINDO GRAVAÇÃO</div>
-                    <div class="sticky-audio-numbers">
-                        <span id="stkCaller">📞 -</span> <i class="fa fa-arrow-right" style="font-size:10px; opacity:0.6;"></i> <span id="stkTarget">🎯 -</span>
-                        <span id="stkTime" class="sticky-audio-time">00:00</span>
+                <div class="sticky-audio-details">
+                    <div class="sticky-audio-title">Reproduzindo Gravação</div>
+                    <div class="sticky-audio-meta">
+                        <span id="stkCaller">📞 -</span> ➔ <span id="stkTarget">🎯 -</span>
+                        <span id="stkTime" class="stk-time-badge">00:00 / 00:00</span>
                     </div>
                 </div>
             </div>
 
-            <!-- Controles de Áudio Centrais -->
+            <!-- Controles Centrais -->
             <div class="sticky-audio-controls">
                 <div class="sticky-audio-buttons">
                     <button type="button" class="btn-audio-ctrl" onclick="stkSeekRelative(-5)" title="Voltar 5 segundos">⏮ -5s</button>
@@ -1896,6 +1899,15 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
         <audio id="stkAudioElement" preload="auto"></audio>
     </div>
 
+    <!-- Modal CEL Events -->
+    <div id="celModalCdr">
+        <div class="modal-content-box" style="width:820px; max-width:95%;">
+            <iframe id="celIframeElement" style="width:100%; height:450px; border:none; border-radius:8px;"></iframe>
+            <button onclick="closeCelModal()" style="background:#64748b; color:#fff; border:none; padding:6px 16px; border-radius:6px; font-weight:bold; cursor:pointer; margin-top:10px;">Fechar</button>
+        </div>
+    </div>
+
+    <!-- Modal Salvar na Agenda Pública -->
     <div id="addressBookModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(15,23,42,0.65); backdrop-filter:blur(4px); z-index:2147483647; align-items:center; justify-content:center;">
         <div style="background:#ffffff; border-radius:14px; padding:24px; width:440px; max-width:92%; box-shadow:0 25px 50px -12px rgba(0,0,0,0.35); text-align:left; border:1px solid #e2e8f0; font-family:'Segoe UI', system-ui, sans-serif;">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; border-bottom:1px solid #f1f5f9; padding-bottom:10px;">
@@ -1947,7 +1959,6 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
 
             <script>
             var currentAudio = null;
-            setTimeout(ensureAudioBarInBody, 100);
 
             function getOrInitAudio() {
                 if (!currentAudio) {
@@ -1962,19 +1973,11 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
                 return currentAudio;
             }
 
-                                                function ensureAudioBarInBody() {
+            function ensureAudioBarInBody() {
                 var bar = document.getElementById('stickyBottomAudioPlayer');
                 if (bar && bar.parentElement !== document.body) {
                     document.body.appendChild(bar);
                 }
-            }
-            ensureAudioBarInBody();
-            document.addEventListener('DOMContentLoaded', ensureAudioBarInBody);
-            }
-            if (document.readyState === 'loading') {
-                document.addEventListener('DOMContentLoaded', ensureAudioBarInBody);
-            } else {
-                ensureAudioBarInBody();
             }
 
             function playCdrAudio(audioUrl, caller, target, downloadUrl) {
@@ -2070,21 +2073,9 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
 
             function openCelModal(uniqueId) {
                 var modal = document.getElementById('celModalCdr');
-                if (modal && modal.parentElement !== document.body) {
-                    document.body.appendChild(modal);
-                }
                 var iframe = document.getElementById('celIframeElement');
                 iframe.src = '?menu=<?php echo htmlspecialchars($module_name); ?>&rawmode=yes&uniqueid=' + uniqueId;
                 modal.style.display = 'flex';
-            }
-
-            function closeCelModal() {
-                var modal = document.getElementById('celModalCdr');
-                if (modal) {
-                    modal.style.display = 'none';
-                    var iframe = document.getElementById('celIframeElement');
-                    if (iframe) iframe.src = 'about:blank';
-                }
             }
 
             function openAddressBookModal(phoneNumber, name, lastName, company, email, notes) {
@@ -2154,15 +2145,11 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
                         var cur = aud.currentTime || 0;
                         var dur = aud.duration || 0;
                         var bar = document.getElementById('stkProgressBar');
-                        if (bar && dur > 0 && isFinite(dur)) {
+                        if (bar && dur > 0) {
                             bar.value = (cur / dur) * 100;
                         }
                         var timeEl = document.getElementById('stkTime');
-                        if (timeEl) {
-                            var curText = formatSecondsToMmSs(cur);
-                            var durText = (dur && isFinite(dur) && dur > 0) ? ' / ' + formatSecondsToMmSs(dur) : '';
-                            timeEl.textContent = curText + durText;
-                        }
+                        if (timeEl) timeEl.textContent = formatSecondsToMmSs(cur) + ' / ' + formatSecondsToMmSs(dur);
                     });
 
                     aud.addEventListener('ended', function() {
