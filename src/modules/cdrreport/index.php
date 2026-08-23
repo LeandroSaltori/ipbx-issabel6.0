@@ -1857,47 +1857,58 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
         </div>
     </div>
 
-    <!-- Sticky Bottom Audio Player Flutuante -->
-    <div id="stickyBottomAudioPlayer" class="sticky-audio-bar">
-        <div class="sticky-audio-inner">
-            <!-- Info da Chamada -->
-            <div class="sticky-audio-info">
-                <div class="sticky-audio-icon">🎧</div>
-                <div class="sticky-audio-details">
-                    <div class="sticky-audio-title">Reproduzindo Gravação</div>
-                    <div class="sticky-audio-meta">
-                        <span id="stkCaller">📞 -</span> ➔ <span id="stkTarget">🎯 -</span>
-                        <span id="stkTime" class="stk-time-badge">00:00 / 00:00</span>
+    
+        <!-- Modal Popup de Reprodução de Gravação -->
+        <div id="audioPlayerModal" class="audio-modal-overlay" style="display:none;" onclick="if(event.target === this) closeAudioPlayerModal();">
+            <div class="audio-modal-card">
+                <!-- Header do Popup -->
+                <div class="audio-modal-header">
+                    <div class="audio-modal-title-box">
+                        <span class="audio-modal-icon">🎧</span>
+                        <div>
+                            <h3 class="audio-modal-title">Reproduzindo Gravação</h3>
+                            <div class="audio-modal-meta">
+                                <span id="stkCaller">📞 Origem: -</span> ➔ <span id="stkTarget">🎯 Destino: -</span>
+                            </div>
+                        </div>
+                    </div>
+                    <button type="button" class="audio-modal-close-btn" onclick="closeAudioPlayerModal()" title="Fechar">✖</button>
+                </div>
+
+                <!-- Body do Popup -->
+                <div class="audio-modal-body">
+                    <!-- Barra de Progresso e Tempo -->
+                    <div class="audio-progress-container">
+                        <div class="audio-time-row">
+                            <span id="stkCurTime" class="time-text">00:00</span>
+                            <span id="stkTotalTime" class="time-text">00:00</span>
+                        </div>
+                        <input type="range" id="stkProgressBar" min="0" max="100" value="0" step="0.1" oninput="stkSeekTo(this.value)" class="audio-range-slider" />
+                    </div>
+
+                    <!-- Controles Principais -->
+                    <div class="audio-controls-row">
+                        <button type="button" class="btn-audio-ctrl" onclick="stkSeekRelative(-5)" title="Voltar 5 segundos">⏮ -5s</button>
+                        <button type="button" id="stkPlayPauseBtn" class="btn-audio-ctrl btn-play-main" onclick="stkTogglePlay()">⏸ Pausar</button>
+                        <button type="button" class="btn-audio-ctrl" onclick="stkSeekRelative(5)" title="Avançar 5 segundos">+5s ⏭</button>
+                    </div>
+
+                    <!-- Velocidade de Reprodução e Download -->
+                    <div class="audio-footer-row">
+                        <div class="audio-speed-group">
+                            <span class="speed-label">Velocidade:</span>
+                            <button type="button" class="speed-btn active" onclick="stkSetSpeed(1.0, this)">1.0x</button>
+                            <button type="button" class="speed-btn" onclick="stkSetSpeed(1.25, this)">1.25x</button>
+                            <button type="button" class="speed-btn" onclick="stkSetSpeed(1.5, this)">1.5x</button>
+                            <button type="button" class="speed-btn" onclick="stkSetSpeed(2.0, this)">2.0x</button>
+                        </div>
+                        <a id="stkDownloadBtn" href="#" target="_blank" class="btn-audio-download" title="Baixar Gravação">⬇️ Baixar Gravação</a>
                     </div>
                 </div>
             </div>
-
-            <!-- Controles Centrais -->
-            <div class="sticky-audio-controls">
-                <div class="sticky-audio-buttons">
-                    <button type="button" class="btn-audio-ctrl" onclick="stkSeekRelative(-5)" title="Voltar 5 segundos">⏮ -5s</button>
-                    <button type="button" id="stkPlayPauseBtn" class="btn-audio-ctrl btn-play-main" onclick="stkTogglePlay()">⏸ Pausar</button>
-                    <button type="button" class="btn-audio-ctrl" onclick="stkSeekRelative(5)" title="Avançar 5 segundos">+5s ⏭</button>
-                </div>
-                <div class="sticky-audio-progress-wrap">
-                    <input type="range" id="stkProgressBar" min="0" max="100" value="0" step="0.1" oninput="stkSeekTo(this.value)" />
-                </div>
-            </div>
-
-            <!-- Velocidade e Ações -->
-            <div class="sticky-audio-actions">
-                <div class="sticky-speed-selector">
-                    <button type="button" class="speed-btn active" onclick="stkSetSpeed(1.0, this)">1.0x</button>
-                    <button type="button" class="speed-btn" onclick="stkSetSpeed(1.25, this)">1.25x</button>
-                    <button type="button" class="speed-btn" onclick="stkSetSpeed(1.5, this)">1.5x</button>
-                    <button type="button" class="speed-btn" onclick="stkSetSpeed(2.0, this)">2.0x</button>
-                </div>
-                <a id="stkDownloadBtn" href="#" target="_blank" class="btn-audio-download" title="Baixar Áudio">⬇️</a>
-                <button type="button" class="btn-audio-close" onclick="closeStickyAudioPlayer()" title="Fechar Player">✖</button>
-            </div>
+            <audio id="stkAudioElement" preload="auto"></audio>
         </div>
-        <audio id="stkAudioElement" preload="auto"></audio>
-    </div>
+
 
         <!-- Modal CEL Events -->
     <div id="celModalCdr" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(15,23,42,0.65); backdrop-filter:blur(4px); z-index:2147483647; align-items:center; justify-content:center;">
