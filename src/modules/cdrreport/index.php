@@ -81,40 +81,95 @@ function handleSaveAddressBook($arrConf = array())
         $name = $telefono;
     }
 
-    $dbDir = isset($arrConf['issabel_dbdir']) ? $arrConf['issabel_dbdir'] : '/var/www/db';
-    if (!file_exists("{$dbDir}/address_book.db") && file_exists("/var/www/db/address_book.db")) {
-        $dbDir = '/var/www/db';
-    }
-    $dsn = "sqlite3:///{$dbDir}/address_book.db";
-    $pDB_addr = new paloDB($dsn);
+    $possibleDbPaths = array(
+        '/var/www/db/address_book.db',
+        '/var/www/html/db/address_book.db',
+        isset($arrConf['issabel_dbdir']) ? $arrConf['issabel_dbdir'] . '/address_book.db' : '/var/www/db/address_book.db'
+    );
 
-    if (!$pDB_addr->connStatus) {
-        echo json_encode(array('status' => 'error', 'message' => 'Erro ao conectar ao banco da Agenda: ' . $pDB_addr->errMsg));
-        exit;
+    $dbPath = '';
+    foreach ($possibleDbPaths as $p) {
+        if (file_exists($p)) {
+            $dbPath = $p;
+            break;
+        }
+    }
+    if (empty($dbPath)) {
+        $dbPath = '/var/www/db/address_book.db';
     }
 
     $cleanPhone = preg_replace('/\D/', '', $telefono);
-    $checkSql = "SELECT id, name, last_name FROM contact WHERE (telefono = ? OR telefono = ?) AND directory = 'external' LIMIT 1";
-    $existing = $pDB_addr->getFirstRowQuery($checkSql, true, array($telefono, $cleanPhone));
 
-    if (!empty($existing) && isset($existing['id'])) {
-        $updateSql = "UPDATE contact SET name=?, last_name=?, company=?, email=?, notes=?, status='isPublic', directory='external' WHERE id=?";
-        $ok = $pDB_addr->genQuery($updateSql, array($name, $last_name, $company, $email, $notes, $existing['id']));
-        if ($ok) {
-            echo json_encode(array('status' => 'success', 'message' => "Contato '$name' atualizado com sucesso na Agenda Pública!"));
+    try {
+        if (class_exists('SQLite3')) {
+            $db = new SQLite3($dbPath, SQLITE3_OPEN_READWRITE | SQLITE3_OPEN_CREATE);
+            
+            $stmt = $db->prepare("SELECT id, name, last_name, telefono FROM contact WHERE (telefono = :p1 OR telefono = :p2) AND directory = 'external' LIMIT 1");
+            $stmt->bindValue(':p1', $telefono, SQLITE3_TEXT);
+            $stmt->bindValue(':p2', $cleanPhone, SQLITE3_TEXT);
+            $res = $stmt->execute();
+            $existing = $res ? $res->fetchArray(SQLITE3_ASSOC) : false;
+
+            if ($existing && !empty($existing['id'])) {
+                $contactName = trim($existing['name'] . ' ' . $existing['last_name']);
+                if (empty($contactName)) $contactName = $existing['telefono'];
+                echo json_encode(array(
+                    'status' => 'exists',
+                    'message' => "Este número ($telefono) já está cadastrado na Agenda Pública como '$contactName'!"
+                ));
+                $db->close();
+                exit;
+            }
+
+            $insert = $db->prepare("INSERT INTO contact (name, last_name, telefono, cell_phone, home_phone, fax1, fax2, email, iduser, picture, province, city, address, company, company_contact, contact_rol, directory, notes, status, department, im) VALUES (:name, :last_name, :telefono, '', '', '', '', :email, 1, '', '', '', '', :company, '', '', 'external', :notes, 'isPublic', '', '')");
+            $insert->bindValue(':name', $name, SQLITE3_TEXT);
+            $insert->bindValue(':last_name', $last_name, SQLITE3_TEXT);
+            $insert->bindValue(':telefono', $telefono, SQLITE3_TEXT);
+            $insert->bindValue(':email', $email, SQLITE3_TEXT);
+            $insert->bindValue(':company', $company, SQLITE3_TEXT);
+            $insert->bindValue(':notes', $notes, SQLITE3_TEXT);
+            $insert->execute();
+            $db->close();
+
+            echo json_encode(array(
+                'status' => 'success',
+                'message' => "Contato '$name' cadastrado com sucesso na Agenda Pública!"
+            ));
+            exit;
         } else {
-            echo json_encode(array('status' => 'error', 'message' => 'Erro ao atualizar contato: ' . $pDB_addr->errMsg));
+            $pdo = new PDO("sqlite:$dbPath");
+            $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+
+            $stmt = $pdo->prepare("SELECT id, name, last_name, telefono FROM contact WHERE (telefono = ? OR telefono = ?) AND directory = 'external' LIMIT 1");
+            $stmt->execute(array($telefono, $cleanPhone));
+            $existing = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if ($existing && !empty($existing['id'])) {
+                $contactName = trim($existing['name'] . ' ' . $existing['last_name']);
+                if (empty($contactName)) $contactName = $existing['telefono'];
+                echo json_encode(array(
+                    'status' => 'exists',
+                    'message' => "Este número ($telefono) já está cadastrado na Agenda Pública como '$contactName'!"
+                ));
+                exit;
+            }
+
+            $insert = $pdo->prepare("INSERT INTO contact (name, last_name, telefono, cell_phone, home_phone, fax1, fax2, email, iduser, picture, province, city, address, company, company_contact, contact_rol, directory, notes, status, department, im) VALUES (?, ?, ?, '', '', '', '', ?, 1, '', '', '', '', ?, '', '', 'external', ?, 'isPublic', '', '')");
+            $insert->execute(array($name, $last_name, $telefono, $email, $company, $notes));
+
+            echo json_encode(array(
+                'status' => 'success',
+                'message' => "Contato '$name' cadastrado com sucesso na Agenda Pública!"
+            ));
+            exit;
         }
-    } else {
-        $insertSql = "INSERT INTO contact (name, last_name, telefono, cell_phone, home_phone, fax1, fax2, email, iduser, picture, province, city, address, company, company_contact, contact_rol, directory, notes, status, department, im) VALUES (?, ?, ?, '', '', '', '', ?, 1, '', '', '', '', ?, '', '', 'external', ?, 'isPublic', '', '')";
-        $ok = $pDB_addr->genQuery($insertSql, array($name, $last_name, $telefono, $email, $company, $notes));
-        if ($ok) {
-            echo json_encode(array('status' => 'success', 'message' => "Contato '$name' cadastrado com sucesso na Agenda Pública!"));
-        } else {
-            echo json_encode(array('status' => 'error', 'message' => 'Erro ao cadastrar contato: ' . $pDB_addr->errMsg));
-        }
+    } catch (Exception $e) {
+        echo json_encode(array(
+            'status' => 'error',
+            'message' => 'Erro ao salvar contato no banco da Agenda: ' . $e->getMessage()
+        ));
+        exit;
     }
-    exit;
 }
 
 function _moduleContent(&$smarty, $module_name)
@@ -1850,6 +1905,8 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
             if (res.status === 'success') {
                 alert('✅ ' + res.message);
                 closeAddressBookModal();
+            } else if (res.status === 'exists') {
+                alert('⚠️ ' + res.message);
             } else {
                 alert('❌ ' + (res.message || 'Erro ao salvar contato.'));
             }
