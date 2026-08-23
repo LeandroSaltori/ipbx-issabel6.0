@@ -144,6 +144,24 @@ function _moduleContent(&$smarty, $module_name)
         .chart-card-box { background: #ffffff; border-radius: 10px; padding: 16px 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.04); border: 1px solid #e2e8f0; height: 280px; display: flex; flex-direction: column; }
         .chart-card-box h4 { margin: 0 0 10px 0; font-size: 12px; font-weight: 800; color: #334155; text-transform: uppercase; border-bottom: 1px solid #f1f5f9; padding-bottom: 4px; }
         .chart-canvas-wrapper { position: relative; flex: 1; width: 100%; height: 100%; }
+        .table-card-box { background: #ffffff; border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.04); border: 1px solid #e2e8f0; overflow: hidden; margin-top: 15px; margin-bottom: 25px; }
+        .gr-table { width: 100%; border-collapse: collapse; text-align: left; }
+        .gr-table thead { background: #334155; color: #ffffff; }
+        .gr-table th { padding: 10px 14px; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; }
+        .gr-table td { padding: 10px 14px; border-bottom: 1px solid #f1f5f9; font-size: 12px; vertical-align: middle; }
+        .gr-table tbody tr:hover { background: #f8fafc; }
+
+        .badge-status { padding: 3px 8px; border-radius: 6px; font-weight: bold; font-size: 10px; display: inline-flex; align-items: center; gap: 4px; }
+        .badge-ans { background: #dcfce7; color: #15803d; border: 1px solid #86efac; }
+        .badge-noans { background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; }
+        .badge-busy { background: #fef3c7; color: #b45309; border: 1px solid #fde68a; }
+        .badge-fail { background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; }
+
+        .badge-type { padding: 2px 7px; border-radius: 4px; font-size: 10px; font-weight: bold; }
+        .badge-in { background: #dcfce7; color: #15803d; border: 1px solid #86efac; }
+        .badge-out { background: #dbeafe; color: #1e40af; border: 1px solid #93c5fd; }
+        .badge-int { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
+
     </style>
 
     <div class="gr-root">
@@ -241,6 +259,74 @@ function _moduleContent(&$smarty, $module_name)
                     <canvas id="chartGrStatus"></canvas>
                 </div>
             </div>
+        </div>
+
+        <!-- Tabela de Detalhamento das Chamadas -->
+        <div class="table-card-box">
+            <div style="padding:14px 16px; background:#f8fafc; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center;">
+                <h4 style="margin:0; font-size:13px; font-weight:800; color:#334155; text-transform:uppercase;">📋 Detalhamento das Chamadas do Período (Exibindo até 200 registros)</h4>
+                <span style="font-size:11px; color:#64748b; font-weight:600;">Total: <?php echo number_format($totCalls, 0, ',', '.'); ?> ligações</span>
+            </div>
+            <table class="gr-table">
+                <thead>
+                    <tr>
+                        <th>Data / Hora</th>
+                        <th>Origem (Bina / Ramal)</th>
+                        <th>Destino</th>
+                        <th>Tipo</th>
+                        <th>Status</th>
+                        <th>Duração</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php if (count($rows) > 0): ?>
+                        <?php 
+                        $displayRows = array_slice($rows, 0, 200);
+                        foreach ($displayRows as $r): 
+                            $st = strtoupper(trim($r['disposition']));
+                            $dur = (int)$r['duration'];
+                            $src = !empty($r['src']) ? $r['src'] : '-';
+                            $dst = !empty($r['dst']) ? $r['dst'] : '-';
+
+                            $srcDigits = preg_replace('/[^0-9]/', '', $src);
+                            $dstDigits = preg_replace('/[^0-9]/', '', $dst);
+                            
+                            $isOut = strlen($srcDigits) <= 5 && strlen($dstDigits) > 5;
+                            $isIn  = strlen($srcDigits) > 5 && strlen($dstDigits) <= 5;
+                        ?>
+                            <tr>
+                                <td><span style="color:#334155; font-weight:600; font-size:11px;">📅 <?php echo htmlspecialchars($r['calldate']); ?></span></td>
+                                <td><span style="font-weight:700; color:#0f172a;">📞 <?php echo htmlspecialchars($src); ?></span></td>
+                                <td><span style="background:#f1f5f9; color:#334155; padding:3px 8px; border-radius:6px; font-weight:600; font-size:11px;">🎯 <?php echo htmlspecialchars($dst); ?></span></td>
+                                <td>
+                                    <?php if ($isOut): ?>
+                                        <span class="badge-type badge-out">⬆️ Saindo (Efetuada)</span>
+                                    <?php elseif ($isIn): ?>
+                                        <span class="badge-type badge-in">⬇️ Entrante (Recebida)</span>
+                                    <?php else: ?>
+                                        <span class="badge-type badge-int">🔄 Interna / Ramal</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td>
+                                    <?php
+                                    if ($st == 'ANSWERED') echo "<span class='badge-status badge-ans'>✅ ATENDIDA</span>";
+                                    elseif ($st == 'NO ANSWER') echo "<span class='badge-status badge-noans'>📵 NÃO ATENDEU</span>";
+                                    elseif ($st == 'BUSY') echo "<span class='badge-status badge-busy'>🟡 OCUPADO</span>";
+                                    else echo "<span class='badge-status badge-fail'>✖ $st</span>";
+                                    ?>
+                                </td>
+                                <td><span style="color:#0f172a; font-weight:700; font-size:11px;">⏱️ <?php echo sprintf('%02d:%02d', floor($dur / 60), $dur % 60); ?></span></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    <?php else: ?>
+                        <tr>
+                            <td colspan="6" style="text-align:center; padding:25px; color:#64748b;">
+                                Nenhum registro de ligação encontrado para os filtros selecionados.
+                            </td>
+                        </tr>
+                    <?php endif; ?>
+                </tbody>
+            </table>
         </div>
     </div>
 
