@@ -87,24 +87,25 @@ function getCdr7DaysStatsMap($phoneNumbers = array(), $pDB = null) {
     $sevenDaysAgo = date('Y-m-d 00:00:00', strtotime('-7 days'));
     $inClause = "'" . implode("','", array_map('addslashes', $cleanList)) . "'";
 
+    // Quando o número é SRC no CDR -> Significa chamada recebida deste número (Entrada)
     $sqlOrig = "SELECT src, count(*) as total FROM cdr WHERE calldate >= '$sevenDaysAgo' AND src IN ($inClause) GROUP BY src";
-    $resOrig = $pDB->fetchTable($sqlOrig, true);
+    $resOrig = @$pDB->fetchTable($sqlOrig, true);
     if (is_array($resOrig)) {
         foreach ($resOrig as $row) {
-            $stats[$row['src']]['originadas'] = (int)$row['total'];
+            $stats[$row['src']]['recebidas_do_cliente'] = (int)$row['total'];
         }
     }
 
+    // Quando o número é DST no CDR -> Significa que a empresa/ramal ligou para este número (Saída)
     $sqlRec = "SELECT dst, count(*) as total FROM cdr WHERE calldate >= '$sevenDaysAgo' AND dst IN ($inClause) GROUP BY dst";
-    $resRec = $pDB->fetchTable($sqlRec, true);
+    $resRec = @$pDB->fetchTable($sqlRec, true);
     if (is_array($resRec)) {
         foreach ($resRec as $row) {
-            $stats[$row['dst']]['recebidas'] = (int)$row['total'];
+            $stats[$row['dst']]['ligadas_para_o_cliente'] = (int)$row['total'];
         }
     }
     return $stats;
 }
-
 
 function getAsteriskExtensionNamesMap($pDB = null) {
     static $extMap = null;
@@ -130,8 +131,8 @@ function renderCallerWithContactBadge($raw_src, $val_src, $contactsMap = array()
         $contact = $contactsMap[$raw_clean];
     }
 
-    $origCount = isset($stats7d[$raw_src]['originadas']) ? $stats7d[$raw_src]['originadas'] : (isset($stats7d[$raw_clean]['originadas']) ? $stats7d[$raw_clean]['originadas'] : 0);
-    $recCount = isset($stats7d[$raw_src]['recebidas']) ? $stats7d[$raw_src]['recebidas'] : (isset($stats7d[$raw_clean]['recebidas']) ? $stats7d[$raw_clean]['recebidas'] : 0);
+    $fromClientCount = isset($stats7d[$raw_src]['recebidas_do_cliente']) ? $stats7d[$raw_src]['recebidas_do_cliente'] : (isset($stats7d[$raw_clean]['recebidas_do_cliente']) ? $stats7d[$raw_clean]['recebidas_do_cliente'] : 0);
+    $toClientCount = isset($stats7d[$raw_src]['ligadas_para_o_cliente']) ? $stats7d[$raw_src]['ligadas_para_o_cliente'] : (isset($stats7d[$raw_clean]['ligadas_para_o_cliente']) ? $stats7d[$raw_clean]['ligadas_para_o_cliente'] : 0);
 
     // 1. Se já for um contato cadastrado na Agenda Externa
     if ($contact && !empty($contact['fullName'])) {
@@ -139,7 +140,7 @@ function renderCallerWithContactBadge($raw_src, $val_src, $contactsMap = array()
         if (!empty($contact['company'])) $tooltip .= "\n🏢 Empresa: " . $contact['company'];
         if (!empty($contact['email'])) $tooltip .= "\n📧 E-mail: " . $contact['email'];
         if (!empty($contact['notes'])) $tooltip .= "\n📝 Obs: " . $contact['notes'];
-        $tooltip .= "\n📊 Últimos 7 dias:\n  • ⬇️ Recebidas deste número: $recCount\n  • ⬆️ Ligadas para este número: $origCount";
+        $tooltip .= "\n📊 Últimos 7 dias:\n  • ⬇️ Recebidas deste número (Entrada): $fromClientCount\n  • ⬆️ Ligadas para este número (Saída): $toClientCount";
 
         return "<div style='display:inline-flex; align-items:center; gap:6px; flex-wrap:wrap;'>".
             "<span title='" . htmlspecialchars($tooltip, ENT_QUOTES) . "' style='background:rgba(37,99,235,0.08); color:#1d4ed8; padding:3px 8px; border-radius:6px; font-weight:700; font-size:11px; cursor:help; border:1px solid rgba(37,99,235,0.25); display:inline-flex; align-items:center; gap:4px;'>".
@@ -163,7 +164,7 @@ function renderCallerWithContactBadge($raw_src, $val_src, $contactsMap = array()
 
     if ($isInternal) {
         $dispText = !empty($extName) ? "$val_src - $extName" : "$val_src";
-        $tooltip = "🏢 Ramal Interno: $dispText\n📊 Últimos 7 dias:\n  • ⬇️ Chamadas recebidas: $recCount\n  • ⬆️ Chamadas originadas: $origCount";
+        $tooltip = "🏢 Ramal Interno: $dispText\n📊 Últimos 7 dias:\n  • ⬇️ Chamadas recebidas: $toClientCount\n  • ⬆️ Chamadas originadas: $fromClientCount";
         return "<div style='display:inline-flex; align-items:center; gap:6px;'>".
             "<span title='" . htmlspecialchars($tooltip, ENT_QUOTES) . "' style='background:#f1f5f9; color:#334155; padding:3px 8px; border-radius:6px; font-weight:600; font-size:11px; border:1px solid #e2e8f0; display:inline-flex; align-items:center; gap:4px;'>".
             "👤 Ramal " . htmlspecialchars($dispText) .
@@ -172,7 +173,7 @@ function renderCallerWithContactBadge($raw_src, $val_src, $contactsMap = array()
     }
 
     // 3. Número Externo (PSTN / Celular / Fixo) -> Exibe botão para Salvar na Agenda
-    $tooltip = "📞 Número Externo: $val_src\n📊 Últimos 7 dias:\n  • ⬇️ Recebidas deste número: $recCount\n  • ⬆️ Ligadas para este número: $origCount";
+    $tooltip = "📞 Número Externo: $val_src\n📊 Últimos 7 dias:\n  • ⬇️ Recebidas deste número (Entrada): $fromClientCount\n  • ⬆️ Ligadas para este número (Saída): $toClientCount";
     $html = "<div style='display:inline-flex; align-items:center; gap:6px;'>".
         "<span title='" . htmlspecialchars($tooltip, ENT_QUOTES) . "' style='font-weight:600; color:#1e293b; cursor:help;'>📞 " . htmlspecialchars($val_src) . "</span>";
     if (!empty($raw_src) && $raw_src != '-') {

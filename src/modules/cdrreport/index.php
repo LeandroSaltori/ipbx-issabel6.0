@@ -127,24 +127,25 @@ function getCdr7DaysStatsMap($phoneNumbers = array(), $pDB = null) {
     $sevenDaysAgo = date('Y-m-d 00:00:00', strtotime('-7 days'));
     $inClause = "'" . implode("','", array_map('addslashes', $cleanList)) . "'";
 
+    // Quando o número é SRC no CDR -> Significa chamada recebida deste número (Entrada)
     $sqlOrig = "SELECT src, count(*) as total FROM cdr WHERE calldate >= '$sevenDaysAgo' AND src IN ($inClause) GROUP BY src";
-    $resOrig = $pDB->fetchTable($sqlOrig, true);
+    $resOrig = @$pDB->fetchTable($sqlOrig, true);
     if (is_array($resOrig)) {
         foreach ($resOrig as $row) {
-            $stats[$row['src']]['originadas'] = (int)$row['total'];
+            $stats[$row['src']]['recebidas_do_cliente'] = (int)$row['total'];
         }
     }
 
+    // Quando o número é DST no CDR -> Significa que a empresa/ramal ligou para este número (Saída)
     $sqlRec = "SELECT dst, count(*) as total FROM cdr WHERE calldate >= '$sevenDaysAgo' AND dst IN ($inClause) GROUP BY dst";
-    $resRec = $pDB->fetchTable($sqlRec, true);
+    $resRec = @$pDB->fetchTable($sqlRec, true);
     if (is_array($resRec)) {
         foreach ($resRec as $row) {
-            $stats[$row['dst']]['recebidas'] = (int)$row['total'];
+            $stats[$row['dst']]['ligadas_para_o_cliente'] = (int)$row['total'];
         }
     }
     return $stats;
 }
-
 
 function getAsteriskExtensionNamesMap($pDB = null) {
     static $extMap = null;
@@ -170,8 +171,8 @@ function renderCallerWithContactBadge($raw_src, $val_src, $contactsMap = array()
         $contact = $contactsMap[$raw_clean];
     }
 
-    $origCount = isset($stats7d[$raw_src]['originadas']) ? $stats7d[$raw_src]['originadas'] : (isset($stats7d[$raw_clean]['originadas']) ? $stats7d[$raw_clean]['originadas'] : 0);
-    $recCount = isset($stats7d[$raw_src]['recebidas']) ? $stats7d[$raw_src]['recebidas'] : (isset($stats7d[$raw_clean]['recebidas']) ? $stats7d[$raw_clean]['recebidas'] : 0);
+    $fromClientCount = isset($stats7d[$raw_src]['recebidas_do_cliente']) ? $stats7d[$raw_src]['recebidas_do_cliente'] : (isset($stats7d[$raw_clean]['recebidas_do_cliente']) ? $stats7d[$raw_clean]['recebidas_do_cliente'] : 0);
+    $toClientCount = isset($stats7d[$raw_src]['ligadas_para_o_cliente']) ? $stats7d[$raw_src]['ligadas_para_o_cliente'] : (isset($stats7d[$raw_clean]['ligadas_para_o_cliente']) ? $stats7d[$raw_clean]['ligadas_para_o_cliente'] : 0);
 
     // 1. Se já for um contato cadastrado na Agenda Externa
     if ($contact && !empty($contact['fullName'])) {
@@ -179,7 +180,7 @@ function renderCallerWithContactBadge($raw_src, $val_src, $contactsMap = array()
         if (!empty($contact['company'])) $tooltip .= "\n🏢 Empresa: " . $contact['company'];
         if (!empty($contact['email'])) $tooltip .= "\n📧 E-mail: " . $contact['email'];
         if (!empty($contact['notes'])) $tooltip .= "\n📝 Obs: " . $contact['notes'];
-        $tooltip .= "\n📊 Últimos 7 dias:\n  • ⬇️ Recebidas deste número: $recCount\n  • ⬆️ Ligadas para este número: $origCount";
+        $tooltip .= "\n📊 Últimos 7 dias:\n  • ⬇️ Recebidas deste número (Entrada): $fromClientCount\n  • ⬆️ Ligadas para este número (Saída): $toClientCount";
 
         return "<div style='display:inline-flex; align-items:center; gap:6px; flex-wrap:wrap;'>".
             "<span title='" . htmlspecialchars($tooltip, ENT_QUOTES) . "' style='background:rgba(37,99,235,0.08); color:#1d4ed8; padding:3px 8px; border-radius:6px; font-weight:700; font-size:11px; cursor:help; border:1px solid rgba(37,99,235,0.25); display:inline-flex; align-items:center; gap:4px;'>".
@@ -203,7 +204,7 @@ function renderCallerWithContactBadge($raw_src, $val_src, $contactsMap = array()
 
     if ($isInternal) {
         $dispText = !empty($extName) ? "$val_src - $extName" : "$val_src";
-        $tooltip = "🏢 Ramal Interno: $dispText\n📊 Últimos 7 dias:\n  • ⬇️ Chamadas recebidas: $recCount\n  • ⬆️ Chamadas originadas: $origCount";
+        $tooltip = "🏢 Ramal Interno: $dispText\n📊 Últimos 7 dias:\n  • ⬇️ Chamadas recebidas: $toClientCount\n  • ⬆️ Chamadas originadas: $fromClientCount";
         return "<div style='display:inline-flex; align-items:center; gap:6px;'>".
             "<span title='" . htmlspecialchars($tooltip, ENT_QUOTES) . "' style='background:#f1f5f9; color:#334155; padding:3px 8px; border-radius:6px; font-weight:600; font-size:11px; border:1px solid #e2e8f0; display:inline-flex; align-items:center; gap:4px;'>".
             "👤 Ramal " . htmlspecialchars($dispText) .
@@ -212,7 +213,7 @@ function renderCallerWithContactBadge($raw_src, $val_src, $contactsMap = array()
     }
 
     // 3. Número Externo (PSTN / Celular / Fixo) -> Exibe botão para Salvar na Agenda
-    $tooltip = "📞 Número Externo: $val_src\n📊 Últimos 7 dias:\n  • ⬇️ Recebidas deste número: $recCount\n  • ⬆️ Ligadas para este número: $origCount";
+    $tooltip = "📞 Número Externo: $val_src\n📊 Últimos 7 dias:\n  • ⬇️ Recebidas deste número (Entrada): $fromClientCount\n  • ⬆️ Ligadas para este número (Saída): $toClientCount";
     $html = "<div style='display:inline-flex; align-items:center; gap:6px;'>".
         "<span title='" . htmlspecialchars($tooltip, ENT_QUOTES) . "' style='font-weight:600; color:#1e293b; cursor:help;'>📞 " . htmlspecialchars($val_src) . "</span>";
     if (!empty($raw_src) && $raw_src != '-') {
@@ -1915,230 +1916,206 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
         </div>
     </div>
 
-    <script>
-    var currentAudio = document.getElementById('stkAudioElement');
+            <script>
+            var currentAudio = null;
 
-    function ensureAudioBarInBody() {
-        var bar = document.getElementById('stickyBottomAudioPlayer');
-        if (bar && bar.parentElement !== document.body) {
-            document.body.appendChild(bar);
-        }
-    }
-
-    document.addEventListener("DOMContentLoaded", function() {
-        ensureAudioBarInBody();
-    });
-
-    function playCdrAudio(audioUrl, caller, target, downloadUrl) {
-        ensureAudioBarInBody();
-        var bar = document.getElementById('stickyBottomAudioPlayer');
-        document.getElementById('stkCaller').textContent = '📞 ' + (caller || '-');
-        document.getElementById('stkTarget').textContent = '🎯 ' + (target || '-');
-        document.getElementById('stkDownloadBtn').href = downloadUrl || audioUrl;
-        
-        currentAudio.src = audioUrl;
-        bar.classList.add('active');
-        
-        var p = currentAudio.play();
-        if (p !== undefined) {
-            p.then(function() {
-                updatePlayPauseButton(true);
-            }).catch(function(err) {
-                console.log("Audio play error:", err);
-                updatePlayPauseButton(false);
-            });
-        }
-    }
-
-    function updatePlayPauseButton(isPlaying) {
-        var btn = document.getElementById('stkPlayPauseBtn');
-        if (isPlaying) {
-            btn.innerHTML = '⏸ Pausar';
-            btn.style.background = '#e11d48';
-        } else {
-            btn.innerHTML = '▶ Continuar';
-            btn.style.background = '#7c3aed';
-        }
-    }
-
-    function stkTogglePlay() {
-        if (currentAudio.paused) {
-            currentAudio.play();
-            updatePlayPauseButton(true);
-        } else {
-            currentAudio.pause();
-            updatePlayPauseButton(false);
-        }
-    }
-
-    function stkSeekRelative(seconds) {
-        if (currentAudio) {
-            currentAudio.currentTime = Math.max(0, Math.min(currentAudio.duration || 0, currentAudio.currentTime + seconds));
-        }
-    }
-
-    function stkSeekTo(val) {
-        if (currentAudio && currentAudio.duration) {
-            currentAudio.currentTime = (val / 100) * currentAudio.duration;
-        }
-    }
-
-    function stkSetSpeed(speed, btn) {
-        if (currentAudio) {
-            currentAudio.playbackRate = speed;
-            var pills = document.querySelectorAll('.sticky-speed-selector .speed-btn');
-            pills.forEach(function(p) { p.classList.remove('active'); });
-            if (btn) btn.classList.add('active');
-        }
-    }
-
-    function closeStickyAudioPlayer() {
-        if (currentAudio) {
-            currentAudio.pause();
-            currentAudio.currentTime = 0;
-        }
-        document.getElementById('stickyBottomAudioPlayer').classList.remove('active');
-    }
-
-    currentAudio.addEventListener('timeupdate', function() {
-        var cur = currentAudio.currentTime || 0;
-        var dur = currentAudio.duration || 0;
-        var bar = document.getElementById('stkProgressBar');
-        if (dur > 0) {
-            bar.value = (cur / dur) * 100;
-        }
-        document.getElementById('stkTime').textContent = formatSecondsToMmSs(cur) + ' / ' + formatSecondsToMmSs(dur);
-    });
-
-    currentAudio.addEventListener('ended', function() {
-        updatePlayPauseButton(false);
-    });
-
-    function formatSecondsToMmSs(secs) {
-        var m = Math.floor(secs / 60);
-        var s = Math.floor(secs % 60);
-        return (m < 10 ? '0' + m : m) + ':' + (s < 10 ? '0' + s : s);
-    }
-
-    function openCelModal(uniqueId) {
-        var modal = document.getElementById('celModalCdr');
-        var iframe = document.getElementById('celIframeElement');
-        iframe.src = '?menu=<?php echo htmlspecialchars($module_name); ?>&rawmode=yes&uniqueid=' + uniqueId;
-        modal.style.display = 'flex';
-    }
-            function openAddressBookModal(phoneNumber, name, lastName, company, email, notes) {
-        var modal = document.getElementById('addressBookModal');
-        if (modal && modal.parentElement !== document.body) {
-            document.body.appendChild(modal);
-        }
-        document.getElementById('ab_phone').value = phoneNumber || '';
-        document.getElementById('ab_name').value = name || '';
-        document.getElementById('ab_last_name').value = lastName || '';
-        document.getElementById('ab_company').value = company || '';
-        document.getElementById('ab_email').value = email || '';
-        document.getElementById('ab_notes').value = notes || '';
-        modal.style.display = 'flex';
-        document.getElementById('ab_name').focus();
-    }
-        document.getElementById('ab_phone').value = phoneNumber || '';
-        document.getElementById('ab_name').value = '';
-        document.getElementById('ab_last_name').value = '';
-        document.getElementById('ab_company').value = '';
-        document.getElementById('ab_email').value = '';
-        document.getElementById('ab_notes').value = '';
-        modal.style.display = 'flex';
-        document.getElementById('ab_name').focus();
-    }
-
-    function closeAddressBookModal() {
-        document.getElementById('addressBookModal').style.display = 'none';
-    }
-
-    function submitSaveAddressBook(e) {
-        e.preventDefault();
-        var btn = document.getElementById('btnSaveAb');
-        btn.disabled = true;
-        btn.textContent = 'Salvando...';
-
-        var data = new FormData();
-        data.append('action', 'save_address_book');
-        data.append('phone', document.getElementById('ab_phone').value);
-        data.append('name', document.getElementById('ab_name').value);
-        data.append('last_name', document.getElementById('ab_last_name').value);
-        data.append('company', document.getElementById('ab_company').value);
-        data.append('email', document.getElementById('ab_email').value);
-        data.append('notes', document.getElementById('ab_notes').value);
-
-        fetch('index.php?menu=<?php echo htmlspecialchars($module_name); ?>&rawmode=yes', {
-            method: 'POST',
-            body: data
-        })
-        .then(function(r) { return r.json(); })
-        .then(function(res) {
-            btn.disabled = false;
-            btn.textContent = '💾 Salvar Contato';
-            if (res.status === 'success') {
-                alert('✅ ' + res.message);
-                closeAddressBookModal();
-            } else if (res.status === 'exists') {
-                alert('⚠️ ' + res.message);
-            } else {
-                alert('❌ ' + (res.message || 'Erro ao salvar contato.'));
+            function getOrInitAudio() {
+                if (!currentAudio) {
+                    currentAudio = document.getElementById('stkAudioElement');
+                }
+                if (!currentAudio) {
+                    currentAudio = document.createElement('audio');
+                    currentAudio.id = 'stkAudioElement';
+                    currentAudio.preload = 'auto';
+                    document.body.appendChild(currentAudio);
+                }
+                return currentAudio;
             }
-        })
-        .catch(function(err) {
-            btn.disabled = false;
-            btn.textContent = '💾 Salvar Contato';
-            alert('❌ Erro na comunicação com o servidor: ' + err);
-        });
-    }
 
-    document.addEventListener("DOMContentLoaded", function() {
-        if (typeof Chart !== 'undefined') {
-            var ctxHourly = document.getElementById('chartCdrHourly').getContext('2d');
-            new Chart(ctxHourly, {
-                type: 'bar',
-                data: {
-                    labels: ['00h','01h','02h','03h','04h','05h','06h','07h','08h','09h','10h','11h','12h','13h','14h','15h','16h','17h','18h','19h','20h','21h','22h','23h'],
-                    datasets: [{
-                        label: 'Volume de Ligações',
-                        data: [<?php echo implode(',', $hourlyTraffic); ?>],
-                        backgroundColor: '#6366f1',
-                        borderRadius: 4
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        y: { beginAtZero: true, grid: { color: '#f1f5f9' } },
-                        x: { grid: { display: false } }
+            function ensureAudioBarInBody() {
+                var bar = document.getElementById('stickyBottomAudioPlayer');
+                if (bar && bar.parentElement !== document.body) {
+                    document.body.appendChild(bar);
+                }
+            }
+
+            function playCdrAudio(audioUrl, caller, target, downloadUrl) {
+                ensureAudioBarInBody();
+                var bar = document.getElementById('stickyBottomAudioPlayer');
+                var aud = getOrInitAudio();
+
+                var callerEl = document.getElementById('stkCaller');
+                if (callerEl) callerEl.textContent = '📞 ' + (caller || '-');
+                var targetEl = document.getElementById('stkTarget');
+                if (targetEl) targetEl.textContent = '🎯 ' + (target || '-');
+                var downEl = document.getElementById('stkDownloadBtn');
+                if (downEl) downEl.href = downloadUrl || audioUrl;
+                
+                aud.src = audioUrl;
+                if (bar) bar.classList.add('active');
+                
+                var p = aud.play();
+                if (p !== undefined) {
+                    p.then(function() {
+                        updatePlayPauseButton(true);
+                    }).catch(function(err) {
+                        console.log("Audio play error:", err);
+                        updatePlayPauseButton(false);
+                    });
+                }
+            }
+
+            function updatePlayPauseButton(isPlaying) {
+                var btn = document.getElementById('stkPlayPauseBtn');
+                if (btn) {
+                    if (isPlaying) {
+                        btn.innerHTML = '⏸ Pausar';
+                        btn.style.background = '#e11d48';
+                    } else {
+                        btn.innerHTML = '▶ Continuar';
+                        btn.style.background = '#7c3aed';
                     }
                 }
-            });
+            }
 
-            var ctxStatus = document.getElementById('chartCdrStatus').getContext('2d');
-            new Chart(ctxStatus, {
-                type: 'doughnut',
-                data: {
-                    labels: ['Atendidas', 'Não Atendidas', 'Ocupado', 'Falhas'],
-                    datasets: [{
-                        data: [<?php echo "$answeredCount, $noAnswerCount, $busyCount, $failedCount"; ?>],
-                        backgroundColor: ['#10b981', '#ef4444', '#f59e0b', '#dc2626'],
-                        borderWidth: 2,
-                        borderColor: '#ffffff'
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { position: 'right' } }
+            function stkTogglePlay() {
+                var aud = getOrInitAudio();
+                if (aud.paused) {
+                    aud.play();
+                    updatePlayPauseButton(true);
+                } else {
+                    aud.pause();
+                    updatePlayPauseButton(false);
+                }
+            }
+
+            function stkSeekRelative(seconds) {
+                var aud = getOrInitAudio();
+                if (aud) {
+                    aud.currentTime = Math.max(0, Math.min(aud.duration || 0, aud.currentTime + seconds));
+                }
+            }
+
+            function stkSeekTo(val) {
+                var aud = getOrInitAudio();
+                if (aud && aud.duration) {
+                    aud.currentTime = (val / 100) * aud.duration;
+                }
+            }
+
+            function stkSetSpeed(speed, btn) {
+                var aud = getOrInitAudio();
+                if (aud) {
+                    aud.playbackRate = speed;
+                    var pills = document.querySelectorAll('.sticky-speed-selector .speed-btn');
+                    pills.forEach(function(p) { p.classList.remove('active'); });
+                    if (btn) btn.classList.add('active');
+                }
+            }
+
+            function closeStickyAudioPlayer() {
+                var aud = getOrInitAudio();
+                if (aud) {
+                    aud.pause();
+                    aud.currentTime = 0;
+                }
+                var bar = document.getElementById('stickyBottomAudioPlayer');
+                if (bar) bar.classList.remove('active');
+            }
+
+            function formatSecondsToMmSs(secs) {
+                var m = Math.floor(secs / 60);
+                var s = Math.floor(secs % 60);
+                return (m < 10 ? '0' + m : m) + ':' + (s < 10 ? '0' + s : s);
+            }
+
+            function openCelModal(uniqueId) {
+                var modal = document.getElementById('celModalCdr');
+                var iframe = document.getElementById('celIframeElement');
+                iframe.src = '?menu=<?php echo htmlspecialchars($module_name); ?>&rawmode=yes&uniqueid=' + uniqueId;
+                modal.style.display = 'flex';
+            }
+
+            function openAddressBookModal(phoneNumber, name, lastName, company, email, notes) {
+                var modal = document.getElementById('addressBookModal');
+                if (modal && modal.parentElement !== document.body) {
+                    document.body.appendChild(modal);
+                }
+                document.getElementById('ab_phone').value = phoneNumber || '';
+                document.getElementById('ab_name').value = name || '';
+                document.getElementById('ab_last_name').value = lastName || '';
+                document.getElementById('ab_company').value = company || '';
+                document.getElementById('ab_email').value = email || '';
+                document.getElementById('ab_notes').value = notes || '';
+                modal.style.display = 'flex';
+                document.getElementById('ab_name').focus();
+            }
+
+            function closeAddressBookModal() {
+                document.getElementById('addressBookModal').style.display = 'none';
+            }
+
+            function submitSaveAddressBook(e) {
+                e.preventDefault();
+                var btn = document.getElementById('btnSaveAb');
+                btn.disabled = true;
+                btn.textContent = 'Salvando...';
+
+                var data = new FormData();
+                data.append('action', 'save_address_book');
+                data.append('phone', document.getElementById('ab_phone').value);
+                data.append('name', document.getElementById('ab_name').value);
+                data.append('last_name', document.getElementById('ab_last_name').value);
+                data.append('company', document.getElementById('ab_company').value);
+                data.append('email', document.getElementById('ab_email').value);
+                data.append('notes', document.getElementById('ab_notes').value);
+
+                fetch('index.php?menu=<?php echo htmlspecialchars($module_name); ?>&rawmode=yes', {
+                    method: 'POST',
+                    body: data
+                })
+                .then(function(r) { return r.json(); })
+                .then(function(res) {
+                    btn.disabled = false;
+                    btn.textContent = '💾 Salvar Contato';
+                    if (res.status === 'success') {
+                        alert('✅ ' + res.message);
+                        closeAddressBookModal();
+                        window.location.reload();
+                    } else if (res.status === 'exists') {
+                        alert('⚠️ ' + res.message);
+                    } else {
+                        alert('❌ ' + (res.message || 'Erro ao salvar contato.'));
+                    }
+                })
+                .catch(function(err) {
+                    btn.disabled = false;
+                    btn.textContent = '💾 Salvar Contato';
+                    alert('❌ Erro na comunicação com o servidor: ' + err);
+                });
+            }
+
+            document.addEventListener("DOMContentLoaded", function() {
+                ensureAudioBarInBody();
+                var aud = getOrInitAudio();
+                if (aud) {
+                    aud.addEventListener('timeupdate', function() {
+                        var cur = aud.currentTime || 0;
+                        var dur = aud.duration || 0;
+                        var bar = document.getElementById('stkProgressBar');
+                        if (bar && dur > 0) {
+                            bar.value = (cur / dur) * 100;
+                        }
+                        var timeEl = document.getElementById('stkTime');
+                        if (timeEl) timeEl.textContent = formatSecondsToMmSs(cur) + ' / ' + formatSecondsToMmSs(dur);
+                    });
+
+                    aud.addEventListener('ended', function() {
+                        updatePlayPauseButton(false);
+                    });
                 }
             });
-        }
-    });
-    </script>
+        </script>
     <?php
     return ob_get_clean();
 }
