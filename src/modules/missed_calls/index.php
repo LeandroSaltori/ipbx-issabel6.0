@@ -546,7 +546,13 @@ function _moduleContent(&$smarty, $module_name)
                                     ?>
                                 </td>
                                 <td><span style="color:#0f172a; font-weight:700; font-size:11px;">⏱️ <?php echo formatSecsMc($r['duration']); ?></span></td>
-                                <td><code><?php echo htmlspecialchars(!empty($r['lastapp']) ? $r['lastapp'] : '-'); ?></code></td>
+                                <td>
+                                    <?php if (!empty($r['lastapp']) && $r['lastapp'] != '-'): ?>
+                                        <span style='color:#475569; font-size:11px;'><code><?php echo htmlspecialchars($r['lastapp']); ?></code></span>
+                                    <?php else: ?>
+                                        <span style='color:#cbd5e1;'>-</span>
+                                    <?php endif; ?>
+                                </td>
                             </tr>
                         <?php endforeach; ?>
                     <?php else: ?>

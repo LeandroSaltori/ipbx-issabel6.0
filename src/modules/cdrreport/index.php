@@ -1748,7 +1748,13 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
                                     ?>
                                 </td>
                                 <td><span style='color:#0f172a; font-weight:700; font-size:11px;'>⏱️ <?php echo htmlspecialchars($val_dur); ?></span></td>
-                                <td><span style='color:#64748b; font-size:11px;'><code><?php echo htmlspecialchars($did); ?></code></span></td>
+                                <td>
+                                    <?php if (!empty($did) && $did != '-'): ?>
+                                        <span style='color:#475569; font-size:11px; font-weight:600;'>📟 <?php echo htmlspecialchars($did); ?></span>
+                                    <?php else: ?>
+                                        <span style='color:#cbd5e1;'>-</span>
+                                    <?php endif; ?>
+                                </td>
                                 <td>
                                     <?php if (!empty($recFile) && $hasValidAudio): ?>
                                         <?php 
