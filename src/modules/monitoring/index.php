@@ -135,11 +135,19 @@ function renderFullMonitoringDashboard($smarty, $module_name, $local_templates_d
     $rec_type      = isset($_REQUEST['rec_type']) ? trim($_REQUEST['rec_type']) : 'ALL';
     $call_scope    = isset($_REQUEST['call_scope']) ? trim($_REQUEST['call_scope']) : 'ALL';
     $isFirstLoad   = !isset($_REQUEST['filter_applied']) && !isset($_REQUEST['page']);
-    $only_recorded = isset($_REQUEST['only_recorded']) ? (int)$_REQUEST['only_recorded'] : ($isFirstLoad ? 1 : 0);
-    $hide_zero     = isset($_REQUEST['hide_zero']) ? (int)$_REQUEST['hide_zero'] : ($isFirstLoad ? 1 : 0);
-    $min_duration  = isset($_REQUEST['min_duration']) ? (int)$_REQUEST['min_duration'] : ($isFirstLoad ? 1 : 0);
-    if ($hide_zero == 1 && $min_duration < 1) {
-        $min_duration = 1;
+    if ($isFirstLoad) {
+        $only_recorded = 1;
+        $hide_zero     = 1;
+        $min_duration  = 1;
+    } else {
+        $only_recorded = isset($_REQUEST['only_recorded']) ? 1 : 0;
+        $hide_zero     = isset($_REQUEST['hide_zero']) ? 1 : 0;
+        $min_duration  = isset($_REQUEST['min_duration']) ? (int)$_REQUEST['min_duration'] : 0;
+        if ($hide_zero == 1 && $min_duration < 1) {
+            $min_duration = 1;
+        } elseif ($hide_zero == 0 && $min_duration == 1) {
+            $min_duration = 0;
+        }
     }
 
     $page          = isset($_REQUEST['page']) ? max(1, (int)$_REQUEST['page']) : 1;
@@ -719,7 +727,7 @@ function renderFullMonitoringDashboard($smarty, $module_name, $local_templates_d
                         </div>
                         <div class="filter-field-group">
                             <label>🏷️ Tipo Gravação</label>
-                            <select name="rec_type" class="filter-input">
+                            <select name="rec_type" class="filter-input" onchange="this.form.submit()">
                                 <option value="ALL" <?php if ($rec_type == 'ALL') echo 'selected'; ?>>-- Todos os Tipos --</option>
                                 <option value="incoming" <?php if ($rec_type == 'incoming') echo 'selected'; ?>>⬇️ Entrada (Incoming)</option>
                                 <option value="outgoing" <?php if ($rec_type == 'outgoing') echo 'selected'; ?>>⬆️ Saída (Outgoing)</option>
@@ -729,7 +737,7 @@ function renderFullMonitoringDashboard($smarty, $module_name, $local_templates_d
                         </div>
                         <div class="filter-field-group">
                             <label>🌐 Escopo Chamada</label>
-                            <select name="call_scope" class="filter-input">
+                            <select name="call_scope" class="filter-input" onchange="this.form.submit()">
                                 <option value="ALL" <?php if ($call_scope == 'ALL') echo 'selected'; ?>>-- Todas (Internas/Externas) --</option>
                                 <option value="external" <?php if ($call_scope == 'external') echo 'selected'; ?>>🌐 Apenas Externas (PSTN/DID)</option>
                                 <option value="internal" <?php if ($call_scope == 'internal') echo 'selected'; ?>>🏢 Apenas Internas (Ramal-Ramal)</option>
@@ -737,9 +745,9 @@ function renderFullMonitoringDashboard($smarty, $module_name, $local_templates_d
                         </div>
                         <div class="filter-field-group" title="⏱️ Duração Mínima&#10;Filtre chamadas que duraram pelo menos a quantidade de tempo selecionada.">
                             <label>⏱️ Duração Mínima</label>
-                            <select name="min_duration" class="filter-input">
-                                <option value="0" <?php if ($min_duration == 0) echo 'selected'; ?>>-- Qualquer Duração --</option>
-                                <option value="1" <?php if ($min_duration == 1) echo 'selected'; ?>>🚫 Ocultar Zeradas (> 0s)</option>
+                            <select name="min_duration" id="sel_min_duration_mon" class="filter-input" onchange="if (this.value > 0) { document.getElementById('chk_hide_zero_mon').checked = true; } else { document.getElementById('chk_hide_zero_mon').checked = false; } this.form.submit();">
+                                <option value="0" <?php if ($min_duration == 0 && $hide_zero == 0) echo 'selected'; ?>>-- Qualquer Duração --</option>
+                                <option value="1" <?php if ($min_duration == 1 || ($min_duration == 0 && $hide_zero == 1)) echo 'selected'; ?>>🚫 Ocultar Zeradas (> 0s)</option>
                                 <option value="10" <?php if ($min_duration == 10) echo 'selected'; ?>>≥ 10 segundos</option>
                                 <option value="30" <?php if ($min_duration == 30) echo 'selected'; ?>>≥ 30 segundos</option>
                                 <option value="60" <?php if ($min_duration == 60) echo 'selected'; ?>>≥ 1 minuto</option>
@@ -750,7 +758,7 @@ function renderFullMonitoringDashboard($smarty, $module_name, $local_templates_d
                         </div>
                         <div class="filter-field-group">
                             <label>📄 Por Página</label>
-                            <select name="limit" class="filter-input">
+                            <select name="limit" class="filter-input" onchange="this.form.submit()">
                                 <option value="20" <?php if ($limit == 20) echo 'selected'; ?>>20 por pág</option>
                                 <option value="50" <?php if ($limit == 50) echo 'selected'; ?>>50 por pág</option>
                                 <option value="100" <?php if ($limit == 100) echo 'selected'; ?>>100 por pág</option>
@@ -759,13 +767,13 @@ function renderFullMonitoringDashboard($smarty, $module_name, $local_templates_d
                         </div>
                         <div class="filter-field-group" style="align-self:flex-end; padding-bottom:6px;">
                             <label style="cursor:pointer; display:flex; align-items:center; gap:6px; font-weight:700; color:#ef4444; font-size:12px; margin:0;" title="Ocultar do relatório todas as ligações que registraram 0 segundos">
-                                <input type="checkbox" name="hide_zero" value="1" <?php if ($hide_zero == 1 || $min_duration > 0) echo 'checked'; ?> style="width:16px; height:16px; cursor:pointer;" />
+                                <input type="checkbox" id="chk_hide_zero_mon" name="hide_zero" value="1" <?php if ($hide_zero == 1) echo 'checked'; ?> onchange="if (!this.checked) { document.getElementById('sel_min_duration_mon').value = '0'; } else { document.getElementById('sel_min_duration_mon').value = '1'; } this.form.submit();" style="width:16px; height:16px; cursor:pointer;" />
                                 🚫 Ocultar Zeradas (0s)
                             </label>
                         </div>
                         <div class="filter-field-group" style="align-self:flex-end; padding-bottom:6px;">
                             <label style="cursor:pointer; display:flex; align-items:center; gap:6px; font-weight:700; color:#7c3aed; font-size:12px; margin:0;">
-                                <input type="checkbox" name="only_recorded" value="1" <?php if ($only_recorded == 1) echo 'checked'; ?> style="width:16px; height:16px; cursor:pointer;" />
+                                <input type="checkbox" name="only_recorded" value="1" <?php if ($only_recorded == 1) echo 'checked'; ?> onchange="this.form.submit();" style="width:16px; height:16px; cursor:pointer;" />
                                 🎯 Apenas com Gravação
                             </label>
                         </div>

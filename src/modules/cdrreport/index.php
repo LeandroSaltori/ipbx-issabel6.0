@@ -556,11 +556,19 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
     $ringgroup     = isset($_REQUEST['ringgroup']) ? trim($_REQUEST['ringgroup']) : '';
     $call_scope    = isset($_REQUEST['call_scope']) ? trim($_REQUEST['call_scope']) : 'ALL';
     $isFirstLoad   = !isset($_REQUEST['filter_applied']) && !isset($_REQUEST['page']);
-    $only_recorded = isset($_REQUEST['only_recorded']) ? (int)$_REQUEST['only_recorded'] : ($isFirstLoad ? 1 : 0);
-    $hide_zero     = isset($_REQUEST['hide_zero']) ? (int)$_REQUEST['hide_zero'] : ($isFirstLoad ? 1 : 0);
-    $min_duration  = isset($_REQUEST['min_duration']) ? (int)$_REQUEST['min_duration'] : ($isFirstLoad ? 1 : 0);
-    if ($hide_zero == 1 && $min_duration < 1) {
-        $min_duration = 1;
+    if ($isFirstLoad) {
+        $only_recorded = 1;
+        $hide_zero     = 1;
+        $min_duration  = 1;
+    } else {
+        $only_recorded = isset($_REQUEST['only_recorded']) ? 1 : 0;
+        $hide_zero     = isset($_REQUEST['hide_zero']) ? 1 : 0;
+        $min_duration  = isset($_REQUEST['min_duration']) ? (int)$_REQUEST['min_duration'] : 0;
+        if ($hide_zero == 1 && $min_duration < 1) {
+            $min_duration = 1;
+        } elseif ($hide_zero == 0 && $min_duration == 1) {
+            $min_duration = 0;
+        }
     }
 
     $page  = isset($_REQUEST['page']) ? max(1, (int)$_REQUEST['page']) : 1;
@@ -1242,7 +1250,7 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
                     </div>
                     <div class="filter-field-group" title="🚦 Status da Ligação&#10;Filtre por:&#10;• Atendidas (ANSWERED): Houve diálogo&#10;• Não Atendidas (NO ANSWER): Tocou sem resposta&#10;• Ocupado (BUSY): Destino ocupado&#10;• Falhas (FAILED): Erro de rota ou rede.">
                         <label>🚦 Status</label>
-                        <select name="status" class="filter-input">
+                        <select name="status" class="filter-input" onchange="this.form.submit()">
                             <option value="ALL" <?php if ($status == 'ALL') echo 'selected'; ?>>-- Todos os Status --</option>
                             <option value="ANSWERED" <?php if ($status == 'ANSWERED') echo 'selected'; ?>>✅ Atendidas (ANSWERED)</option>
                             <option value="NO ANSWER" <?php if ($status == 'NO ANSWER') echo 'selected'; ?>>📵 Não Atendidas (NO ANSWER)</option>
@@ -1252,7 +1260,7 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
                     </div>
                     <div class="filter-field-group" title="🏢 Fila ou Grupo de Atendimento&#10;Filtre pelas ligações direcionadas a uma fila de atendimento específica.">
                         <label>🏢 Fila / Grupo</label>
-                        <select name="ringgroup" class="filter-input">
+                        <select name="ringgroup" class="filter-input" onchange="this.form.submit()">
                             <option value="">-- Qualquer Fila/Grupo --</option>
                             <?php if (is_array($groupsMap)): ?>
                                 <?php foreach ($groupsMap as $gKey => $gVal): ?>
@@ -1265,7 +1273,7 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
                     </div>
                     <div class="filter-field-group" title="🌐 Escopo da Chamada&#10;Filtre entre ligações que utilizaram troncos externos ou apenas ramal para ramal.">
                         <label>🌐 Escopo</label>
-                        <select name="call_scope" class="filter-input">
+                        <select name="call_scope" class="filter-input" onchange="this.form.submit()">
                             <option value="ALL" <?php if ($call_scope == 'ALL') echo 'selected'; ?>>-- Todas (Internas/Externas) --</option>
                             <option value="external" <?php if ($call_scope == 'external') echo 'selected'; ?>>🌐 Apenas Externas (PSTN/DID)</option>
                             <option value="internal" <?php if ($call_scope == 'internal') echo 'selected'; ?>>🏢 Apenas Internas (Ramal-Ramal)</option>
@@ -1273,9 +1281,9 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
                     </div>
                     <div class="filter-field-group" title="⏱️ Duração Mínima&#10;Filtre chamadas que duraram pelo menos a quantidade de tempo selecionada.">
                         <label>⏱️ Duração Mínima</label>
-                        <select name="min_duration" class="filter-input">
-                            <option value="0" <?php if ($min_duration == 0) echo 'selected'; ?>>-- Qualquer Duração --</option>
-                            <option value="1" <?php if ($min_duration == 1) echo 'selected'; ?>>🚫 Ocultar Zeradas (> 0s)</option>
+                        <select name="min_duration" id="sel_min_duration_cdr" class="filter-input" onchange="if (this.value > 0) { document.getElementById('chk_hide_zero_cdr').checked = true; } else { document.getElementById('chk_hide_zero_cdr').checked = false; } this.form.submit();">
+                            <option value="0" <?php if ($min_duration == 0 && $hide_zero == 0) echo 'selected'; ?>>-- Qualquer Duração --</option>
+                            <option value="1" <?php if ($min_duration == 1 || ($min_duration == 0 && $hide_zero == 1)) echo 'selected'; ?>>🚫 Ocultar Zeradas (> 0s)</option>
                             <option value="10" <?php if ($min_duration == 10) echo 'selected'; ?>>≥ 10 segundos</option>
                             <option value="30" <?php if ($min_duration == 30) echo 'selected'; ?>>≥ 30 segundos</option>
                             <option value="60" <?php if ($min_duration == 60) echo 'selected'; ?>>≥ 1 minuto</option>
@@ -1286,13 +1294,13 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
                     </div>
                     <div class="filter-field-group" style="align-self:flex-end; padding-bottom:6px;">
                         <label style="cursor:pointer; display:flex; align-items:center; gap:6px; font-weight:700; color:#ef4444; font-size:12px; margin:0;" title="Ocultar do relatório todas as ligações que registraram 0 segundos">
-                            <input type="checkbox" name="hide_zero" value="1" <?php if ($hide_zero == 1 || $min_duration > 0) echo 'checked'; ?> style="width:16px; height:16px; cursor:pointer;" />
+                            <input type="checkbox" id="chk_hide_zero_cdr" name="hide_zero" value="1" <?php if ($hide_zero == 1) echo 'checked'; ?> onchange="if (!this.checked) { document.getElementById('sel_min_duration_cdr').value = '0'; } else { document.getElementById('sel_min_duration_cdr').value = '1'; } this.form.submit();" style="width:16px; height:16px; cursor:pointer;" />
                             🚫 Ocultar Zeradas (0s)
                         </label>
                     </div>
                     <div class="filter-field-group" style="align-self:flex-end; padding-bottom:6px;">
                         <label style="cursor:pointer; display:flex; align-items:center; gap:6px; font-weight:700; color:#7c3aed; font-size:12px; margin:0;">
-                            <input type="checkbox" name="only_recorded" value="1" <?php if ($only_recorded == 1) echo 'checked'; ?> style="width:16px; height:16px; cursor:pointer;" />
+                            <input type="checkbox" name="only_recorded" value="1" <?php if ($only_recorded == 1) echo 'checked'; ?> onchange="this.form.submit();" style="width:16px; height:16px; cursor:pointer;" />
                             🎯 Apenas com Gravação
                         </label>
                     </div>
