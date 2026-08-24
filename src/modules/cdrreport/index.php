@@ -61,6 +61,103 @@ function formatSecsCdr($sec) {
     return sprintf('%02d:%02d', $m, $s);
 }
 
+function resolveCdrRecording($r) {
+    static $recCache = array();
+
+    $uniqueId = !empty($r[6]) ? trim($r[6]) : '';
+    $rawRec   = !empty($r[9]) ? trim($r[9]) : '';
+    $rawUser  = !empty($r[7]) ? trim($r[7]) : '';
+    $callDate = !empty($r[0]) ? trim($r[0]) : '';
+
+    $cacheKey = $uniqueId . '|' . $rawRec . '|' . $rawUser . '|' . substr($callDate, 0, 10);
+    if (isset($recCache[$cacheKey])) {
+        return $recCache[$cacheKey];
+    }
+
+    $recFile = '';
+    if (!empty($rawRec) && $rawRec !== 'deleted' && $rawRec !== 'none' && $rawRec !== '-') {
+        $recFile = basename($rawRec);
+    }
+
+    if (empty($recFile) && !empty($rawUser)) {
+        if (strpos($rawUser, 'audio:') !== false) {
+            $parts = explode('audio:', $rawUser);
+            $cand = trim($parts[1]);
+            if (!empty($cand) && $cand !== 'deleted' && $cand !== 'none' && $cand !== '-') {
+                $recFile = basename($cand);
+            }
+        } elseif (preg_match('/^[\w\-\.]+\.(wav|WAV|mp3|gsm)$/i', $rawUser)) {
+            $recFile = basename($rawUser);
+        }
+    }
+
+    $dateFolder = '';
+    $monthFolder = '';
+    if (preg_match('/^(\d{4})-(\d{2})-(\d{2})/', $callDate, $dm)) {
+        $dateFolder = "{$dm[1]}/{$dm[2]}/{$dm[3]}/";
+        $monthFolder = "{$dm[1]}/{$dm[2]}/";
+    }
+
+    $monitorBase = '/var/spool/asterisk/monitor/';
+
+    // 1. Se temos o nome do arquivo, testa caminhos diretos (rápido, sem find)
+    if (!empty($recFile)) {
+        $checkPaths = array(
+            $monitorBase . $recFile,
+            $monitorBase . $dateFolder . $recFile,
+            $monitorBase . $monthFolder . $recFile,
+            $monitorBase . date('Y/m/d/') . $recFile,
+            $monitorBase . date('Y/m/') . $recFile
+        );
+        foreach ($checkPaths as $cp) {
+            if (!empty($cp) && file_exists($cp) && filesize($cp) > 44) {
+                $res = array('filename' => basename($cp), 'path' => $cp, 'valid' => true);
+                $recCache[$cacheKey] = $res;
+                return $res;
+            }
+        }
+    }
+
+    // 2. Se não encontrou pelo nome, busca pelo UniqueID no diretório da data ou raiz do monitor
+    if (!empty($uniqueId)) {
+        $patterns = array();
+        if (!empty($dateFolder)) {
+            $patterns[] = $monitorBase . $dateFolder . "*{$uniqueId}*";
+        }
+        if (!empty($monthFolder)) {
+            $patterns[] = $monitorBase . $monthFolder . "*{$uniqueId}*";
+        }
+        $patterns[] = $monitorBase . "*{$uniqueId}*";
+
+        foreach ($patterns as $pattern) {
+            $globRes = glob($pattern);
+            if (!empty($globRes)) {
+                foreach ($globRes as $gf) {
+                    if (is_file($gf) && filesize($gf) > 44) {
+                        $res = array('filename' => basename($gf), 'path' => $gf, 'valid' => true);
+                        $recCache[$cacheKey] = $res;
+                        return $res;
+                    }
+                }
+            }
+        }
+    }
+
+    // 3. Fallback find apenas se $recFile existir mas estiver em subpasta não padrão
+    if (!empty($recFile)) {
+        $findP = trim(shell_exec("find /var/spool/asterisk/monitor/ -name " . escapeshellarg($recFile) . " 2>/dev/null | head -n 1"));
+        if (!empty($findP) && file_exists($findP) && filesize($findP) > 44) {
+            $res = array('filename' => basename($findP), 'path' => $findP, 'valid' => true);
+            $recCache[$cacheKey] = $res;
+            return $res;
+        }
+    }
+
+    $res = array('filename' => '', 'path' => '', 'valid' => false);
+    $recCache[$cacheKey] = $res;
+    return $res;
+}
+
 
 function getAddressBookContactsMap() {
     static $map = null;
@@ -954,6 +1051,13 @@ function handleCdrExportExcel($oCDR, $module_name)
     $field_pattern = isset($_REQUEST['field_pattern']) ? trim($_REQUEST['field_pattern']) : '';
     $status        = isset($_REQUEST['status']) ? trim($_REQUEST['status']) : 'ALL';
     $ringgroup     = isset($_REQUEST['ringgroup']) ? trim($_REQUEST['ringgroup']) : '';
+    $call_scope    = isset($_REQUEST['call_scope']) ? trim($_REQUEST['call_scope']) : 'ALL';
+    $only_recorded = isset($_REQUEST['only_recorded']) ? (int)$_REQUEST['only_recorded'] : 0;
+    $min_duration  = isset($_REQUEST['min_duration']) ? (int)$_REQUEST['min_duration'] : 0;
+    $hide_zero     = isset($_REQUEST['hide_zero']) ? (int)$_REQUEST['hide_zero'] : 0;
+    if ($hide_zero == 1 && $min_duration < 1) {
+        $min_duration = 1;
+    }
 
     $paramFiltro = array(
         'date_start'    => $date_start . ' 00:00:00',
@@ -977,6 +1081,22 @@ function handleCdrExportExcel($oCDR, $module_name)
 
     if (is_array($arrResult['cdrs'])) {
         foreach ($arrResult['cdrs'] as $r) {
+            $srcNum = !empty($r[1]) ? $r[1] : '';
+            $dstNum = !empty($r[2]) ? $r[2] : '';
+            $didNum = !empty($r[16]) ? $r[16] : '';
+            $sDigits = preg_replace('/\D/', '', (string)$srcNum);
+            $dDigits = preg_replace('/\D/', '', (string)$dstNum);
+            $isInternal = (empty($didNum) || $didNum == '-') && (!empty($sDigits) && strlen($sDigits) <= 5 && !empty($dDigits) && strlen($dDigits) <= 5);
+
+            if ($call_scope == 'internal' && !$isInternal) continue;
+            if ($call_scope == 'external' && $isInternal) continue;
+
+            $durSecs = (int)$r[8];
+            if ($min_duration > 0 && $durSecs < $min_duration) continue;
+
+            $recInfo = resolveCdrRecording($r);
+            if ($only_recorded == 1 && !$recInfo['valid']) continue;
+
             $dt     = formatDateBrCdr($r[0]);
             $src    = !empty($r[1]) ? $r[1] : '-';
             $rg     = !empty($r[11]) ? $r[11] : '-';
@@ -986,7 +1106,7 @@ function handleCdrExportExcel($oCDR, $module_name)
             $st     = !empty($r[5]) ? $r[5] : '-';
             $dur    = formatSecsCdr($r[8]);
             $did    = !empty($r[16]) ? $r[16] : '-';
-            $rec    = !empty($r[9]) ? $r[9] : '-';
+            $rec    = $recInfo['valid'] ? $recInfo['filename'] : '-';
 
             fputcsv($output, array($dt, $src, $rg, $dst, $cSrc, $cDst, $st, $dur, $did, $rec), ';');
         }
@@ -1005,6 +1125,13 @@ function handleCdrExportPdf($oCDR, $module_name)
     $field_pattern = isset($_REQUEST['field_pattern']) ? trim($_REQUEST['field_pattern']) : '';
     $status        = isset($_REQUEST['status']) ? trim($_REQUEST['status']) : 'ALL';
     $ringgroup     = isset($_REQUEST['ringgroup']) ? trim($_REQUEST['ringgroup']) : '';
+    $call_scope    = isset($_REQUEST['call_scope']) ? trim($_REQUEST['call_scope']) : 'ALL';
+    $only_recorded = isset($_REQUEST['only_recorded']) ? (int)$_REQUEST['only_recorded'] : 0;
+    $min_duration  = isset($_REQUEST['min_duration']) ? (int)$_REQUEST['min_duration'] : 0;
+    $hide_zero     = isset($_REQUEST['hide_zero']) ? (int)$_REQUEST['hide_zero'] : 0;
+    if ($hide_zero == 1 && $min_duration < 1) {
+        $min_duration = 1;
+    }
 
     $paramFiltro = array(
         'date_start'    => $date_start . ' 00:00:00',
@@ -1018,6 +1145,28 @@ function handleCdrExportPdf($oCDR, $module_name)
     );
 
     $arrResult = $oCDR->listarCDRs($paramFiltro, 100000, 0, true);
+    $cdrsPdf = array();
+    if (is_array($arrResult['cdrs'])) {
+        foreach ($arrResult['cdrs'] as $r) {
+            $srcNum = !empty($r[1]) ? $r[1] : '';
+            $dstNum = !empty($r[2]) ? $r[2] : '';
+            $didNum = !empty($r[16]) ? $r[16] : '';
+            $sDigits = preg_replace('/\D/', '', (string)$srcNum);
+            $dDigits = preg_replace('/\D/', '', (string)$dstNum);
+            $isInternal = (empty($didNum) || $didNum == '-') && (!empty($sDigits) && strlen($sDigits) <= 5 && !empty($dDigits) && strlen($dDigits) <= 5);
+
+            if ($call_scope == 'internal' && !$isInternal) continue;
+            if ($call_scope == 'external' && $isInternal) continue;
+
+            $durSecs = (int)$r[8];
+            if ($min_duration > 0 && $durSecs < $min_duration) continue;
+
+            $recInfo = resolveCdrRecording($r);
+            if ($only_recorded == 1 && !$recInfo['valid']) continue;
+
+            $cdrsPdf[] = $r;
+        }
+    }
 
     ?>
     <!DOCTYPE html>
@@ -1099,7 +1248,7 @@ function handleCdrExportPdf($oCDR, $module_name)
             <button onclick="window.print();" style="background:#0284c7; color:#fff; border:none; padding:8px 16px; border-radius:6px; font-weight:bold; cursor:pointer;">🖨️ Imprimir / Salvar PDF</button>
         </div>
         <h2>📞 Relatório de Ligações - IPbx Prisma</h2>
-        <p>Gerado em <?php echo date('d/m/Y H:i:s'); ?> | Total: <?php echo is_array($arrResult['cdrs']) ? count($arrResult['cdrs']) : 0; ?> chamadas</p>
+        <p>Gerado em <?php echo date('d/m/Y H:i:s'); ?> | Total: <?php echo count($cdrsPdf); ?> chamadas</p>
         
         <table>
             <thead>
@@ -1114,8 +1263,8 @@ function handleCdrExportPdf($oCDR, $module_name)
                 </tr>
             </thead>
             <tbody>
-                <?php if (is_array($arrResult['cdrs'])): ?>
-                    <?php foreach ($arrResult['cdrs'] as $r): ?>
+                <?php if (!empty($cdrsPdf)): ?>
+                    <?php foreach ($cdrsPdf as $r): ?>
                     <tr>
                         <td><?php echo formatDateBrCdr($r[0]); ?></td>
                         <td>📞 <?php echo htmlspecialchars($r[1]); ?></td>
@@ -1226,12 +1375,11 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
         }
 
         if ($only_recorded == 1) {
-            $recFile  = !empty($r[9]) ? $r[9] : '';
-            $uniqueId = !empty($r[6]) ? $r[6] : '';
-            // Fast in-memory check to avoid slow disk I/O in the 10.000 records loop
-            if (empty($recFile) && empty($uniqueId)) {
+            $recInfo = resolveCdrRecording($r);
+            if (!$recInfo['valid']) {
                 continue;
             }
+            $r[9] = $recInfo['filename'];
         }
 
         $filteredList[] = $r;
@@ -1272,14 +1420,18 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
     $missPercent = $totalCount > 0 ? round((($noAnswerCount + $busyCount + $failedCount) / $totalCount) * 100, 1) : 0;
 
     $exportParams = http_build_query(array(
-        'menu' => $module_name,
-        'rawmode' => 'yes',
-        'date_start' => $date_start,
-        'date_end' => $date_end,
-        'field_name' => $field_name,
+        'menu'          => $module_name,
+        'rawmode'       => 'yes',
+        'date_start'    => $date_start,
+        'date_end'      => $date_end,
+        'field_name'    => $field_name,
         'field_pattern' => $field_pattern,
-        'status' => $status,
-        'ringgroup' => $ringgroup
+        'status'        => $status,
+        'ringgroup'     => $ringgroup,
+        'call_scope'    => $call_scope,
+        'only_recorded' => $only_recorded,
+        'min_duration'  => $min_duration,
+        'hide_zero'     => $hide_zero
     ));
 
     ob_start();
@@ -2013,41 +2165,12 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
                             $val_dst   = !empty($r[2]) ? $r[2] : '-';
                             $raw_st    = strtoupper(trim($r[5]));
                             $val_dur   = formatSecsCdr($r[8]);
-                            $recFile   = !empty($r[9]) ? $r[9] : '';
                             $uniqueId  = !empty($r[6]) ? $r[6] : '';
                             $did       = !empty($r[16]) ? $r[16] : '-';
 
-                            // Fallback se a gravação não estiver no campo recordingfile, busca pelo UniqueID no monitor
-                            if (empty($recFile) && !empty($uniqueId)) {
-                                $globRes = glob("/var/spool/asterisk/monitor/*{$uniqueId}*");
-                                if (empty($globRes)) {
-                                    $globRes = glob("/var/spool/asterisk/monitor/*/*/*/*{$uniqueId}*");
-                                }
-                                if (!empty($globRes) && isset($globRes[0])) {
-                                    $recFile = basename($globRes[0]);
-                                }
-                            }
-
-                            $hasValidAudio = false;
-                            if (!empty($recFile)) {
-                                $checkPaths = array(
-                                    "/var/spool/asterisk/monitor/$recFile",
-                                    "/var/spool/asterisk/monitor/" . date('Y/m/d/') . $recFile,
-                                    "/var/spool/asterisk/monitor/" . date('Y/m/') . $recFile
-                                );
-                                foreach ($checkPaths as $cp) {
-                                    if (file_exists($cp) && filesize($cp) > 44) {
-                                        $hasValidAudio = true;
-                                        break;
-                                    }
-                                }
-                                if (!$hasValidAudio) {
-                                    $findP = trim(shell_exec("find /var/spool/asterisk/monitor/ -name " . escapeshellarg($recFile) . " 2>/dev/null | head -n 1"));
-                                    if (!empty($findP) && file_exists($findP) && filesize($findP) > 44) {
-                                        $hasValidAudio = true;
-                                    }
-                                }
-                            }
+                            $recInfo   = resolveCdrRecording($r);
+                            $recFile   = $recInfo['filename'];
+                            $hasValidAudio = $recInfo['valid'];
 
                             if (!empty($raw_rg) && isset($groupsMap[$raw_rg])) {
                                 $fullName = "$raw_rg - " . $groupsMap[$raw_rg];
