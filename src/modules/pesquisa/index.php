@@ -1695,6 +1695,160 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
 
 
             <script>
+
+            var currentAudio = null;
+
+            function getOrInitAudio() {
+                if (!currentAudio) {
+                    currentAudio = document.getElementById('stkAudioElement');
+                }
+                if (!currentAudio) {
+                    currentAudio = document.createElement('audio');
+                    currentAudio.id = 'stkAudioElement';
+                    currentAudio.preload = 'auto';
+                    document.body.appendChild(currentAudio);
+                }
+                return currentAudio;
+            }
+
+            function ensureAudioModalInBody() {
+                var modal = document.getElementById('audioPlayerModal');
+                if (modal && modal.parentElement !== document.body) {
+                    document.body.appendChild(modal);
+                }
+            }
+
+            function playCdrAudio(audioUrl, caller, target, downloadUrl) {
+                ensureAudioModalInBody();
+                var modal = document.getElementById('audioPlayerModal');
+                var aud = getOrInitAudio();
+
+                var callerEl = document.getElementById('stkCaller');
+                if (callerEl) callerEl.textContent = '📞 Origem: ' + (caller || '-');
+                var targetEl = document.getElementById('stkTarget');
+                if (targetEl) targetEl.textContent = '🎯 Destino: ' + (target || '-');
+                var downEl = document.getElementById('stkDownloadBtn');
+                if (downEl) downEl.href = downloadUrl || audioUrl;
+
+                var curTimeEl = document.getElementById('stkCurTime');
+                if (curTimeEl) curTimeEl.textContent = '00:00';
+                var totalTimeEl = document.getElementById('stkTotalTime');
+                if (totalTimeEl) totalTimeEl.textContent = '00:00';
+                var bar = document.getElementById('stkProgressBar');
+                if (bar) bar.value = 0;
+
+                aud.src = audioUrl;
+                if (modal) {
+                    modal.classList.add('active');
+                    modal.style.display = 'flex';
+                }
+
+                var p = aud.play();
+                if (p !== undefined) {
+                    p.then(function() {
+                        updatePlayPauseButton(true);
+                    }).catch(function(err) {
+                        console.log("Audio play error:", err);
+                        updatePlayPauseButton(false);
+                    });
+                }
+            }
+
+            function playMonitoringAudio(audioUrl, caller, target, downloadUrl) {
+                playCdrAudio(audioUrl, caller, target, downloadUrl);
+            }
+
+            function updatePlayPauseButton(isPlaying) {
+                var btn = document.getElementById('stkPlayPauseBtn');
+                if (btn) {
+                    if (isPlaying) {
+                        btn.innerHTML = '⏸ Pausar';
+                        btn.style.background = '#e11d48';
+                    } else {
+                        btn.innerHTML = '▶ Continuar';
+                        btn.style.background = 'linear-gradient(135deg, #7c3aed 0%, #6366f1 100%)';
+                    }
+                }
+            }
+
+            function stkTogglePlay() {
+                var aud = getOrInitAudio();
+                if (aud.paused) {
+                    aud.play();
+                    updatePlayPauseButton(true);
+                } else {
+                    aud.pause();
+                    updatePlayPauseButton(false);
+                }
+            }
+
+            function stkSeekRelative(seconds) {
+                var aud = getOrInitAudio();
+                if (aud) {
+                    aud.currentTime = Math.max(0, Math.min(aud.duration || 0, aud.currentTime + seconds));
+                }
+            }
+
+            function stkSeekTo(val) {
+                var aud = getOrInitAudio();
+                if (aud && aud.duration) {
+                    aud.currentTime = (val / 100) * aud.duration;
+                }
+            }
+
+            function stkSetSpeed(speed, btn) {
+                var aud = getOrInitAudio();
+                if (aud) {
+                    aud.playbackRate = speed;
+                    var pills = document.querySelectorAll('.audio-speed-group .speed-btn');
+                    pills.forEach(function(p) { p.classList.remove('active'); });
+                    if (btn) btn.classList.add('active');
+                }
+            }
+
+            function closeAudioPlayerModal() {
+                var aud = getOrInitAudio();
+                if (aud) {
+                    aud.pause();
+                    aud.currentTime = 0;
+                }
+                var modal = document.getElementById('audioPlayerModal');
+                if (modal) {
+                    modal.classList.remove('active');
+                    modal.style.display = 'none';
+                }
+                updatePlayPauseButton(false);
+            }
+
+            function formatSecondsToMmSs(sec) {
+                if (!sec || isNaN(sec) || !isFinite(sec) || sec < 0) return '00:00';
+                var m = Math.floor(sec / 60);
+                var s = Math.floor(sec % 60);
+                return (m < 10 ? '0' + m : m) + ':' + (s < 10 ? '0' + s : s);
+            }
+
+            document.addEventListener('DOMContentLoaded', function() {
+                var aud = getOrInitAudio();
+                if (aud) {
+                    aud.addEventListener('timeupdate', function() {
+                        var cur = aud.currentTime || 0;
+                        var dur = aud.duration || 0;
+                        var bar = document.getElementById('stkProgressBar');
+                        if (bar && dur > 0) {
+                            bar.value = (cur / dur) * 100;
+                        }
+                        var curEl = document.getElementById('stkCurTime');
+                        if (curEl) curEl.textContent = formatSecondsToMmSs(cur);
+                        var totEl = document.getElementById('stkTotalTime');
+                        if (totEl && dur > 0) totEl.textContent = formatSecondsToMmSs(dur);
+                    });
+
+                    aud.addEventListener('ended', function() {
+                        updatePlayPauseButton(false);
+                    });
+                }
+            });
+
             
 
             function openAddressBookModal(phoneNumber, name, lastName, company, email, notes) {
