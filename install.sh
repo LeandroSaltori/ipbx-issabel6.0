@@ -1251,6 +1251,33 @@ if [ -f "$REPO_DIR/ipbx-menu.sh" ]; then
 fi
 
 # ==============================================================================
+# CONFIGURAÇÃO DE LOGROTATE & OTIMIZAÇÃO DE DISCO
+# ==============================================================================
+log_info "Configurando Logrotate e limpeza de logs do sistema..."
+if [ -f "$REPO_DIR/scripts/ipbx-logrotate.sh" ]; then
+    bash "$REPO_DIR/scripts/ipbx-logrotate.sh" --now || true
+fi
+
+# ==============================================================================
+# BLINDAGEM DE SEGURANÇA (HARDENING APACHE & SCANNER ANTI-INVASÃO)
+# ==============================================================================
+log_info "Aplicando blindagem de segurança e hardening anti-invasão..."
+if [ -f "$REPO_DIR/scripts/ipbx-security-hardening.sh" ]; then
+    bash "$REPO_DIR/scripts/ipbx-security-hardening.sh" || true
+fi
+
+if [ -f "$REPO_DIR/scripts/monitor_prisma.sh" ]; then
+    /bin/cp -f "$REPO_DIR/scripts/monitor_prisma.sh" /usr/local/bin/monitor_issabel_users.sh
+    /bin/cp -f "$REPO_DIR/scripts/monitor_prisma.sh" /usr/local/bin/monitor_prisma.sh
+    chmod +x /usr/local/bin/monitor_issabel_users.sh /usr/local/bin/monitor_prisma.sh
+
+    if ! crontab -l 2>/dev/null | grep -q "monitor_issabel_users.sh"; then
+        (crontab -l 2>/dev/null; echo "* * * * * /usr/local/bin/monitor_issabel_users.sh") | crontab -
+        log_success "Monitor de segurança ativo no crontab (a cada minuto)."
+    fi
+fi
+
+# ==============================================================================
 # CONFIGURAÇÃO DE ATUALIZAÇÃO AUTOMÁTICA SEMANAL (CRON & LOGS)
 # ==============================================================================
 log_info "Configurando rotina de atualização semanal automática e registros de log..."

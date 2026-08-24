@@ -35,3 +35,9 @@ As 26 opções do menu modular devem ser mantidas sempre ativas e funcionais:
 1. Sempre gerar snapshot em `/var/backup/ipbx/backup_YYYY-MM-DD_HHMMSS` antes de qualquer alteração (`update.sh`, `install.sh`, `ipbx-menu.sh`).
 2. O rollback nunca apaga diretórios inteiros (`rm -rf /var/www/html/modules` é estritamente proibido). A restauração é feita sobrepondo com segurança os arquivos presentes no backup selecionado.
 3. Permitir seleção histórica de backups por data/hora.
+
+## SEGURANÇA CIRÚRGICA E NÃO-INTERFERÊNCIA
+1. Hardening do Apache restrito a pastas de mídia/uploads (`/recordings/` e `/themes/*/images/`).
+2. Módulos PHP customizados, APIs, Webhooks, WhatsApp e conexões AMI/AGI devem ter 100% de liberdade contínua de execução.
+3. Rotação de logs (Logrotate) não-intrusiva com `logger reload`.
+

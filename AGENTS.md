@@ -66,3 +66,13 @@ Todas as opções do menu interativo [1] a [26], [A] e [0] devem permanecer **10
 1. **Relatórios e CDR**:
    - Consultas devem refletir dados reais do MySQL (`asteriskcdrdb.cdr`), SQLite (`address_book.db`, `menu.db`) e do monitor de áudios (`/var/spool/asterisk/monitor/`).
    - Não utilizar dados mockados ou estáticos nos relatórios operacionais.
+
+---
+
+## 5. POLÍTICA DE SEGURANÇA CIRÚRGICA E NÃO-INTERFERÊNCIA
+1. **Preservação Total de APIs e Scripts PHP**:
+   - Qualquer regra de Apache Hardening ou script de segurança **NUNCA deve bloquear ou interferir** em scripts PHP legítimos, módulos customizados, integrações de WhatsApp, Webhooks, APIs REST ou conexões Asterisk AMI/AGI.
+   - O bloqueio de execução de scripts PHP no Apache é estritamente restrito a pastas estáticas de mídia/uploads (`/var/www/html/recordings/` e subpastas `/themes/*/images/`).
+2. **Logrotate Não-Intrusivo**:
+   - Rotação de logs com compressão sem jamais derrubar o Asterisk nem processos em tempo real (utiliza sempre `asterisk -rx "logger reload"`).
+

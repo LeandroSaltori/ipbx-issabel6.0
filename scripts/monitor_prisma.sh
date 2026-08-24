@@ -27,7 +27,7 @@ send_tg() {
         -d "parse_mode=Markdown" > /dev/null 2>&1 || true
 }
 
-# --- 1. BUSCA POR RASTRO DE INVASÃO E WEB SHELLS ---
+# --- 1. BUSCA POR RASTRO DE INVASÃO, WEB SHELLS E DIALPLANS MALICIOSOS ---
 SUSPICIOUS_TERMS=("Emad__Was__Here" "c99shell" "r57shell" "eval(base64_decode" "passthru(\$_GET" "shell_exec(\$_POST")
 
 for TERM in "${SUSPICIOUS_TERMS[@]}"; do
@@ -42,6 +42,16 @@ for TERM in "${SUSPICIOUS_TERMS[@]}"; do
         break
     fi
 done
+
+# Checa dialplan malicioso conhecido (ex: thanku-outcall)
+if /usr/bin/grep -rnE "thanku-outcall|custom-get-extensions" /etc/asterisk/extensions*.conf 2>/dev/null | /usr/bin/head -n 1 | /usr/bin/grep -q ":"; then
+    MSG="%F0%9F%9A%A8 *ALERTA: DIALPLAN MALICIOSO DETECTADO NO ASTERISK* %F0%9F%9A%A8%0A%0A"
+    MSG="${MSG}%F0%9F%93%8C *Servidor:* ${CLIENTE}%0A"
+    MSG="${MSG}%F0%9F%93%9E *Contexto:* thanku-outcall / rotas piratas%0A"
+    MSG="${MSG}%F0%9F%9B%A1 *Acao:* Execute 'ipbx-security' para remover.%0A"
+    MSG="${MSG}%F0%9F%93%85 *Data:* $(date '+%d/%m/%Y %H:%M:%S')"
+    send_tg "$MSG"
+fi
 
 # --- 2. MONITOR DE FIREWALL (STATUS E REGRAS) ---
 if systemctl is-enabled iptables &>/dev/null || systemctl is-active iptables &>/dev/null; then

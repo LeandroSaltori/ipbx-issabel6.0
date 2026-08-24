@@ -952,27 +952,31 @@ update_ssl() {
     fi
 }
 
-# --- 27. LIMPEZA DE LOGS & OTIMIZAÇÃO DE DISCO ---
+# --- 27. LIMPEZA DE LOGS & OTIMIZAÇÃO DE DISCO (LOGROTATE) ---
 update_limpalogs() {
-    log_info "Executando limpeza de logs e otimização de disco..."
-    if [ -f "$REPO_DIR/scripts/limpa_logs.sh" ]; then
+    log_info "Configurando Logrotate e executando limpeza de logs..."
+    if [ -f "$REPO_DIR/scripts/ipbx-logrotate.sh" ]; then
+        bash "$REPO_DIR/scripts/ipbx-logrotate.sh" --now
+    elif [ -f "$REPO_DIR/scripts/limpa_logs.sh" ]; then
         /bin/cp -f "$REPO_DIR/scripts/limpa_logs.sh" /usr/local/bin/ipbx-limpalogs
         chmod +x /usr/local/bin/ipbx-limpalogs
         bash "$REPO_DIR/scripts/limpa_logs.sh"
+    fi
 
-        # Configura agendamento no crontab semanal
-        if ! crontab -l 2>/dev/null | grep -q "ipbx-limpalogs"; then
-            (crontab -l 2>/dev/null; echo "0 4 * * 0 /usr/local/bin/ipbx-limpalogs > /dev/null 2>&1") | crontab -
-            log_success "Agendamento de limpeza semanal configurado no crontab (Domingos às 04h)."
-        fi
-    else
-        log_error "Script scripts/limpa_logs.sh não encontrado no repositório."
+    # Configura agendamento no crontab semanal
+    if ! crontab -l 2>/dev/null | grep -q "ipbx-limpalogs"; then
+        (crontab -l 2>/dev/null; echo "0 4 * * 0 /usr/local/bin/ipbx-limpalogs > /dev/null 2>&1") | crontab -
+        log_success "Agendamento de limpeza semanal configurado no crontab (Domingos às 04h)."
     fi
 }
 
-# --- 28. MONITOR DE SEGURANÇA & TELEGRAM (FIREWALL, INVASÃO E USUÁRIOS) ---
+# --- 28. MONITOR DE SEGURANÇA & HARDENING ANTI-INVASÃO (TELEGRAM) ---
 update_monitor_prisma() {
-    log_info "Configurando Monitor de Segurança & Telegram (Firewall, Invasão e Usuários)..."
+    log_info "Aplicando Hardening de Segurança & Monitor Telegram..."
+    if [ -f "$REPO_DIR/scripts/ipbx-security-hardening.sh" ]; then
+        bash "$REPO_DIR/scripts/ipbx-security-hardening.sh"
+    fi
+
     if [ -f "$REPO_DIR/scripts/monitor_prisma.sh" ]; then
         /bin/cp -f "$REPO_DIR/scripts/monitor_prisma.sh" /usr/local/bin/monitor_issabel_users.sh
         /bin/cp -f "$REPO_DIR/scripts/monitor_prisma.sh" /usr/local/bin/monitor_prisma.sh
@@ -984,8 +988,6 @@ update_monitor_prisma() {
         else
             log_info "Monitor de segurança já configurado no crontab."
         fi
-    else
-        log_error "Script scripts/monitor_prisma.sh não encontrado no repositório."
     fi
 }
 
