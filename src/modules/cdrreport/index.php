@@ -802,7 +802,6 @@ function renderCelDetailsHtml($pDB, $uniqueid)
 
                 aud.src = audioUrl;
                 if (modal) {
-                    modal.classList.add('active');
                     modal.style.display = 'flex';
                 }
 
@@ -864,8 +863,18 @@ function renderCelDetailsHtml($pDB, $uniqueid)
                 if (aud) {
                     aud.playbackRate = speed;
                     var pills = document.querySelectorAll('.audio-speed-group .speed-btn');
-                    pills.forEach(function(p) { p.classList.remove('active'); });
-                    if (btn) btn.classList.add('active');
+                    pills.forEach(function(p) { 
+                        p.classList.remove('active');
+                        p.style.background = 'rgba(255,255,255,0.08)';
+                        p.style.borderColor = 'rgba(255,255,255,0.12)';
+                        p.style.color = '#94a3b8';
+                    });
+                    if (btn) {
+                        btn.classList.add('active');
+                        btn.style.background = '#8b5cf6';
+                        btn.style.borderColor = '#8b5cf6';
+                        btn.style.color = '#ffffff';
+                    }
                 }
             }
 
@@ -877,7 +886,6 @@ function renderCelDetailsHtml($pDB, $uniqueid)
                 }
                 var modal = document.getElementById('audioPlayerModal');
                 if (modal) {
-                    modal.classList.remove('active');
                     modal.style.display = 'none';
                 }
                 updatePlayPauseButton(false);
@@ -905,6 +913,12 @@ function renderCelDetailsHtml($pDB, $uniqueid)
                         var totEl = document.getElementById('stkTotalTime');
                         if (totEl && dur > 0) totEl.textContent = formatSecondsToMmSs(dur);
                     });
+
+                    aud.addEventListener('ended', function() {
+                        updatePlayPauseButton(false);
+                    });
+                }
+            });
 
                     aud.addEventListener('ended', function() {
                         updatePlayPauseButton(false);
@@ -2155,51 +2169,51 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
 
     
         
-        <!-- Modal Popup de Reprodução de Gravação -->
-        <div id="audioPlayerModal" class="audio-modal-overlay" onclick="if(event.target === this) closeAudioPlayerModal();">
-            <div class="audio-modal-card" style="background:linear-gradient(145deg, #1e1b4b 0%, #0f172a 100%); border:1px solid rgba(139,92,246,0.4); border-radius:16px; box-shadow:0 25px 50px -12px rgba(0,0,0,0.8), 0 0 30px rgba(124,58,237,0.3); width:92%; max-width:520px; overflow:hidden; color:#ffffff; font-family:'Segoe UI', sans-serif;">
+        <!-- Modal Popup de Reprodução de Gravação (Totalmente Desacoplado do Rodapé) -->
+        <div id="audioPlayerModal" class="audio-modal-overlay" style="display:none; position:fixed !important; top:0 !important; left:0 !important; width:100vw !important; height:100vh !important; background:rgba(15,23,42,0.75) !important; backdrop-filter:blur(6px) !important; -webkit-backdrop-filter:blur(6px) !important; z-index:2147483647 !important; align-items:center !important; justify-content:center !important;" onclick="if(event.target === this) closeAudioPlayerModal();">
+            <div class="audio-modal-card" style="background:linear-gradient(145deg, #1e1b4b 0%, #0f172a 100%) !important; border:1px solid rgba(139,92,246,0.4) !important; border-radius:16px !important; box-shadow:0 25px 50px -12px rgba(0,0,0,0.8), 0 0 30px rgba(124,58,237,0.3) !important; width:92% !important; max-width:520px !important; overflow:hidden !important; color:#ffffff !important; font-family:'Segoe UI', sans-serif !important;">
                 <!-- Header do Popup -->
-                <div class="audio-modal-header">
-                    <div class="audio-modal-title-box">
-                        <span class="audio-modal-icon">🎧</span>
+                <div class="audio-modal-header" style="padding:16px 20px; background:rgba(255,255,255,0.05); border-bottom:1px solid rgba(255,255,255,0.1); display:flex; justify-content:space-between; align-items:center;">
+                    <div class="audio-modal-title-box" style="display:flex; align-items:center; gap:12px;">
+                        <span class="audio-modal-icon" style="font-size:24px; background:rgba(124,58,237,0.3); border:1px solid rgba(139,92,246,0.4); padding:8px; border-radius:10px; display:flex; align-items:center; justify-content:center;">🎧</span>
                         <div>
-                            <h3 class="audio-modal-title">Reproduzindo Gravação</h3>
-                            <div class="audio-modal-meta">
+                            <h3 class="audio-modal-title" style="margin:0; font-size:16px; font-weight:800; color:#f8fafc;">Reproduzindo Gravação</h3>
+                            <div class="audio-modal-meta" style="margin-top:3px; font-size:12px; color:#cbd5e1; font-weight:600;">
                                 <span id="stkCaller">📞 Origem: -</span> ➔ <span id="stkTarget">🎯 Destino: -</span>
                             </div>
                         </div>
                     </div>
-                    <button type="button" class="audio-modal-close-btn" onclick="closeAudioPlayerModal()" title="Fechar">✖</button>
+                    <button type="button" class="audio-modal-close-btn" onclick="closeAudioPlayerModal()" title="Fechar" style="background:rgba(255,255,255,0.1); color:#e2e8f0; border:1px solid rgba(255,255,255,0.15); font-size:15px; font-weight:bold; cursor:pointer; width:32px; height:32px; border-radius:8px; display:flex; align-items:center; justify-content:center;">✖</button>
                 </div>
 
                 <!-- Body do Popup -->
-                <div class="audio-modal-body">
+                <div class="audio-modal-body" style="padding:20px;">
                     <!-- Barra de Progresso e Tempo -->
-                    <div class="audio-progress-container">
-                        <div class="audio-time-row">
+                    <div class="audio-progress-container" style="margin-bottom:18px;">
+                        <div class="audio-time-row" style="display:flex; justify-content:space-between; font-size:12px; color:#94a3b8; font-weight:700; margin-bottom:6px;">
                             <span id="stkCurTime" class="time-text">00:00</span>
                             <span id="stkTotalTime" class="time-text">00:00</span>
                         </div>
-                        <input type="range" id="stkProgressBar" min="0" max="100" value="0" step="0.1" oninput="stkSeekTo(this.value)" class="audio-range-slider" />
+                        <input type="range" id="stkProgressBar" min="0" max="100" value="0" step="0.1" oninput="stkSeekTo(this.value)" class="audio-range-slider" style="width:100%; height:6px; border-radius:3px; background:rgba(255,255,255,0.2); outline:none; cursor:pointer; accent-color:#8b5cf6;" />
                     </div>
 
                     <!-- Controles Principais -->
-                    <div class="audio-controls-row">
-                        <button type="button" class="btn-audio-ctrl" onclick="stkSeekRelative(-5)" title="Voltar 5 segundos">⏮ -5s</button>
-                        <button type="button" id="stkPlayPauseBtn" class="btn-audio-ctrl btn-play-main" onclick="stkTogglePlay()">⏸ Pausar</button>
-                        <button type="button" class="btn-audio-ctrl" onclick="stkSeekRelative(5)" title="Avançar 5 segundos">+5s ⏭</button>
+                    <div class="audio-controls-row" style="display:flex; justify-content:center; align-items:center; gap:14px; margin-bottom:20px;">
+                        <button type="button" class="btn-audio-ctrl" onclick="stkSeekRelative(-5)" title="Voltar 5 segundos" style="background:rgba(255,255,255,0.1); color:#ffffff; border:1px solid rgba(255,255,255,0.15); padding:8px 14px; border-radius:8px; font-size:13px; font-weight:700; cursor:pointer;">⏮ -5s</button>
+                        <button type="button" id="stkPlayPauseBtn" class="btn-audio-ctrl btn-play-main" onclick="stkTogglePlay()" style="background:linear-gradient(135deg, #7c3aed 0%, #6366f1 100%); color:#ffffff; border:none; padding:10px 24px; border-radius:8px; font-size:14px; font-weight:700; cursor:pointer; box-shadow:0 4px 12px rgba(124,58,237,0.4);">⏸ Pausar</button>
+                        <button type="button" class="btn-audio-ctrl" onclick="stkSeekRelative(5)" title="Avançar 5 segundos" style="background:rgba(255,255,255,0.1); color:#ffffff; border:1px solid rgba(255,255,255,0.15); padding:8px 14px; border-radius:8px; font-size:13px; font-weight:700; cursor:pointer;">+5s ⏭</button>
                     </div>
 
                     <!-- Velocidade de Reprodução e Download -->
-                    <div class="audio-footer-row">
-                        <div class="audio-speed-group">
-                            <span class="speed-label">Velocidade:</span>
-                            <button type="button" class="speed-btn active" onclick="stkSetSpeed(1.0, this)">1.0x</button>
-                            <button type="button" class="speed-btn" onclick="stkSetSpeed(1.25, this)">1.25x</button>
-                            <button type="button" class="speed-btn" onclick="stkSetSpeed(1.5, this)">1.5x</button>
-                            <button type="button" class="speed-btn" onclick="stkSetSpeed(2.0, this)">2.0x</button>
+                    <div class="audio-footer-row" style="display:flex; justify-content:space-between; align-items:center; padding-top:14px; border-top:1px solid rgba(255,255,255,0.1); flex-wrap:wrap; gap:10px;">
+                        <div class="audio-speed-group" style="display:flex; align-items:center; gap:5px;">
+                            <span class="speed-label" style="font-size:11px; color:#94a3b8; font-weight:600; margin-right:2px;">Velocidade:</span>
+                            <button type="button" class="speed-btn active" onclick="stkSetSpeed(1.0, this)" style="background:#8b5cf6; border:1px solid #8b5cf6; color:#ffffff; border-radius:6px; font-size:11px; font-weight:700; padding:4px 8px; cursor:pointer;">1.0x</button>
+                            <button type="button" class="speed-btn" onclick="stkSetSpeed(1.25, this)" style="background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.12); color:#94a3b8; border-radius:6px; font-size:11px; font-weight:700; padding:4px 8px; cursor:pointer;">1.25x</button>
+                            <button type="button" class="speed-btn" onclick="stkSetSpeed(1.5, this)" style="background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.12); color:#94a3b8; border-radius:6px; font-size:11px; font-weight:700; padding:4px 8px; cursor:pointer;">1.5x</button>
+                            <button type="button" class="speed-btn" onclick="stkSetSpeed(2.0, this)" style="background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.12); color:#94a3b8; border-radius:6px; font-size:11px; font-weight:700; padding:4px 8px; cursor:pointer;">2.0x</button>
                         </div>
-                        <a id="stkDownloadBtn" href="#" target="_blank" class="btn-audio-download" title="Baixar Gravação">⬇️ Baixar Gravação</a>
+                        <a id="stkDownloadBtn" href="#" target="_blank" class="btn-audio-download" title="Baixar Gravação" style="background:rgba(16,185,129,0.2); border:1px solid rgba(16,185,129,0.4); color:#34d399; padding:6px 12px; border-radius:6px; font-size:11px; font-weight:700; text-decoration:none; display:inline-flex; align-items:center; gap:4px;">⬇️ Baixar Gravação</a>
                     </div>
                 </div>
             </div>
@@ -2317,7 +2331,6 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
 
                 aud.src = audioUrl;
                 if (modal) {
-                    modal.classList.add('active');
                     modal.style.display = 'flex';
                 }
 
@@ -2379,8 +2392,18 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
                 if (aud) {
                     aud.playbackRate = speed;
                     var pills = document.querySelectorAll('.audio-speed-group .speed-btn');
-                    pills.forEach(function(p) { p.classList.remove('active'); });
-                    if (btn) btn.classList.add('active');
+                    pills.forEach(function(p) { 
+                        p.classList.remove('active');
+                        p.style.background = 'rgba(255,255,255,0.08)';
+                        p.style.borderColor = 'rgba(255,255,255,0.12)';
+                        p.style.color = '#94a3b8';
+                    });
+                    if (btn) {
+                        btn.classList.add('active');
+                        btn.style.background = '#8b5cf6';
+                        btn.style.borderColor = '#8b5cf6';
+                        btn.style.color = '#ffffff';
+                    }
                 }
             }
 
@@ -2392,7 +2415,6 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
                 }
                 var modal = document.getElementById('audioPlayerModal');
                 if (modal) {
-                    modal.classList.remove('active');
                     modal.style.display = 'none';
                 }
                 updatePlayPauseButton(false);
@@ -2420,6 +2442,12 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
                         var totEl = document.getElementById('stkTotalTime');
                         if (totEl && dur > 0) totEl.textContent = formatSecondsToMmSs(dur);
                     });
+
+                    aud.addEventListener('ended', function() {
+                        updatePlayPauseButton(false);
+                    });
+                }
+            });
 
                     aud.addEventListener('ended', function() {
                         updatePlayPauseButton(false);
