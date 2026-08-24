@@ -180,7 +180,7 @@ function renderDirectionTrunkBadge($did, $raw_src, $val_dst, $channel = '', $dst
         }
     }
 
-    if (!empty($did) && $did != '-') {
+    if (!empty($did) && $did != '-' && $did != 's') {
         return "<span title='📥 Entrada via Linha/DID: " . htmlspecialchars($did, ENT_QUOTES) . "' style='background:#f0fdf4; color:#166534; border:1px solid #bbf7d0; padding:4px 10px; border-radius:12px; font-weight:700; font-size:11px; display:inline-flex; align-items:center; gap:5px;'><i class='fa fa-arrow-down'></i> Entrada <span style='font-size:10px; color:#15803d; font-weight:600;'>(" . htmlspecialchars($did) . ")</span></span>";
     } elseif ($srcIsExt && !$dstIsExt && !empty($val_dst) && $val_dst != '-') {
         $sub = !empty($trunkName) ? " <span style='font-size:10px; color:#1e40af; font-weight:600;'>(" . htmlspecialchars($trunkName) . ")</span>" : "";
@@ -913,12 +913,6 @@ function renderCelDetailsHtml($pDB, $uniqueid)
                         var totEl = document.getElementById('stkTotalTime');
                         if (totEl && dur > 0) totEl.textContent = formatSecondsToMmSs(dur);
                     });
-
-                    aud.addEventListener('ended', function() {
-                        updatePlayPauseButton(false);
-                    });
-                }
-            });
 
                     aud.addEventListener('ended', function() {
                         updatePlayPauseButton(false);
@@ -2064,7 +2058,9 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
                                 $val_rg_html = "<span style='color:#cbd5e1;'>-</span>";
                             }
 
-                            if (!empty($val_dst) && isset($groupsMap[$val_dst])) {
+                            if ($val_dst === 's' || $val_dst === '' || $val_dst === '-') {
+                                $val_dst_html = "<span style='background:#f1f5f9; color:#475569; padding:3px 8px; border-radius:6px; font-weight:600; font-size:11px;' title='Atendimento Geral / Rota de Entrada'>🎯 Atendimento Geral</span>";
+                            } elseif (!empty($val_dst) && isset($groupsMap[$val_dst])) {
                                 $val_dst_html = "<span title='🏢 Fila: " . htmlspecialchars($val_dst . " - " . $groupsMap[$val_dst], ENT_QUOTES) . "' style='background:#ede9fe; color:#6d28d9; padding:3px 8px; border-radius:6px; font-weight:700; font-size:11px; cursor:help; border:1px solid #ddd6fe; display:inline-flex; align-items:center; gap:4px;'><i class='fa fa-users'></i> " . htmlspecialchars($val_dst) . "</span>";
                             } else {
                                 $val_dst_html = "<span style='background:#ede9fe; color:#6d28d9; padding:3px 8px; border-radius:6px; font-weight:600; font-size:11px;'>🎯 " . htmlspecialchars($val_dst) . "</span>";
@@ -2449,12 +2445,6 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
                 }
             });
 
-                    aud.addEventListener('ended', function() {
-                        updatePlayPauseButton(false);
-                    });
-                }
-            });
-
             
 
             
@@ -2609,11 +2599,16 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
                 }
             }
 
-            if (document.readyState === 'loading') {
-                document.addEventListener('DOMContentLoaded', initCdrCharts);
-            } else {
+            function runCdrCharts() {
                 initCdrCharts();
             }
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', runCdrCharts);
+            } else {
+                runCdrCharts();
+            }
+            setTimeout(runCdrCharts, 300);
+            setTimeout(runCdrCharts, 800);
 
         </script>
     <?php

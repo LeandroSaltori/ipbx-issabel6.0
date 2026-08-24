@@ -1857,12 +1857,6 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
                 }
             });
 
-                    aud.addEventListener('ended', function() {
-                        updatePlayPauseButton(false);
-                    });
-                }
-            });
-
             
 
             function openAddressBookModal(phoneNumber, name, lastName, company, email, notes) {

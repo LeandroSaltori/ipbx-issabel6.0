@@ -1541,12 +1541,6 @@ function renderFullMonitoringDashboard($smarty, $module_name, $local_templates_d
                 }
             });
 
-                    aud.addEventListener('ended', function() {
-                        updatePlayPauseButton(false);
-                    });
-                }
-            });
-
             
 
             function openAddressBookModal(phoneNumber, name, lastName, company, email, notes) {
