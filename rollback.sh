@@ -50,12 +50,13 @@ fi
 
 # Detecta se stdin é terminal interativo
 menu_read() {
+    local var_name="${!#}"
     if [ -t 0 ]; then
         read "$@"
-    elif [ -e /dev/tty ]; then
+    elif [ -e /dev/tty ] && [ -r /dev/tty ]; then
         read "$@" < /dev/tty
     else
-        CONFIRMA="sim"
+        eval "$var_name=\"\""
     fi
 }
 
@@ -209,33 +210,15 @@ fi
 log_info "Iniciando restauração do snapshot..."
 log_to_file "Iniciando restauração de $SELECTED_BACKUP"
 
-# 1. Restauração de pastas WEB
-for dir in admin lang modules themes/tenant themes/prisma_v5; do
-    if [ -d "$SELECTED_BACKUP/html/$dir" ]; then
-        if $DRY_RUN; then
-            log_dry "Restauraria /var/www/html/$dir"
-        else
-            mkdir -p "/var/www/html/$(dirname "$dir")" 2>/dev/null || true
-            rm -rf "/var/www/html/$dir"
-            cp -rpf "$SELECTED_BACKUP/html/$dir" "/var/www/html/$dir"
-            chown -R asterisk:asterisk "/var/www/html/$dir"
-            log_success "/var/www/html/$dir restaurado com sucesso"
-        fi
-    fi
-done
-
-# 2. Restauração de arquivos WEB soltos
+# 1. Restauração segura de arquivos e pastas WEB
 if [ -d "$SELECTED_BACKUP/html" ]; then
-    for f in $(find "$SELECTED_BACKUP/html" -maxdepth 1 -type f 2>/dev/null); do
-        fname=$(basename "$f")
-        if $DRY_RUN; then
-            log_dry "Restauraria /var/www/html/$fname"
-        else
-            cp -pf "$f" "/var/www/html/$fname"
-            chown asterisk:asterisk "/var/www/html/$fname"
-            log_success "/var/www/html/$fname restaurado"
-        fi
-    done
+    if $DRY_RUN; then
+        log_dry "Restauraria arquivos de $SELECTED_BACKUP/html/ para /var/www/html/"
+    else
+        cp -rpf "$SELECTED_BACKUP/html/." "/var/www/html/"
+        chown -R asterisk:asterisk /var/www/html/
+        log_success "Arquivos e módulos WEB restaurados com sucesso a partir de $SELECTED_BACKUP/html"
+    fi
 fi
 
 # 3. Restauração dos bancos SQLite (menu.db, acl.db)
