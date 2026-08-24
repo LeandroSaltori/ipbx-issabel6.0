@@ -1594,26 +1594,7 @@ function renderFullMonitoringDashboard($smarty, $module_name, $local_templates_d
                 });
             }
 
-            document.addEventListener("DOMContentLoaded", function() {
-                ensureAudioBarInBody();
-                var aud = getOrInitAudio();
-                if (aud) {
-                    aud.addEventListener('timeupdate', function() {
-                        var cur = aud.currentTime || 0;
-                        var dur = aud.duration || 0;
-                        var bar = document.getElementById('stkProgressBar');
-                        if (bar && dur > 0) {
-                            bar.value = (cur / dur) * 100;
-                        }
-                        var timeEl = document.getElementById('stkTime');
-                        if (timeEl) timeEl.textContent = formatSecondsToMmSs(cur) + ' / ' + formatSecondsToMmSs(dur);
-                    });
 
-                    aud.addEventListener('ended', function() {
-                        updatePlayPauseButton(false);
-                    });
-                }
-            });
         </script>
     </body>
     </html>
