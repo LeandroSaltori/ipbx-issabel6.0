@@ -231,7 +231,7 @@ function _moduleContent(&$smarty, $module_name)
             <div class="kpi-card-item blue" title="📤 Chamadas Efetuadas (Saindo)&#10;Volume de ligações realizadas para fora da central pelos atendentes.">
                 <div class="kpi-card-title">📤 Efetuadas</div>
                 <div class="kpi-card-num"><?php echo number_format($totOut, 0, ',', '.'); ?></div>
-                <div class="kpi-card-desc">Chamadas saindo</div>
+                <div class="kpi-card-desc">Chamadas de saída</div>
             </div>
             <div class="kpi-card-item amber" title="🎯 Taxa de Atendimento (%)&#10;Percentual de chamadas que foram atendidas com sucesso sobre o total de ligações.">
                 <div class="kpi-card-title">🎯 Taxa de Atendimento</div>
@@ -300,7 +300,7 @@ function _moduleContent(&$smarty, $module_name)
                                 <td><span style="background:#f1f5f9; color:#334155; padding:3px 8px; border-radius:6px; font-weight:600; font-size:11px;">🎯 <?php echo htmlspecialchars($dst); ?></span></td>
                                 <td>
                                     <?php if ($isOut): ?>
-                                        <span class="badge-type badge-out">⬆️ Saindo (Efetuada)</span>
+                                        <span class="badge-type badge-out">⬆️ Saída (Efetuada)</span>
                                     <?php elseif ($isIn): ?>
                                         <span class="badge-type badge-in">⬇️ Entrante (Recebida)</span>
                                     <?php else: ?>
@@ -346,7 +346,7 @@ function _moduleContent(&$smarty, $module_name)
                             borderRadius: 4
                         },
                         {
-                            label: 'Efetudas (Saindo)',
+                            label: 'Efetuadas (Saída)',
                             data: <?php echo json_encode($hourlyOut); ?>,
                             backgroundColor: '#3b82f6',
                             borderRadius: 4

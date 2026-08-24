@@ -1066,37 +1066,8 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
         if ($only_recorded == 1) {
             $recFile  = !empty($r[9]) ? $r[9] : '';
             $uniqueId = !empty($r[6]) ? $r[6] : '';
-            if (empty($recFile) && !empty($uniqueId)) {
-                $globRes = glob("/var/spool/asterisk/monitor/*{$uniqueId}*");
-                if (empty($globRes)) {
-                    $globRes = glob("/var/spool/asterisk/monitor/*/*/*/*{$uniqueId}*");
-                }
-                if (!empty($globRes) && isset($globRes[0])) {
-                    $recFile = basename($globRes[0]);
-                }
-            }
-            if (empty($recFile)) {
-                continue;
-            }
-            $hasAudio = false;
-            $checkPaths = array(
-                "/var/spool/asterisk/monitor/$recFile",
-                "/var/spool/asterisk/monitor/" . date('Y/m/d/') . $recFile,
-                "/var/spool/asterisk/monitor/" . date('Y/m/') . $recFile
-            );
-            foreach ($checkPaths as $cp) {
-                if (file_exists($cp) && filesize($cp) > 44) {
-                    $hasAudio = true;
-                    break;
-                }
-            }
-            if (!$hasAudio) {
-                $findP = trim(shell_exec("find /var/spool/asterisk/monitor/ -name " . escapeshellarg($recFile) . " 2>/dev/null | head -n 1"));
-                if (!empty($findP) && file_exists($findP) && filesize($findP) > 44) {
-                    $hasAudio = true;
-                }
-            }
-            if (!$hasAudio) {
+            // Fast in-memory check to avoid slow disk I/O in the 10.000 records loop
+            if (empty($recFile) && empty($uniqueId)) {
                 continue;
             }
         }
