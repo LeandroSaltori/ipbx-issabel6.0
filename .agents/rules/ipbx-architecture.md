@@ -41,3 +41,8 @@ As 26 opções do menu modular devem ser mantidas sempre ativas e funcionais:
 2. Módulos PHP customizados, APIs, Webhooks, WhatsApp e conexões AMI/AGI devem ter 100% de liberdade contínua de execução.
 3. Rotação de logs (Logrotate) não-intrusiva com `logger reload`.
 
+## CONSULTA DE SKILLS E DESIGN VISUAL PREMIUM
+1. Consultar ativamente as **Skills** do sistema (`modern-web-guidance`, UI/UX, Chart.js, acessibilidade) antes de qualquer desenvolvimento web/frontend.
+2. Interfaces com design visual de alto impacto (efeito "WOW"): paletas elegantes, cards KPIs executivos, modais desacoplados, micro-animações, layout responsivo e usabilidade impecável para o cliente final.
+
+

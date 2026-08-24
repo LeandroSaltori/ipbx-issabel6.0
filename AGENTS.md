@@ -76,3 +76,15 @@ Todas as opções do menu interativo [1] a [26], [A] e [0] devem permanecer **10
 2. **Logrotate Não-Intrusivo**:
    - Rotação de logs com compressão sem jamais derrubar o Asterisk nem processos em tempo real (utiliza sempre `asterisk -rx "logger reload"`).
 
+---
+
+## 6. CONSULTA DE SKILLS E EXCELÊNCIA VISUAL (UI/UX PREMIUM)
+1. **Consulta Mandatória de SKILLS Especializadas**:
+   - Sempre consultar ativamente as **Skills** do sistema (`modern-web-guidance`, UI/UX, debugging, visualização de dados, acessibilidade) para embasar qualquer desenvolvimento frontend ou web.
+2. **Design Visual de Alto Impacto para o Cliente**:
+   - A interface deve entregar uma experiência **premium, moderna e profissional** (efeito "WOW").
+   - Utilizar paletas de cores refinadas, tipografia moderna (Google Fonts/Segoe UI), glassmorphism, micro-interações, hover effects suaves, cards de KPIs executivos com gradientes elegantes e gráficos dinâmicos (Chart.js).
+   - Componentes modais desacoplados e players flutuantes não invasivos.
+   - Proibido criar interfaces simplistas, arcaicas ou com elementos genéricos que desvalorizem o produto aos olhos do cliente final.
+
+
