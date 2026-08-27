@@ -14,7 +14,26 @@ Este manual orienta a configuração do **Servidor LDAP de Ramais e Agenda** nos
 
 ---
 
-## ⚙️ Tabela Detalhada de Parâmetros
+## ⚙️ Parâmetros de Configuração Manual (Web Interface)
+
+- **LDAP Server:** `macboot.ipbxprisma.cloud`
+- **Port:** `10389`
+- **Base DN:** `dc=pbx,dc=com`
+- **Username:** `cn=admin,dc=pbx,dc=com`
+- **Password:** `SUA_SENHA_AQUI` (definida em `/etc/sysconfig/issabel-ldap`, padrão: `issabelPBX`)
+- **LDAP Name Filter:** `(|(cn=%)(displayName=%))`
+- **LDAP Number Filter:** `(homePhone=%)`
+- **LDAP Name Attributes:** `cn displayName`
+- **LDAP Number Attributes:** `homePhone`
+- **LDAP Display Name:** `%cn`
+- **Lookup Display Name:** `%cn`
+- **Max Hits:** `3000`
+- **Search Timeout:** `30`
+- **LDAP Lookup:** Habilitar para Incoming e Outgoing Calls
+
+---
+
+## 📋 Tabela Detalhada de Parâmetros
 
 | Campo / Parâmetro | Valor Recomendado | Descrição / Observação |
 | :--- | :--- | :--- |
@@ -30,8 +49,43 @@ Este manual orienta a configuração do **Servidor LDAP de Ramais e Agenda** nos
 | **LDAP Number Filter** | `(homePhone=%)` *(apenas ramais)* <br> **OU** <br> `(\|(homePhone=%)(telephoneNumber=%)(mobile=%))` | Filtro aplicado ao pesquisar por dígitos numéricos. |
 | **LDAP Display Name** | `%cn` ou `%displayName` | Formato como o nome será exibido na tela do aparelho. |
 | **Max. Hits** | `3000` *(ou 1000)* | Limite máximo de contatos retornados na consulta. |
+| **Search Timeout** | `30` | Tempo limite de espera da busca em segundos. |
 | **LDAP Lookup For Dial** | `Ativado (Yes)` | Busca automática ao digitar no teclado para discar. |
 | **LDAP Lookup For Incoming Call** | `Ativado (Yes)` | Identifica e mostra o nome do contato nas chamadas recebidas (Bina inteligente). |
+
+---
+
+## 🛠️ Template XML de Provisionamento LDAP Grandstream
+
+Salve como `ldap_grandstream.xml` ou importe via web em **Maintenance > Upgrade and Provisioning > Config File**:
+
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<gs_provision>
+    <config version="2">
+        <item name="ldap">
+            <part name="server">macboot.ipbxprisma.cloud</part>
+            <part name="port">10389</part>
+            <part name="base">dc=pbx,dc=com</part>
+            <part name="protocol">LDAP</part>
+            <part name="version">3</part>
+            <part name="username">cn=admin,dc=pbx,dc=com</part>
+            <part name="password">SUA_SENHA_AQUI</part>
+            <part name="ldapDisplayName">%cn</part>
+            <part name="ldapNumberFilter">(homePhone=%)</part>
+            <part name="ldapNumberAttributes">homePhone</part>
+            <part name="ldapNameFilter">(|(cn=%)(displayName=%))</part>
+            <part name="ldapNameAttributes">cn displayName</part>
+            <part name="ldapMailFilter"></part>
+            <part name="ldapMailAttributes"></part>
+            <part name="ldapPositionFilter"></part>
+            <part name="ldapPositionAttributes"></part>
+            <part name="ldapDepartmentFilter"></part>
+            <part name="ldapDepartmentAttributes"></part>
+        </item>
+    </config>
+</gs_provision>
+```
 
 ---
 
