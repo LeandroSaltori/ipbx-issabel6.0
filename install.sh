@@ -1235,6 +1235,37 @@ fi
 log_success "User-Agent PJSIP configurado para IPbx-Prisma."
 
 # ==============================================================================
+# 21. SERVIDOR LDAP DE RAMAIS (issabel-ldap)
+# ==============================================================================
+log_info "21/21 - Instalando e configurando Servidor LDAP de Ramais..."
+if [ -f "$REPO_DIR/src/ldap/issabel-ldap" ]; then
+    cp -f "$REPO_DIR/src/ldap/issabel-ldap" /usr/local/bin/issabel-ldap
+    chmod 755 /usr/local/bin/issabel-ldap
+
+    if [ -f "$REPO_DIR/src/ldap/systemd/issabel-ldap.service" ]; then
+        cp -f "$REPO_DIR/src/ldap/systemd/issabel-ldap.service" /etc/systemd/system/issabel-ldap.service
+        chmod 644 /etc/systemd/system/issabel-ldap.service
+    fi
+
+    if [ ! -f /etc/sysconfig/issabel-ldap ] && [ -f "$REPO_DIR/src/ldap/systemd/issabel-ldap.sysconfig" ]; then
+        mkdir -p /etc/sysconfig 2>/dev/null || true
+        cp -f "$REPO_DIR/src/ldap/systemd/issabel-ldap.sysconfig" /etc/sysconfig/issabel-ldap
+        chmod 640 /etc/sysconfig/issabel-ldap
+    fi
+
+    # Libera porta 10389 no firewalld caso esteja ativo
+    if command -v firewall-cmd &>/dev/null && systemctl is-active firewalld &>/dev/null; then
+        firewall-cmd --permanent --add-port=10389/tcp 2>/dev/null || true
+        firewall-cmd --reload 2>/dev/null || true
+    fi
+
+    systemctl daemon-reload
+    systemctl enable issabel-ldap.service 2>/dev/null || true
+    systemctl restart issabel-ldap.service 2>/dev/null || true
+    log_success "Servidor LDAP instalado e ativo na porta 10389 (issabel-ldap)."
+fi
+
+# ==============================================================================
 # IMPLANTAÇÃO DO COMANDO DE ROLLBACK (ipbx-rollback) E MENU (ipbx-update)
 # ==============================================================================
 log_info "Implantando comandos auxiliares no sistema..."

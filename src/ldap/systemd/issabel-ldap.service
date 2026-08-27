@@ -1,0 +1,14 @@
+[Unit]
+Description=Issabel LDAP Service
+
+[Service]
+EnvironmentFile=-/etc/sysconfig/issabel-ldap
+PIDFile=/var/run/issabel-ldap.pid
+User=asterisk
+Group=asterisk
+WorkingDirectory=/usr/local/bin
+ExecStart=/usr/local/bin/issabel-ldap $OPTIONS
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

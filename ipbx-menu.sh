@@ -768,6 +768,7 @@ update_ldap() {
     log_info "Instalando Servidor LDAP de Ramais..."
     LDAP_BIN_SRC="$REPO_DIR/src/ldap/issabel-ldap"
     LDAP_SVC_SRC="$REPO_DIR/src/ldap/systemd/issabel-ldap.service"
+    LDAP_SYS_SRC="$REPO_DIR/src/ldap/systemd/issabel-ldap.sysconfig"
 
     if [ -f "$LDAP_BIN_SRC" ]; then
         cp -f "$LDAP_BIN_SRC" /usr/local/bin/issabel-ldap
@@ -776,11 +777,24 @@ update_ldap() {
         if [ -f "$LDAP_SVC_SRC" ]; then
             cp -f "$LDAP_SVC_SRC" /etc/systemd/system/issabel-ldap.service
             chmod 644 /etc/systemd/system/issabel-ldap.service
-            systemctl daemon-reload
-            systemctl enable issabel-ldap.service 2>/dev/null || true
-            systemctl restart issabel-ldap.service 2>/dev/null || true
-            log_success "Servidor LDAP instalado e ativo na porta 10389."
         fi
+
+        if [ ! -f /etc/sysconfig/issabel-ldap ] && [ -f "$LDAP_SYS_SRC" ]; then
+            mkdir -p /etc/sysconfig 2>/dev/null || true
+            cp -f "$LDAP_SYS_SRC" /etc/sysconfig/issabel-ldap
+            chmod 640 /etc/sysconfig/issabel-ldap
+        fi
+
+        # Libera porta 10389 no firewalld caso esteja ativo
+        if command -v firewall-cmd &>/dev/null && systemctl is-active firewalld &>/dev/null; then
+            firewall-cmd --permanent --add-port=10389/tcp 2>/dev/null || true
+            firewall-cmd --reload 2>/dev/null || true
+        fi
+
+        systemctl daemon-reload
+        systemctl enable issabel-ldap.service 2>/dev/null || true
+        systemctl restart issabel-ldap.service 2>/dev/null || true
+        log_success "Servidor LDAP instalado e ativo na porta 10389 (issabel-ldap)."
     else
         log_error "Binário LDAP não encontrado no repositório."
     fi
