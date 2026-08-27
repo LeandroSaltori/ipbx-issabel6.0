@@ -80,30 +80,44 @@ iptables -A INPUT -p tcp --dport 10389 -j ACCEPT
 
 ---
 
-## 📱 Configuração em Telefones IP
+---
 
-### 1. Yealink (T19P, T21P, T27G, T29G, T4X, T5X, etc.)
-- **Menu Web:** *Directory* -> *LDAP*
-- **LDAP Server:** `IP_DO_SEU_PBX`
+## 📱 Manuais e Guias Passo a Passo Dedicados
+
+- 📖 [**Guia Ilustrado de Configuração - Grandstream (GXP / GRP / GDMS)**](ldap_grandstream.md)
+- 📖 [**Guia de Configuração - Fanvil & Intelbras (V62, X-Series, TIP 125, TIP 200)**](ldap_fanvil.md)
+
+---
+
+### Resumo Rápido por Marca:
+
+#### 1. Grandstream (GXP16XX, GXP21XX, GRP26XX, GDMS)
+Consulte o guia completo com imagens em: [**Manual Grandstream**](ldap_grandstream.md)
+- **Server Address:** `IP_OU_DOMINIO_DO_PBX`
 - **Port:** `10389`
-- **Base DN:** `dc=asterisk` ou `ou=issabel` (ou deixar vazio)
-- **User Name / Password:** Deixar vazio (se anônimo) ou preencher conforme `/etc/sysconfig/issabel-ldap`
+- **Base:** `dc=pbx,dc=com`
+- **User Name:** `cn=admin,dc=pbx,dc=com`
+- **LDAP Name Attributes:** `cn displayName`
+- **LDAP Number Attributes:** `homePhone` *(ramais)* ou `homePhone telephoneNumber mobile` *(ramais + contatos)*
+- **LDAP Name Filter:** `(|(cn=%)(displayName=%))`
+- **LDAP Number Filter:** `(homePhone=%)` ou `(|(homePhone=%)(telephoneNumber=%)(mobile=%))`
+
+#### 2. Fanvil & Intelbras (V62, X-Series, TIP 125, TIP 200)
+Consulte o guia completo em: [**Manual Fanvil / Intelbras**](ldap_fanvil.md)
+- **Servidor:** `IP_OU_DOMINIO_DO_PBX`
+- **Porta:** `10389`
+- **Base DN:** `dc=pbx,dc=com`
+- **Usuário:** `cn=admin,dc=pbx,dc=com`
+- **Filtro Nome:** `(|(cn=%)(displayName=%))`
+- **Filtro Número:** `(homePhone=%)` ou `(|(homePhone=%)(telephoneNumber=%)(mobile=%))`
+
+#### 3. Yealink (T19P, T21P, T27G, T29G, T4X, T5X, etc.)
+- **Menu Web:** *Directory* -> *LDAP*
+- **LDAP Server:** `IP_OU_DOMINIO_DO_PBX`
+- **Port:** `10389`
+- **Base DN:** `dc=pbx,dc=com`
+- **User Name / Password:** `cn=admin,dc=pbx,dc=com` / *SuaSenha* (ou em branco se anônimo)
 - **LDAP Name Attributes:** `displayName cn`
 - **LDAP Number Attributes:** `telephoneNumber mobile homePhone`
 - **LDAP Display Name:** `%displayName%`
 - **LDAP Search Filter:** `(&(objectClass=*)(|(cn=%)(displayName=%)(telephoneNumber=%)(homePhone=%)))`
-
-### 2. Grandstream (GXP16XX, GXP21XX, GRP26XX)
-- **Menu Web:** *Contacts* -> *LDAP*
-- **Server Address:** `IP_DO_SEU_PBX`
-- **Port:** `10389`
-- **Base DN:** `dc=asterisk`
-- **LDAP Name Attributes:** `displayName cn`
-- **LDAP Number Attributes:** `telephoneNumber homePhone mobile`
-
-### 3. Intelbras / Fanvil (TIP 125, TIP 200, V62, X3, X4, etc.)
-- **Menu Web:** *Agenda / Contatos* -> *LDAP*
-- **Servidor:** `IP_DO_SEU_PBX`
-- **Porta:** `10389`
-- **Atributos de Nome:** `displayName`
-- **Atributos de Telefone:** `homePhone telephoneNumber mobile`
