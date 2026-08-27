@@ -59,6 +59,13 @@ if [ ! -d /var/www/html/modules/easy_vpn ] && [ ! -d /var/www/html/modules/easyv
     fi
 fi
 
+# Cria link simbólico de compatibilidade para ambos os nomes (easy_vpn e openvpn)
+if [ -d /var/www/html/modules/easy_vpn ] && [ ! -d /var/www/html/modules/openvpn ]; then
+    ln -s /var/www/html/modules/easy_vpn /var/www/html/modules/openvpn 2>/dev/null || true
+elif [ -d /var/www/html/modules/easyvpn ] && [ ! -d /var/www/html/modules/openvpn ]; then
+    ln -s /var/www/html/modules/easyvpn /var/www/html/modules/openvpn 2>/dev/null || true
+fi
+
 # 3. Correção do Easy-RSA 3.0.8 (Resolve o bug de travamento do 'Create CA' no Issabel 5)
 log_info "Configurando ambiente Easy-RSA 3.0.8..."
 mkdir -p /usr/share/easy-rsa/3.0.8/ /usr/share/easy-rsa/3/ 2>/dev/null || true
