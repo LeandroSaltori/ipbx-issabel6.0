@@ -1266,6 +1266,15 @@ if [ -f "$REPO_DIR/src/ldap/issabel-ldap" ]; then
 fi
 
 # ==============================================================================
+# 22. SERVIDOR OPENVPN (EASYVPN)
+# ==============================================================================
+log_info "22/22 - Instalando e configurando Servidor OpenVPN..."
+if [ -f "$REPO_DIR/scripts/ipbx-openvpn.sh" ]; then
+    bash "$REPO_DIR/scripts/ipbx-openvpn.sh" || true
+    log_success "Servidor OpenVPN instalado e configurado com Easy-RSA 3.0.8."
+fi
+
+# ==============================================================================
 # IMPLANTAÇÃO DO COMANDO DE ROLLBACK (ipbx-rollback) E MENU (ipbx-update)
 # ==============================================================================
 log_info "Implantando comandos auxiliares no sistema..."

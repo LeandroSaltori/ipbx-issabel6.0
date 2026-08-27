@@ -1005,6 +1005,17 @@ update_monitor_prisma() {
     fi
 }
 
+# --- 28. SERVIDOR OPENVPN (EASYVPN) ---
+update_openvpn() {
+    log_info "Instalando e configurando Servidor OpenVPN (EasyVPN)..."
+    if [ -f "$REPO_DIR/scripts/ipbx-openvpn.sh" ]; then
+        bash "$REPO_DIR/scripts/ipbx-openvpn.sh"
+        log_success "Servidor OpenVPN configurado e pronto para uso."
+    else
+        log_error "Script scripts/ipbx-openvpn.sh não encontrado no repositório."
+    fi
+}
+
 # --- 29. ROLLBACK ---
 update_rollback() {
     log_info "Implantando comando de rollback no sistema..."
@@ -1048,6 +1059,7 @@ install_all() {
     update_pjsip
     update_autoupdate
     update_limpalogs
+    update_openvpn
     update_rollback
     reload_services
     echo ""
@@ -1086,7 +1098,8 @@ show_menu() {
     echo -e "${BLUE}║${NC}   ${WHITE}[21]${NC} Ferramentas Diagnóstico     ${WHITE}[22]${NC} Features Asterisk         ${BLUE}║${NC}"
     echo -e "${BLUE}║${NC}   ${WHITE}[23]${NC} PJSIP User-Agent            ${WHITE}[24]${NC} Auto-Update Semanal       ${BLUE}║${NC}"
     echo -e "${BLUE}║${NC}   ${WHITE}[25]${NC} Web Developer               ${WHITE}[26]${NC} Configurar Domínio e SSL  ${BLUE}║${NC}"
-    echo -e "${BLUE}║${NC}   ${WHITE}[27]${NC} Limpeza de Logs e Disco     ${WHITE}[28]${NC} Instalar Rollback         ${BLUE}║${NC}"
+    echo -e "${BLUE}║${NC}   ${WHITE}[27]${NC} Limpeza de Logs e Disco     ${WHITE}[28]${NC} Servidor OpenVPN (EasyVPN)${BLUE}║${NC}"
+    echo -e "${BLUE}║${NC}   ${WHITE}[29]${NC} Instalar Rollback                                              ${BLUE}║${NC}"
     echo -e "${BLUE}║${NC}                                                                    ${BLUE}║${NC}"
     echo -e "${BLUE}╠══════════════════════════════════════════════════════════════════════╣${NC}"
     echo -e "${BLUE}║${NC}   ${YELLOW}[A]${NC}  ${YELLOW}INSTALAR TUDO${NC} (igual ao install.sh completo)                ${BLUE}║${NC}"
@@ -1129,7 +1142,8 @@ while true; do
         25) create_snapshot "Web Developer"; update_developer; reload_services ;;
         26) create_snapshot "Configuração Domínio SSL"; update_ssl; reload_services ;;
         27) update_limpalogs ;;
-        28) update_rollback ;;
+        28) create_snapshot "Servidor OpenVPN"; update_openvpn; reload_services ;;
+        29) update_rollback ;;
         [aA]) create_snapshot "Instalação Completa"; install_all ;;
         0)
             echo ""
