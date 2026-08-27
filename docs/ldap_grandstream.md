@@ -57,7 +57,12 @@ Este manual orienta a configuração do **Servidor LDAP de Ramais e Agenda** nos
 
 ## 🛠️ Template XML de Provisionamento LDAP Grandstream
 
-Salve como `ldap_grandstream.xml` ou importe via web em **Maintenance > Upgrade and Provisioning > Config File**:
+Você pode baixar o arquivo XML pronto para uso ou importá-lo diretamente no seu aparelho / GDMS:
+
+- 📥 **Arquivo para Download:** [`docs/templates/ldap_grandstream.xml`](./templates/ldap_grandstream.xml)
+- 🌐 **Link Direto (RAW):** `https://raw.githubusercontent.com/LeandroSaltori/ipbx-issabel6.0/main/docs/templates/ldap_grandstream.xml`
+
+### Conteúdo do Arquivo `ldap_grandstream.xml`:
 
 ```xml
 <?xml version="1.0" encoding="utf-8"?>
@@ -70,7 +75,7 @@ Salve como `ldap_grandstream.xml` ou importe via web em **Maintenance > Upgrade 
             <part name="protocol">LDAP</part>
             <part name="version">3</part>
             <part name="username">cn=admin,dc=pbx,dc=com</part>
-            <part name="password">SUA_SENHA_AQUI</part>
+            <part name="password">COLOQUE_A_SENHA_AQUI</part>
             <part name="ldapDisplayName">%cn</part>
             <part name="ldapNumberFilter">(homePhone=%)</part>
             <part name="ldapNumberAttributes">homePhone</part>
@@ -86,6 +91,26 @@ Salve como `ldap_grandstream.xml` ou importe via web em **Maintenance > Upgrade 
     </config>
 </gs_provision>
 ```
+
+---
+
+## 📥 Como Importar o XML no Aparelho ou na Nuvem
+
+### Opção 1: Via Interface Web Local do Telefone Grandstream
+1. Acesse o IP do telefone no navegador e faça login (padrão: `admin`).
+2. Vá em **Maintenance** ➔ **Upgrade and Provisioning** ➔ **Config File**.
+3. No campo **Upload Configuration File**, selecione o arquivo [`ldap_grandstream.xml`](./templates/ldap_grandstream.xml).
+4. Clique em **Upload XML Config**.
+5. O telefone aplicará as configurações instantaneamente sem necessidade de reiniciar.
+
+---
+
+### Opção 2: Via Plataforma em Nuvem GDMS (Grandstream Cloud)
+1. Acesse o portal [GDMS](https://www.gdms.cloud/).
+2. Vá em **Device Configuration** ➔ **Configuration Templates**.
+3. Selecione o modelo do aparelho (ex: `GRP2601`, `GRP2612`, etc.) ou crie um modelo global de Conta/Parâmetros.
+4. Na aba **Contacts / Phonebook** ➔ **LDAP**, preencha os parâmetros do XML ou importe o template.
+5. Associe aos aparelhos dos clientes e clique em **Save & Push**. Todos os telefones da empresa receberão a agenda corporativa e os ramais automaticamente!
 
 ---
 

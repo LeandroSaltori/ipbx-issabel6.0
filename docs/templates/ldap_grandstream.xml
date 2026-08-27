@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<gs_provision>
+    <config version="2">
+        <item name="ldap">
+            <part name="server">macboot.ipbxprisma.cloud</part>
+            <part name="port">10389</part>
+            <part name="base">dc=pbx,dc=com</part>
+            <part name="protocol">LDAP</part>
+            <part name="version">3</part>
+            <part name="username">cn=admin,dc=pbx,dc=com</part>
+            <part name="password">COLOQUE_A_SENHA_AQUI</part>
+            <part name="ldapDisplayName">%cn</part>
+            <part name="ldapNumberFilter">(homePhone=%)</part>
+            <part name="ldapNumberAttributes">homePhone</part>
+            <part name="ldapNameFilter">(|(cn=%)(displayName=%))</part>
+            <part name="ldapNameAttributes">cn displayName</part>
+            <part name="ldapMailFilter"></part>
+            <part name="ldapMailAttributes"></part>
+            <part name="ldapPositionFilter"></part>
+            <part name="ldapPositionAttributes"></part>
+            <part name="ldapDepartmentFilter"></part>
+            <part name="ldapDepartmentAttributes"></part>
+        </item>
+    </config>
+</gs_provision>
