@@ -118,13 +118,16 @@ mkdir -p /etc/openvpn/server /etc/openvpn/client /etc/openvpn/ccd /var/log/openv
 chown -R asterisk:asterisk /etc/openvpn /var/log/openvpn 2>/dev/null || true
 chmod 775 /etc/openvpn 2>/dev/null || true
 
-# 7. Registro do Módulo Web no Menu do Issabel
+# 7. Saneamento do Menu do Issabel (Remove entrada fantasma e garante módulo oficial)
 if command -v sqlite3 &>/dev/null && [ -f /var/www/db/menu.db ]; then
-    log_info "Registrando módulo OpenVPN no menu do Issabel..."
-    sqlite3 /var/www/db/acl.db "INSERT OR IGNORE INTO acl_resource (name, description) VALUES ('vpn', 'OpenVPN');" 2>/dev/null || true
-    sqlite3 /var/www/db/menu.db "DELETE FROM menu WHERE id = 'vpn';" 2>/dev/null || true
-    sqlite3 /var/www/db/menu.db "INSERT INTO menu (id, IdParent, Link, Name, Type, order_no) VALUES ('vpn', 'security', 'modules/vpn/', 'OpenVPN', 'framed', 12);" 2>/dev/null || true
-    sqlite3 /var/www/db/acl.db "INSERT OR IGNORE INTO acl_group_permission (id_action, id_group, id_resource) SELECT 1, 1, id FROM acl_resource WHERE name = 'vpn';" 2>/dev/null || true
+    log_info "Saneando e organizando menu do OpenVPN no Issabel..."
+    # Remove menu duplicado/inválido que apontava para modules/vpn/
+    sqlite3 /var/www/db/menu.db "DELETE FROM menu WHERE id = 'vpn' OR Link LIKE '%modules/vpn%';" 2>/dev/null || true
+    sqlite3 /var/www/db/acl.db "DELETE FROM acl_resource WHERE name = 'vpn';" 2>/dev/null || true
+    sqlite3 /var/www/db/acl.db "DELETE FROM acl_group_permission WHERE id_resource NOT IN (SELECT id FROM acl_resource);" 2>/dev/null || true
+
+    # Garante que o módulo nativo do EasyVPN/OpenVPN tenha permissão total para o grupo admin
+    sqlite3 /var/www/db/acl.db "INSERT OR IGNORE INTO acl_group_permission (id_action, id_group, id_resource) SELECT 1, 1, id FROM acl_resource WHERE name IN ('easy_vpn', 'easyvpn', 'openvpn');" 2>/dev/null || true
 fi
 
 # 8. Ajuste de Serviços Systemd
