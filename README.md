@@ -192,6 +192,9 @@ ipbx-issabel6.0/
 9. 🔄 **Atualização Automática Semanal (Auto Update):** Rotina semanal (`scripts/ipbx-autoupdate.sh`) via cron (`/etc/cron.weekly/ipbx-autoupdate`).
 10. ⏱️ **Resumo Flutuante com Retenção (2s Hover):** Os cards de resumo nos relatórios do sistema possuem um atraso de 2 segundos mantendo o mouse parado na linha antes de abrir, evitando popups acidentais durante a navegação.
 
+11. 🛡️ **Servidor OpenVPN (EasyVPN):** Túnel criptografado com Easy-RSA 3.0.8 corrigido, IP forwarding no kernel e regras de NAT para ramais remotos e telefones IP físicos sem falha de áudio.
+12. 📇 **Servidor LDAP Integrado (Porta 10389):** Serviço nativo `issabel-ldap` com sincronização automática da agenda corporativa para telefones Grandstream, Fanvil e Yealink.
+
 ---
 
 ## 🛠️ Scripts Utilitários e Comandos Rápidos
@@ -202,6 +205,7 @@ O repositório disponibiliza diversos scripts independentes na pasta [`scripts/`
 | :--- | :--- | :--- |
 | **`ipbx-update`**<br>([`ipbx-menu.sh`](./ipbx-menu.sh)) | **Menu Interativo Modular:** Permite atualizar módulo por módulo com segurança e snapshots automáticos por data. | `ipbx-update`<br>*ou* `curl -sSL .../ipbx-menu.sh \| bash` |
 | **`ipbx-rollback`**<br>([`rollback.sh`](./rollback.sh)) | **Rollback por Data/Hora:** Restaura o PBX para o estado anterior exato de qualquer data/hora gravada. | `ipbx-rollback`<br>*ou* `ipbx-rollback --latest` |
+| **`ipbx-openvpn.sh`**<br>([`scripts/ipbx-openvpn.sh`](./scripts/ipbx-openvpn.sh)) | **Servidor OpenVPN (EasyVPN):** Instala OpenVPN, Easy-RSA 3.0.8, interface web `ovpn2`, regras NAT e iptables. | `bash scripts/ipbx-openvpn.sh` |
 | **`ipbx-ssl`**<br>([`scripts/auto_dominio.sh`](./scripts/auto_dominio.sh)) | **Domínio e SSL Let's Encrypt:** Cria VirtualHost no Apache, emite certificado SSL gratuito e integra chaves com o Webphone WebRTC. | `bash scripts/auto_dominio.sh <dominio> <email>` |
 | **`ipbx-limpalogs`**<br>([`scripts/limpa_logs.sh`](./scripts/limpa_logs.sh)) | **Limpeza Segura de Logs e Disco:** Trunca logs >50MB, apaga logs antigos rotacionados e limpa cache Smarty. **Nunca apaga CDRs nem gravações.** | `bash scripts/limpa_logs.sh` |
 | **`monitor_prisma.sh`**<br>([`scripts/monitor_prisma.sh`](./scripts/monitor_prisma.sh)) | **Monitor de Segurança Telegram:** Detecta web shells/Emad em `/var/www/html/`, monitora Firewall (iptables/firewalld) e alerta novos usuários Web criados. | `bash scripts/monitor_prisma.sh` |
@@ -214,6 +218,10 @@ O repositório disponibiliza diversos scripts independentes na pasta [`scripts/`
 
 Para instruções detalhadas de configuração de cada recurso, acesse os manuais na pasta [`docs/`](./docs/):
 
+- 🛡️ [Servidor OpenVPN (EasyVPN) - Configuração e Softphones/Telefones IP](./docs/openvpn_server.md)
+- 📇 [Servidor LDAP Integrado (issabel-ldap na porta 10389)](./docs/ldap_server.md)
+- ☎️ [Provisionamento LDAP Grandstream (GRP2601/Série GRP) com XML](./docs/ldap_grandstream.md)
+- ☎️ [Provisionamento LDAP Fanvil (Série X/V)](./docs/ldap_fanvil.md)
 - 🔒 [Configuração de Domínio e SSL Let's Encrypt (`auto_dominio.sh`)](./docs/auto_dominio_ssl.md)
 - 🧹 [Limpeza de Logs e Otimização de Disco (`limpa_logs.sh`)](./docs/limpa_logs.md)
 - 🚨 [Monitor de Segurança & Alertas Telegram (`monitor_prisma.sh`)](./docs/monitor_seguranca_telegram.md)
@@ -222,7 +230,6 @@ Para instruções detalhadas de configuração de cada recurso, acesse os manuai
 - 📊 [Asternic CDR - Relatórios de Chamadas](./docs/asternic_cdr.md)
 - 🎛️ [Painel IPbx - Monitoramento Visual de Ramais](./docs/painel_ipbx.md)
 - 📝 [Pesquisa de Satisfação WEB & URA](./docs/pesquisa_satisfacao_web.md)
-- 🗂️ [Servidor LDAP para Telefones IP](./docs/ldap_directory.md)
 - 📞 [Instalação TFTP](./docs/tftp_install.md)
 - 🔗 [Alteração de Links no Menu do Issabel](./docs/alterar_link.md)
 - 🔄 [Rollback Versionado por Data/Hora](#-rollback-versionado-restaurar-por-data)

@@ -5,7 +5,7 @@ Este documento estabelece as regras e padrões arquiteturais obrigatórios para 
 ---
 
 ## 1. MENU DE ATUALIZAÇÃO MODULAR (`ipbx-menu.sh`)
-Todas as opções do menu interativo [1] a [26], [A] e [0] devem permanecer **100% funcionais, íntegras e sem quebras** em qualquer alteração futura:
+Todas as opções do menu interativo [1] a [29], [A] e [0] devem permanecer **100% funcionais, íntegras e sem quebras** em qualquer alteração futura:
 
 * **APARÊNCIA E INTERFACE:**
   - `[1]` Terminal (MOTD)
@@ -28,16 +28,19 @@ Todas as opções do menu interativo [1] a [26], [A] e [0] devem permanecer **10
   - `[15]` Call Center
   - `[16]` ChanSpy (Escuta)
   - `[17]` Mensagens Texto (PJSIP)
-  - `[18]` Servidor LDAP
-* **SISTEMA E CONFIGURAÇÕES:**
+  - `[18]` Servidor LDAP (`issabel-ldap` porta 10389)
+* **SISTEMA, SEGURANÇA E REDE:**
   - `[19]` Música de Espera (MOH)
-  - `[20]` Telegram (Notificações)
+  - `[20]` Monitor de Segurança Telegram
   - `[21]` Ferramentas Diagnóstico
   - `[22]` Features Asterisk
   - `[23]` PJSIP User-Agent
   - `[24]` Auto-Update Semanal
   - `[25]` Web Developer
-  - `[26]` Instalar Rollback (`ipbx-rollback`)
+  - `[26]` Configurar Domínio e SSL Let's Encrypt
+  - `[27]` Limpeza de Logs e Otimização de Disco
+  - `[28]` Servidor OpenVPN (EasyVPN)
+  - `[29]` Rollback (Restauração / Instalar `ipbx-rollback`)
 * **OPÇÕES GLOBAIS:**
   - `[A]` INSTALAR TUDO (execução completa)
   - `[0]` Sair
