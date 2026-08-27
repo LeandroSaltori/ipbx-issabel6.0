@@ -1016,18 +1016,50 @@ update_openvpn() {
     fi
 }
 
-# --- 29. ROLLBACK (RESTAURAÇÃO) ---
+# --- 29. ROLLBACK (RESTAURAÇÃO / INSTALAÇÃO) ---
 update_rollback() {
-    log_info "Iniciando Assistente Interativo de Rollback (Restauração de Snapshot)..."
-    if [ -f "$REPO_DIR/rollback.sh" ]; then
-        /bin/cp -f "$REPO_DIR/rollback.sh" /usr/local/bin/ipbx-rollback
-        chmod +x /usr/local/bin/ipbx-rollback
-        bash "$REPO_DIR/rollback.sh"
-    elif [ -f /usr/local/bin/ipbx-rollback ]; then
-        /usr/local/bin/ipbx-rollback
-    else
-        log_error "Script rollback.sh não encontrado no repositório."
-    fi
+    echo ""
+    echo -e "${BLUE}╔══════════════════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${BLUE}║${WHITE}                 ASSISTENTE DE ROLLBACK & SNAPSHOTS                   ${BLUE}║${NC}"
+    echo -e "${BLUE}╠══════════════════════════════════════════════════════════════════════╣${NC}"
+    echo -e "${BLUE}║${NC}   ${WHITE}[1]${NC} Restaurar um Ponto de Backup (Executar Rollback Interativo)     ${BLUE}║${NC}"
+    echo -e "${BLUE}║${NC}   ${WHITE}[2]${NC} Apenas Instalar / Atualizar o comando 'ipbx-rollback' no Linux  ${BLUE}║${NC}"
+    echo -e "${BLUE}║${NC}   ${RED}[0]${NC} Voltar ao Menu Principal                                        ${BLUE}║${NC}"
+    echo -e "${BLUE}╚══════════════════════════════════════════════════════════════════════╝${NC}"
+    echo ""
+    echo -ne "${CYAN}Escolha o que deseja fazer [1/2/0]: ${NC}"
+    menu_read -r OPCAO_ROLLBACK
+
+    case "$OPCAO_ROLLBACK" in
+        1)
+            log_info "Iniciando Assistente de Restauração..."
+            if [ -f "$REPO_DIR/rollback.sh" ]; then
+                /bin/cp -f "$REPO_DIR/rollback.sh" /usr/local/bin/ipbx-rollback
+                chmod +x /usr/local/bin/ipbx-rollback
+                bash "$REPO_DIR/rollback.sh"
+            elif [ -f /usr/local/bin/ipbx-rollback ]; then
+                /usr/local/bin/ipbx-rollback
+            else
+                log_error "Script rollback.sh não encontrado no repositório."
+            fi
+            ;;
+        2)
+            log_info "Instalando utilitário de Rollback no sistema..."
+            if [ -f "$REPO_DIR/rollback.sh" ]; then
+                /bin/cp -f "$REPO_DIR/rollback.sh" /usr/local/bin/ipbx-rollback
+                chmod +x /usr/local/bin/ipbx-rollback
+                log_success "Comando 'ipbx-rollback' instalado com sucesso em /usr/local/bin/ipbx-rollback."
+            elif [ -f /usr/local/bin/ipbx-rollback ]; then
+                log_success "Comando 'ipbx-rollback' já está presente em /usr/local/bin/ipbx-rollback."
+            else
+                curl -sSL "https://raw.githubusercontent.com/LeandroSaltori/ipbx-issabel6.0/main/rollback.sh" -o /usr/local/bin/ipbx-rollback 2>/dev/null && chmod +x /usr/local/bin/ipbx-rollback || true
+                log_success "Comando 'ipbx-rollback' instalado com sucesso."
+            fi
+            ;;
+        0|*)
+            log_info "Retornando ao menu principal..."
+            ;;
+    esac
 }
 
 # --- INSTALAR TUDO ---
@@ -1105,7 +1137,7 @@ show_menu() {
     echo -e "${BLUE}║${NC}   ${WHITE}[23]${NC} PJSIP User-Agent            ${WHITE}[24]${NC} Auto-Update Semanal       ${BLUE}║${NC}"
     echo -e "${BLUE}║${NC}   ${WHITE}[25]${NC} Web Developer               ${WHITE}[26]${NC} Configurar Domínio e SSL  ${BLUE}║${NC}"
     echo -e "${BLUE}║${NC}   ${WHITE}[27]${NC} Limpeza de Logs e Disco     ${WHITE}[28]${NC} Servidor OpenVPN (EasyVPN)${BLUE}║${NC}"
-    echo -e "${BLUE}║${NC}   ${WHITE}[29]${NC} Executar Rollback (Restauro)                                   ${BLUE}║${NC}"
+    echo -e "${BLUE}║${NC}   ${WHITE}[29]${NC} Rollback (Restauro/Instalar)                                  ${BLUE}║${NC}"
     echo -e "${BLUE}║${NC}                                                                    ${BLUE}║${NC}"
     echo -e "${BLUE}╠══════════════════════════════════════════════════════════════════════╣${NC}"
     echo -e "${BLUE}║${NC}   ${YELLOW}[A]${NC}  ${YELLOW}INSTALAR TUDO${NC} (igual ao install.sh completo)                ${BLUE}║${NC}"
