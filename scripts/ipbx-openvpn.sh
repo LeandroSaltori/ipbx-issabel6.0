@@ -139,15 +139,15 @@ if command -v sqlite3 &>/dev/null && [ -f /var/www/db/menu.db ]; then
     # Insere recurso no ACL
     sqlite3 /var/www/db/acl.db "INSERT INTO acl_resource (name, description) VALUES ('$MODULE_ID', 'OpenVPN');" 2>/dev/null || true
 
-    # Insere entrada no menu lateral sob 'Segurança' (security)
-    sqlite3 /var/www/db/menu.db "INSERT INTO menu (id, IdParent, Link, Name, Type, order_no) VALUES ('$MODULE_ID', 'security', 'modules/$MODULE_ID/index.php', 'OpenVPN', 'module', 12);" 2>/dev/null || \
+    # Insere entrada no menu lateral sob 'Segurança' (security) com Link vazio (padrão de módulos do Issabel)
     sqlite3 /var/www/db/menu.db "INSERT INTO menu (id, IdParent, Link, Name, Type, order_no) VALUES ('$MODULE_ID', 'security', '', 'OpenVPN', 'module', 12);" 2>/dev/null || true
 
     # Garante permissão para o grupo de administradores (id_group = 1)
     sqlite3 /var/www/db/acl.db "INSERT OR IGNORE INTO acl_group_permission (id_action, id_group, id_resource) SELECT 1, 1, id FROM acl_resource WHERE name = '$MODULE_ID';" 2>/dev/null || true
 
-    # Ajusta permissões dos bancos e limpa cache de menu
-    chown asterisk:asterisk /var/www/db/menu.db /var/www/db/acl.db 2>/dev/null || true
+    # Ajusta permissões dos arquivos do módulo e dos bancos
+    chown -R asterisk:asterisk /var/www/html/modules/$MODULE_ID /var/www/db/menu.db /var/www/db/acl.db 2>/dev/null || true
+    chmod -R 755 /var/www/html/modules/$MODULE_ID 2>/dev/null || true
     chmod 666 /var/www/db/menu.db /var/www/db/acl.db 2>/dev/null || true
     rm -rf /var/www/html/var/templates_c/* /tmp/smarty* 2>/dev/null || true
 fi
