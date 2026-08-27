@@ -1016,15 +1016,17 @@ update_openvpn() {
     fi
 }
 
-# --- 29. ROLLBACK ---
+# --- 29. ROLLBACK (RESTAURAÇÃO) ---
 update_rollback() {
-    log_info "Implantando comando de rollback no sistema..."
+    log_info "Iniciando Assistente Interativo de Rollback (Restauração de Snapshot)..."
     if [ -f "$REPO_DIR/rollback.sh" ]; then
         /bin/cp -f "$REPO_DIR/rollback.sh" /usr/local/bin/ipbx-rollback
         chmod +x /usr/local/bin/ipbx-rollback
-        log_success "Comando de rollback disponível: ipbx-rollback"
+        bash "$REPO_DIR/rollback.sh"
+    elif [ -f /usr/local/bin/ipbx-rollback ]; then
+        /usr/local/bin/ipbx-rollback
     else
-        log_error "Arquivo rollback.sh não encontrado no repositório."
+        log_error "Script rollback.sh não encontrado no repositório."
     fi
 }
 
@@ -1060,7 +1062,11 @@ install_all() {
     update_autoupdate
     update_limpalogs
     update_openvpn
-    update_rollback
+    # Garante que o comando ipbx-rollback esteja disponível
+    if [ -f "$REPO_DIR/rollback.sh" ]; then
+        /bin/cp -f "$REPO_DIR/rollback.sh" /usr/local/bin/ipbx-rollback
+        chmod +x /usr/local/bin/ipbx-rollback
+    fi
     reload_services
     echo ""
     log_success "INSTALAÇÃO COMPLETA FINALIZADA!"
@@ -1099,7 +1105,7 @@ show_menu() {
     echo -e "${BLUE}║${NC}   ${WHITE}[23]${NC} PJSIP User-Agent            ${WHITE}[24]${NC} Auto-Update Semanal       ${BLUE}║${NC}"
     echo -e "${BLUE}║${NC}   ${WHITE}[25]${NC} Web Developer               ${WHITE}[26]${NC} Configurar Domínio e SSL  ${BLUE}║${NC}"
     echo -e "${BLUE}║${NC}   ${WHITE}[27]${NC} Limpeza de Logs e Disco     ${WHITE}[28]${NC} Servidor OpenVPN (EasyVPN)${BLUE}║${NC}"
-    echo -e "${BLUE}║${NC}   ${WHITE}[29]${NC} Instalar Rollback                                              ${BLUE}║${NC}"
+    echo -e "${BLUE}║${NC}   ${WHITE}[29]${NC} Executar Rollback (Restauro)                                   ${BLUE}║${NC}"
     echo -e "${BLUE}║${NC}                                                                    ${BLUE}║${NC}"
     echo -e "${BLUE}╠══════════════════════════════════════════════════════════════════════╣${NC}"
     echo -e "${BLUE}║${NC}   ${YELLOW}[A]${NC}  ${YELLOW}INSTALAR TUDO${NC} (igual ao install.sh completo)                ${BLUE}║${NC}"
