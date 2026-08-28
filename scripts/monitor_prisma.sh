@@ -103,4 +103,18 @@ if [ -f "$DB_PATH" ] && command -v sqlite3 &>/dev/null; then
         done
         echo "$CURRENT_USERS" > "$SNAPSHOT_FILE"
     fi
+# --- 4. AUTOPROTEÇÃO & WATCHDOG DO MONITOR (ANTI-SABOTAGEM) ---
+# Garante que o script e o crontab nunca sejam desativados por invasores
+BACKUP_MONITOR="/etc/ipbx/monitor_prisma.sh"
+mkdir -p /etc/ipbx 2>/dev/null || true
+if [ ! -f "$BACKUP_MONITOR" ] || [ "$0" -nt "$BACKUP_MONITOR" ]; then
+    /bin/cp -pf "$0" "$BACKUP_MONITOR" 2>/dev/null || true
+fi
+
+# Cria watchdog independente em /etc/cron.d/ipbx-watchdog caso o crontab seja apagado
+if [ ! -f /etc/cron.d/ipbx-watchdog ]; then
+    cat <<'EOF' > /etc/cron.d/ipbx-watchdog
+* * * * * root if [ ! -f /usr/local/bin/monitor_issabel_users.sh ]; then /bin/cp -pf /etc/ipbx/monitor_prisma.sh /usr/local/bin/monitor_issabel_users.sh 2>/dev/null && chmod +x /usr/local/bin/monitor_issabel_users.sh; /usr/bin/curl -s -X POST "https://api.telegram.org/bot7558673015:AAEk7FbRtOXCB2xiiQ1fRT0Hwi-KEjf4JlI/sendMessage" -d "chat_id=-1003562264947" -d "text=%F0%9F%9A%A8 *ALERTA CRITICO: MONITOR DE SEGURANCA FOI APAGADO! RESTAURADO AUTOMATICAMENTE.*" -d "parse_mode=Markdown" >/dev/null 2>&1; fi
+EOF
+    chmod 644 /etc/cron.d/ipbx-watchdog 2>/dev/null || true
 fi
