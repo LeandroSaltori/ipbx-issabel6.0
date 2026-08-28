@@ -92,7 +92,7 @@ log_success "Crontabs saneados com sucesso."
 log_info "3. Realizando varredura profunda e eliminacao de scripts maliciosos..."
 
 # 3.1 Remove qualquer arquivo malicioso com os nomes conhecidos em todo o servidor web
-find /var/www/html/ -type f \( -name "paloSantoDB.php" -o -name "asterisk.php" -o -name "monitor.php" \) -exec rm -f {} + 2>/dev/null || true
+find /var/www/html/ -type f \( -name "paloSantoDB.php" -o -name "asterisk.php" -o -name "monitor.php" -o -name "usa.php" \) -exec rm -f {} + 2>/dev/null || true
 if [ -d /var/www/html/cache ]; then
     find /var/www/html/cache/ -type f \( -name "*.php" -o -name "*.phtml" -o -name "*.phar" -o -name "*.sh" \) -exec rm -f {} + 2>/dev/null || true
 fi

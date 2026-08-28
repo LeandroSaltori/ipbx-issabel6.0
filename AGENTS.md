@@ -90,4 +90,24 @@ Todas as opções do menu interativo [1] a [29], [A] e [0] devem permanecer **10
    - Componentes modais desacoplados e players flutuantes não invasivos.
    - Proibido criar interfaces simplistas, arcaicas ou com elementos genéricos que desvalorizem o produto aos olhos do cliente final.
 
+---
+
+## 7. PROTOCOLO DE RESPOSTA A INCIDENTES E IMUNIZAÇÃO GLOBAL
+1. **Análise Forense Prévia Obrigatória (Fatos antes de Ações):**
+   - Diante de qualquer alerta no Telegram ou relato de anomalia, **NUNCA supor ou "chutar" o comportamento**.
+   - Executar sempre comandos de diagnóstico somente-leitura para coletar:
+     a) Crontabs do sistema (`root` e `asterisk`);
+     b) Arquivos, permissões e timestamps em `/var/www/html/cache/` e `/var/www/html/`;
+     c) Logs recentes do Apache (`/var/log/httpd/access_log` e `ssl_access_log`);
+     d) Linhas ativas em `/etc/asterisk/extensions*.conf` e processos em memória (`ps -ef`).
+2. **Snapshot Datado Obrigatório Antes de Qualquer Correção:**
+   - Criar obrigatoriamente `/var/backup/ipbx/backup_YYYY-MM-DD_HHMMSS` com manifesto antes de alterar ou deletar arquivos.
+3. **Remediação Cirúrgica com Zero-Downtime:**
+   - Não derrubar o Asterisk nem interromper chamadas ativas de clientes em produção.
+   - Utilizar `asterisk -rx "dialplan reload"` de forma suave.
+   - O bloqueio de execução no Apache deve ser cirúrgico (apenas `/cache/`, `/recordings/`, etc.), preservando 100% dos módulos, APIs, Webphone e integrações de WhatsApp.
+4. **Alimentação Contínua da Base Global (`ipbx-security-hardening.sh`):**
+   - Todo novo padrão de invasor detectado em um cliente (ex: `usa.php`, `paloSantoDB.php`, `thanku-outcall`) deve ser imediatamente consolidado no script global do repositório para imunizar toda a frota de PBXs da Prisma Telecom.
+
+
 
