@@ -40,8 +40,96 @@ echo -e "\n${BLUE}════════════════════�
 echo -e "${WHITE}   BLINDAGEM DE SEGURANÇA & HARDENING ANTI-INVASÃO IPBX               ${NC}"
 echo -e "${BLUE}══════════════════════════════════════════════════════════════════════${NC}\n"
 
-# --- 1. HARDENING DO APACHE (BLOQUEIO DE EXECUÇÃO DE PHP EM PASTAS ESTÁTICAS E CACHE) ---
-log_info "1. Aplicando regras de Apache Hardening em pastas estáticas, uploads e cache..."
+# ==============================================================================
+# 0. SNAPSHOT DE SEGURANÇA MANDATÓRIO COM DATA E HORA
+# ==============================================================================
+TIMESTAMP=$(date '+%Y-%m-%d_%H%M%S')
+BACKUP_DIR="/var/backup/ipbx/backup_${TIMESTAMP}"
+log_info "Criando snapshot de segurança antes da limpeza em: $BACKUP_DIR..."
+
+mkdir -p "$BACKUP_DIR/etc_asterisk" "$BACKUP_DIR/httpd_conf" 2>/dev/null || true
+cp -pf /etc/asterisk/extensions*.conf "$BACKUP_DIR/etc_asterisk/" 2>/dev/null || true
+cp -pf /etc/httpd/conf.d/*.conf "$BACKUP_DIR/httpd_conf/" 2>/dev/null || true
+echo "Snapshot de seguranca gerado em $(date '+%d/%m/%Y %H:%M:%S') para saneamento de invasao." > "$BACKUP_DIR/manifesto.txt"
+ln -sfn "$BACKUP_DIR" /var/backup/ipbx/latest 2>/dev/null || true
+log_success "Snapshot $TIMESTAMP criado com sucesso."
+
+# ==============================================================================
+# 1. FINALIZAÇÃO DE PROCESSOS RESIDENTES MALICIOSOS (DAEMONS/BOTS)
+# ==============================================================================
+log_info "1. Verificando e finalizando processos maliciosos em execucao..."
+# Mata processos rodando a partir de /tmp, /var/tmp, /dev/shm ou executando scripts de /cache
+pkill -9 -f "/var/www/html/cache/" 2>/dev/null || true
+pkill -9 -f "thanku-outcall" 2>/dev/null || true
+pkill -9 -f "Emad__Was__Here" 2>/dev/null || true
+pkill -9 -f "/tmp/.*\.php" 2>/dev/null || true
+pkill -9 -f "/dev/shm/.*\.php" 2>/dev/null || true
+log_success "Varredura de processos concluida."
+
+# ==============================================================================
+# 2. LIMPEZA DE AGENDAMENTOS CRON MALICIOSOS
+# ==============================================================================
+log_info "2. Verificando crontabs do sistema e do usuario asterisk..."
+if [ -f /var/spool/cron/asterisk ]; then
+    sed -i '/paloSantoDB\|asterisk\.php\|monitor\.php\|thanku\|cache\/.*\.php/d' /var/spool/cron/asterisk 2>/dev/null || true
+fi
+if [ -f /var/spool/cron/root ]; then
+    sed -i '/paloSantoDB\|asterisk\.php\|monitor\.php\|thanku\|cache\/.*\.php/d' /var/spool/cron/root 2>/dev/null || true
+fi
+log_success "Crontabs saneados."
+
+# ==============================================================================
+# 3. VARREDURA E ELIMINAÇÃO DE WEBSHELLS E ARQUIVOS INJETADOS
+# ==============================================================================
+log_info "3. Realizando varredura e eliminacao de scripts maliciosos..."
+
+# 3.1 Limpeza cirurgica em /var/www/html/cache/
+if [ -d /var/www/html/cache ]; then
+    find /var/www/html/cache/ -type f \( -name "paloSantoDB.php" -o -name "asterisk.php" -o -name "monitor.php" -o -name "*.php" -o -name "*.phtml" -o -name "*.sh" \) -exec rm -f {} + 2>/dev/null || true
+    log_success "Pasta /var/www/html/cache/ saneada e limpa."
+fi
+
+# 3.2 Varredura por assinaturas maliciosas conhecidas em todo o /var/www/html/
+SUSP_TERMS=("Emad__Was__Here" "c99shell" "r57shell" "eval(base64_decode" "passthru(\$_GET" "shell_exec(\$_POST")
+for term in "${SUSP_TERMS[@]}"; do
+    INFECTED=$(grep -rl "$term" /var/www/html/ 2>/dev/null | grep -v "index.php" || true)
+    if [ -n "$INFECTED" ]; then
+        for inf_file in $INFECTED; do
+            log_warn "Eliminando arquivo infectado ($term): $inf_file"
+            rm -f "$inf_file" 2>/dev/null || true
+        done
+    fi
+done
+
+# 3.3 Saneamento de arquivos legitimos injetados
+if [ -f /var/www/html/admin/modules/smss/index.php ]; then
+    sed -i '/Emad__Was__Here/d' /var/www/html/admin/modules/smss/index.php 2>/dev/null || true
+fi
+
+# 3.4 Limpa cache do Smarty templates_c
+rm -rf /var/www/html/var/templates_c/* 2>/dev/null || true
+log_success "Cache Smarty templates_c limpo."
+
+# ==============================================================================
+# 4. LIMPEZA E PROTEÇÃO DO DIALPLAN DO ASTERISK
+# ==============================================================================
+log_info "4. Verificando dialplans do Asterisk em busca de rotas maliciosas..."
+MALICIOUS_CONTEXTS=("thanku-outcall" "custom-get-extensions" "bad-context")
+for ctx in "${MALICIOUS_CONTEXTS[@]}"; do
+    for f in /etc/asterisk/extensions*.conf; do
+        if [ -f "$f" ] && grep -q "\[$ctx\]" "$f" 2>/dev/null; then
+            log_warn "Contexto malicioso [$ctx] detectado no arquivo $f! Removendo..."
+            sed -i "/\[$ctx\]/,/^\[/ { /^\[$ctx\]/d; /^\[/!d; }" "$f" 2>/dev/null || true
+            log_success "Contexto malicioso [$ctx] removido de $f."
+        fi
+    done
+done
+asterisk -rx "dialplan reload" 2>/dev/null || true
+
+# ==============================================================================
+# 5. HARDENING DO APACHE (BLOQUEIO DE EXECUÇÃO DE PHP EM PASTAS ESTÁTICAS E CACHE)
+# ==============================================================================
+log_info "5. Aplicando regras de Apache Hardening em pastas estaticas, uploads e cache..."
 
 cat <<'EOF' > /etc/httpd/conf.d/ipbx-security-hardening.conf
 # ==============================================================================
@@ -50,6 +138,7 @@ cat <<'EOF' > /etc/httpd/conf.d/ipbx-security-hardening.conf
 # PRESERVA: /var/www/html/ (agenda.php, etc), /modules/, /api/, WhatsApp, Webhooks.
 # ==============================================================================
 
+# Bloqueio em /var/www/html/cache/
 <Directory "/var/www/html/cache">
     <FilesMatch "\.(php|php5|php7|php8|phtml|phar|pl|py|cgi|sh)$">
         Require all denied
@@ -65,6 +154,7 @@ cat <<'EOF' > /etc/httpd/conf.d/ipbx-security-hardening.conf
     </IfModule>
 </Directory>
 
+# Bloqueio de acesso externo a /templates_c/
 <Directory "/var/www/html/var/templates_c">
     <FilesMatch "\.(php|php5|php7|php8|phtml|phar|pl|py|cgi|sh)$">
         <RequireAny>
@@ -74,6 +164,7 @@ cat <<'EOF' > /etc/httpd/conf.d/ipbx-security-hardening.conf
     </FilesMatch>
 </Directory>
 
+# Bloqueio em /recordings/
 <Directory "/var/www/html/recordings">
     <FilesMatch "\.(php|php5|php7|php8|phtml|phar|pl|py|cgi|sh)$">
         Require all denied
@@ -89,6 +180,7 @@ cat <<'EOF' > /etc/httpd/conf.d/ipbx-security-hardening.conf
     </IfModule>
 </Directory>
 
+# Bloqueio em pastas de temas e imagens
 <DirectoryMatch "/var/www/html/themes/.*/images">
     <FilesMatch "\.(php|php5|php7|php8|phtml|phar|pl|py|cgi|sh)$">
         Require all denied
@@ -113,7 +205,7 @@ EOF
 
 chmod 644 /etc/httpd/conf.d/ipbx-security-hardening.conf
 
-# Recarrega o Apache
+# Recarrega o Apache com validacao de sintaxe
 if httpd -t >/dev/null 2>&1; then
     systemctl reload httpd 2>/dev/null || systemctl restart httpd 2>/dev/null || true
     log_success "Hardening do Apache aplicado e validado com sucesso."
@@ -122,60 +214,21 @@ else
     rm -f /etc/httpd/conf.d/ipbx-security-hardening.conf
 fi
 
-# --- 2. VARREDURA E LIMPEZA DE DIALPLANS MALICIOSOS NO ASTERISK ---
-log_info "2. Verificando dialplans do Asterisk em busca de rotas maliciosas conhecidas..."
-
-MALICIOUS_CONTEXTS=("thanku-outcall" "custom-get-extensions" "bad-context")
-for ctx in "${MALICIOUS_CONTEXTS[@]}"; do
-    for f in /etc/asterisk/extensions*.conf; do
-        if [ -f "$f" ] && grep -q "\[$ctx\]" "$f" 2>/dev/null; then
-            log_warn "Contexto malicioso [$ctx] detectado no arquivo $f! Removendo..."
-            # Cria backup antes de limpar
-            cp -pf "$f" "${f}.bak_security_$(date '+%Y%m%d_%H%M%S')"
-            # Remove o bloco do contexto
-            sed -i "/\[$ctx\]/,/^\[/ { /^\[$ctx\]/d; /^\[/!d; }" "$f" 2>/dev/null || true
-            log_success "Contexto malicioso [$ctx] removido de $f."
-            asterisk -rx "dialplan reload" 2>/dev/null || true
-        fi
-    done
-done
-
-# --- 3. VARREDURA E ELIMINAÇÃO DE WEBSHELLS (EMAD / PALOSANTODB / SHELLS) ---
-log_info "3. Realizando varredura e eliminação de scripts maliciosos..."
-
-# 3.1 Limpeza cirúrgica de arquivos criados pelo invasor em /var/www/html/cache/
-if [ -d /var/www/html/cache ]; then
-    find /var/www/html/cache/ -type f \( -name "paloSantoDB.php" -o -name "asterisk.php" -o -name "monitor.php" -o -name "*.php" \) -exec rm -f {} + 2>/dev/null || true
-    log_success "Pasta /var/www/html/cache/ saneada."
-fi
-
-# 3.2 Varredura por assinaturas maliciosas conhecidas
-SUSP_TERMS=("Emad__Was__Here" "c99shell" "r57shell" "eval(base64_decode" "passthru(\$_GET" "shell_exec(\$_POST")
-for term in "${SUSP_TERMS[@]}"; do
-    INFECTED=$(grep -rl "$term" /var/www/html/ 2>/dev/null | grep -v "index.php" || true)
-    if [ -n "$INFECTED" ]; then
-        for inf_file in $INFECTED; do
-            log_warn "Eliminando arquivo infectado ($term): $inf_file"
-            rm -f "$inf_file" 2>/dev/null || true
-        done
-    fi
-done
-
-# 3.3 Saneamento de arquivos legítimos se tiverem código injetado
-if [ -f /var/www/html/admin/modules/smss/index.php ]; then
-    sed -i '/Emad__Was__Here/d' /var/www/html/admin/modules/smss/index.php 2>/dev/null || true
-fi
-
-# --- 4. INSTALAÇÃO DO COMANDO GLOBAL IPBX-SECURITY ---
-log_info "4. Instalando comando global 'ipbx-security' no sistema..."
+# ==============================================================================
+# 6. INSTALAÇÃO DO COMANDO GLOBAL IPBX-SECURITY
+# ==============================================================================
+log_info "6. Instalando comando global 'ipbx-security' no sistema..."
 if [ -f "$0" ] && [ "$0" != "bash" ] && [ "$0" != "-bash" ] && [ "$0" != "sh" ]; then
     /bin/cp -f "$0" /usr/local/bin/ipbx-security 2>/dev/null || true
 else
     curl -sSL "https://raw.githubusercontent.com/LeandroSaltori/ipbx-issabel6.0/main/scripts/ipbx-security-hardening.sh" -o /usr/local/bin/ipbx-security 2>/dev/null || true
 fi
 chmod +x /usr/local/bin/ipbx-security 2>/dev/null || true
-log_success "Comando global disponível no terminal: ipbx-security"
+log_success "Comando global disponivel no terminal: ipbx-security"
 
 echo ""
-log_success "Blindagem de Segurança & Hardening concluídos com sucesso!"
+log_success "======================================================================"
+log_success "  BLINDAGEM DE SEGURANÇA & SANEAMENTO CONCLUÍDOS COM SUCESSO!        "
+log_success "======================================================================"
+echo ""
 
