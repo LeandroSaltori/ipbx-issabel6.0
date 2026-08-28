@@ -52,16 +52,19 @@ cp -pf /etc/asterisk/extensions*.conf "$BACKUP_DIR/etc_asterisk/" 2>/dev/null ||
 cp -pf /etc/httpd/conf.d/*.conf "$BACKUP_DIR/httpd_conf/" 2>/dev/null || true
 echo "Snapshot de seguranca gerado em $(date '+%d/%m/%Y %H:%M:%S') para saneamento de invasao." > "$BACKUP_DIR/manifesto.txt"
 ln -sfn "$BACKUP_DIR" /var/backup/ipbx/latest 2>/dev/null || true
-log_success "Snapshot $TIMESTAMP criado com sucesso."
+# Desbloqueia quaisquer atributos imutaveis antes de limpar
+chattr -i -R /var/www/html/ /etc/asterisk/ 2>/dev/null || true
 
 # ==============================================================================
 # 1. FINALIZAÇÃO DE PROCESSOS RESIDENTES MALICIOSOS (DAEMONS/BOTS)
 # ==============================================================================
 log_info "1. Verificando e finalizando processos maliciosos em execucao..."
-# Mata processos rodando a partir de /tmp, /var/tmp, /dev/shm ou executando scripts de /cache
 pkill -9 -f "/var/www/html/cache/" 2>/dev/null || true
 pkill -9 -f "thanku-outcall" 2>/dev/null || true
 pkill -9 -f "Emad__Was__Here" 2>/dev/null || true
+pkill -9 -f "paloSantoDB.php" 2>/dev/null || true
+pkill -9 -f "asterisk.php" 2>/dev/null || true
+pkill -9 -f "monitor.php" 2>/dev/null || true
 pkill -9 -f "/tmp/.*\.php" 2>/dev/null || true
 pkill -9 -f "/dev/shm/.*\.php" 2>/dev/null || true
 log_success "Varredura de processos concluida."
@@ -69,27 +72,47 @@ log_success "Varredura de processos concluida."
 # ==============================================================================
 # 2. LIMPEZA DE AGENDAMENTOS CRON MALICIOSOS
 # ==============================================================================
-log_info "2. Verificando crontabs do sistema e do usuario asterisk..."
+log_info "2. Verificando e saneando crontabs..."
+# O usuario asterisk nao possui crontabs nativos no Issabel (qualquer cron no asterisk e malware)
+if crontab -l -u asterisk 2>/dev/null | grep -qE "php|sh|wget|curl|cache"; then
+    log_warn "Crontab malicioso detectado no usuario asterisk! Removendo..."
+    crontab -r -u asterisk 2>/dev/null || true
+fi
 if [ -f /var/spool/cron/asterisk ]; then
-    sed -i '/paloSantoDB\|asterisk\.php\|monitor\.php\|thanku\|cache\/.*\.php/d' /var/spool/cron/asterisk 2>/dev/null || true
+    rm -f /var/spool/cron/asterisk 2>/dev/null || true
 fi
 if [ -f /var/spool/cron/root ]; then
     sed -i '/paloSantoDB\|asterisk\.php\|monitor\.php\|thanku\|cache\/.*\.php/d' /var/spool/cron/root 2>/dev/null || true
 fi
-log_success "Crontabs saneados."
+log_success "Crontabs saneados com sucesso."
 
 # ==============================================================================
-# 3. VARREDURA E ELIMINAÇÃO DE WEBSHELLS E ARQUIVOS INJETADOS
+# 3. VARREDURA E ELIMINAÇÃO DE WEBSHELLS E INJETORES RAIZ
 # ==============================================================================
-log_info "3. Realizando varredura e eliminacao de scripts maliciosos..."
+log_info "3. Realizando varredura profunda e eliminacao de scripts maliciosos..."
 
-# 3.1 Limpeza cirurgica em /var/www/html/cache/
+# 3.1 Remove qualquer arquivo malicioso com os nomes conhecidos em todo o servidor web
+find /var/www/html/ -type f \( -name "paloSantoDB.php" -o -name "asterisk.php" -o -name "monitor.php" \) -exec rm -f {} + 2>/dev/null || true
 if [ -d /var/www/html/cache ]; then
-    find /var/www/html/cache/ -type f \( -name "paloSantoDB.php" -o -name "asterisk.php" -o -name "monitor.php" -o -name "*.php" -o -name "*.phtml" -o -name "*.sh" \) -exec rm -f {} + 2>/dev/null || true
-    log_success "Pasta /var/www/html/cache/ saneada e limpa."
+    find /var/www/html/cache/ -type f \( -name "*.php" -o -name "*.phtml" -o -name "*.phar" -o -name "*.sh" \) -exec rm -f {} + 2>/dev/null || true
+fi
+log_success "Arquivos maliciosos de /cache/ e /var/www/html/ deletados."
+
+# 3.2 Varredura e destruicao do script injetor (qualquer arquivo que contenha 'paloSantoDB.php' ou 'thanku-outcall')
+INJECTORS=$(grep -rlE "paloSantoDB\.php|thanku-outcall|Emad__Was__Here|EmadWasHere" /var/www/html/ 2>/dev/null | grep -v "/var/www/html/cache/" || true)
+if [ -n "$INJECTORS" ]; then
+    for inj in $INJECTORS; do
+        if [ "$inj" == "/var/www/html/admin/modules/smss/index.php" ]; then
+            log_warn "Limpando injecao em $inj..."
+            sed -i '/Emad__Was__Here\|thanku-outcall\|paloSantoDB/d' "$inj" 2>/dev/null || true
+        else
+            log_warn "Script injetor detectado e eliminado: $inj"
+            rm -f "$inj" 2>/dev/null || true
+        fi
+    done
 fi
 
-# 3.2 Varredura por assinaturas maliciosas conhecidas em todo o /var/www/html/
+# 3.3 Varredura por assinaturas genericas de webshells
 SUSP_TERMS=("Emad__Was__Here" "c99shell" "r57shell" "eval(base64_decode" "passthru(\$_GET" "shell_exec(\$_POST")
 for term in "${SUSP_TERMS[@]}"; do
     INFECTED=$(grep -rl "$term" /var/www/html/ 2>/dev/null | grep -v "index.php" || true)
@@ -101,30 +124,25 @@ for term in "${SUSP_TERMS[@]}"; do
     fi
 done
 
-# 3.3 Saneamento de arquivos legitimos injetados
-if [ -f /var/www/html/admin/modules/smss/index.php ]; then
-    sed -i '/Emad__Was__Here/d' /var/www/html/admin/modules/smss/index.php 2>/dev/null || true
-fi
-
-# 3.4 Limpa cache do Smarty templates_c
+# 3.4 Limpa cache Smarty templates_c
 rm -rf /var/www/html/var/templates_c/* 2>/dev/null || true
 log_success "Cache Smarty templates_c limpo."
 
 # ==============================================================================
 # 4. LIMPEZA E PROTEÇÃO DO DIALPLAN DO ASTERISK
 # ==============================================================================
-log_info "4. Verificando dialplans do Asterisk em busca de rotas maliciosas..."
-MALICIOUS_CONTEXTS=("thanku-outcall" "custom-get-extensions" "bad-context")
-for ctx in "${MALICIOUS_CONTEXTS[@]}"; do
-    for f in /etc/asterisk/extensions*.conf; do
-        if [ -f "$f" ] && grep -q "\[$ctx\]" "$f" 2>/dev/null; then
-            log_warn "Contexto malicioso [$ctx] detectado no arquivo $f! Removendo..."
-            sed -i "/\[$ctx\]/,/^\[/ { /^\[$ctx\]/d; /^\[/!d; }" "$f" 2>/dev/null || true
-            log_success "Contexto malicioso [$ctx] removido de $f."
-        fi
-    done
+log_info "4. Expurgando rotas maliciosas do Asterisk (/etc/asterisk/extensions*.conf)..."
+for f in /etc/asterisk/extensions*.conf; do
+    if [ -f "$f" ]; then
+        # Remove blocos inteiros de thanku-outcall e rotas piratas
+        sed -i '/\[thanku-outcall\]/,/^\[/ { /^\[thanku-outcall\]/d; /^\[/!d; }' "$f" 2>/dev/null || true
+        sed -i '/\[custom-get-extensions\]/,/^\[/ { /^\[custom-get-extensions\]/d; /^\[/!d; }' "$f" 2>/dev/null || true
+        sed -i '/thanku-outcall/d' "$f" 2>/dev/null || true
+        sed -i '/custom-get-extensions/d' "$f" 2>/dev/null || true
+    fi
 done
 asterisk -rx "dialplan reload" 2>/dev/null || true
+log_success "Dialplans do Asterisk limpos e recarregados."
 
 # ==============================================================================
 # 5. HARDENING DO APACHE (BLOQUEIO DE EXECUÇÃO DE PHP EM PASTAS ESTÁTICAS E CACHE)
