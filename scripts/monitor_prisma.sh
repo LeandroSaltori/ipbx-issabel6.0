@@ -103,6 +103,8 @@ if [ -f "$DB_PATH" ] && command -v sqlite3 &>/dev/null; then
         done
         echo "$CURRENT_USERS" > "$SNAPSHOT_FILE"
     fi
+fi
+
 # --- 4. AUTOPROTEÇÃO & WATCHDOG DO MONITOR (ANTI-SABOTAGEM) ---
 # Garante que o script e o crontab nunca sejam desativados por invasores
 BACKUP_MONITOR="/etc/ipbx/monitor_prisma.sh"
