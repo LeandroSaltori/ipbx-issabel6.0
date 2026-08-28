@@ -350,6 +350,320 @@ update_nome_ramais() {
         /bin/cp -rf "$REPO_DIR/src/ramais/"* /var/www/html/modules/ramais/ 2>/dev/null || true
     fi
 
+    # Se por qualquer motivo o index.php não estiver criado em /var/www/html/nome_ramais, cria o arquivo autônomo diretamente
+    if [ ! -f /var/www/html/nome_ramais/index.php ] || [ $(wc -l < /var/www/html/nome_ramais/index.php 2>/dev/null || echo 0) -lt 50 ]; then
+        log_info "Gerando arquivo index.php autônomo do Gerenciador de Ramais em /var/www/html/nome_ramais..."
+        cat << 'EOF_NOME_RAMAIS' > /var/www/html/nome_ramais/index.php
+<?php
+// IPBX Prisma Telecom - Módulo de Gerenciamento e Alteração de Nome de Ramais
+$db_host = 'localhost';
+$db_user = 'root';
+$db_pass = '';
+$db_name = 'asterisk';
+
+if (file_exists('/etc/issabel.conf')) {
+    $issabel_conf = parse_ini_file('/etc/issabel.conf');
+    if (isset($issabel_conf['mysqlrootpwd'])) {
+        $db_pass = trim($issabel_conf['mysqlrootpwd']);
+    }
+}
+
+try {
+    $pdo = new PDO("mysql:host={$db_host};dbname={$db_name};charset=utf8mb4", $db_user, $db_pass);
+    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+} catch (PDOException $e) { 
+    try {
+        $pdo = new PDO("mysql:host={$db_host};dbname={$db_name};charset=utf8mb4", 'root', 'ls251289');
+        $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    } catch (PDOException $e2) {
+        die('Erro de Conexão com o Banco de Dados Asterisk: ' . $e2->getMessage()); 
+    }
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    header('Content-Type: application/json');
+    $exten = filter_input(INPUT_POST, 'exten', FILTER_SANITIZE_FULL_SPECIAL_CHARS);
+    $newName = filter_input(INPUT_POST, 'new_name', FILTER_SANITIZE_FULL_SPECIAL_CHARS);
+
+    if ($exten && $newName) {
+        try {
+            $stmt1 = $pdo->prepare("UPDATE users SET name = :name WHERE extension = :exten");
+            $stmt1->execute([':name' => $newName, ':exten' => $exten]);
+
+            $stmt2 = $pdo->prepare("UPDATE devices SET description = :name WHERE id = :exten");
+            $stmt2->execute([':name' => $newName, ':exten' => $exten]);
+
+            @shell_exec('sudo /var/lib/asterisk/bin/retrieve_conf 2>&1');
+            @shell_exec('sudo /usr/sbin/fwconsole reload 2>&1 || sudo asterisk -rx "core reload" 2>&1 || sudo asterisk -rx "module reload" 2>&1');
+
+            echo json_encode(['status' => 'success', 'message' => 'Ramal ' . $exten . ' atualizado para "' . $newName . '" com sucesso!']);
+        } catch (Exception $e) {
+            echo json_encode(['status' => 'error', 'message' => 'Erro ao salvar no banco: ' . $e->getMessage()]);
+        }
+        exit;
+    }
+    echo json_encode(['status' => 'error', 'message' => 'Dados inválidos inseridos.']);
+    exit;
+}
+
+$stmt = $pdo->query("SELECT extension, name FROM users ORDER BY CAST(extension AS UNSIGNED) ASC");
+$ramais = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$totalRamais = count($ramais);
+?>
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prisma Telecom - Gerenciador de Ramais</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #6d1a7c;
+            --primary-hover: #561363;
+            --bg-color: #f8fafc;
+            --card-bg: #ffffff;
+            --text-main: #1e293b;
+            --text-muted: #64748b;
+            --border-color: #e2e8f0;
+            --success: #10b981;
+            --success-hover: #059669;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
+        body { background-color: var(--bg-color); color: var(--text-main); padding: 30px 15px; }
+
+        .container { max-width: 950px; margin: 0 auto; }
+        
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .header h1 { font-size: 1.5rem; color: var(--primary); font-weight: 700; display: flex; align-items: center; gap: 10px; }
+        .badge-count { background: #f1f5f9; border: 1px solid var(--border-color); color: var(--primary); font-size: 0.85rem; padding: 4px 14px; border-radius: 20px; font-weight: 600; }
+
+        .search-box {
+            position: relative;
+            margin-bottom: 20px;
+        }
+
+        .search-box input {
+            width: 100%;
+            padding: 12px 16px 12px 42px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            background: var(--card-bg);
+            font-size: 0.95rem;
+            outline: none;
+            transition: all 0.2s;
+        }
+
+        .search-box input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(109, 26, 124, 0.15);
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+        }
+
+        .card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+            overflow: hidden;
+        }
+
+        table { width: 100%; border-collapse: collapse; text-align: left; }
+        th { background: #f8fafc; color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; padding: 14px 20px; border-bottom: 1px solid var(--border-color); }
+        td { padding: 14px 20px; border-bottom: 1px solid var(--border-color); font-size: 0.95rem; vertical-align: middle; }
+        tr:last-child td { border-bottom: none; }
+        tr:hover { background-color: #faf5ff; }
+
+        .ramal-number { font-weight: 700; color: var(--primary); font-size: 1rem; }
+        
+        .input-name {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 0.9rem;
+            outline: none;
+            transition: border 0.2s;
+        }
+
+        .input-name:focus { border-color: var(--primary); }
+
+        .btn-save {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 8px 18px;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            min-width: 80px;
+        }
+
+        .btn-save:hover { background-color: var(--primary-hover); }
+        .btn-save:disabled { opacity: 0.6; cursor: not-allowed; }
+
+        #toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 12px 20px;
+            border-radius: 8px;
+            color: white;
+            font-weight: 500;
+            font-size: 0.9rem;
+            display: none;
+            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
+            z-index: 9999;
+            transition: all 0.3s ease;
+        }
+        .toast-success { background-color: var(--success); }
+        .toast-error { background-color: #ef4444; }
+
+        @media (max-width: 640px) {
+            body { padding: 15px 10px; }
+            td, th { padding: 10px 12px; }
+            .header h1 { font-size: 1.25rem; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <h1>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+            Gerenciador de Ramais
+        </h1>
+        <span class="badge-count"><?= $totalRamais ?> Ramais Cadastrados</span>
+    </div>
+
+    <div class="search-box">
+        <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        <input type="text" id="searchInput" placeholder="Buscar por número ou nome do ramal..." onkeyup="filterTable()">
+    </div>
+
+    <div class="card">
+        <table id="ramaisTable">
+            <thead>
+                <tr>
+                    <th style="width: 15%;">Ramal</th>
+                    <th style="width: 65%;">Nome de Exibição (CallerID)</th>
+                    <th style="width: 20%; text-align: right;">Ação</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php if (empty($ramais)): ?>
+                    <tr>
+                        <td colspan="3" style="text-align: center; color: var(--text-muted); padding: 30px;">Nenhum ramal encontrado no sistema.</td>
+                    </tr>
+                <?php else: ?>
+                    <?php foreach ($ramais as $r): ?>
+                        <tr id="row-<?= htmlspecialchars($r['extension']) ?>">
+                            <td><span class="ramal-number"><?= htmlspecialchars($r['extension']) ?></span></td>
+                            <td>
+                                <input type="text" class="input-name" id="name-<?= htmlspecialchars($r['extension']) ?>" value="<?= htmlspecialchars($r['name']) ?>" data-original="<?= htmlspecialchars($r['name']) ?>">
+                            </td>
+                            <td style="text-align: right;">
+                                <button class="btn-save" onclick="saveRamal('<?= htmlspecialchars($r['extension']) ?>')">Salvar</button>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+function filterTable() {
+    const input = document.getElementById('searchInput').value.toLowerCase();
+    const rows = document.querySelectorAll('#ramaisTable tbody tr');
+
+    rows.forEach(row => {
+        const text = row.innerText.toLowerCase();
+        row.style.display = text.includes(input) ? '' : 'none';
+    });
+}
+
+function showToast(message, isError = false) {
+    const toast = document.getElementById('toast');
+    toast.innerText = message;
+    toast.className = isError ? 'toast-error' : 'toast-success';
+    toast.style.display = 'block';
+    setTimeout(() => { toast.style.display = 'none'; }, 3500);
+}
+
+function saveRamal(exten) {
+    const input = document.getElementById('name-' + exten);
+    const newName = input.value.trim();
+    const btn = document.querySelector('#row-' + exten + ' .btn-save');
+
+    if (!newName) {
+        showToast('O nome do ramal não pode ficar vazio.', true);
+        return;
+    }
+
+    btn.disabled = true;
+    btn.innerText = 'Salvando...';
+
+    const formData = new FormData();
+    formData.append('exten', exten);
+    formData.append('new_name', newName);
+
+    fetch(window.location.href, {
+        method: 'POST',
+        body: formData
+    })
+    .then(res => res.json())
+    .then(data => {
+        btn.disabled = false;
+        btn.innerText = 'Salvar';
+        if (data.status === 'success') {
+            showToast(data.message);
+            input.setAttribute('data-original', newName);
+        } else {
+            showToast(data.message || 'Erro ao atualizar ramal.', true);
+        }
+    })
+    .catch(err => {
+        btn.disabled = false;
+        btn.innerText = 'Salvar';
+        showToast('Falha na comunicação com o servidor.', true);
+    });
+}
+</script>
+
+</body>
+</html>
+EOF_NOME_RAMAIS
+    fi
+
     # Sudoers para o asterisk executar comandos de reload
     echo "asterisk ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/asterisk 2>/dev/null || true
     chmod 440 /etc/sudoers.d/asterisk 2>/dev/null || true
