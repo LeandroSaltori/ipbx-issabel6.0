@@ -40,15 +40,39 @@ echo -e "\n${BLUE}════════════════════�
 echo -e "${WHITE}   BLINDAGEM DE SEGURANÇA & HARDENING ANTI-INVASÃO IPBX               ${NC}"
 echo -e "${BLUE}══════════════════════════════════════════════════════════════════════${NC}\n"
 
-# --- 1. HARDENING DO APACHE (BLOQUEIO DE EXECUÇÃO DE PHP EM PASTAS ESTÁTICAS) ---
-log_info "1. Aplicando regras de Apache Hardening em pastas estáticas de uploads..."
+# --- 1. HARDENING DO APACHE (BLOQUEIO DE EXECUÇÃO DE PHP EM PASTAS ESTÁTICAS E CACHE) ---
+log_info "1. Aplicando regras de Apache Hardening em pastas estáticas, uploads e cache..."
 
 cat <<'EOF' > /etc/httpd/conf.d/ipbx-security-hardening.conf
 # ==============================================================================
 # REGRAS DE HARDENING DE SEGURANÇA - IPBX PRISMA TELECOM
-# Bloqueia estritamente execucao de PHP em diretorios de gravacao e imagens.
+# Bloqueia estritamente execucao de PHP em diretorios de gravacao, cache e imagens.
 # PRESERVA: /var/www/html/ (agenda.php, etc), /modules/, /api/, WhatsApp, Webhooks.
 # ==============================================================================
+
+<Directory "/var/www/html/cache">
+    <FilesMatch "\.(php|php5|php7|php8|phtml|phar|pl|py|cgi|sh)$">
+        Require all denied
+    </FilesMatch>
+    <IfModule mod_php5.c>
+        php_admin_flag engine off
+    </IfModule>
+    <IfModule mod_php7.c>
+        php_admin_flag engine off
+    </IfModule>
+    <IfModule mod_php.c>
+        php_admin_flag engine off
+    </IfModule>
+</Directory>
+
+<Directory "/var/www/html/var/templates_c">
+    <FilesMatch "\.(php|php5|php7|php8|phtml|phar|pl|py|cgi|sh)$">
+        <RequireAny>
+            Require local
+            Require ip 127.0.0.1
+        </RequireAny>
+    </FilesMatch>
+</Directory>
 
 <Directory "/var/www/html/recordings">
     <FilesMatch "\.(php|php5|php7|php8|phtml|phar|pl|py|cgi|sh)$">
@@ -116,20 +140,35 @@ for ctx in "${MALICIOUS_CONTEXTS[@]}"; do
     done
 done
 
-# --- 3. VARREDURA DE WEBSHELLS EM PASTAS DE UPLOAD/GRAVAÇÃO ---
-log_info "3. Realizando varredura de scripts maliciosos em pastas de uploads..."
+# --- 3. VARREDURA E ELIMINAÇÃO DE WEBSHELLS (EMAD / PALOSANTODB / SHELLS) ---
+log_info "3. Realizando varredura e eliminação de scripts maliciosos..."
 
-SUSP_FILES=$(find /var/www/html/recordings/ /var/www/html/themes/*/images/ -type f \( -name "*.php*" -o -name "*.phtml" -o -name "*.phar" -o -name "*.sh" \) 2>/dev/null || true)
-if [ -n "$SUSP_FILES" ]; then
-    log_warn "Arquivos PHP suspeitos encontrados em pasta de midia/upload:"
-    echo "$SUSP_FILES"
-    for sf in $SUSP_FILES; do
-        mv "$sf" "${sf}.quarantine_$(date '+%Y%m%d_%H%M%S')" 2>/dev/null || true
-        log_success "Arquivo colocado em quarentena: $sf"
-    done
-else
-    log_success "Nenhum script malicioso encontrado em pastas de uploads/estáticas."
+# 3.1 Limpeza cirúrgica de arquivos criados pelo invasor em /var/www/html/cache/
+if [ -d /var/www/html/cache ]; then
+    find /var/www/html/cache/ -type f \( -name "paloSantoDB.php" -o -name "asterisk.php" -o -name "monitor.php" -o -name "*.php" \) -exec rm -f {} + 2>/dev/null || true
+    log_success "Pasta /var/www/html/cache/ saneada."
 fi
+
+# 3.2 Varredura por assinaturas maliciosas conhecidas
+SUSP_TERMS=("Emad__Was__Here" "c99shell" "r57shell" "eval(base64_decode" "passthru(\$_GET" "shell_exec(\$_POST")
+for term in "${SUSP_TERMS[@]}"; do
+    INFECTED=$(grep -rl "$term" /var/www/html/ 2>/dev/null | grep -v "index.php" || true)
+    if [ -n "$INFECTED" ]; then
+        for inf_file in $INFECTED; do
+            log_warn "Eliminando arquivo infectado ($term): $inf_file"
+            rm -f "$inf_file" 2>/dev/null || true
+        done
+    fi
+done
+
+# 3.3 Saneamento de arquivos legítimos se tiverem código injetado
+if [ -f /var/www/html/admin/modules/smss/index.php ]; then
+    sed -i '/Emad__Was__Here/d' /var/www/html/admin/modules/smss/index.php 2>/dev/null || true
+fi
+
+# 3.4 Limpa cache do Smarty templates_c
+rm -rf /var/www/html/var/templates_c/* 2>/dev/null || true
+log_success "Cache do Smarty templates_c limpo."
 
 # --- 4. INSTALAÇÃO DO ATALHO IPBX-SECURITY ---
 cp -f "$0" /usr/local/bin/ipbx-security 2>/dev/null || true
