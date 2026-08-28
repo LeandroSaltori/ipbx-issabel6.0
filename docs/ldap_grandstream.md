@@ -114,11 +114,33 @@ Você pode baixar o arquivo XML pronto para uso ou importá-lo diretamente no se
 
 ---
 
-## 💡 Dicas de Otimização
+## 🔘 Configurando Tecla de Atalho (Line Key / VPK / Softkey) com 1 Clique
 
-1. **Apenas Ramais Internos:**
+Para permitir que o usuário abra o diretório LDAP instantaneamente na tela inicial do telefone Grandstream com **1 toque**:
+
+### 1. Configuração em Modelos com Telas/Linhas (Série GRP / GXP):
+1. Acesse a interface web do Grandstream: **Settings** ➔ **Programmable Keys** ➔ **Virtual Multi-Purpose Keys (VPK)** ou **Line Keys**.
+2. Na tecla desejada (ex: `LINE 2` ou tecla lateral):
+   - **Mode (Modo):** `Phonebook` ou `LDAP Search`
+   - **Account:** `Account 1`
+   - **Description / Label:** `Agenda` (ou `Ramais`)
+3. Clique em **Save and Apply**. O visor do telefone mostrará o botão direto para a busca de ramais.
+
+---
+
+## 💡 Dicas de Otimização e Usabilidade
+
+1. **Bina Inteligente em Tempo Real (Incoming Lookup):**
+   - Com o parâmetro `LDAP Lookup For Incoming Call = Yes`, quando qualquer ramal ou contato da agenda ligar, o telefone IP busca o nome completo no LDAP e exibe no visor LCD em milissegundos.
+
+2. **Busca Preditiva ao Discar (Predial Lookup):**
+   - Com `LDAP Lookup For Dial = Yes`, ao começar a digitar qualquer número ou nome no teclado, o Grandstream sugere os ramais e contatos automaticamente.
+
+3. **Apenas Ramais Internos:**
    - Mantenha `LDAP Number Attributes = homePhone` e `LDAP Number Filter = (homePhone=%)`.
-2. **Ramais + Contatos da Agenda Telefônica (Clientes/Fornecedores):**
+
+4. **Ramais + Contatos da Agenda Telefônica (Clientes/Fornecedores):**
    - Configure `LDAP Number Attributes = homePhone telephoneNumber mobile` e `LDAP Number Filter = (|(homePhone=%)(telephoneNumber=%)(mobile=%))`.
-3. **Consulta Direta no Aparelho:**
-   - No teclado do Grandstream, basta pressionar o botão **Contacts / Phonebook** e selecionar **LDAP** para navegar por todos os ramais da empresa em tempo real.
+
+5. **Consulta Direta no Aparelho:**
+   - No teclado do Grandstream, basta pressionar o botão físico **Contacts / Phonebook** e selecionar **LDAP** para navegar por todos os ramais da empresa em tempo real.
