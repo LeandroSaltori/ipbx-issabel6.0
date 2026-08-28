@@ -166,13 +166,16 @@ if [ -f /var/www/html/admin/modules/smss/index.php ]; then
     sed -i '/Emad__Was__Here/d' /var/www/html/admin/modules/smss/index.php 2>/dev/null || true
 fi
 
-# 3.4 Limpa cache do Smarty templates_c
-rm -rf /var/www/html/var/templates_c/* 2>/dev/null || true
-log_success "Cache do Smarty templates_c limpo."
-
-# --- 4. INSTALAÇÃO DO ATALHO IPBX-SECURITY ---
-cp -f "$0" /usr/local/bin/ipbx-security 2>/dev/null || true
+# --- 4. INSTALAÇÃO DO COMANDO GLOBAL IPBX-SECURITY ---
+log_info "4. Instalando comando global 'ipbx-security' no sistema..."
+if [ -f "$0" ] && [ "$0" != "bash" ] && [ "$0" != "-bash" ] && [ "$0" != "sh" ]; then
+    /bin/cp -f "$0" /usr/local/bin/ipbx-security 2>/dev/null || true
+else
+    curl -sSL "https://raw.githubusercontent.com/LeandroSaltori/ipbx-issabel6.0/main/scripts/ipbx-security-hardening.sh" -o /usr/local/bin/ipbx-security 2>/dev/null || true
+fi
 chmod +x /usr/local/bin/ipbx-security 2>/dev/null || true
+log_success "Comando global disponível no terminal: ipbx-security"
 
 echo ""
 log_success "Blindagem de Segurança & Hardening concluídos com sucesso!"
+
