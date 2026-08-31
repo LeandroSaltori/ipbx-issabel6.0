@@ -112,11 +112,57 @@ sysctl -p /etc/sysctl.d/99-openvpn.conf 2>/dev/null || sysctl -w net.ipv4.ip_for
 # 6. Estrutura de Diretórios, Permissões e Sudoers para o Módulo Web
 mkdir -p /etc/openvpn/server /etc/openvpn/client /etc/openvpn/ccd /var/log/openvpn 2>/dev/null || true
 
-# Permissão sudo sem senha para o usuário asterisk conseguir iniciar/reiniciar o OpenVPN pelos botões do front-end
+# Permissão sudo sem senha ampla para o usuário asterisk conseguir iniciar/reiniciar o OpenVPN pelos botões do front-end
 cat << 'EOF' > /etc/sudoers.d/99-openvpn-asterisk
-asterisk ALL=(ALL) NOPASSWD: /usr/bin/systemctl start openvpn*, /usr/bin/systemctl stop openvpn*, /usr/bin/systemctl restart openvpn*, /usr/bin/systemctl status openvpn*, /usr/sbin/openvpn, /usr/bin/openvpn, /etc/init.d/openvpn
+asterisk ALL=(ALL) NOPASSWD: /usr/bin/systemctl, /bin/systemctl, /usr/sbin/openvpn, /usr/bin/openvpn, /etc/init.d/openvpn, /usr/share/issabel/privileged/openvpn, /usr/local/bin/ipbx-openvpn-helper.sh
 EOF
 chmod 440 /etc/sudoers.d/99-openvpn-asterisk 2>/dev/null || true
+
+# Script Helper de Compatibilidade do Serviço OpenVPN para o Front-End
+cat << 'EOFHELP' > /usr/local/bin/ipbx-openvpn-helper.sh
+#!/bin/bash
+ACTION="$1"
+[ -z "$ACTION" ] && ACTION="status"
+
+# Sanitiza máscara no server.conf antes de iniciar
+for CFG in /etc/openvpn/server/server.conf /etc/openvpn/server.conf; do
+    if [ -f "$CFG" ]; then
+        sed -i 's/255\.255\.225\.0/255.255.255.0/g' "$CFG" 2>/dev/null || true
+        sed -i -E 's/^server ([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+) 255\.255\.[0-9]+\.0/server \1 255.255.255.0/g' "$CFG" 2>/dev/null || true
+    fi
+done
+
+case "$ACTION" in
+    start|restart|reload)
+        systemctl daemon-reload 2>/dev/null || true
+        systemctl restart openvpn-server@server.service 2>/dev/null || systemctl restart openvpn@server.service 2>/dev/null || true
+        exit 0
+        ;;
+    stop)
+        systemctl stop openvpn-server@server.service 2>/dev/null || systemctl stop openvpn@server.service 2>/dev/null || true
+        killall -9 openvpn 2>/dev/null || true
+        exit 0
+        ;;
+    status)
+        if systemctl is-active openvpn-server@server.service &>/dev/null || systemctl is-active openvpn@server.service &>/dev/null || pgrep -x openvpn &>/dev/null; then
+            echo "OpenVPN is running"
+            exit 0
+        else
+            echo "OpenVPN is stopped"
+            exit 1
+        fi
+        ;;
+    *)
+        systemctl "$ACTION" openvpn-server@server.service 2>/dev/null || true
+        ;;
+esac
+EOFHELP
+chmod +x /usr/local/bin/ipbx-openvpn-helper.sh 2>/dev/null || true
+
+# Cria ponte em /etc/init.d/openvpn e /usr/share/issabel/privileged/openvpn
+mkdir -p /usr/share/issabel/privileged /etc/init.d 2>/dev/null || true
+ln -sfn /usr/local/bin/ipbx-openvpn-helper.sh /etc/init.d/openvpn 2>/dev/null || true
+ln -sfn /usr/local/bin/ipbx-openvpn-helper.sh /usr/share/issabel/privileged/openvpn 2>/dev/null || true
 
 # Links simbólicos e espelhamento entre caminhos para que qualquer alteração no front funcione em ambos
 if [ -f /etc/openvpn/server/server.conf ] && [ ! -L /etc/openvpn/server.conf ]; then
