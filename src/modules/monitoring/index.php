@@ -1409,7 +1409,15 @@ function renderFullMonitoringDashboard($smarty, $module_name, $local_templates_d
                 return currentAudio;
             }
 
+            function ensureAudioModalInBody() {
+                var modal = document.getElementById('audioPlayerModal');
+                if (modal && modal.parentElement !== document.body) {
+                    document.body.appendChild(modal);
+                }
+            }
+
             function playCdrAudio(audioUrl, caller, target, downloadUrl) {
+                ensureAudioModalInBody();
                 var modal = document.getElementById('audioPlayerModal');
                 var aud = getOrInitAudio();
 
@@ -1429,25 +1437,9 @@ function renderFullMonitoringDashboard($smarty, $module_name, $local_templates_d
 
                 aud.src = audioUrl;
                 if (modal) {
-                    modal.style.position = 'fixed';
-                    modal.style.top = '0';
-                    modal.style.left = '0';
-                    modal.style.width = '100%';
-                    modal.style.height = '100%';
-                    modal.style.transform = 'none';
-                    modal.style.display = 'flex';
+                    modal.classList.add('active');
+                    modal.style.setProperty('display', 'flex', 'important');
                 }
-
-                var p = aud.play();
-                if (p !== undefined) {
-                    p.then(function() {
-                        updatePlayPauseButton(true);
-                    }).catch(function(err) {
-                        console.log("Audio play error:", err);
-                        updatePlayPauseButton(false);
-                    });
-                }
-            }
 
                 var p = aud.play();
                 if (p !== undefined) {
