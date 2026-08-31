@@ -158,7 +158,7 @@ if command -v timedatectl &>/dev/null; then
 fi
 
 # ------------------------------------------------------------------------------
-# 3. CONFIGURAÇÃO DE TIMEZONE NO PHP (/etc/php.ini)
+# 3. CONFIGURAÇÃO DE TIMEZONE NO PHP & APACHE
 # ------------------------------------------------------------------------------
 log_info "3. Configurando Timezone no PHP ($TARGET_TIMEZONE)..."
 
@@ -179,16 +179,45 @@ if [ -d /etc/php.d ]; then
     log_success "Configuração prioritária criada em /etc/php.d/00-ipbx-timezone.ini"
 fi
 
-# Recarrega o Apache suavemente sem derrubar conexões
-systemctl reload httpd 2>/dev/null || systemctl restart httpd 2>/dev/null || service httpd reload 2>/dev/null || true
+# ------------------------------------------------------------------------------
+# 4. ATUALIZAÇÃO DO BANCO DE DADOS DO FREEPBX / ISSABEL (TIME CONDITIONS)
+# ------------------------------------------------------------------------------
+log_info "4. Atualizando timezone no banco de dados do FreePBX / Issabel..."
 
-# Recarrega o Logger do Asterisk de forma suave
+# Obtém senha de root do MySQL do Issabel caso exista
+MYSQL_PWD_OPT=""
+if [ -f /etc/issabel.conf ]; then
+    MYSQL_ROOT_PASS=$(grep -i "^mysqlrootpwd=" /etc/issabel.conf | cut -d'=' -f2 | tr -d ' "\r\n' || true)
+    [ -n "$MYSQL_ROOT_PASS" ] && MYSQL_PWD_OPT="-p$MYSQL_ROOT_PASS"
+fi
+
+mysql -u root $MYSQL_PWD_OPT -e "UPDATE asterisk.freepbx_settings SET value='$TARGET_TIMEZONE' WHERE keyword='TIMEZONE';" 2>/dev/null || \
+mysql -e "UPDATE asterisk.freepbx_settings SET value='$TARGET_TIMEZONE' WHERE keyword='TIMEZONE';" 2>/dev/null || true
+
+# ------------------------------------------------------------------------------
+# 5. REINICIALIZAÇÃO DE SERVIÇOS (MARIADB, APACHE, PHP-FPM, CROND)
+# ------------------------------------------------------------------------------
+log_info "5. Reiniciando serviços para aplicar o novo fuso em todos os daemons..."
+
+# Reinicia MariaDB/MySQL para atualizar NOW() e variáveis de tempo do banco
+systemctl restart mariadb 2>/dev/null || systemctl restart mysqld 2>/dev/null || service mariadb restart 2>/dev/null || service mysqld restart 2>/dev/null || true
+
+# Reinicia Apache e PHP-FPM para limpar variáveis de ambiente de processos antigos
+systemctl restart httpd 2>/dev/null || systemctl restart apache2 2>/dev/null || service httpd restart 2>/dev/null || true
+systemctl restart php-fpm 2>/dev/null || service php-fpm restart 2>/dev/null || true
+
+# Reinicia Crond para que agendamentos sigam o horário de Brasília
+systemctl restart crond 2>/dev/null || systemctl restart cron 2>/dev/null || true
+
+# Recarrega o Dialplan e Logger do Asterisk
 if command -v asterisk &>/dev/null; then
+    asterisk -rx "dialplan reload" 2>/dev/null || true
     asterisk -rx "logger reload" 2>/dev/null || true
+    asterisk -rx "module reload app_timecondition.so" 2>/dev/null || true
 fi
 
 # ------------------------------------------------------------------------------
-# 4. RESUMO E CONFIRMAÇÃO FINAL
+# 6. RESUMO E CONFIRMAÇÃO FINAL
 # ------------------------------------------------------------------------------
 echo ""
 DATA_HORA_ATUAL=$(date '+%d/%m/%Y %H:%M:%S (%Z %z)')
@@ -199,4 +228,8 @@ if command -v timedatectl &>/dev/null; then
     echo -e "${CYAN}   → Status Timedatectl:${NC}"
     timedatectl status 2>/dev/null | grep -E "Time zone|Local time|NTP service|synchronized" || timedatectl status 2>/dev/null || true
 fi
+echo ""
+log_info "💡 DICA: Caso o Asterisk tenha sido iniciado antes da alteração de timezone,"
+log_info "        um 'reboot' no servidor ou 'systemctl restart asterisk' garantirá que"
+log_info "        100% das regras de Time Conditions e gravações utilizem o novo relógio."
 echo ""
