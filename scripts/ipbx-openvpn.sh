@@ -138,11 +138,22 @@ for EASYRSA_DIR in /etc/openvpn/easy-rsa /etc/openvpn/server/easy-rsa /usr/share
     fi
 done
 
-# Garante a diretiva crl-verify no server.conf se o crl.pem existir
+# Sanitização e Correção Automática da Linha 'server' no server.conf
+for CFG in /etc/openvpn/server/server.conf /etc/openvpn/server.conf; do
+    if [ -f "$CFG" ]; then
+        # Corrige máscaras com erro de digitação (ex: 225.0 -> 255.0)
+        sed -i 's/255\.255\.225\.0/255.255.255.0/g' "$CFG" 2>/dev/null || true
+        # Garante que a linha server tenha formato válido
+        sed -i -E 's/^server ([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+) 255\.255\.[0-9]+\.0/server \1 255.255.255.0/g' "$CFG" 2>/dev/null || true
+    fi
+done
+
+# Garante a diretiva crl-verify no server.conf com caminho absoluto se o crl.pem existir
 if [ -f /etc/openvpn/server/crl.pem ] || [ -f /etc/openvpn/crl.pem ]; then
     for CFG in /etc/openvpn/server/server.conf /etc/openvpn/server.conf; do
-        if [ -f "$CFG" ] && ! grep -q "crl-verify" "$CFG"; then
-            echo "crl-verify crl.pem" >> "$CFG"
+        if [ -f "$CFG" ]; then
+            sed -i '/crl-verify/d' "$CFG" 2>/dev/null || true
+            echo "crl-verify /etc/openvpn/server/crl.pem" >> "$CFG"
         fi
     done
 fi
