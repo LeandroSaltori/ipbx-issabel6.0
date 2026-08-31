@@ -28,6 +28,7 @@ echo "Update Rápido de Módulos (update.sh) - $(date '+%d/%m/%Y às %H:%M:%S')"
 [ -f /var/www/html/modules/pesquisa/index.php ] && cp -pf /var/www/html/modules/pesquisa/index.php "$BACKUP_DIR/html/modules/pesquisa/" 2>/dev/null || true
 [ -f /var/www/html/modules/missed_calls/index.php ] && cp -pf /var/www/html/modules/missed_calls/index.php "$BACKUP_DIR/html/modules/missed_calls/" 2>/dev/null || true
 [ -f /var/www/html/modules/graphic_report/index.php ] && cp -pf /var/www/html/modules/graphic_report/index.php "$BACKUP_DIR/html/modules/graphic_report/" 2>/dev/null || true
+[ -f /var/www/html/agenda.php ] && cp -pf /var/www/html/agenda.php "$BACKUP_DIR/html/" 2>/dev/null || true
 
 ln -sfn "$BACKUP_DIR" /var/backup/ipbx/latest 2>/dev/null || true
 echo "📦 Ponto de restauração gravado em: $BACKUP_DIR"
@@ -41,8 +42,12 @@ curl -s -k -o /var/www/html/modules/monitoring/index.php https://raw.githubuserc
 curl -s -k -o /var/www/html/modules/pesquisa/index.php https://raw.githubusercontent.com/LeandroSaltori/ipbx-issabel6.0/main/src/modules/pesquisa/index.php
 curl -s -k -o /var/www/html/modules/missed_calls/index.php https://raw.githubusercontent.com/LeandroSaltori/ipbx-issabel6.0/main/src/modules/missed_calls/index.php
 curl -s -k -o /var/www/html/modules/graphic_report/index.php https://raw.githubusercontent.com/LeandroSaltori/ipbx-issabel6.0/main/src/modules/graphic_report/index.php
+curl -s -k -o /var/www/html/agenda.php https://raw.githubusercontent.com/LeandroSaltori/ipbx-issabel6.0/main/src/agenda.php
+cp -f /var/www/html/agenda.php /var/www/html/Agenda.php 2>/dev/null || true
 
 # Permissões
+chown asterisk:asterisk /var/www/html/agenda.php /var/www/html/Agenda.php 2>/dev/null || true
+chmod 644 /var/www/html/agenda.php /var/www/html/Agenda.php 2>/dev/null || true
 chown -R asterisk:asterisk /var/www/html/
 
 # Limpar cache do Smarty e recarregar Apache para limpar OpCache

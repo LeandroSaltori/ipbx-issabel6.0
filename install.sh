@@ -173,13 +173,22 @@ fi
 # ==============================================================================
 # 3. AGENDA.PHP
 # ==============================================================================
-log_info "3/20 - Instalando Agenda.php..."
-if [ -f "$REPO_DIR/src/Agenda.php" ]; then
-    cp -f "$REPO_DIR/src/Agenda.php" /var/www/html/Agenda.php
-    cp -f "$REPO_DIR/src/Agenda.php" /var/www/html/agenda.php
-    chown asterisk:asterisk /var/www/html/Agenda.php /var/www/html/agenda.php
-    chmod 644 /var/www/html/Agenda.php /var/www/html/agenda.php
-    log_success "Agenda.php instalada."
+log_info "3/20 - Instalando agenda.php..."
+agenda_src=""
+if [ -f "$REPO_DIR/src/agenda.php" ]; then
+    agenda_src="$REPO_DIR/src/agenda.php"
+elif [ -f "$REPO_DIR/src/Agenda.php" ]; then
+    agenda_src="$REPO_DIR/src/Agenda.php"
+fi
+
+if [ -n "$agenda_src" ]; then
+    cp -f "$agenda_src" /var/www/html/agenda.php
+    cp -f "$agenda_src" /var/www/html/Agenda.php 2>/dev/null || true
+    chown asterisk:asterisk /var/www/html/agenda.php /var/www/html/Agenda.php 2>/dev/null || true
+    chmod 644 /var/www/html/agenda.php /var/www/html/Agenda.php 2>/dev/null || true
+    log_success "agenda.php instalada com sucesso em /var/www/html/agenda.php."
+else
+    log_warn "Arquivo agenda.php não encontrado no repositório."
 fi
 
 # ==============================================================================

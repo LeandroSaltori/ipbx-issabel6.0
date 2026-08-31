@@ -267,22 +267,22 @@ update_modules() {
 
 # --- 6. AGENDA TELEFÔNICA ---
 update_agenda() {
-    log_info "Instalando Agenda.php..."
+    log_info "Instalando agenda.php em /var/www/html/agenda.php..."
     local agenda_src=""
-    if [ -f "$REPO_DIR/src/Agenda.php" ]; then
-        agenda_src="$REPO_DIR/src/Agenda.php"
-    elif [ -f "$REPO_DIR/src/agenda.php" ]; then
+    if [ -f "$REPO_DIR/src/agenda.php" ]; then
         agenda_src="$REPO_DIR/src/agenda.php"
+    elif [ -f "$REPO_DIR/src/Agenda.php" ]; then
+        agenda_src="$REPO_DIR/src/Agenda.php"
     fi
 
     if [ -n "$agenda_src" ]; then
-        cp -f "$agenda_src" /var/www/html/Agenda.php
         cp -f "$agenda_src" /var/www/html/agenda.php
-        chown asterisk:asterisk /var/www/html/Agenda.php /var/www/html/agenda.php
-        chmod 644 /var/www/html/Agenda.php /var/www/html/agenda.php
-        log_success "Agenda.php instalada."
+        cp -f "$agenda_src" /var/www/html/Agenda.php 2>/dev/null || true
+        chown asterisk:asterisk /var/www/html/agenda.php /var/www/html/Agenda.php 2>/dev/null || true
+        chmod 644 /var/www/html/agenda.php /var/www/html/Agenda.php 2>/dev/null || true
+        log_success "agenda.php instalada com sucesso em /var/www/html/agenda.php."
     else
-        log_error "Arquivo Agenda.php não encontrado no repositório."
+        log_error "Arquivo agenda.php não encontrado no repositório."
     fi
 }
 
