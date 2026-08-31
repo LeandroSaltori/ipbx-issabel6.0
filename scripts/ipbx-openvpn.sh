@@ -212,8 +212,54 @@ for f in ca.crt server.crt server.key dh2048.pem dh.pem ipp.txt openvpn-status.l
     fi
 done
 
-# 7. Sincronizador Automático de Exclusão e Revogação de Certificados
-log_info "Configurando sincronizador de exclusão de certificados..."
+# 7. Cron de Sanitização + Auto-Start Permanente do OpenVPN
+log_info "Configurando sanitizador permanente e auto-start do OpenVPN..."
+cat << 'EOFSANITIZE' > /usr/local/bin/ipbx-openvpn-sanitize.sh
+#!/bin/bash
+# Corrige automaticamente o server.conf após qualquer modificação pelo wizard web
+# e reinicia o OpenVPN se ele estiver parado
+
+CHANGED=0
+for CFG in /etc/openvpn/server/server.conf /etc/openvpn/server.conf; do
+    [ ! -f "$CFG" ] && continue
+    # Corrige máscara inválida (255.255.225.0 -> 255.255.255.0) e variações
+    if grep -qP 'server\s+\S+\s+255\.255\.[^2][0-9]{2}\.[0-9]' "$CFG" 2>/dev/null || \
+       grep -q '255\.255\.225\.0' "$CFG" 2>/dev/null; then
+        sed -i 's/255\.255\.225\.0/255.255.255.0/g' "$CFG"
+        sed -i -E 's/^(server [0-9.]+) 255\.255\.[0-9]+\.0/\1 255.255.255.0/' "$CFG"
+        CHANGED=1
+    fi
+    # Remove linhas crl-verify duplicadas e garante caminho absoluto
+    if [ -f /etc/openvpn/server/crl.pem ]; then
+        sed -i '/crl-verify/d' "$CFG"
+        echo "crl-verify /etc/openvpn/server/crl.pem" >> "$CFG"
+    fi
+done
+
+# Se o OpenVPN está parado mas existe server.conf com CA válida, inicia automaticamente
+if ! systemctl is-active openvpn-server@server.service &>/dev/null && \
+   ! systemctl is-active openvpn@server.service &>/dev/null; then
+    if [ -f /etc/openvpn/server/server.conf ] || [ -f /etc/openvpn/server.conf ]; then
+        # Só inicia se tiver ca.crt e server.crt (CA configurada)
+        if ls /etc/openvpn/server/ca.crt /etc/openvpn/ca.crt &>/dev/null 2>/dev/null; then
+            systemctl restart openvpn-server@server.service 2>/dev/null || \
+            systemctl restart openvpn@server.service 2>/dev/null || true
+        fi
+    fi
+fi
+EOFSANITIZE
+chmod +x /usr/local/bin/ipbx-openvpn-sanitize.sh 2>/dev/null || true
+
+# Executa imediatamente
+bash /usr/local/bin/ipbx-openvpn-sanitize.sh 2>/dev/null || true
+
+# Cron a cada minuto: sanitiza + auto-start
+cat << 'EOFCRON2' > /etc/cron.d/ipbx-openvpn-sanitize
+* * * * * root /usr/local/bin/ipbx-openvpn-sanitize.sh >/dev/null 2>&1
+EOFCRON2
+chmod 644 /etc/cron.d/ipbx-openvpn-sanitize 2>/dev/null || true
+
+# 7b. Sincronizador Automático de Exclusão e Revogação de Certificados
 cat << 'EOFSYNC' > /usr/local/bin/ipbx-openvpn-sync.sh
 #!/bin/bash
 CLIENTKEYS_DIR="/etc/openvpn/clientkeys"
