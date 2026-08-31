@@ -92,6 +92,7 @@ if [ "$CHANGES_MADE" -eq 1 ] || [ ! -f "$CRL_DEST" ]; then
             /bin/cp -f "$EASYRSA_DIR/pki/crl.pem" /etc/openvpn/server/crl.pem 2>/dev/null || true
             /bin/cp -f "$EASYRSA_DIR/pki/crl.pem" /etc/openvpn/crl.pem 2>/dev/null || true
             chmod 644 /etc/openvpn/server/crl.pem /etc/openvpn/crl.pem 2>/dev/null || true
+            chown asterisk:asterisk /etc/openvpn/server/crl.pem /etc/openvpn/crl.pem 2>/dev/null || true
         fi
     fi
     
