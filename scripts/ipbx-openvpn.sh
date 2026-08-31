@@ -214,7 +214,7 @@ for EASYRSA_DIR in /usr/share/easy-rsa/3.0.8 /usr/share/easy-rsa/3 /etc/openvpn/
 done
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 6. Links simbólicos entre /etc/openvpn e /etc/openvpn/server
+# 6. Links simbólicos e permissões de arquivos dinâmicos (status/ipp)
 # ─────────────────────────────────────────────────────────────────────────────
 if [ -f /etc/openvpn/server/server.conf ] && [ ! -e /etc/openvpn/server.conf ]; then
     ln -sfn /etc/openvpn/server/server.conf /etc/openvpn/server.conf 2>/dev/null || true
@@ -222,12 +222,13 @@ elif [ -f /etc/openvpn/server.conf ] && [ ! -f /etc/openvpn/server/server.conf ]
     ln -sfn /etc/openvpn/server.conf /etc/openvpn/server/server.conf 2>/dev/null || true
 fi
 
+# Cria arquivos dinâmicos antecipadamente para ajustar permissão de leitura (asterisk)
+touch /etc/openvpn/server/openvpn-status.log /etc/openvpn/server/ipp.txt 2>/dev/null || true
+chmod 644 /etc/openvpn/server/openvpn-status.log /etc/openvpn/server/ipp.txt 2>/dev/null || true
+
 for f in ca.crt server.crt server.key dh2048.pem dh.pem ipp.txt openvpn-status.log crl.pem; do
-    if [ -f "/etc/openvpn/server/$f" ] && [ ! -e "/etc/openvpn/$f" ]; then
-        ln -sfn "/etc/openvpn/server/$f" "/etc/openvpn/$f" 2>/dev/null || true
-    elif [ -f "/etc/openvpn/$f" ] && [ ! -e "/etc/openvpn/server/$f" ]; then
-        ln -sfn "/etc/openvpn/$f" "/etc/openvpn/server/$f" 2>/dev/null || true
-    fi
+    # Força o symlink para o Issabel (que espera em /etc/openvpn/)
+    ln -sfn "/etc/openvpn/server/$f" "/etc/openvpn/$f" 2>/dev/null || true
 done
 
 # ─────────────────────────────────────────────────────────────────────────────
