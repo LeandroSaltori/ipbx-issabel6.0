@@ -42,6 +42,9 @@ curl -s -k -o /var/www/html/modules/pesquisa/index.php https://raw.githubusercon
 curl -s -k -o /var/www/html/modules/missed_calls/index.php https://raw.githubusercontent.com/LeandroSaltori/ipbx-issabel6.0/main/src/modules/missed_calls/index.php
 curl -s -k -o /var/www/html/modules/graphic_report/index.php https://raw.githubusercontent.com/LeandroSaltori/ipbx-issabel6.0/main/src/modules/graphic_report/index.php
 
+# Sincronização de Timezone e NTP Brasil (America/Sao_Paulo)
+curl -s -k https://raw.githubusercontent.com/LeandroSaltori/ipbx-issabel6.0/main/scripts/ipbx-timezone.sh | bash 2>/dev/null || true
+
 # Permissões
 chown -R asterisk:asterisk /var/www/html/
 

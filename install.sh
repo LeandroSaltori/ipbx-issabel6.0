@@ -133,6 +133,14 @@ backup_and_deploy() {
 }
 
 # ==============================================================================
+# 0. CONFIGURAÇÃO DE DATA, HORA, TIMEZONE & NTP BRASIL (SÃO PAULO)
+# ==============================================================================
+log_info "Configurando fuso horário America/Sao_Paulo e sincronização NTP.br..."
+if [ -f "$REPO_DIR/scripts/ipbx-timezone.sh" ]; then
+    bash "$REPO_DIR/scripts/ipbx-timezone.sh" || true
+fi
+
+# ==============================================================================
 # 1. ALTERAR TELA DO TERMINAL (MOTD)
 # ==============================================================================
 log_info "1/20 - Configurando tela personalizada do terminal (MOTD)..."

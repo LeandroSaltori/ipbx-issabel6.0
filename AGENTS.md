@@ -41,6 +41,7 @@ Todas as opções do menu interativo [1] a [29], [A] e [0] devem permanecer **10
   - `[27]` Limpeza de Logs e Otimização de Disco
   - `[28]` Servidor OpenVPN (EasyVPN)
   - `[29]` Rollback (Restauração / Instalar `ipbx-rollback`)
+  - `[30]` Data/Hora, Timezone e NTP Brasil (`America/Sao_Paulo`)
 * **OPÇÕES GLOBAIS:**
   - `[A]` INSTALAR TUDO (execução completa)
   - `[0]` Sair

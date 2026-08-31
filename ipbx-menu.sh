@@ -1376,11 +1376,23 @@ update_rollback() {
     esac
 }
 
+# --- 30. DATA/HORA, TIMEZONE & NTP BRASIL (SÃO PAULO) ---
+update_timezone() {
+    log_info "Configurando Data, Hora, Timezone (America/Sao_Paulo) e NTP.br..."
+    if [ -f "$REPO_DIR/scripts/ipbx-timezone.sh" ]; then
+        bash "$REPO_DIR/scripts/ipbx-timezone.sh"
+        log_success "Data, hora e fuso horário configurados com sucesso."
+    else
+        log_error "Script scripts/ipbx-timezone.sh não encontrado no repositório."
+    fi
+}
+
 # --- INSTALAR TUDO ---
 install_all() {
     echo ""
     log_info "Executando instalação COMPLETA de todos os módulos..."
     echo ""
+    update_timezone
     update_motd
     update_admin
     update_agenda
@@ -1451,7 +1463,7 @@ show_menu() {
     echo -e "${BLUE}║${NC}   ${WHITE}[23]${NC} PJSIP User-Agent            ${WHITE}[24]${NC} Auto-Update Semanal       ${BLUE}║${NC}"
     echo -e "${BLUE}║${NC}   ${WHITE}[25]${NC} Web Developer               ${WHITE}[26]${NC} Configurar Domínio e SSL  ${BLUE}║${NC}"
     echo -e "${BLUE}║${NC}   ${WHITE}[27]${NC} Limpeza de Logs e Disco     ${WHITE}[28]${NC} Servidor OpenVPN (EasyVPN)${BLUE}║${NC}"
-    echo -e "${BLUE}║${NC}   ${WHITE}[29]${NC} Rollback (Restauro/Instalar)                                  ${BLUE}║${NC}"
+    echo -e "${BLUE}║${NC}   ${WHITE}[29]${NC} Rollback (Restauro/Instalar)${WHITE}[30]${NC} Data/Hora e NTP (São Paulo)${BLUE}║${NC}"
     echo -e "${BLUE}║${NC}                                                                    ${BLUE}║${NC}"
     echo -e "${BLUE}╠══════════════════════════════════════════════════════════════════════╣${NC}"
     echo -e "${BLUE}║${NC}   ${YELLOW}[A]${NC}  ${YELLOW}INSTALAR TUDO${NC} (igual ao install.sh completo)                ${BLUE}║${NC}"
@@ -1496,6 +1508,7 @@ while true; do
         27) update_limpalogs ;;
         28) create_snapshot "Servidor OpenVPN"; update_openvpn; reload_services ;;
         29) update_rollback ;;
+        30) create_snapshot "Data/Hora e NTP Brasil"; update_timezone; reload_services ;;
         [aA]) create_snapshot "Instalação Completa"; install_all ;;
         0)
             echo ""
