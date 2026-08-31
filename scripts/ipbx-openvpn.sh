@@ -119,12 +119,17 @@ EOF
 chmod 440 /etc/sudoers.d/99-openvpn-asterisk 2>/dev/null || true
 
 # Links simbólicos e espelhamento entre caminhos para que qualquer alteração no front funcione em ambos
-ln -sfn /etc/openvpn/server.conf /etc/openvpn/server/server.conf 2>/dev/null || true
-for f in ca.crt server.crt server.key dh2048.pem dh.pem; do
-    if [ -f "/etc/openvpn/$f" ] && [ ! -f "/etc/openvpn/server/$f" ]; then
-        ln -sfn "/etc/openvpn/$f" "/etc/openvpn/server/$f" 2>/dev/null || true
-    elif [ -f "/etc/openvpn/server/$f" ] && [ ! -f "/etc/openvpn/$f" ]; then
+if [ -f /etc/openvpn/server/server.conf ] && [ ! -L /etc/openvpn/server.conf ]; then
+    ln -sfn /etc/openvpn/server/server.conf /etc/openvpn/server.conf 2>/dev/null || true
+elif [ -f /etc/openvpn/server.conf ] && [ ! -f /etc/openvpn/server/server.conf ]; then
+    ln -sfn /etc/openvpn/server.conf /etc/openvpn/server/server.conf 2>/dev/null || true
+fi
+
+for f in ca.crt server.crt server.key dh2048.pem dh.pem ipp.txt openvpn-status.log; do
+    if [ -f "/etc/openvpn/server/$f" ] && [ ! -f "/etc/openvpn/$f" ]; then
         ln -sfn "/etc/openvpn/server/$f" "/etc/openvpn/$f" 2>/dev/null || true
+    elif [ -f "/etc/openvpn/$f" ] && [ ! -f "/etc/openvpn/server/$f" ]; then
+        ln -sfn "/etc/openvpn/$f" "/etc/openvpn/server/$f" 2>/dev/null || true
     fi
 done
 
