@@ -584,35 +584,40 @@ function handleExportPdf($pPesquisa)
             @media print { .no-print { display:none; } }
         #prisma_report_tooltip, .prisma_report_tooltip { display: none !important; opacity: 0 !important; visibility: hidden !important; pointer-events: none !important; }
 
-        /* Modal Popup de Reprodução de Áudio */
+        /* Janela Flutuante de Reprodução de Áudio (Floating Widget) */
         .audio-modal-overlay {
             position: fixed !important;
-            top: 0 !important;
-            left: 0 !important;
-            width: 100vw !important;
-            height: 100vh !important;
-            background: rgba(15, 23, 42, 0.75) !important;
-            backdrop-filter: blur(6px) !important;
-            -webkit-backdrop-filter: blur(6px) !important;
+            bottom: 24px !important;
+            right: 24px !important;
+            top: auto !important;
+            left: auto !important;
+            width: 460px !important;
+            max-width: calc(100vw - 48px) !important;
+            height: auto !important;
+            background: transparent !important;
             z-index: 2147483647 !important;
             display: none;
-            align-items: center !important;
-            justify-content: center !important;
+            pointer-events: none !important;
         }
         .audio-modal-overlay.active {
-            display: flex !important;
+            display: block !important;
         }
-        @keyframes audioFadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes audioFloatSlideUp {
+            from { transform: translateY(35px) scale(0.96); opacity: 0; }
+            to { transform: translateY(0) scale(1); opacity: 1; }
+        }
         .audio-modal-card {
             background: linear-gradient(145deg, #1e1b4b 0%, #0f172a 100%) !important;
-            border: 1px solid rgba(139, 92, 246, 0.4) !important;
+            border: 1px solid rgba(139, 92, 246, 0.55) !important;
             border-radius: 16px !important;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8), 0 0 30px rgba(124, 58, 237, 0.3) !important;
-            width: 92% !important;
-            max-width: 520px !important;
+            box-shadow: 0 20px 45px -10px rgba(0, 0, 0, 0.85), 0 0 35px rgba(124, 58, 237, 0.35) !important;
+            width: 100% !important;
             overflow: hidden !important;
             color: #ffffff !important;
             font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif !important;
+            pointer-events: auto !important;
+            animation: audioFloatSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) !important;
+        }
             animation: audioPopIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
         }
         @keyframes audioPopIn { from { transform: scale(0.92) translateY(10px); opacity: 0; } to { transform: scale(1) translateY(0); opacity: 1; } }
@@ -1223,35 +1228,40 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
         }
     #prisma_report_tooltip, .prisma_report_tooltip { display: none !important; opacity: 0 !important; visibility: hidden !important; pointer-events: none !important; }
 
-        /* Modal Popup de Reprodução de Áudio */
+        /* Janela Flutuante de Reprodução de Áudio (Floating Widget) */
         .audio-modal-overlay {
             position: fixed !important;
-            top: 0 !important;
-            left: 0 !important;
-            width: 100vw !important;
-            height: 100vh !important;
-            background: rgba(15, 23, 42, 0.75) !important;
-            backdrop-filter: blur(6px) !important;
-            -webkit-backdrop-filter: blur(6px) !important;
+            bottom: 24px !important;
+            right: 24px !important;
+            top: auto !important;
+            left: auto !important;
+            width: 460px !important;
+            max-width: calc(100vw - 48px) !important;
+            height: auto !important;
+            background: transparent !important;
             z-index: 2147483647 !important;
             display: none;
-            align-items: center !important;
-            justify-content: center !important;
+            pointer-events: none !important;
         }
         .audio-modal-overlay.active {
-            display: flex !important;
+            display: block !important;
         }
-        @keyframes audioFadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes audioFloatSlideUp {
+            from { transform: translateY(35px) scale(0.96); opacity: 0; }
+            to { transform: translateY(0) scale(1); opacity: 1; }
+        }
         .audio-modal-card {
             background: linear-gradient(145deg, #1e1b4b 0%, #0f172a 100%) !important;
-            border: 1px solid rgba(139, 92, 246, 0.4) !important;
+            border: 1px solid rgba(139, 92, 246, 0.55) !important;
             border-radius: 16px !important;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8), 0 0 30px rgba(124, 58, 237, 0.3) !important;
-            width: 92% !important;
-            max-width: 520px !important;
+            box-shadow: 0 20px 45px -10px rgba(0, 0, 0, 0.85), 0 0 35px rgba(124, 58, 237, 0.35) !important;
+            width: 100% !important;
             overflow: hidden !important;
             color: #ffffff !important;
             font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif !important;
+            pointer-events: auto !important;
+            animation: audioFloatSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) !important;
+        }
             animation: audioPopIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
         }
         @keyframes audioPopIn { from { transform: scale(0.92) translateY(10px); opacity: 0; } to { transform: scale(1) translateY(0); opacity: 1; } }
@@ -1842,6 +1852,7 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
             }
 
             document.addEventListener('DOMContentLoaded', function() {
+                ensureAudioModalInBody();
                 var aud = getOrInitAudio();
                 if (aud) {
                     aud.addEventListener('timeupdate', function() {
