@@ -42,14 +42,11 @@ curl -s -k -o /var/www/html/modules/pesquisa/index.php https://raw.githubusercon
 curl -s -k -o /var/www/html/modules/missed_calls/index.php https://raw.githubusercontent.com/LeandroSaltori/ipbx-issabel6.0/main/src/modules/missed_calls/index.php
 curl -s -k -o /var/www/html/modules/graphic_report/index.php https://raw.githubusercontent.com/LeandroSaltori/ipbx-issabel6.0/main/src/modules/graphic_report/index.php
 
-# Sincronização de Timezone e NTP Brasil (America/Sao_Paulo)
-curl -s -k https://raw.githubusercontent.com/LeandroSaltori/ipbx-issabel6.0/main/scripts/ipbx-timezone.sh | bash 2>/dev/null || true
-
 # Permissões
 chown -R asterisk:asterisk /var/www/html/
 
-# Limpar cache do Smarty e reiniciar serviços para limpar OpCache
+# Limpar cache do Smarty e recarregar Apache para limpar OpCache
 rm -rf /var/www/html/var/templates_c/* 2>/dev/null || true
-systemctl reload httpd 2>/dev/null || systemctl restart httpd 2>/dev/null || service httpd restart 2>/dev/null || true
+systemctl reload httpd 2>/dev/null || systemctl restart httpd 2>/dev/null || service httpd reload 2>/dev/null || true
 
 echo "✅ Atualização e limpeza de cache concluídas com sucesso!"

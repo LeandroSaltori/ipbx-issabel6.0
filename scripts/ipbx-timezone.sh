@@ -199,21 +199,17 @@ mysql -e "UPDATE asterisk.freepbx_settings SET value='$TARGET_TIMEZONE' WHERE ke
 # ------------------------------------------------------------------------------
 log_info "5. Reiniciando serviços para aplicar o novo fuso em todos os daemons..."
 
-# Reinicia MariaDB/MySQL para atualizar NOW() e variáveis de tempo do banco
-systemctl restart mariadb 2>/dev/null || systemctl restart mysqld 2>/dev/null || service mariadb restart 2>/dev/null || service mysqld restart 2>/dev/null || true
-
-# Reinicia Apache e PHP-FPM para limpar variáveis de ambiente de processos antigos
-systemctl restart httpd 2>/dev/null || systemctl restart apache2 2>/dev/null || service httpd restart 2>/dev/null || true
+# Reinicia Apache e PHP-FPM para limpar variáveis de ambiente
+systemctl reload httpd 2>/dev/null || systemctl restart httpd 2>/dev/null || service httpd reload 2>/dev/null || true
 systemctl restart php-fpm 2>/dev/null || service php-fpm restart 2>/dev/null || true
 
-# Reinicia Crond para que agendamentos sigam o horário de Brasília
+# Reinicia Crond
 systemctl restart crond 2>/dev/null || systemctl restart cron 2>/dev/null || true
 
 # Recarrega o Dialplan e Logger do Asterisk
 if command -v asterisk &>/dev/null; then
     asterisk -rx "dialplan reload" 2>/dev/null || true
     asterisk -rx "logger reload" 2>/dev/null || true
-    asterisk -rx "module reload app_timecondition.so" 2>/dev/null || true
 fi
 
 # ------------------------------------------------------------------------------
