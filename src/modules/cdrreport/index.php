@@ -720,7 +720,7 @@ function renderCelDetailsHtml($pDB, $uniqueid)
             backdrop-filter: blur(6px) !important;
             -webkit-backdrop-filter: blur(6px) !important;
             z-index: 2147483647 !important;
-            display: none !important;
+            display: none;
             align-items: center !important;
             justify-content: center !important;
         }
@@ -899,7 +899,8 @@ function renderCelDetailsHtml($pDB, $uniqueid)
 
                 aud.src = audioUrl;
                 if (modal) {
-                    modal.style.display = 'flex';
+                    modal.classList.add('active');
+                    modal.style.setProperty('display', 'flex', 'important');
                 }
 
                 var p = aud.play();
@@ -983,7 +984,8 @@ function renderCelDetailsHtml($pDB, $uniqueid)
                 }
                 var modal = document.getElementById('audioPlayerModal');
                 if (modal) {
-                    modal.style.display = 'none';
+                    modal.classList.remove('active');
+                    modal.style.setProperty('display', 'none', 'important');
                 }
                 updatePlayPauseButton(false);
             }
@@ -1196,7 +1198,7 @@ function handleCdrExportPdf($oCDR, $module_name)
             backdrop-filter: blur(6px) !important;
             -webkit-backdrop-filter: blur(6px) !important;
             z-index: 2147483647 !important;
-            display: none !important;
+            display: none;
             align-items: center !important;
             justify-content: center !important;
         }
@@ -1929,7 +1931,7 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
             backdrop-filter: blur(6px) !important;
             -webkit-backdrop-filter: blur(6px) !important;
             z-index: 2147483647 !important;
-            display: none !important;
+            display: none;
             align-items: center !important;
             justify-content: center !important;
         }
@@ -2287,7 +2289,7 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
     
         
         <!-- Modal Popup de Reprodução de Gravação (Totalmente Desacoplado do Rodapé) -->
-        <div id="audioPlayerModal" class="audio-modal-overlay" style="display:none; position:fixed !important; top:0 !important; left:0 !important; width:100vw !important; height:100vh !important; background:rgba(15,23,42,0.75) !important; backdrop-filter:blur(6px) !important; -webkit-backdrop-filter:blur(6px) !important; z-index:2147483647 !important; align-items:center !important; justify-content:center !important;" onclick="if(event.target === this) closeAudioPlayerModal();">
+        <div id="audioPlayerModal" class="audio-modal-overlay" onclick="if(event.target === this) closeAudioPlayerModal();">
             <div class="audio-modal-card" style="background:linear-gradient(145deg, #1e1b4b 0%, #0f172a 100%) !important; border:1px solid rgba(139,92,246,0.4) !important; border-radius:16px !important; box-shadow:0 25px 50px -12px rgba(0,0,0,0.8), 0 0 30px rgba(124,58,237,0.3) !important; width:92% !important; max-width:520px !important; overflow:hidden !important; color:#ffffff !important; font-family:'Segoe UI', sans-serif !important;">
                 <!-- Header do Popup -->
                 <div class="audio-modal-header" style="padding:16px 20px; background:rgba(255,255,255,0.05); border-bottom:1px solid rgba(255,255,255,0.1); display:flex; justify-content:space-between; align-items:center;">
@@ -2448,7 +2450,8 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
 
                 aud.src = audioUrl;
                 if (modal) {
-                    modal.style.display = 'flex';
+                    modal.classList.add('active');
+                    modal.style.setProperty('display', 'flex', 'important');
                 }
 
                 var p = aud.play();
@@ -2532,7 +2535,8 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
                 }
                 var modal = document.getElementById('audioPlayerModal');
                 if (modal) {
-                    modal.style.display = 'none';
+                    modal.classList.remove('active');
+                    modal.style.setProperty('display', 'none', 'important');
                 }
                 updatePlayPauseButton(false);
             }
