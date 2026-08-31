@@ -928,25 +928,29 @@ function renderFullMonitoringDashboard($smarty, $module_name, $local_templates_d
             }
         #prisma_report_tooltip, .prisma_report_tooltip { display: none !important; opacity: 0 !important; visibility: hidden !important; pointer-events: none !important; }
 
-        /* Card Flutuante de Reprodução de Gravação Centralizado (Acompanha a Tela) */
+        /* Modal Pop-up de Reprodução de Gravação Centralizado */
         #audioPlayerModal, .audio-modal-overlay {
             position: fixed !important;
-            top: 50% !important;
-            left: 50% !important;
-            transform: translate(-50%, -50%) !important;
-            width: 480px !important;
-            max-width: calc(100vw - 32px) !important;
-            height: auto !important;
-            background: transparent !important;
+            top: 0 !important;
+            left: 0 !important;
+            right: 0 !important;
+            bottom: 0 !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            background: rgba(15, 23, 42, 0.65) !important;
+            backdrop-filter: blur(4px) !important;
+            -webkit-backdrop-filter: blur(4px) !important;
             z-index: 2147483647 !important;
             display: none;
+            align-items: center !important;
+            justify-content: center !important;
             margin: 0 !important;
             padding: 0 !important;
             box-sizing: border-box !important;
-            pointer-events: auto !important;
+            transform: none !important;
         }
         #audioPlayerModal.active, .audio-modal-overlay.active {
-            display: block !important;
+            display: flex !important;
         }
         @keyframes audioPopIn { from { transform: scale(0.92); opacity: 0; } to { transform: scale(1); opacity: 1; } }
         .audio-modal-card {
@@ -954,7 +958,9 @@ function renderFullMonitoringDashboard($smarty, $module_name, $local_templates_d
             border: 1px solid rgba(139, 92, 246, 0.65) !important;
             border-radius: 16px !important;
             box-shadow: 0 25px 60px -10px rgba(0, 0, 0, 0.85), 0 0 35px rgba(124, 58, 237, 0.45) !important;
-            width: 100% !important;
+            width: 92% !important;
+            max-width: 500px !important;
+            margin: auto !important;
             overflow: hidden !important;
             color: #ffffff !important;
             font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif !important;
@@ -967,10 +973,7 @@ function renderFullMonitoringDashboard($smarty, $module_name, $local_templates_d
             display: flex !important;
             justify-content: space-between !important;
             align-items: center !important;
-            cursor: move !important;
-            user-select: none !important;
         }
-        @keyframes audioPopIn { from { transform: scale(0.92) translateY(10px); opacity: 0; } to { transform: scale(1) translateY(0); opacity: 1; } }
         .audio-modal-header { padding: 16px 20px !important; background: rgba(255, 255, 255, 0.05) !important; border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important; display: flex !important; justify-content: space-between !important; align-items: center !important; }
         .audio-modal-title-box { display: flex !important; align-items: center !important; gap: 12px !important; }
         .audio-modal-icon { font-size: 24px !important; background: rgba(124, 58, 237, 0.3) !important; border: 1px solid rgba(139, 92, 246, 0.4) !important; padding: 8px !important; border-radius: 10px !important; display: flex !important; align-items: center !important; justify-content: center !important; }
@@ -1406,65 +1409,7 @@ function renderFullMonitoringDashboard($smarty, $module_name, $local_templates_d
                 return currentAudio;
             }
 
-            function ensureAudioModalInRoot() {
-                var modal = document.getElementById('audioPlayerModal');
-                if (modal && modal.parentElement !== document.body) {
-                    document.body.appendChild(modal);
-                }
-            }
-
-            function initAudioModalDraggable() {
-                var modal = document.getElementById('audioPlayerModal');
-                if (!modal || modal._hasDragInit) return;
-                modal._hasDragInit = true;
-
-                var header = modal.querySelector('.audio-modal-header');
-                if (!header) return;
-
-                var isDragging = false;
-                var startX, startY, initialLeft, initialTop;
-
-                header.addEventListener('mousedown', function(e) {
-                    if (e.target.closest('.audio-modal-close-btn') || e.target.tagName === 'BUTTON' || e.target.tagName === 'A') return;
-                    isDragging = true;
-                    startX = e.clientX;
-                    startY = e.clientY;
-                    
-                    var rect = modal.getBoundingClientRect();
-                    initialLeft = rect.left;
-                    initialTop = rect.top;
-
-                    modal.style.transform = 'none';
-                    modal.style.bottom = 'auto';
-                    modal.style.right = 'auto';
-                    modal.style.left = initialLeft + 'px';
-                    modal.style.top = initialTop + 'px';
-
-                    document.addEventListener('mousemove', onMouseMove);
-                    document.addEventListener('mouseup', onMouseUp);
-                    e.preventDefault();
-                });
-
-                function onMouseMove(e) {
-                    if (!isDragging) return;
-                    var dx = e.clientX - startX;
-                    var dy = e.clientY - startY;
-                    var newLeft = Math.max(10, Math.min(window.innerWidth - modal.offsetWidth - 10, initialLeft + dx));
-                    var newTop = Math.max(10, Math.min(window.innerHeight - modal.offsetHeight - 10, initialTop + dy));
-                    modal.style.left = newLeft + 'px';
-                    modal.style.top = newTop + 'px';
-                }
-
-                function onMouseUp() {
-                    isDragging = false;
-                    document.removeEventListener('mousemove', onMouseMove);
-                    document.removeEventListener('mouseup', onMouseUp);
-                }
-            }
-
             function playCdrAudio(audioUrl, caller, target, downloadUrl) {
-                ensureAudioModalInRoot();
-                initAudioModalDraggable();
                 var modal = document.getElementById('audioPlayerModal');
                 var aud = getOrInitAudio();
 
@@ -1484,15 +1429,25 @@ function renderFullMonitoringDashboard($smarty, $module_name, $local_templates_d
 
                 aud.src = audioUrl;
                 if (modal) {
-                    if (!modal.style.left || modal.style.left === 'auto') {
-                        modal.style.position = 'fixed';
-                        modal.style.top = '50%';
-                        modal.style.left = '50%';
-                        modal.style.transform = 'translate(-50%, -50%)';
-                    }
-                    modal.classList.add('active');
-                    modal.style.setProperty('display', 'block', 'important');
+                    modal.style.position = 'fixed';
+                    modal.style.top = '0';
+                    modal.style.left = '0';
+                    modal.style.width = '100%';
+                    modal.style.height = '100%';
+                    modal.style.transform = 'none';
+                    modal.style.display = 'flex';
                 }
+
+                var p = aud.play();
+                if (p !== undefined) {
+                    p.then(function() {
+                        updatePlayPauseButton(true);
+                    }).catch(function(err) {
+                        console.log("Audio play error:", err);
+                        updatePlayPauseButton(false);
+                    });
+                }
+            }
 
                 var p = aud.play();
                 if (p !== undefined) {
