@@ -101,36 +101,13 @@ net.ipv4.ip_forward = 1
 EOF
 sysctl -p /etc/sysctl.d/99-openvpn.conf 2>/dev/null || sysctl -w net.ipv4.ip_forward=1 2>/dev/null || true
 
-# 5. Configuração de Regras de Firewall e Masquerade (NAT)
-log_info "Configurando regras de Firewall e NAT para tráfego de ramais VPN..."
-
-# Detecta interface padrão de saída para a internet
-DEFAULT_IFACE=$(ip route show default 2>/dev/null | awk '/default/ {print $5}' | head -n1)
-[ -z "$DEFAULT_IFACE" ] && DEFAULT_IFACE="eth0"
-
-if command -v firewall-cmd &>/dev/null && systemctl is-active firewalld &>/dev/null; then
-    log_info "Configurando regras no Firewalld (interface $DEFAULT_IFACE)..."
-    firewall-cmd --permanent --add-port=1194/udp --add-port=1194/tcp --add-port=1196/udp --add-port=1196/tcp 2>/dev/null || true
-    firewall-cmd --permanent --add-masquerade 2>/dev/null || true
-    firewall-cmd --permanent --direct --add-rule ipv4 nat POSTROUTING 0 -o "$DEFAULT_IFACE" -j MASQUERADE 2>/dev/null || true
-    firewall-cmd --reload 2>/dev/null || true
-else
-    log_info "Configurando regras no iptables..."
-    iptables -t nat -C POSTROUTING -o "$DEFAULT_IFACE" -j MASQUERADE 2>/dev/null || \
-    iptables -t nat -A POSTROUTING -o "$DEFAULT_IFACE" -j MASQUERADE 2>/dev/null || true
-
-    iptables -C INPUT -p udp --dport 1194 -j ACCEPT 2>/dev/null || iptables -A INPUT -p udp --dport 1194 -j ACCEPT 2>/dev/null || true
-    iptables -C INPUT -p udp --dport 1196 -j ACCEPT 2>/dev/null || iptables -A INPUT -p udp --dport 1196 -j ACCEPT 2>/dev/null || true
-    iptables -C INPUT -p tcp --dport 1194 -j ACCEPT 2>/dev/null || iptables -A INPUT -p tcp --dport 1194 -j ACCEPT 2>/dev/null || true
-    iptables -C INPUT -p tcp --dport 1196 -j ACCEPT 2>/dev/null || iptables -A INPUT -p tcp --dport 1196 -j ACCEPT 2>/dev/null || true
-
-    iptables -C FORWARD -i tun+ -j ACCEPT 2>/dev/null || iptables -A FORWARD -i tun+ -j ACCEPT 2>/dev/null || true
-    iptables -C FORWARD -o tun+ -j ACCEPT 2>/dev/null || iptables -A FORWARD -o tun+ -j ACCEPT 2>/dev/null || true
-
-    if command -v iptables-save &>/dev/null; then
-        iptables-save > /etc/sysconfig/iptables 2>/dev/null || true
-    fi
-fi
+# 5. Habilitação de Roteamento de Pacotes no Kernel
+log_info "Garantindo IP Forwarding no kernel..."
+mkdir -p /etc/sysctl.d 2>/dev/null || true
+cat << 'EOF' > /etc/sysctl.d/99-openvpn.conf
+net.ipv4.ip_forward = 1
+EOF
+sysctl -p /etc/sysctl.d/99-openvpn.conf 2>/dev/null || sysctl -w net.ipv4.ip_forward=1 2>/dev/null || true
 
 # 6. Estrutura de Diretórios, Permissões e Sudoers para o Módulo Web
 mkdir -p /etc/openvpn/server /etc/openvpn/client /etc/openvpn/ccd /var/log/openvpn 2>/dev/null || true
