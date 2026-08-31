@@ -121,10 +121,23 @@ for CFG in /etc/openvpn/server/server.conf /etc/openvpn/server.conf; do
     [ -f "$CFG" ] || continue
     sed -i 's/255\.255\.225\.0/255.255.255.0/g' "$CFG" 2>/dev/null || true
     sed -i -E 's/^(server [0-9.]+) 255\.255\.[0-9]+\.0/\1 255.255.255.0/g' "$CFG" 2>/dev/null || true
+    
+    # O diretório /etc/openvpn/server/ é restrito (700) no Rocky Linux.
+    # O Issabel (asterisk) precisa ler o openvpn-status.log.
+    # Forçamos o log para a raiz do openvpn:
+    if grep -q "^status " "$CFG"; then
+        sed -i 's|^status .*|status /etc/openvpn/openvpn-status.log|' "$CFG" 2>/dev/null || true
+    else
+        echo "status /etc/openvpn/openvpn-status.log" >> "$CFG"
+    fi
 done
 
 case "$ACTION" in
     start|restart|reload)
+        # Garante que o arquivo exista com permissão de leitura global antes do serviço subir
+        touch /etc/openvpn/openvpn-status.log 2>/dev/null || true
+        chmod 644 /etc/openvpn/openvpn-status.log 2>/dev/null || true
+        
         systemctl daemon-reload 2>/dev/null || true
         systemctl restart openvpn-server@server.service 2>/dev/null || \
         systemctl restart openvpn@server.service 2>/dev/null || true
