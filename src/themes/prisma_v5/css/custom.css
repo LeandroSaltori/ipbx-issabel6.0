@@ -47,12 +47,14 @@
 }
 
 .audio-modal-header {
-    padding: 16px 20px !important;
-    background: rgba(255, 255, 255, 0.05) !important;
+    padding: 14px 18px !important;
+    background: rgba(255, 255, 255, 0.07) !important;
     border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
     display: flex !important;
     justify-content: space-between !important;
     align-items: center !important;
+    cursor: move !important;
+    user-select: none !important;
 }
 
 .audio-modal-title-box {

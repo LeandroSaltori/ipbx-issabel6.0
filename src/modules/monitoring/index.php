@@ -1405,8 +1405,57 @@ function renderFullMonitoringDashboard($smarty, $module_name, $local_templates_d
                 }
             }
 
+            function initAudioModalDraggable() {
+                var modal = document.getElementById('audioPlayerModal');
+                if (!modal || modal._hasDragInit) return;
+                modal._hasDragInit = true;
+
+                var header = modal.querySelector('.audio-modal-header');
+                if (!header) return;
+
+                var isDragging = false;
+                var startX, startY, initialLeft, initialTop;
+
+                header.addEventListener('mousedown', function(e) {
+                    if (e.target.closest('.audio-modal-close-btn') || e.target.tagName === 'BUTTON' || e.target.tagName === 'A') return;
+                    isDragging = true;
+                    startX = e.clientX;
+                    startY = e.clientY;
+                    
+                    var rect = modal.getBoundingClientRect();
+                    initialLeft = rect.left;
+                    initialTop = rect.top;
+
+                    modal.style.bottom = 'auto';
+                    modal.style.right = 'auto';
+                    modal.style.left = initialLeft + 'px';
+                    modal.style.top = initialTop + 'px';
+
+                    document.addEventListener('mousemove', onMouseMove);
+                    document.addEventListener('mouseup', onMouseUp);
+                    e.preventDefault();
+                });
+
+                function onMouseMove(e) {
+                    if (!isDragging) return;
+                    var dx = e.clientX - startX;
+                    var dy = e.clientY - startY;
+                    var newLeft = Math.max(10, Math.min(window.innerWidth - modal.offsetWidth - 10, initialLeft + dx));
+                    var newTop = Math.max(10, Math.min(window.innerHeight - modal.offsetHeight - 10, initialTop + dy));
+                    modal.style.left = newLeft + 'px';
+                    modal.style.top = newTop + 'px';
+                }
+
+                function onMouseUp() {
+                    isDragging = false;
+                    document.removeEventListener('mousemove', onMouseMove);
+                    document.removeEventListener('mouseup', onMouseUp);
+                }
+            }
+
             function playCdrAudio(audioUrl, caller, target, downloadUrl) {
                 ensureAudioModalInBody();
+                initAudioModalDraggable();
                 var modal = document.getElementById('audioPlayerModal');
                 var aud = getOrInitAudio();
 
@@ -1426,8 +1475,14 @@ function renderFullMonitoringDashboard($smarty, $module_name, $local_templates_d
 
                 aud.src = audioUrl;
                 if (modal) {
+                    if (!modal.style.left || modal.style.left === 'auto') {
+                        modal.style.bottom = '24px';
+                        modal.style.right = '24px';
+                        modal.style.top = 'auto';
+                        modal.style.left = 'auto';
+                    }
                     modal.classList.add('active');
-                    modal.style.setProperty('display', 'flex', 'important');
+                    modal.style.setProperty('display', 'block', 'important');
                 }
 
                 var p = aud.play();
