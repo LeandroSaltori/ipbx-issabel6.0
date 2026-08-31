@@ -44,12 +44,21 @@ elif command -v yum &>/dev/null; then
     yum install -y issabel-easyvpn 2>/dev/null || true
 fi
 
+# Remove symlinks anteriores para garantir que a reinstalação traga o arquivo original
+rm -f /usr/share/issabel/privileged/openvpn 2>/dev/null || true
+
 # Reinstala o módulo web SEMPRE para garantir arquivos íntegros
 log_info "Garantindo módulo web do issabel-easyvpn..."
 if command -v dnf &>/dev/null; then
     dnf reinstall -y issabel-easyvpn 2>/dev/null || dnf install -y issabel-easyvpn 2>/dev/null || true
 else
     yum reinstall -y issabel-easyvpn 2>/dev/null || yum install -y issabel-easyvpn 2>/dev/null || true
+fi
+
+# Salva o script privilegiado original (que lida com os clientes conectados)
+if [ -f /usr/share/issabel/privileged/openvpn ] && [ ! -L /usr/share/issabel/privileged/openvpn ]; then
+    cp -f /usr/share/issabel/privileged/openvpn /usr/share/issabel/privileged/openvpn.orig
+    chmod +x /usr/share/issabel/privileged/openvpn.orig
 fi
 
 # Corrige permissões dos arquivos do módulo para o Apache/PHP conseguir ler
@@ -150,7 +159,12 @@ case "$ACTION" in
         fi
         ;;
     *)
-        systemctl "$ACTION" openvpn-server@server.service 2>/dev/null || true
+        # Delega qualquer outra chamada (como get_connected_clients) para o script original
+        if [ -x /usr/share/issabel/privileged/openvpn.orig ]; then
+            exec /usr/share/issabel/privileged/openvpn.orig "$@"
+        else
+            systemctl "$ACTION" openvpn-server@server.service 2>/dev/null || true
+        fi
         ;;
 esac
 EOFHELP
