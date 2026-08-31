@@ -873,15 +873,15 @@ function renderCelDetailsHtml($pDB, $uniqueid)
                 return currentAudio;
             }
 
-            function ensureAudioModalInBody() {
+            function ensureAudioModalInRoot() {
                 var modal = document.getElementById('audioPlayerModal');
-                if (modal && modal.parentElement !== document.body) {
-                    document.body.appendChild(modal);
+                if (modal && modal.parentElement !== document.documentElement) {
+                    document.documentElement.appendChild(modal);
                 }
             }
 
             function playCdrAudio(audioUrl, caller, target, downloadUrl) {
-                ensureAudioModalInBody();
+                ensureAudioModalInRoot();
                 var modal = document.getElementById('audioPlayerModal');
                 var aud = getOrInitAudio();
 
@@ -901,13 +901,11 @@ function renderCelDetailsHtml($pDB, $uniqueid)
 
                 aud.src = audioUrl;
                 if (modal) {
-                    modal.style.removeProperty('bottom');
-                    modal.style.removeProperty('right');
-                    modal.style.removeProperty('left');
-                    modal.style.removeProperty('top');
                     modal.style.position = 'fixed';
                     modal.style.top = '0';
                     modal.style.left = '0';
+                    modal.style.right = '0';
+                    modal.style.bottom = '0';
                     modal.style.width = '100vw';
                     modal.style.height = '100vh';
                     modal.style.zIndex = '2147483647';
@@ -2315,7 +2313,7 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
     
         
         <!-- Janela Flutuante de Reprodução de Gravação (Floating Audio Player Widget) -->
-        <div id="audioPlayerModal" class="audio-modal-overlay">
+        <div id="audioPlayerModal" class="audio-modal-overlay" onclick="if(event.target === this) closeAudioPlayerModal();">
             <div class="audio-modal-card" style="background:linear-gradient(145deg, #1e1b4b 0%, #0f172a 100%) !important; border:1px solid rgba(139,92,246,0.4) !important; border-radius:16px !important; box-shadow:0 25px 50px -12px rgba(0,0,0,0.8), 0 0 30px rgba(124,58,237,0.3) !important; width:92% !important; max-width:520px !important; overflow:hidden !important; color:#ffffff !important; font-family:'Segoe UI', sans-serif !important;">
                 <!-- Header do Popup -->
                 <div class="audio-modal-header" style="padding:16px 20px; background:rgba(255,255,255,0.05); border-bottom:1px solid rgba(255,255,255,0.1); display:flex; justify-content:space-between; align-items:center;">
@@ -2448,15 +2446,15 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
                 return currentAudio;
             }
 
-            function ensureAudioModalInBody() {
+            function ensureAudioModalInRoot() {
                 var modal = document.getElementById('audioPlayerModal');
-                if (modal && modal.parentElement !== document.body) {
-                    document.body.appendChild(modal);
+                if (modal && modal.parentElement !== document.documentElement) {
+                    document.documentElement.appendChild(modal);
                 }
             }
 
             function playCdrAudio(audioUrl, caller, target, downloadUrl) {
-                ensureAudioModalInBody();
+                ensureAudioModalInRoot();
                 var modal = document.getElementById('audioPlayerModal');
                 var aud = getOrInitAudio();
 
@@ -2476,13 +2474,11 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
 
                 aud.src = audioUrl;
                 if (modal) {
-                    modal.style.removeProperty('bottom');
-                    modal.style.removeProperty('right');
-                    modal.style.removeProperty('left');
-                    modal.style.removeProperty('top');
                     modal.style.position = 'fixed';
                     modal.style.top = '0';
                     modal.style.left = '0';
+                    modal.style.right = '0';
+                    modal.style.bottom = '0';
                     modal.style.width = '100vw';
                     modal.style.height = '100vh';
                     modal.style.zIndex = '2147483647';

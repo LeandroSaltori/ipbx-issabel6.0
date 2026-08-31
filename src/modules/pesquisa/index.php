@@ -1719,15 +1719,15 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
                 return currentAudio;
             }
 
-            function ensureAudioModalInBody() {
+            function ensureAudioModalInRoot() {
                 var modal = document.getElementById('audioPlayerModal');
-                if (modal && modal.parentElement !== document.body) {
-                    document.body.appendChild(modal);
+                if (modal && modal.parentElement !== document.documentElement) {
+                    document.documentElement.appendChild(modal);
                 }
             }
 
             function playCdrAudio(audioUrl, caller, target, downloadUrl) {
-                ensureAudioModalInBody();
+                ensureAudioModalInRoot();
                 var modal = document.getElementById('audioPlayerModal');
                 var aud = getOrInitAudio();
 
@@ -1747,13 +1747,11 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
 
                 aud.src = audioUrl;
                 if (modal) {
-                    modal.style.removeProperty('bottom');
-                    modal.style.removeProperty('right');
-                    modal.style.removeProperty('left');
-                    modal.style.removeProperty('top');
                     modal.style.position = 'fixed';
                     modal.style.top = '0';
                     modal.style.left = '0';
+                    modal.style.right = '0';
+                    modal.style.bottom = '0';
                     modal.style.width = '100vw';
                     modal.style.height = '100vh';
                     modal.style.zIndex = '2147483647';

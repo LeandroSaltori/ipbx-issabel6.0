@@ -928,13 +928,13 @@ function renderFullMonitoringDashboard($smarty, $module_name, $local_templates_d
             }
         #prisma_report_tooltip, .prisma_report_tooltip { display: none !important; opacity: 0 !important; visibility: hidden !important; pointer-events: none !important; }
 
-        /* Modal Pop-up de Reprodução de Gravação Centralizado */
-        .audio-modal-overlay {
+        /* Modal Pop-up de Reprodução de Gravação Centralizado (Root Viewport) */
+        #audioPlayerModal, .audio-modal-overlay {
             position: fixed !important;
-            top: 0 !important;
-            left: 0 !important;
-            right: 0 !important;
-            bottom: 0 !important;
+            top: 0px !important;
+            left: 0px !important;
+            right: 0px !important;
+            bottom: 0px !important;
             width: 100vw !important;
             height: 100vh !important;
             background: rgba(15, 23, 42, 0.75) !important;
@@ -944,8 +944,11 @@ function renderFullMonitoringDashboard($smarty, $module_name, $local_templates_d
             display: none;
             align-items: center !important;
             justify-content: center !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            box-sizing: border-box !important;
         }
-        .audio-modal-overlay.active {
+        #audioPlayerModal.active, .audio-modal-overlay.active {
             display: flex !important;
         }
         @keyframes audioPopIn { from { transform: scale(0.92) translateY(10px); opacity: 0; } to { transform: scale(1) translateY(0); opacity: 1; } }
@@ -1398,15 +1401,15 @@ function renderFullMonitoringDashboard($smarty, $module_name, $local_templates_d
                 return currentAudio;
             }
 
-            function ensureAudioModalInBody() {
+            function ensureAudioModalInRoot() {
                 var modal = document.getElementById('audioPlayerModal');
-                if (modal && modal.parentElement !== document.body) {
-                    document.body.appendChild(modal);
+                if (modal && modal.parentElement !== document.documentElement) {
+                    document.documentElement.appendChild(modal);
                 }
             }
 
             function playCdrAudio(audioUrl, caller, target, downloadUrl) {
-                ensureAudioModalInBody();
+                ensureAudioModalInRoot();
                 var modal = document.getElementById('audioPlayerModal');
                 var aud = getOrInitAudio();
 
@@ -1426,13 +1429,11 @@ function renderFullMonitoringDashboard($smarty, $module_name, $local_templates_d
 
                 aud.src = audioUrl;
                 if (modal) {
-                    modal.style.removeProperty('bottom');
-                    modal.style.removeProperty('right');
-                    modal.style.removeProperty('left');
-                    modal.style.removeProperty('top');
                     modal.style.position = 'fixed';
                     modal.style.top = '0';
                     modal.style.left = '0';
+                    modal.style.right = '0';
+                    modal.style.bottom = '0';
                     modal.style.width = '100vw';
                     modal.style.height = '100vh';
                     modal.style.zIndex = '2147483647';
