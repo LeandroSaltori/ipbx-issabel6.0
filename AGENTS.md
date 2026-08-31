@@ -4,111 +4,90 @@ Este documento estabelece as regras e padrões arquiteturais obrigatórios para 
 
 ---
 
-## 1. MENU DE ATUALIZAÇÃO MODULAR (`ipbx-menu.sh`)
-Todas as opções do menu interativo [1] a [29], [A] e [0] devem permanecer **100% funcionais, íntegras e sem quebras** em qualquer alteração futura:
-
-* **APARÊNCIA E INTERFACE:**
-  - `[1]` Terminal (MOTD)
-  - `[2]` Tema e Favicon (Prisma v5)
-  - `[3]` Painel Admin
-  - `[4]` Traduções (lang pt_BR)
-* **MÓDULOS E FUNCIONALIDADES:**
-  - `[5]` Módulos Web (todos)
-  - `[6]` Agenda Telefônica (`agenda.php` SQLite & Asterisk)
-  - `[7]` Webphone WebRTC
-  - `[8]` Click-to-Dial
-  - `[9]` Painel IPbx
-  - `[10]` Nome dos Ramais
-* **RELATÓRIOS:**
-  - `[11]` Relatório Geral (CDR)
-  - `[12]` Relatório de Filas
-  - `[13]` Relatórios Extras (Graphic Report / Missed Calls)
-  - `[14]` Pesquisa de Satisfação
-* **CALL CENTER E COMUNICAÇÃO:**
-  - `[15]` Call Center
-  - `[16]` ChanSpy (Escuta)
-  - `[17]` Mensagens Texto (PJSIP)
-  - `[18]` Servidor LDAP (`issabel-ldap` porta 10389)
-* **SISTEMA, SEGURANÇA E REDE:**
-  - `[19]` Música de Espera (MOH)
-  - `[20]` Monitor de Segurança Telegram
-  - `[21]` Ferramentas Diagnóstico
-  - `[22]` Features Asterisk
-  - `[23]` PJSIP User-Agent
-  - `[24]` Auto-Update Semanal
-  - `[25]` Web Developer
-  - `[26]` Configurar Domínio e SSL Let's Encrypt
-  - `[27]` Limpeza de Logs e Otimização de Disco
-  - `[28]` Servidor OpenVPN (EasyVPN)
-  - `[29]` Rollback (Restauração / Instalar `ipbx-rollback`)
-  - `[30]` Data/Hora, Timezone e NTP Brasil (`America/Sao_Paulo`)
-* **OPÇÕES GLOBAIS:**
-  - `[A]` INSTALAR TUDO (execução completa)
-  - `[0]` Sair
+## 1. PRINCÍPIO DE NÃO-REGRESSÃO (ZERO QUEBRA)
+1. **Edições Cirúrgicas e Pontuais:**
+   - **NUNCA reescrever arquivos inteiros do zero** quando for solicitada uma alteração pontual. Realizar alterações cirúrgicas mantendo 100% da estrutura existente.
+2. **Preservação de Rotas, Hooks e Bindings:**
+   - Preservar integralmente rotas, hooks, bindings Smarty/PHP (`$smarty->assign(...)`, `.tpl`), conexões de banco de dados e funções JavaScript já homologadas.
+3. **Preservação de Scripts e Funções Auxiliares:**
+   - É estritamente proibido remover funções auxiliares, scripts utilitários ou dependências existentes sem ordem explícita do usuário.
+4. **Integridade do Menu Modular (`ipbx-menu.sh`):**
+   - Todas as opções do menu interativo `[1]` a `[30]`, `[A]` e `[0]` devem permanecer **100% funcionais, íntegras e sem quebras** em qualquer alteração.
 
 ---
 
-## 2. POLÍTICA DE BACKUP E SNAPSHOTS ANTES DE ATUALIZAR
-1. **NUNCA sobrescrever arquivos sem antes gerar um snapshot**:
+## 2. PADRÃO DE ARQUITETURA DE UI PARA ISSABEL/ELASTIX
+1. **Estrutura de Containers com Overflow Interno:**
+   - O framework web do Issabel renderiza o conteúdo dentro de containers com overflow interno ativo (`#neo-contentbox`, `.neo-contentbox`, `#content`).
+2. **Proibição de `position: fixed` Simples na Árvore de Módulos:**
+   - É **proibido** utilizar `position: fixed` diretamente em divs inseridas no fluxo de layout dos módulos CDR, tabelas e relatórios, pois o container com scroll interno quebra o viewport fixing.
+3. **Uso Obrigatório de HTML5 `<dialog>` Nativo (Top Layer):**
+   - Qualquer modal, player de áudio flutuante, formulário popup ou janela de visualização **DEVE utilizar obrigatoriamente a tag HTML5 `<dialog>` nativa** (`dialog#modal-player-gravacao` ou equivalente).
+   - O elemento deve ser anexado diretamente à raiz do documento (`document.body.appendChild(...)`) e aberto via método nativo `.showModal()`, garantindo renderização na **Top Layer** do navegador, imune a restrições de overflow, transformações ou hierarquias internas do tema.
+   - O fechamento deve ser executado via `.close()`, limpando estados de reprodução e removendo/ocultando o dialog com segurança.
+   - Estilização do backdrop deve ser aplicada via pseudo-elemento `dialog::backdrop` (`background: rgba(0, 0, 0, 0.65); backdrop-filter: blur(4px);`).
+
+---
+
+## 3. PADRÃO DE DESIGN E LAYOUT VALIDADO
+1. **Preservação da Identidade Visual e Paleta Dark:**
+   - Preservar a paleta escura homologada (`#1c1b2f`, `#252440`, `#0f172a`, gradientes violeta/azul `#7c3aed` / `#6366f1` e acabamentos em glassmorphism).
+2. **Proteção Contra Truncamento e Quebra de Botões:**
+   - Todo botão de ação contendo ícone/texto (como *"Baixar Gravação"*, *"Ouvir"*, *"Filtrar"*, *"Salvar"*) deve conter obrigatoriamente:
+     ```css
+     white-space: nowrap !important;
+     flex-shrink: 0 !important;
+     width: auto !important;
+     overflow: visible !important;
+     text-overflow: clip !important;
+     ```
+3. **Experiência Visual de Alto Impacto (Efeito "WOW"):**
+   - Interfaces com tipografia moderna (Segoe UI / Google Fonts), micro-interações suaves, badges de status coloridos, cards de KPIs executivos com gradientes elegantes e gráficos dinâmicos (Chart.js).
+
+---
+
+## 4. WORKFLOW DE EXECUÇÃO E ESCOPO ISOLADO
+1. **Apresentação de Escopo Isolado Pré-Edição:**
+   - Antes de aplicar alterações em arquivos `.tpl`, `.php`, `.js` ou `.css`, apresentar claramente o escopo isolado do que será modificado, explicitando o impacto e a finalidade.
+2. **Validação de Impacto Interdependente:**
+   - Qualquer ajuste em componentes compartilhados (como temas, CSS centralizado `custom.css` ou scripts do framework) deve ser validado simultaneamente nos módulos dependentes (`cdrreport`, `monitoring`, `pesquisa`, `callcenter`).
+
+---
+
+## 5. POLÍTICA DE BACKUP E SNAPSHOTS ANTES DE ATUALIZAR
+1. **Snapshot Obrigatório Pré-Atualização:**
    - Todo script de atualização (`install.sh`, `update.sh`, `ipbx-menu.sh`) **deve obrigatoriamente** criar um ponto de restauração com data e hora em `/var/backup/ipbx/backup_YYYY-MM-DD_HHMMSS`.
    - O manifesto (`manifesto.txt`) deve conter a descrição do que foi atualizado e o horário exato.
    - O link simbólico `/var/backup/ipbx/latest` deve apontar para o snapshot mais recente.
 
 ---
 
-## 3. POLÍTICA DE ROLLBACK SEGURO (`rollback.sh`)
-1. **O Rollback NUNCA deve apagar pastas inteiras do Issabel**:
+## 6. POLÍTICA DE ROLLBACK SEGURO (`rollback.sh`)
+1. **Restauração Não-Destrutiva:**
    - A restauração de arquivos web deve sobrepor/restaurar apenas os arquivos e diretórios presentes no snapshot (`cp -rpf "$SELECTED_BACKUP/html/." /var/www/html/`), **sem jamais executar `rm -rf /var/www/html/modules`**.
-2. **Histórico Versionado por Data/Hora**:
-   - O usuário pode rodar `ipbx-rollback` e escolher interativamente qual ponto histórico deseja restaurar ([1] Mais recente, [2] Anterior, etc.) ou passar `--latest`.
-3. **Compatibilidade com execução via pipe/curl**:
-   - `rollback.sh` deve detectar se está rodando via `curl ... | bash` e ler corretamente de `/dev/tty` quando disponível.
+2. **Histórico Versionado e Execução Flexível:**
+   - Permitir escolha interativa de versões históricas ou passagem de parâmetros não-interativos (`--latest`), com suporte a pipes e leitura via `/dev/tty`.
 
 ---
 
-## 4. INTEGRIDADE DOS DADOS EM TEMPO REAL
-1. **Relatórios e CDR**:
-   - Consultas devem refletir dados reais do MySQL (`asteriskcdrdb.cdr`), SQLite (`address_book.db`, `menu.db`) e do monitor de áudios (`/var/spool/asterisk/monitor/`).
-   - Não utilizar dados mockados ou estáticos nos relatórios operacionais.
+## 7. INTEGRIDADE DOS DADOS EM TEMPO REAL
+1. **Consultas em Dados Reais:**
+   - Consultas de relatórios operacionais e dashboards devem refletir fielmente dados reais do MySQL (`asteriskcdrdb.cdr`), SQLite (`address_book.db`, `menu.db`) e do spool de gravações (`/var/spool/asterisk/monitor/`).
+   - Proibido uso de dados estáticos/mockados em relatórios de produção.
 
 ---
 
-## 5. POLÍTICA DE SEGURANÇA CIRÚRGICA E NÃO-INTERFERÊNCIA
-1. **Preservação Total de APIs e Scripts PHP**:
-   - Qualquer regra de Apache Hardening ou script de segurança **NUNCA deve bloquear ou interferir** em scripts PHP legítimos, módulos customizados, integrações de WhatsApp, Webhooks, APIs REST ou conexões Asterisk AMI/AGI.
-   - O bloqueio de execução de scripts PHP no Apache é estritamente restrito a pastas estáticas de mídia/uploads (`/var/www/html/recordings/` e subpastas `/themes/*/images/`).
-2. **Logrotate Não-Intrusivo**:
-   - Rotação de logs com compressão sem jamais derrubar o Asterisk nem processos em tempo real (utiliza sempre `asterisk -rx "logger reload"`).
+## 8. POLÍTICA DE SEGURANÇA CIRÚRGICA E ZERO-DOWNTIME
+1. **Preservação Total de APIs e Scripts PHP:**
+   - Regras de Apache Hardening ou scripts de proteção **NUNCA devem interferir** em scripts PHP legítimos, módulos customizados, integrações de WhatsApp, Webhooks, APIs REST ou conexões AMI/AGI.
+   - Bloqueio de execução de scripts PHP no Apache restrito estritamente a pastas estáticas de uploads/mídia (`/var/www/html/recordings/` e subpastas `/themes/*/images/`).
+2. **Operação Contínua do Asterisk:**
+   - Não reiniciar ou derrubar o serviço Asterisk desnecessariamente em produção. Aplicar recargas suaves (`asterisk -rx "dialplan reload"`, `logger reload`).
 
 ---
 
-## 6. CONSULTA DE SKILLS E EXCELÊNCIA VISUAL (UI/UX PREMIUM)
-1. **Consulta Mandatória de SKILLS Especializadas**:
-   - Sempre consultar ativamente as **Skills** do sistema (`modern-web-guidance`, UI/UX, debugging, visualização de dados, acessibilidade) para embasar qualquer desenvolvimento frontend ou web.
-2. **Design Visual de Alto Impacto para o Cliente**:
-   - A interface deve entregar uma experiência **premium, moderna e profissional** (efeito "WOW").
-   - Utilizar paletas de cores refinadas, tipografia moderna (Google Fonts/Segoe UI), glassmorphism, micro-interações, hover effects suaves, cards de KPIs executivos com gradientes elegantes e gráficos dinâmicos (Chart.js).
-   - Componentes modais desacoplados e players flutuantes não invasivos.
-   - Proibido criar interfaces simplistas, arcaicas ou com elementos genéricos que desvalorizem o produto aos olhos do cliente final.
-
----
-
-## 7. PROTOCOLO DE RESPOSTA A INCIDENTES E IMUNIZAÇÃO GLOBAL
-1. **Análise Forense Prévia Obrigatória (Fatos antes de Ações):**
-   - Diante de qualquer alerta no Telegram ou relato de anomalia, **NUNCA supor ou "chutar" o comportamento**.
-   - Executar sempre comandos de diagnóstico somente-leitura para coletar:
-     a) Crontabs do sistema (`root` e `asterisk`);
-     b) Arquivos, permissões e timestamps em `/var/www/html/cache/` e `/var/www/html/`;
-     c) Logs recentes do Apache (`/var/log/httpd/access_log` e `ssl_access_log`);
-     d) Linhas ativas em `/etc/asterisk/extensions*.conf` e processos em memória (`ps -ef`).
-2. **Snapshot Datado Obrigatório Antes de Qualquer Correção:**
-   - Criar obrigatoriamente `/var/backup/ipbx/backup_YYYY-MM-DD_HHMMSS` com manifesto antes de alterar ou deletar arquivos.
-3. **Remediação Cirúrgica com Zero-Downtime:**
-   - Não derrubar o Asterisk nem interromper chamadas ativas de clientes em produção.
-   - Utilizar `asterisk -rx "dialplan reload"` de forma suave.
-   - O bloqueio de execução no Apache deve ser cirúrgico (apenas `/cache/`, `/recordings/`, etc.), preservando 100% dos módulos, APIs, Webphone e integrações de WhatsApp.
-4. **Alimentação Contínua da Base Global (`ipbx-security-hardening.sh`):**
-   - Todo novo padrão de invasor detectado em um cliente (ex: `usa.php`, `paloSantoDB.php`, `thanku-outcall`) deve ser imediatamente consolidado no script global do repositório para imunizar toda a frota de PBXs da Prisma Telecom.
-
-
-
+## 9. PROTOCOLO DE RESPOSTA A INCIDENTES E IMUNIZAÇÃO GLOBAL
+1. **Análise Forense Prévia (Fatos Antes de Ações):**
+   - Diante de anomalias, coletar diagnósticos somente-leitura (crontabs, logs do Apache, processos e permissões em `/cache/`) antes de alterar qualquer arquivo.
+2. **Alimentação da Base Global (`ipbx-security-hardening.sh`):**
+   - Consolidar continuamente novos padrões de vulnerabilidades/invasores detectados no repositório global para imunizar toda a frota de PBXs.

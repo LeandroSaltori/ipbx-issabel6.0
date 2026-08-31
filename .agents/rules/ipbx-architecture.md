@@ -1,48 +1,48 @@
-# IPBX ISSABEL - REGRAS E DIRETRIZES DE ENGENHARIA
+# IPBX ISSABEL (PRISMA TELECOM) - REGRAS E DIRETRIZES ARQUITETURAIS
 
-## MENU DE ATUALIZAÇÃO MODULAR (`ipbx-menu.sh`)
-As 26 opções do menu modular devem ser mantidas sempre ativas e funcionais:
-- [1] Terminal (MOTD)
-- [2] Tema e Favicon
-- [3] Painel Admin
-- [4] Traduções (lang)
-- [5] Módulos Web (todos)
-- [6] Agenda Telefônica
-- [7] Webphone WebRTC
-- [8] Click-to-Dial
-- [9] Painel IPbx
-- [10] Nome dos Ramais
-- [11] Relatório Geral (CDR)
-- [12] Relatório de Filas
-- [13] Relatórios Extras
-- [14] Pesquisa de Satisfação
-- [15] Call Center
-- [16] ChanSpy (Escuta)
-- [17] Mensagens Texto (PJSIP)
-- [18] Servidor LDAP
-- [19] Música de Espera (MOH)
-- [20] Telegram (Notificações)
-- [21] Ferramentas Diagnóstico
-- [22] Features Asterisk
-- [23] PJSIP User-Agent
-- [24] Auto-Update Semanal
-- [25] Web Developer
-- [26] Instalar Rollback
-- [A] Instalar Tudo
-- [0] Sair
+Este documento consolida as regras mandatórias de desenvolvimento e engenharia do projeto **ipbx-issabel6.0**.
 
-## SNAPSHOTS E ROLLBACK SEGURO
-1. Sempre gerar snapshot em `/var/backup/ipbx/backup_YYYY-MM-DD_HHMMSS` antes de qualquer alteração (`update.sh`, `install.sh`, `ipbx-menu.sh`).
-2. O rollback nunca apaga diretórios inteiros (`rm -rf /var/www/html/modules` é estritamente proibido). A restauração é feita sobrepondo com segurança os arquivos presentes no backup selecionado.
-3. Permitir seleção histórica de backups por data/hora.
+---
 
-## SEGURANÇA CIRÚRGICA E NÃO-INTERFERÊNCIA
-1. Hardening do Apache restrito a pastas de mídia/uploads (`/recordings/` e `/themes/*/images/`).
-2. Módulos PHP customizados, APIs, Webhooks, WhatsApp e conexões AMI/AGI devem ter 100% de liberdade contínua de execução.
-3. Rotação de logs (Logrotate) não-intrusiva com `logger reload`.
+## 1. PRINCÍPIO DE NÃO-REGRESSÃO (ZERO QUEBRA)
+- **Edições Cirúrgicas:** NUNCA reescrever arquivos inteiros do zero quando for solicitada uma alteração pontual. Realizar alterações pontuais mantendo 100% da estrutura existente.
+- **Preservação de Rotas e Bindings:** Preservar integralmente rotas, hooks, bindings Smarty/PHP (`$smarty->assign`, `.tpl`) e funções JavaScript já homologadas.
+- **Preservação de Funções Auxiliares:** Não remover funções auxiliares ou scripts existentes sem ordem explícita do usuário.
+- **Menu Modular:** Todas as opções `[1]` a `[30]`, `[A]` e `[0]` do `ipbx-menu.sh` devem permanecer 100% funcionais.
 
-## CONSULTA DE SKILLS E DESIGN VISUAL PREMIUM
-1. Consultar ativamente as **Skills** do sistema (`modern-web-guidance`, UI/UX, Chart.js, acessibilidade) antes de qualquer desenvolvimento web/frontend.
-2. Interfaces com design visual de alto impacto (efeito "WOW"): paletas elegantes, cards KPIs executivos, modais desacoplados, micro-animações, layout responsivo e usabilidade impecável para o cliente final.
+---
 
+## 2. PADRÃO DE ARQUITETURA DE UI PARA ISSABEL/ELASTIX
+- **Overflow Interno:** O Issabel renderiza o conteúdo dentro de containers com overflow interno ativo (`#neo-contentbox`, `.neo-contentbox`, `#content`).
+- **Proibição de `position: fixed` Simples:** É proibido utilizar `position: fixed` diretamente em divs dentro dos módulos/tabelas.
+- **Uso Obrigatório de HTML5 `<dialog>` Nativo (Top Layer):**
+  - Qualquer modal, player ou popup DEVE usar obrigatoriamente a tag HTML5 `<dialog>` nativa (`dialog#modal-player-gravacao`).
+  - Anexar à raiz (`document.body.appendChild(...)`) e abrir via `.showModal()`.
+  - Fechar via `.close()`.
+  - Estilização do backdrop via `dialog::backdrop` (`background: rgba(0, 0, 0, 0.65); backdrop-filter: blur(4px);`).
 
+---
+
+## 3. PADRÃO DE DESIGN E LAYOUT VALIDADO
+- **Paleta Dark Homologada:** Preservar a paleta escura (`#1c1b2f`, `#252440`, `#0f172a`, gradientes violeta/azul).
+- **Anti-Truncamento de Botões:** Botões com ícone/texto devem conter obrigatoriamente `white-space: nowrap !important; flex-shrink: 0 !important; width: auto !important; overflow: visible !important;`.
+- **Experiência Premium:** Cards KPIs com gradientes, tipografia moderna (Segoe UI) e gráficos dinâmicos (Chart.js).
+
+---
+
+## 4. WORKFLOW DE EXECUÇÃO
+- Antes de aplicar alterações em `.tpl`, `.php`, `.js` ou `.css`, apresentar o escopo isolado do que será alterado.
+- Validar o impacto nos módulos dependentes (`cdrreport`, `monitoring`, `pesquisa`).
+
+---
+
+## 5. SNAPSHOTS, BACKUP E ROLLBACK SEGURO
+- Snapshot obrigatório em `/var/backup/ipbx/backup_YYYY-MM-DD_HHMMSS` antes de qualquer alteração (`update.sh`, `install.sh`, `ipbx-menu.sh`).
+- Restauração não-destrutiva no `rollback.sh`: nunca executar `rm -rf /var/www/html/modules`.
+
+---
+
+## 6. SEGURANÇA CIRÚRGICA E ZERO-DOWNTIME
+- Hardening restrito a pastas estáticas de upload (`/recordings/`, `/themes/*/images/`).
+- Preservação total de scripts PHP, Webhooks, WhatsApp e conexões AMI/AGI.
+- Recargas suaves no Asterisk (`dialplan reload`, `logger reload`).
