@@ -328,6 +328,18 @@ if command -v sqlite3 &>/dev/null && [ -f /var/www/db/menu.db ]; then
     rm -rf /var/www/html/var/templates_c/* /tmp/smarty* 2>/dev/null || true
 fi
 
+# 9. Patch Automático no Código PHP do Módulo EasyVPN para Auto-Inicialização e Sanitização
+log_info "Aplicando correções definitivas no código PHP do módulo web..."
+find /var/www/html/modules/easy_vpn /var/www/html/modules/easyvpn /var/www/html/modules/openvpn /var/www/html/ovpn2 -type f \( -name "*.php" -o -name "*.class.php" \) 2>/dev/null | while read -r PHP_FILE; do
+    # 1. Corrige comandos de start/stop/status para chamar o helper correto
+    sed -i 's/\/etc\/init\.d\/openvpn/\/usr\/local\/bin\/ipbx-openvpn-helper\.sh/g' "$PHP_FILE" 2>/dev/null || true
+    sed -i 's/\/usr\/share\/issabel\/privileged\/openvpn/\/usr\/local\/bin\/ipbx-openvpn-helper\.sh/g' "$PHP_FILE" 2>/dev/null || true
+    sed -i 's/service openvpn/sudo \/usr\/local\/bin\/ipbx-openvpn-helper\.sh/g' "$PHP_FILE" 2>/dev/null || true
+    sed -i 's/systemctl start openvpn@server/sudo \/usr\/local\/bin\/ipbx-openvpn-helper\.sh start/g' "$PHP_FILE" 2>/dev/null || true
+    sed -i 's/systemctl restart openvpn@server/sudo \/usr\/local\/bin\/ipbx-openvpn-helper\.sh restart/g' "$PHP_FILE" 2>/dev/null || true
+    sed -i 's/systemctl is-active openvpn@server/sudo \/usr\/local\/bin\/ipbx-openvpn-helper\.sh status/g' "$PHP_FILE" 2>/dev/null || true
+done
+
 # 8. Ajuste de Serviços Systemd
 log_info "Ajustando serviços do OpenVPN no Systemd..."
 systemctl daemon-reload 2>/dev/null || true
