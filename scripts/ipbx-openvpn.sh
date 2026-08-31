@@ -252,27 +252,13 @@ fi
 # a URL ?menu=easy_vpn carregue o módulo corretamente.
 # ─────────────────────────────────────────────────────────────────────────────
 
-# Garante que o módulo está acessível pelo nome easy_vpn
-if [ -d /var/www/html/modules/easy_vpn ]; then
-    MODDIR=/var/www/html/modules/easy_vpn
-elif [ -d /var/www/html/modules/easyvpn ]; then
-    MODDIR=/var/www/html/modules/easyvpn
-    ln -sfn "$MODDIR" /var/www/html/modules/easy_vpn 2>/dev/null || true
-fi
-
-if command -v sqlite3 &>/dev/null && [ -f /var/www/db/menu.db ]; then
-    log_info "Registrando OpenVPN no menu do Issabel..."
-    # Remove entradas antigas de qualquer variação
-    sqlite3 /var/www/db/menu.db "DELETE FROM menu WHERE id IN ('vpn','easyvpn','easy_vpn','openvpn') OR Link LIKE '%vpn%';" 2>/dev/null || true
-    sqlite3 /var/www/db/acl.db  "DELETE FROM acl_resource WHERE name IN ('vpn','easyvpn','easy_vpn','openvpn');" 2>/dev/null || true
-    # id=easy_vpn → URL será ?menu=easy_vpn → carrega /modules/easy_vpn/ corretamente
-    sqlite3 /var/www/db/acl.db  "INSERT INTO acl_resource (name, description) VALUES ('easy_vpn','OpenVPN');" 2>/dev/null || true
-    sqlite3 /var/www/db/menu.db "INSERT INTO menu (id,IdParent,Link,Name,Type,order_no) VALUES ('easy_vpn','security','index.php?menu=easy_vpn','OpenVPN','menu',12);" 2>/dev/null || true
-    sqlite3 /var/www/db/acl.db  "INSERT OR IGNORE INTO acl_group_permission (id_action,id_group,id_resource) SELECT 1,1,id FROM acl_resource WHERE name='easy_vpn';" 2>/dev/null || true
+# O pacote issabel-easyvpn já registra o menu corretamente.
+# Apenas garantimos permissão nos bancos e limpamos o cache Smarty.
+if command -v sqlite3 &>/dev/null; then
     chown asterisk:asterisk /var/www/db/menu.db /var/www/db/acl.db 2>/dev/null || true
     chmod 666 /var/www/db/menu.db /var/www/db/acl.db 2>/dev/null || true
-    rm -rf /var/www/html/var/templates_c/* /tmp/smarty* 2>/dev/null || true
 fi
+rm -rf /var/www/html/var/templates_c/* /tmp/smarty* 2>/dev/null || true
 
 echo ""
 log_success "=================================================================="
