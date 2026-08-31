@@ -584,29 +584,26 @@ function handleExportPdf($pPesquisa)
             @media print { .no-print { display:none; } }
         #prisma_report_tooltip, .prisma_report_tooltip { display: none !important; opacity: 0 !important; visibility: hidden !important; pointer-events: none !important; }
 
-        /* Modal Pop-up de Reprodução de Gravação Centralizado */
+        /* Modal Pop-up de Reprodução de Gravação Centralizado (Acompanha a Tela) */
         #audioPlayerModal, .audio-modal-overlay {
             position: fixed !important;
-            top: 0 !important;
-            left: 0 !important;
-            right: 0 !important;
-            bottom: 0 !important;
-            width: 100vw !important;
-            height: 100vh !important;
-            background: rgba(15, 23, 42, 0.65) !important;
-            backdrop-filter: blur(4px) !important;
-            -webkit-backdrop-filter: blur(4px) !important;
+            top: 50% !important;
+            left: 50% !important;
+            transform: translate(-50%, -50%) !important;
+            width: 520px !important;
+            min-width: 480px !important;
+            max-width: calc(100vw - 32px) !important;
+            height: auto !important;
+            background: transparent !important;
             z-index: 2147483647 !important;
             display: none;
-            align-items: center !important;
-            justify-content: center !important;
             margin: 0 !important;
             padding: 0 !important;
             box-sizing: border-box !important;
-            transform: none !important;
+            pointer-events: auto !important;
         }
         #audioPlayerModal.active, .audio-modal-overlay.active {
-            display: flex !important;
+            display: block !important;
         }
         @keyframes audioPopIn { from { transform: scale(0.92); opacity: 0; } to { transform: scale(1); opacity: 1; } }
         .audio-modal-card {
@@ -614,9 +611,10 @@ function handleExportPdf($pPesquisa)
             border: 1px solid rgba(139, 92, 246, 0.65) !important;
             border-radius: 16px !important;
             box-shadow: 0 25px 60px -10px rgba(0, 0, 0, 0.85), 0 0 35px rgba(124, 58, 237, 0.45) !important;
-            width: 92% !important;
-            max-width: 500px !important;
-            margin: auto !important;
+            width: 100% !important;
+            min-width: 480px !important;
+            max-width: 520px !important;
+            box-sizing: border-box !important;
             overflow: hidden !important;
             color: #ffffff !important;
             font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif !important;
@@ -629,6 +627,30 @@ function handleExportPdf($pPesquisa)
             display: flex !important;
             justify-content: space-between !important;
             align-items: center !important;
+        }
+        .audio-footer-row {
+            display: flex !important;
+            justify-content: space-between !important;
+            align-items: center !important;
+            padding-top: 14px !important;
+            border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
+            flex-wrap: nowrap !important;
+            gap: 12px !important;
+        }
+        .btn-audio-download {
+            white-space: nowrap !important;
+            flex-shrink: 0 !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            gap: 6px !important;
+            background: rgba(16, 185, 129, 0.2) !important;
+            border: 1px solid rgba(16, 185, 129, 0.4) !important;
+            color: #34d399 !important;
+            padding: 6px 14px !important;
+            border-radius: 6px !important;
+            font-size: 11px !important;
+            font-weight: 700 !important;
+            text-decoration: none !important;
         }
             animation: audioPopIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
         }
@@ -1240,29 +1262,26 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
         }
     #prisma_report_tooltip, .prisma_report_tooltip { display: none !important; opacity: 0 !important; visibility: hidden !important; pointer-events: none !important; }
 
-        /* Modal Pop-up de Reprodução de Gravação Centralizado */
+        /* Modal Pop-up de Reprodução de Gravação Centralizado (Acompanha a Tela) */
         #audioPlayerModal, .audio-modal-overlay {
             position: fixed !important;
-            top: 0 !important;
-            left: 0 !important;
-            right: 0 !important;
-            bottom: 0 !important;
-            width: 100vw !important;
-            height: 100vh !important;
-            background: rgba(15, 23, 42, 0.65) !important;
-            backdrop-filter: blur(4px) !important;
-            -webkit-backdrop-filter: blur(4px) !important;
+            top: 50% !important;
+            left: 50% !important;
+            transform: translate(-50%, -50%) !important;
+            width: 520px !important;
+            min-width: 480px !important;
+            max-width: calc(100vw - 32px) !important;
+            height: auto !important;
+            background: transparent !important;
             z-index: 2147483647 !important;
             display: none;
-            align-items: center !important;
-            justify-content: center !important;
             margin: 0 !important;
             padding: 0 !important;
             box-sizing: border-box !important;
-            transform: none !important;
+            pointer-events: auto !important;
         }
         #audioPlayerModal.active, .audio-modal-overlay.active {
-            display: flex !important;
+            display: block !important;
         }
         @keyframes audioPopIn { from { transform: scale(0.92); opacity: 0; } to { transform: scale(1); opacity: 1; } }
         .audio-modal-card {
@@ -1270,9 +1289,10 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
             border: 1px solid rgba(139, 92, 246, 0.65) !important;
             border-radius: 16px !important;
             box-shadow: 0 25px 60px -10px rgba(0, 0, 0, 0.85), 0 0 35px rgba(124, 58, 237, 0.45) !important;
-            width: 92% !important;
-            max-width: 500px !important;
-            margin: auto !important;
+            width: 100% !important;
+            min-width: 480px !important;
+            max-width: 520px !important;
+            box-sizing: border-box !important;
             overflow: hidden !important;
             color: #ffffff !important;
             font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif !important;
@@ -1285,6 +1305,30 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
             display: flex !important;
             justify-content: space-between !important;
             align-items: center !important;
+        }
+        .audio-footer-row {
+            display: flex !important;
+            justify-content: space-between !important;
+            align-items: center !important;
+            padding-top: 14px !important;
+            border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
+            flex-wrap: nowrap !important;
+            gap: 12px !important;
+        }
+        .btn-audio-download {
+            white-space: nowrap !important;
+            flex-shrink: 0 !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            gap: 6px !important;
+            background: rgba(16, 185, 129, 0.2) !important;
+            border: 1px solid rgba(16, 185, 129, 0.4) !important;
+            color: #34d399 !important;
+            padding: 6px 14px !important;
+            border-radius: 6px !important;
+            font-size: 11px !important;
+            font-weight: 700 !important;
+            text-decoration: none !important;
         }
         @keyframes audioPopIn { from { transform: scale(0.92) translateY(10px); opacity: 0; } to { transform: scale(1) translateY(0); opacity: 1; } }
         .audio-modal-header { padding: 16px 20px !important; background: rgba(255, 255, 255, 0.05) !important; border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important; display: flex !important; justify-content: space-between !important; align-items: center !important; }
@@ -1709,15 +1753,15 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
                     </div>
 
                     <!-- Velocidade de Reprodução e Download -->
-                    <div class="audio-footer-row" style="display:flex; justify-content:space-between; align-items:center; padding-top:14px; border-top:1px solid rgba(255,255,255,0.1); flex-wrap:wrap; gap:10px;">
-                        <div class="audio-speed-group" style="display:flex; align-items:center; gap:5px;">
+                    <div class="audio-footer-row" style="display:flex; justify-content:space-between; align-items:center; padding-top:14px; border-top:1px solid rgba(255,255,255,0.1); flex-wrap:nowrap; gap:12px;">
+                        <div class="audio-speed-group" style="display:flex; align-items:center; gap:5px; flex-shrink:0;">
                             <span class="speed-label" style="font-size:11px; color:#94a3b8; font-weight:600; margin-right:2px;">Velocidade:</span>
                             <button type="button" class="speed-btn active" onclick="stkSetSpeed(1.0, this)" style="background:#8b5cf6; border:1px solid #8b5cf6; color:#ffffff; border-radius:6px; font-size:11px; font-weight:700; padding:4px 8px; cursor:pointer;">1.0x</button>
                             <button type="button" class="speed-btn" onclick="stkSetSpeed(1.25, this)" style="background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.12); color:#94a3b8; border-radius:6px; font-size:11px; font-weight:700; padding:4px 8px; cursor:pointer;">1.25x</button>
                             <button type="button" class="speed-btn" onclick="stkSetSpeed(1.5, this)" style="background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.12); color:#94a3b8; border-radius:6px; font-size:11px; font-weight:700; padding:4px 8px; cursor:pointer;">1.5x</button>
                             <button type="button" class="speed-btn" onclick="stkSetSpeed(2.0, this)" style="background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.12); color:#94a3b8; border-radius:6px; font-size:11px; font-weight:700; padding:4px 8px; cursor:pointer;">2.0x</button>
                         </div>
-                        <a id="stkDownloadBtn" href="#" target="_blank" class="btn-audio-download" title="Baixar Gravação" style="background:rgba(16,185,129,0.2); border:1px solid rgba(16,185,129,0.4); color:#34d399; padding:6px 14px; border-radius:6px; font-size:11px; font-weight:700; text-decoration:none; display:inline-flex; align-items:center; gap:6px; white-space:nowrap;">⬇️ Baixar Gravação</a>
+                        <a id="stkDownloadBtn" href="#" target="_blank" class="btn-audio-download" title="Baixar Gravação" style="background:rgba(16,185,129,0.2); border:1px solid rgba(16,185,129,0.4); color:#34d399; padding:6px 14px; border-radius:6px; font-size:11px; font-weight:700; text-decoration:none; display:inline-flex; align-items:center; gap:6px; white-space:nowrap; flex-shrink:0;">⬇️ Baixar Gravação</a>
                     </div>
                 </div>
             </div>
@@ -1772,7 +1816,7 @@ function renderFullExecutiveDashboard($pPesquisa, $module_name)
                 aud.src = audioUrl;
                 if (modal) {
                     modal.classList.add('active');
-                    modal.style.setProperty('display', 'flex', 'important');
+                    modal.style.setProperty('display', 'block', 'important');
                 }
 
                 var p = aud.play();
