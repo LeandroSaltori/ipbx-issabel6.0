@@ -125,7 +125,29 @@ elif [ -f /etc/openvpn/server.conf ] && [ ! -f /etc/openvpn/server/server.conf ]
     ln -sfn /etc/openvpn/server.conf /etc/openvpn/server/server.conf 2>/dev/null || true
 fi
 
-for f in ca.crt server.crt server.key dh2048.pem dh.pem ipp.txt openvpn-status.log; do
+# Garante geração e permissões da Lista de Revogação de Certificados (crl.pem)
+for EASYRSA_DIR in /etc/openvpn/easy-rsa /etc/openvpn/server/easy-rsa /usr/share/easy-rsa/3.0.8 /usr/share/easy-rsa/3; do
+    if [ -d "$EASYRSA_DIR" ] && [ -f "$EASYRSA_DIR/easyrsa" ]; then
+        (cd "$EASYRSA_DIR" && ./easyrsa gen-crl 2>/dev/null || true)
+        if [ -f "$EASYRSA_DIR/pki/crl.pem" ]; then
+            /bin/cp -f "$EASYRSA_DIR/pki/crl.pem" /etc/openvpn/server/crl.pem 2>/dev/null || true
+            /bin/cp -f "$EASYRSA_DIR/pki/crl.pem" /etc/openvpn/crl.pem 2>/dev/null || true
+            chmod 644 /etc/openvpn/server/crl.pem /etc/openvpn/crl.pem 2>/dev/null || true
+        fi
+        break
+    fi
+done
+
+# Garante a diretiva crl-verify no server.conf se o crl.pem existir
+if [ -f /etc/openvpn/server/crl.pem ] || [ -f /etc/openvpn/crl.pem ]; then
+    for CFG in /etc/openvpn/server/server.conf /etc/openvpn/server.conf; do
+        if [ -f "$CFG" ] && ! grep -q "crl-verify" "$CFG"; then
+            echo "crl-verify crl.pem" >> "$CFG"
+        fi
+    done
+fi
+
+for f in ca.crt server.crt server.key dh2048.pem dh.pem ipp.txt openvpn-status.log crl.pem; do
     if [ -f "/etc/openvpn/server/$f" ] && [ ! -f "/etc/openvpn/$f" ]; then
         ln -sfn "/etc/openvpn/server/$f" "/etc/openvpn/$f" 2>/dev/null || true
     elif [ -f "/etc/openvpn/$f" ] && [ ! -f "/etc/openvpn/server/$f" ]; then
@@ -135,6 +157,7 @@ done
 
 chown -R asterisk:asterisk /etc/openvpn /var/log/openvpn 2>/dev/null || true
 chmod -R 775 /etc/openvpn 2>/dev/null || true
+chmod 644 /etc/openvpn/*.crt /etc/openvpn/server/*.crt /etc/openvpn/*.pem /etc/openvpn/server/*.pem /etc/openvpn/server/*.log 2>/dev/null || true
 
 # 7. Registro e Saneamento do Módulo Web no Menu do Issabel
 if command -v sqlite3 &>/dev/null && [ -f /var/www/db/menu.db ]; then
