@@ -93,6 +93,55 @@ chmod +x /usr/share/easy-rsa/3/easyrsa 2>/dev/null || true
 chmod -R 755 /usr/share/easy-rsa 2>/dev/null || true
 log_success "Easy-RSA 3.0.8 configurado com sucesso em /usr/share/easy-rsa/3.0.8/."
 
+# Wrapper inteligente para o easyrsa: revoga silenciosamente cert duplicado antes de recriar
+# Garante comportamento igual ao Issabel 4: criar TESTE → apagar → criar TESTE = funciona sempre
+log_info "Instalando wrapper inteligente do easyrsa (re-criação de certificados)..."
+for EASYRSA_DIR in /usr/share/easy-rsa/3.0.8 /usr/share/easy-rsa/3; do
+    [ ! -f "$EASYRSA_DIR/easyrsa" ] && continue
+    # Renomeia o binário original apenas se não for já nosso wrapper
+    if ! grep -q "IPBX_WRAPPER" "$EASYRSA_DIR/easyrsa" 2>/dev/null; then
+        mv "$EASYRSA_DIR/easyrsa" "$EASYRSA_DIR/easyrsa.real" 2>/dev/null || true
+    fi
+    cat << 'EOFWRAPPER' > "$EASYRSA_DIR/easyrsa"
+#!/bin/bash
+# IPBX_WRAPPER - Wrapper inteligente do easyrsa para IPBX Issabel
+# Permite re-criar certificados com o mesmo nome sem erro (revoke automático)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REAL_EASYRSA="$SCRIPT_DIR/easyrsa.real"
+
+# Se for build-client-full, verifica se o nome já existe no PKI e revoga silenciosamente
+if [[ "$*" == *"build-client-full"* ]]; then
+    CLIENT_NAME=""
+    for arg in "$@"; do
+        if [[ "$arg" != "build-client-full" && "$arg" != --* && "$arg" != "nopass" && -n "$arg" ]]; then
+            CLIENT_NAME="$arg"
+            break
+        fi
+    done
+    if [ -n "$CLIENT_NAME" ]; then
+        PKI_DIR="$SCRIPT_DIR/pki"
+        [ ! -d "$PKI_DIR" ] && PKI_DIR="/usr/share/easy-rsa/3.0.8/pki"
+        [ ! -d "$PKI_DIR" ] && PKI_DIR="/usr/share/easy-rsa/3/pki"
+        # Verifica se já existe como Válido ou Revogado no index.txt
+        if grep -q "/CN=${CLIENT_NAME}$" "$PKI_DIR/index.txt" 2>/dev/null; then
+            echo "[IPBX] Certificado '$CLIENT_NAME' já existe no PKI. Revogando silenciosamente para permitir recriação..."
+            EASYRSA_BATCH=1 "$REAL_EASYRSA" revoke "$CLIENT_NAME" 2>/dev/null || true
+            # Remove entrada do index.txt se o revoke não funcionou (cert já revogado)
+            sed -i "/\/CN=${CLIENT_NAME}$/d" "$PKI_DIR/index.txt" 2>/dev/null || true
+            rm -f "$PKI_DIR/issued/${CLIENT_NAME}.crt" "$PKI_DIR/private/${CLIENT_NAME}.key" "$PKI_DIR/reqs/${CLIENT_NAME}.req" 2>/dev/null || true
+            EASYRSA_BATCH=1 "$REAL_EASYRSA" gen-crl 2>/dev/null || true
+        fi
+    fi
+fi
+
+exec "$REAL_EASYRSA" "$@"
+EOFWRAPPER
+    chmod +x "$EASYRSA_DIR/easyrsa" 2>/dev/null || true
+    break
+done
+
+
+
 # 4. Habilitação de Roteamento de Pacotes IPv4 (IP Forwarding)
 log_info "Habilitando IP Forwarding no kernel do Linux..."
 mkdir -p /etc/sysctl.d 2>/dev/null || true
