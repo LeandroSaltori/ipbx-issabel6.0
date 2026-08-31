@@ -110,30 +110,49 @@ DEFAULT_IFACE=$(ip route show default 2>/dev/null | awk '/default/ {print $5}' |
 
 if command -v firewall-cmd &>/dev/null && systemctl is-active firewalld &>/dev/null; then
     log_info "Configurando regras no Firewalld (interface $DEFAULT_IFACE)..."
-    firewall-cmd --permanent --add-port=1194/udp 2>/dev/null || true
+    firewall-cmd --permanent --add-port=1194/udp --add-port=1194/tcp --add-port=1196/udp --add-port=1196/tcp 2>/dev/null || true
     firewall-cmd --permanent --add-masquerade 2>/dev/null || true
-    firewall-cmd --permanent --direct --add-rule ipv4 nat POSTROUTING 0 -s 10.8.0.0/24 -o "$DEFAULT_IFACE" -j MASQUERADE 2>/dev/null || true
+    firewall-cmd --permanent --direct --add-rule ipv4 nat POSTROUTING 0 -o "$DEFAULT_IFACE" -j MASQUERADE 2>/dev/null || true
     firewall-cmd --reload 2>/dev/null || true
 else
     log_info "Configurando regras no iptables..."
-    iptables -t nat -C POSTROUTING -s 10.8.0.0/24 -j MASQUERADE 2>/dev/null || \
-    iptables -t nat -A POSTROUTING -s 10.8.0.0/24 -j MASQUERADE 2>/dev/null || true
+    iptables -t nat -C POSTROUTING -o "$DEFAULT_IFACE" -j MASQUERADE 2>/dev/null || \
+    iptables -t nat -A POSTROUTING -o "$DEFAULT_IFACE" -j MASQUERADE 2>/dev/null || true
 
-    iptables -C INPUT -p udp --dport 1194 -j ACCEPT 2>/dev/null || \
-    iptables -A INPUT -p udp --dport 1194 -j ACCEPT 2>/dev/null || true
+    iptables -C INPUT -p udp --dport 1194 -j ACCEPT 2>/dev/null || iptables -A INPUT -p udp --dport 1194 -j ACCEPT 2>/dev/null || true
+    iptables -C INPUT -p udp --dport 1196 -j ACCEPT 2>/dev/null || iptables -A INPUT -p udp --dport 1196 -j ACCEPT 2>/dev/null || true
+    iptables -C INPUT -p tcp --dport 1194 -j ACCEPT 2>/dev/null || iptables -A INPUT -p tcp --dport 1194 -j ACCEPT 2>/dev/null || true
+    iptables -C INPUT -p tcp --dport 1196 -j ACCEPT 2>/dev/null || iptables -A INPUT -p tcp --dport 1196 -j ACCEPT 2>/dev/null || true
 
-    iptables -C FORWARD -s 10.8.0.0/24 -j ACCEPT 2>/dev/null || \
-    iptables -A FORWARD -s 10.8.0.0/24 -j ACCEPT 2>/dev/null || true
+    iptables -C FORWARD -i tun+ -j ACCEPT 2>/dev/null || iptables -A FORWARD -i tun+ -j ACCEPT 2>/dev/null || true
+    iptables -C FORWARD -o tun+ -j ACCEPT 2>/dev/null || iptables -A FORWARD -o tun+ -j ACCEPT 2>/dev/null || true
 
     if command -v iptables-save &>/dev/null; then
         iptables-save > /etc/sysconfig/iptables 2>/dev/null || true
     fi
 fi
 
-# 6. Estrutura de Diretórios e Permissões do OpenVPN
+# 6. Estrutura de Diretórios, Permissões e Sudoers para o Módulo Web
 mkdir -p /etc/openvpn/server /etc/openvpn/client /etc/openvpn/ccd /var/log/openvpn 2>/dev/null || true
+
+# Permissão sudo sem senha para o usuário asterisk conseguir iniciar/reiniciar o OpenVPN pelos botões do front-end
+cat << 'EOF' > /etc/sudoers.d/99-openvpn-asterisk
+asterisk ALL=(ALL) NOPASSWD: /usr/bin/systemctl start openvpn*, /usr/bin/systemctl stop openvpn*, /usr/bin/systemctl restart openvpn*, /usr/bin/systemctl status openvpn*, /usr/sbin/openvpn, /usr/bin/openvpn, /etc/init.d/openvpn
+EOF
+chmod 440 /etc/sudoers.d/99-openvpn-asterisk 2>/dev/null || true
+
+# Links simbólicos e espelhamento entre caminhos para que qualquer alteração no front funcione em ambos
+ln -sfn /etc/openvpn/server.conf /etc/openvpn/server/server.conf 2>/dev/null || true
+for f in ca.crt server.crt server.key dh2048.pem dh.pem; do
+    if [ -f "/etc/openvpn/$f" ] && [ ! -f "/etc/openvpn/server/$f" ]; then
+        ln -sfn "/etc/openvpn/$f" "/etc/openvpn/server/$f" 2>/dev/null || true
+    elif [ -f "/etc/openvpn/server/$f" ] && [ ! -f "/etc/openvpn/$f" ]; then
+        ln -sfn "/etc/openvpn/server/$f" "/etc/openvpn/$f" 2>/dev/null || true
+    fi
+done
+
 chown -R asterisk:asterisk /etc/openvpn /var/log/openvpn 2>/dev/null || true
-chmod 775 /etc/openvpn 2>/dev/null || true
+chmod -R 775 /etc/openvpn 2>/dev/null || true
 
 # 7. Registro e Saneamento do Módulo Web no Menu do Issabel
 if command -v sqlite3 &>/dev/null && [ -f /var/www/db/menu.db ]; then
