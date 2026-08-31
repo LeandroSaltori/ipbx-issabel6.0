@@ -155,11 +155,95 @@ for f in ca.crt server.crt server.key dh2048.pem dh.pem ipp.txt openvpn-status.l
     fi
 done
 
-chown -R asterisk:asterisk /etc/openvpn /var/log/openvpn 2>/dev/null || true
-chmod -R 775 /etc/openvpn 2>/dev/null || true
-chmod 644 /etc/openvpn/*.crt /etc/openvpn/server/*.crt /etc/openvpn/*.pem /etc/openvpn/server/*.pem /etc/openvpn/server/*.log 2>/dev/null || true
+# 7. Sincronizador Automático de Exclusão e Revogação de Certificados
+log_info "Configurando sincronizador de exclusão de certificados..."
+cat << 'EOFSYNC' > /usr/local/bin/ipbx-openvpn-sync.sh
+#!/bin/bash
+CLIENTKEYS_DIR="/etc/openvpn/clientkeys"
+[ ! -d "$CLIENTKEYS_DIR" ] && CLIENTKEYS_DIR="/var/www/html/modules/easy_vpn/clientkeys"
 
-# 7. Registro e Saneamento do Módulo Web no Menu do Issabel
+EASYRSA_DIR="/usr/share/easy-rsa/3.0.8"
+[ ! -d "$EASYRSA_DIR" ] && EASYRSA_DIR="/usr/share/easy-rsa/3"
+[ ! -d "$EASYRSA_DIR" ] && EASYRSA_DIR="/etc/openvpn/easy-rsa"
+
+ALLCLIENTS_FILE="/etc/openvpn/allclients.txt"
+[ ! -f "$ALLCLIENTS_FILE" ] && ALLCLIENTS_FILE="/etc/openvpn/server/allclients.txt"
+
+REVOKED_FILE="/etc/openvpn/revokedclients.txt"
+[ ! -f "$REVOKED_FILE" ] && REVOKED_FILE="/etc/openvpn/server/revokedclients.txt"
+
+IPP_FILE="/etc/openvpn/server/ipp.txt"
+[ ! -f "$IPP_FILE" ] && IPP_FILE="/etc/openvpn/ipp.txt"
+
+CRL_DEST="/etc/openvpn/server/crl.pem"
+CHANGES_MADE=0
+
+if [ -d "$CLIENTKEYS_DIR" ]; then
+    if [ -f "$ALLCLIENTS_FILE" ]; then
+        TEMP_ALL=$(mktemp)
+        > "$TEMP_ALL"
+        
+        while IFS= read -r CLIENT_NAME || [ -n "$CLIENT_NAME" ]; do
+            CLIENT_NAME=$(echo "$CLIENT_NAME" | tr -d '\r' | tr -d '\n' | xargs)
+            [ -z "$CLIENT_NAME" ] && continue
+            [ "$CLIENT_NAME" = "server" ] && continue
+            
+            MATCH_FOUND=0
+            for EXT in "zip" "ovpn" "tar.gz"; do
+                if [ -f "$CLIENTKEYS_DIR/${CLIENT_NAME}.${EXT}" ] || [ -f "$CLIENTKEYS_DIR/${CLIENT_NAME}-client.${EXT}" ]; then
+                    MATCH_FOUND=1
+                    break
+                fi
+            done
+            
+            if [ "$MATCH_FOUND" -eq 0 ]; then
+                echo "[SEGURANÇA] Cliente '$CLIENT_NAME' apagado do gerenciador web. Revogando..."
+                if [ -d "$EASYRSA_DIR" ] && [ -f "$EASYRSA_DIR/easyrsa" ]; then
+                    (cd "$EASYRSA_DIR" && EASYRSA_BATCH=1 ./easyrsa revoke "$CLIENT_NAME" 2>/dev/null || true)
+                fi
+                if [ -f "$REVOKED_FILE" ]; then
+                    if ! grep -q "^${CLIENT_NAME}$" "$REVOKED_FILE"; then
+                        echo "$CLIENT_NAME" >> "$REVOKED_FILE"
+                    fi
+                fi
+                if [ -f "$IPP_FILE" ]; then
+                    sed -i "/^${CLIENT_NAME},/d" "$IPP_FILE" 2>/dev/null || true
+                fi
+                CHANGES_MADE=1
+            else
+                echo "$CLIENT_NAME" >> "$TEMP_ALL"
+            fi
+        done < "$ALLCLIENTS_FILE"
+        
+        /bin/cp -f "$TEMP_ALL" "$ALLCLIENTS_FILE" 2>/dev/null || true
+        [ -f /etc/openvpn/server/allclients.txt ] && /bin/cp -f "$TEMP_ALL" /etc/openvpn/server/allclients.txt 2>/dev/null || true
+        rm -f "$TEMP_ALL"
+    fi
+fi
+
+if [ "$CHANGES_MADE" -eq 1 ] || [ ! -f "$CRL_DEST" ]; then
+    if [ -d "$EASYRSA_DIR" ] && [ -f "$EASYRSA_DIR/easyrsa" ]; then
+        (cd "$EASYRSA_DIR" && ./easyrsa gen-crl 2>/dev/null || true)
+        if [ -f "$EASYRSA_DIR/pki/crl.pem" ]; then
+            /bin/cp -f "$EASYRSA_DIR/pki/crl.pem" /etc/openvpn/server/crl.pem 2>/dev/null || true
+            /bin/cp -f "$EASYRSA_DIR/pki/crl.pem" /etc/openvpn/crl.pem 2>/dev/null || true
+            chmod 644 /etc/openvpn/server/crl.pem /etc/openvpn/crl.pem 2>/dev/null || true
+        fi
+    fi
+    systemctl restart openvpn-server@server.service 2>/dev/null || systemctl restart openvpn@server.service 2>/dev/null || true
+fi
+EOFSYNC
+
+chmod +x /usr/local/bin/ipbx-openvpn-sync.sh 2>/dev/null || true
+bash /usr/local/bin/ipbx-openvpn-sync.sh 2>/dev/null || true
+
+# Configura cronjob para sincronizar exclusões a cada minuto
+cat << 'EOFCRON' > /etc/cron.d/ipbx-openvpn-sync
+* * * * * root /usr/local/bin/ipbx-openvpn-sync.sh >/dev/null 2>&1
+EOFCRON
+chmod 644 /etc/cron.d/ipbx-openvpn-sync 2>/dev/null || true
+
+# 8. Registro e Saneamento do Módulo Web no Menu do Issabel
 if command -v sqlite3 &>/dev/null && [ -f /var/www/db/menu.db ]; then
     log_info "Registrando e organizando menu do OpenVPN (ovpn2) no Issabel..."
 
