@@ -44,15 +44,26 @@ elif command -v yum &>/dev/null; then
     yum install -y issabel-easyvpn 2>/dev/null || true
 fi
 
-# Reinstala o módulo web se a pasta não existir (ex: após rollback)
-if [ ! -d /var/www/html/modules/easy_vpn ] && [ ! -d /var/www/html/modules/easyvpn ]; then
-    log_info "Restaurando módulo web do issabel-easyvpn..."
-    if command -v dnf &>/dev/null; then
-        dnf reinstall -y issabel-easyvpn 2>/dev/null || dnf install -y issabel-easyvpn 2>/dev/null || true
-    else
-        yum reinstall -y issabel-easyvpn 2>/dev/null || yum install -y issabel-easyvpn 2>/dev/null || true
-    fi
+# Reinstala o módulo web SEMPRE para garantir arquivos íntegros
+log_info "Garantindo módulo web do issabel-easyvpn..."
+if command -v dnf &>/dev/null; then
+    dnf reinstall -y issabel-easyvpn 2>/dev/null || dnf install -y issabel-easyvpn 2>/dev/null || true
+else
+    yum reinstall -y issabel-easyvpn 2>/dev/null || yum install -y issabel-easyvpn 2>/dev/null || true
 fi
+
+# Corrige permissões dos arquivos do módulo para o Apache/PHP conseguir ler
+for MODDIR in /var/www/html/modules/easy_vpn /var/www/html/modules/easyvpn; do
+    [ -d "$MODDIR" ] || continue
+    chown -R asterisk:asterisk "$MODDIR" 2>/dev/null || true
+    find "$MODDIR" -type d -exec chmod 755 {} \; 2>/dev/null || true
+    find "$MODDIR" -type f -exec chmod 644 {} \; 2>/dev/null || true
+    find "$MODDIR" -name "*.sh" -exec chmod 755 {} \; 2>/dev/null || true
+    log_success "Permissões do módulo corrigidas em $MODDIR"
+    break
+done
+
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 2. Easy-RSA 3.0.8 (versão que o módulo issabel-easyvpn espera)
