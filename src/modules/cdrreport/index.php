@@ -718,10 +718,10 @@ function renderCelDetailsHtml($pDB, $uniqueid)
             bottom: 0 !important;
             width: 100vw !important;
             height: 100vh !important;
-            background: rgba(15, 23, 42, 0.65) !important;
+            background: rgba(0, 0, 0, 0.6) !important;
             backdrop-filter: blur(4px) !important;
             -webkit-backdrop-filter: blur(4px) !important;
-            z-index: 99999 !important;
+            z-index: 2147483647 !important;
             display: none;
             align-items: center !important;
             justify-content: center !important;
@@ -735,10 +735,11 @@ function renderCelDetailsHtml($pDB, $uniqueid)
         #audioPlayerModal.active, .audio-modal-overlay.active {
             display: flex !important;
         }
-        @keyframes audioPopIn { from { transform: scale(0.92); opacity: 0; } to { transform: scale(1); opacity: 1; } }
         .audio-modal-card {
             position: relative !important;
             margin: auto !important;
+            transform: none !important;
+            z-index: 2147483647 !important;
             background: linear-gradient(145deg, #1e1b4b 0%, #0f172a 100%) !important;
             border: 1px solid rgba(139, 92, 246, 0.65) !important;
             border-radius: 16px !important;
@@ -750,7 +751,6 @@ function renderCelDetailsHtml($pDB, $uniqueid)
             overflow: hidden !important;
             color: #ffffff !important;
             font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif !important;
-            animation: audioPopIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
         }
         .audio-modal-header {
             padding: 16px 20px !important;
@@ -926,11 +926,11 @@ function renderCelDetailsHtml($pDB, $uniqueid)
             }
 
             function playCdrAudio(audioUrl, caller, target, downloadUrl) {
-                var modal = document.getElementById('audioPlayerModal');
-                if (modal) {
-                    document.body.appendChild(modal);
-                    modal.classList.add('active');
-                    modal.style.setProperty('display', 'flex', 'important');
+                const modalElement = document.getElementById('audioPlayerModal');
+                if (modalElement) {
+                    document.body.appendChild(modalElement);
+                    modalElement.classList.add('active');
+                    modalElement.style.setProperty('display', 'flex', 'important');
                 }
                 var aud = getOrInitAudio();
 
@@ -2350,8 +2350,8 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
     
         
         <!-- Janela Flutuante de Reprodução de Gravação (Floating Audio Player Widget) -->
-        <div id="audioPlayerModal" class="audio-modal-overlay" onclick="if(event.target === this) closeAudioPlayerModal();" style="position:fixed !important; top:0 !important; left:0 !important; right:0 !important; bottom:0 !important; width:100vw !important; height:100vh !important; background:rgba(15,23,42,0.65) !important; backdrop-filter:blur(4px) !important; -webkit-backdrop-filter:blur(4px) !important; z-index:99999 !important; display:none; align-items:center !important; justify-content:center !important; margin:0 !important; padding:0 !important; box-sizing:border-box !important; transform:none !important; filter:none !important; pointer-events:auto !important;">
-            <div class="audio-modal-card" style="position:relative !important; margin:auto !important; background:linear-gradient(145deg, #1e1b4b 0%, #0f172a 100%) !important; border:1px solid rgba(139,92,246,0.65) !important; border-radius:16px !important; box-shadow:0 25px 60px -10px rgba(0,0,0,0.85), 0 0 35px rgba(124,58,237,0.45) !important; width:100% !important; min-width:480px !important; max-width:520px !important; box-sizing:border-box !important; overflow:hidden !important; color:#ffffff !important; font-family:'Segoe UI', sans-serif !important;">
+        <div id="audioPlayerModal" class="audio-modal-overlay" onclick="if(event.target === this) closeAudioPlayerModal();" style="position:fixed !important; top:0 !important; left:0 !important; right:0 !important; bottom:0 !important; width:100vw !important; height:100vh !important; background:rgba(0,0,0,0.6) !important; backdrop-filter:blur(4px) !important; -webkit-backdrop-filter:blur(4px) !important; z-index:2147483647 !important; display:none; align-items:center !important; justify-content:center !important; margin:0 !important; padding:0 !important; box-sizing:border-box !important; transform:none !important; filter:none !important; pointer-events:auto !important;">
+            <div class="audio-modal-card" style="position:relative !important; margin:auto !important; transform:none !important; z-index:2147483647 !important; background:linear-gradient(145deg, #1e1b4b 0%, #0f172a 100%) !important; border:1px solid rgba(139,92,246,0.65) !important; border-radius:16px !important; box-shadow:0 25px 60px -10px rgba(0,0,0,0.85), 0 0 35px rgba(124,58,237,0.45) !important; width:100% !important; min-width:480px !important; max-width:520px !important; box-sizing:border-box !important; overflow:hidden !important; color:#ffffff !important; font-family:'Segoe UI', sans-serif !important;">
                 <!-- Header do Popup -->
                 <div class="audio-modal-header" style="padding:16px 20px !important; background:rgba(255,255,255,0.06) !important; border-bottom:1px solid rgba(255,255,255,0.1) !important; display:flex !important; justify-content:space-between !important; align-items:center !important;">
                     <div class="audio-modal-title-box" style="display:flex !important; align-items:center !important; gap:12px !important;">
@@ -2491,11 +2491,11 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
             }
 
             function playCdrAudio(audioUrl, caller, target, downloadUrl) {
-                var modal = document.getElementById('audioPlayerModal');
-                if (modal) {
-                    document.body.appendChild(modal);
-                    modal.classList.add('active');
-                    modal.style.setProperty('display', 'flex', 'important');
+                const modalElement = document.getElementById('audioPlayerModal');
+                if (modalElement) {
+                    document.body.appendChild(modalElement);
+                    modalElement.classList.add('active');
+                    modalElement.style.setProperty('display', 'flex', 'important');
                 }
                 var aud = getOrInitAudio();
 
