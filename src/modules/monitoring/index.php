@@ -114,19 +114,177 @@ function getCdr7DaysStatsMap($phoneNumbers = array(), $pDB = null) {
     return $stats;
 }
 
-function getAsteriskExtensionNamesMap($pDB = null) {
-    static $extMap = null;
-    if ($extMap !== null) return $extMap;
-    $extMap = array();
-    if (!is_object($pDB)) return $extMap;
-    $sql = "SELECT extension, name FROM asterisk.users WHERE extension IS NOT NULL AND extension != ''";
-    $res = @$pDB->fetchTable($sql, true);
-    if (is_array($res)) {
-        foreach ($res as $row) {
-            $extMap[$row['extension']] = $row['name'];
+function formatPhoneBrCdr($num) {
+    if (empty($num) || $num == '-') return '-';
+    $clean = preg_replace('/[^0-9]/', '', $num);
+    
+    // Trata prefixo internacional brasileiro 55 ou 0055 ou discagem com 0
+    if (strlen($clean) >= 12 && substr($clean, 0, 2) === '55') {
+        $clean = substr($clean, 2);
+    } elseif (strlen($clean) >= 12 && substr($clean, 0, 2) === '00') {
+        $clean = substr($clean, 2);
+        if (strlen($clean) >= 12 && substr($clean, 0, 2) === '55') {
+            $clean = substr($clean, 2);
+        }
+    } elseif (strlen($clean) >= 11 && substr($clean, 0, 1) === '0') {
+        $clean = substr($clean, 1);
+    }
+
+    if (strlen($clean) == 11) {
+        return sprintf('(%s) %s-%s', substr($clean, 0, 2), substr($clean, 2, 5), substr($clean, 7, 4));
+    } elseif (strlen($clean) == 10) {
+        return sprintf('(%s) %s-%s', substr($clean, 0, 2), substr($clean, 2, 4), substr($clean, 6, 4));
+    } elseif (strlen($clean) == 9) {
+        return sprintf('%s-%s', substr($clean, 0, 5), substr($clean, 5, 4));
+    } elseif (strlen($clean) == 8) {
+        return sprintf('%s-%s', substr($clean, 0, 4), substr($clean, 4, 4));
+    }
+    return $num;
+}
+
+function getAsteriskEntitiesMaps($pDB = null) {
+    static $entities = null;
+    if ($entities !== null) return $entities;
+    $entities = array(
+        'extensions'  => array(),
+        'queues'      => array(),
+        'ringgroups'  => array(),
+        'all_groups'  => array()
+    );
+    if (!is_object($pDB)) return $entities;
+
+    // 1. Ramais (asterisk.users)
+    $sqlExt = "SELECT extension, name FROM asterisk.users WHERE extension IS NOT NULL AND extension != ''";
+    $resExt = @$pDB->fetchTable($sqlExt, true);
+    if (is_array($resExt)) {
+        foreach ($resExt as $row) {
+            $entities['extensions'][$row['extension']] = trim($row['name']);
         }
     }
-    return $extMap;
+
+    // 2. Filas (asterisk.queues_config)
+    $sqlQ = "SELECT extension, descr FROM asterisk.queues_config WHERE extension IS NOT NULL AND extension != ''";
+    $resQ = @$pDB->fetchTable($sqlQ, true);
+    if (is_array($resQ) && !empty($resQ)) {
+        foreach ($resQ as $row) {
+            $descr = !empty($row['descr']) ? trim($row['descr']) : '';
+            $entities['queues'][$row['extension']] = $descr;
+            $entities['all_groups'][$row['extension']] = $descr;
+        }
+    } else {
+        $sqlQ2 = "SELECT extension, value FROM asterisk.queues_config WHERE keyword IN ('description', 'displayname')";
+        $resQ2 = @$pDB->fetchTable($sqlQ2, true);
+        if (is_array($resQ2)) {
+            foreach ($resQ2 as $row) {
+                $entities['queues'][$row['extension']] = trim($row['value']);
+                $entities['all_groups'][$row['extension']] = trim($row['value']);
+            }
+        }
+    }
+
+    // 3. Grupos de Chamada / Ring Groups (asterisk.ringgroups)
+    $sqlRG = "SELECT grpnum, description FROM asterisk.ringgroups WHERE grpnum IS NOT NULL AND grpnum != ''";
+    $resRG = @$pDB->fetchTable($sqlRG, true);
+    if (is_array($resRG)) {
+        foreach ($resRG as $row) {
+            $entities['ringgroups'][$row['grpnum']] = trim($row['description']);
+            $entities['all_groups'][$row['grpnum']] = trim($row['description']);
+        }
+    }
+
+    return $entities;
+}
+
+function getAsteriskExtensionNamesMap($pDB = null) {
+    $ent = getAsteriskEntitiesMaps($pDB);
+    return $ent['extensions'];
+}
+
+function renderDestinationBadge($raw_dst, $raw_src = '', $entities = array(), $contactsMap = array(), $stats7d = array(), $did = '') {
+    if (empty($raw_dst) || $raw_dst == '-') {
+        return "<span style='color:#cbd5e1;'>-</span>";
+    }
+
+    $val_dst_clean = preg_replace('/\D/', '', $raw_dst);
+    $formatted_dst = formatPhoneBrCdr($raw_dst);
+
+    // 1. EXTENSÃO 's' -> URA / Menu Automático / Início de Dialplan
+    if (strtolower($raw_dst) === 's') {
+        $tooltip = "🎛️ Atendimento Automático (s)\nA chamada entrou na URA / Menu de Voz inicial do PBX ou fluxo automático do Asterisk.";
+        return "<span title='" . htmlspecialchars($tooltip, ENT_QUOTES) . "' style='background:rgba(245,158,11,0.12); color:#b45309; border:1px solid rgba(245,158,11,0.3); padding:3px 8px; border-radius:6px; font-weight:700; font-size:11px; display:inline-flex; align-items:center; gap:4px;'><i class='fa fa-sitemap'></i> URA / Menu <span style='font-size:10px; color:#d97706; font-weight:normal;'>(s)</span></span>";
+    }
+
+    // 2. CÓDIGOS DE CAPTURA / SERVIÇO (*8, 00, **, etc.)
+    if ($raw_dst === '00' || $raw_dst === '*8' || $raw_dst === '**') {
+        $tooltip = "📥 Captura de Chamada ({$raw_dst})\nO ramal utilizou o código para capturar (puxar) a ligação que estava tocando em outro ramal ou grupo.";
+        return "<span title='" . htmlspecialchars($tooltip, ENT_QUOTES) . "' style='background:rgba(6,182,212,0.12); color:#0891b2; border:1px solid rgba(6,182,212,0.3); padding:3px 8px; border-radius:6px; font-weight:700; font-size:11px; display:inline-flex; align-items:center; gap:4px;'><i class='fa fa-phone-square'></i> Captura <span style='font-size:10px; color:#0e7490; font-weight:normal;'>({$raw_dst})</span></span>";
+    }
+
+    // 3. OUTROS CÓDIGOS DE RECURSOS DO PBX (Feature Codes)
+    if ($raw_dst === '*97' || $raw_dst === '*98') {
+        return "<span title='📼 Correio de Voz / Caixa Postal' style='background:#fef3c7; color:#92400e; border:1px solid #fde68a; padding:3px 8px; border-radius:6px; font-weight:700; font-size:11px; display:inline-flex; align-items:center; gap:4px;'><i class='fa fa-envelope'></i> Caixa Postal ({$raw_dst})</span>";
+    } elseif ($raw_dst === '*43') {
+        return "<span title='🔊 Teste de Eco' style='background:#f1f5f9; color:#475569; border:1px solid #e2e8f0; padding:3px 8px; border-radius:6px; font-weight:700; font-size:11px; display:inline-flex; align-items:center; gap:4px;'><i class='fa fa-volume-up'></i> Teste de Eco ({$raw_dst})</span>";
+    } elseif (strpos($raw_dst, '*') === 0) {
+        return "<span title='⚙️ Código de Serviço: {$raw_dst}' style='background:#f1f5f9; color:#475569; border:1px solid #e2e8f0; padding:3px 8px; border-radius:6px; font-weight:600; font-size:11px; display:inline-flex; align-items:center; gap:4px;'>⚙️ " . htmlspecialchars($raw_dst) . "</span>";
+    }
+
+    // 4. FILA DE ATENDIMENTO (Queues)
+    if (isset($entities['queues'][$raw_dst])) {
+        $qName = $entities['queues'][$raw_dst];
+        $label = !empty($qName) ? "{$raw_dst} - {$qName}" : "Fila {$raw_dst}";
+        $tooltip = "👥 Fila de Atendimento: {$label}\nDistribuição de chamadas para a equipe de atendentes.";
+        return "<span title='" . htmlspecialchars($tooltip, ENT_QUOTES) . "' style='background:#ede9fe; color:#6d28d9; border:1px solid #ddd6fe; padding:3px 8px; border-radius:6px; font-weight:700; font-size:11px; display:inline-flex; align-items:center; gap:4px;'><i class='fa fa-users'></i> " . htmlspecialchars($label) . "</span>";
+    }
+
+    // 5. GRUPO DE CHAMADAS (Ring Groups)
+    if (isset($entities['ringgroups'][$raw_dst])) {
+        $rgName = $entities['ringgroups'][$raw_dst];
+        $label = !empty($rgName) ? "{$raw_dst} - {$rgName}" : "Grupo {$raw_dst}";
+        $tooltip = "🏢 Grupo de Ramais: {$label}\nToque sincronizado para o grupo de ramais.";
+        return "<span title='" . htmlspecialchars($tooltip, ENT_QUOTES) . "' style='background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd; padding:3px 8px; border-radius:6px; font-weight:700; font-size:11px; display:inline-flex; align-items:center; gap:4px;'><i class='fa fa-building'></i> " . htmlspecialchars($label) . "</span>";
+    }
+
+    // 6. RAMAL INTERNO (asterisk.users ou 2 a 5 dígitos numéricos)
+    $extName = isset($entities['extensions'][$raw_dst]) ? $entities['extensions'][$raw_dst] : (isset($entities['extensions'][$val_dst_clean]) ? $entities['extensions'][$val_dst_clean] : '');
+    $isExtNum = (strlen($val_dst_clean) >= 2 && strlen($val_dst_clean) <= 5 && is_numeric($val_dst_clean));
+
+    if (!empty($extName) || $isExtNum) {
+        $label = !empty($extName) ? "Ramal {$raw_dst} - {$extName}" : "Ramal {$raw_dst}";
+        $tooltip = "👤 Ramal Interno: {$label}";
+        return "<span title='" . htmlspecialchars($tooltip, ENT_QUOTES) . "' style='background:#f1f5f9; color:#334155; border:1px solid #e2e8f0; padding:3px 8px; border-radius:6px; font-weight:600; font-size:11px; display:inline-flex; align-items:center; gap:4px;'>👤 " . htmlspecialchars($label) . "</span>";
+    }
+
+    // 7. CONTATO DA AGENDA PÚBLICA (Address Book)
+    $contact = null;
+    if (isset($contactsMap[$raw_dst])) {
+        $contact = $contactsMap[$raw_dst];
+    } elseif (!empty($val_dst_clean) && isset($contactsMap[$val_dst_clean])) {
+        $contact = $contactsMap[$val_dst_clean];
+    }
+
+    if ($contact && !empty($contact['fullName'])) {
+        $tooltip = "📇 Contato: " . $contact['fullName'];
+        if (!empty($contact['company'])) $tooltip .= "\n🏢 Empresa: " . $contact['company'];
+        if (!empty($contact['email'])) $tooltip .= "\n📧 E-mail: " . $contact['email'];
+        if (!empty($contact['notes'])) $tooltip .= "\n📝 Obs: " . $contact['notes'];
+
+        return "<div style='display:inline-flex; align-items:center; gap:6px; flex-wrap:wrap;'>".
+            "<span title='" . htmlspecialchars($tooltip, ENT_QUOTES) . "' style='background:rgba(37,99,235,0.08); color:#1d4ed8; padding:3px 8px; border-radius:6px; font-weight:700; font-size:11px; cursor:help; border:1px solid rgba(37,99,235,0.25); display:inline-flex; align-items:center; gap:4px;'>".
+            "👤 " . htmlspecialchars($contact['fullName']) . " <span style='color:#64748b; font-size:10px; font-weight:normal;'>(" . htmlspecialchars($formatted_dst) . ")</span>".
+            "</span>".
+            "</div>";
+    }
+
+    // 8. NÚMERO EXTERNO (PSTN / Celular / Fixo)
+    $tooltip = "📞 Número Externo: {$formatted_dst}";
+    $html = "<div style='display:inline-flex; align-items:center; gap:6px;'>".
+        "<span title='" . htmlspecialchars($tooltip, ENT_QUOTES) . "' style='font-weight:600; color:#1e293b; cursor:help;'>📞 " . htmlspecialchars($formatted_dst) . "</span>";
+    if (!empty($raw_dst) && $raw_dst != '-') {
+        $html .= "<button type='button' onclick=\"openAddressBookModal('" . htmlspecialchars($raw_dst, ENT_QUOTES) . "')\" title='📇 Salvar na Agenda Pública\nClique para cadastrar este número na Agenda de Contatos Pública.' style='background:rgba(59,130,246,0.12); color:#2563eb; border:1px solid rgba(59,130,246,0.3); border-radius:50%; width:20px; height:20px; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; font-size:10px; transition:all 0.2s;' onmouseover=\"this.style.background='#2563eb'; this.style.color='#fff';\" onmouseout=\"this.style.background='rgba(59,130,246,0.12)'; this.style.color='#2563eb';\">📇</button>";
+    }
+    $html .= "</div>";
+    return $html;
 }
 
 function renderCallerWithContactBadge($raw_src, $val_src, $contactsMap = array(), $stats7d = array(), $extNamesMap = array()) {
@@ -1185,7 +1343,9 @@ function renderFullMonitoringDashboard($smarty, $module_name, $local_templates_d
                                 }
                                 $abContactsMap = getAddressBookContactsMap();
                                 $stats7dMap = getCdr7DaysStatsMap($pageSrcList, $pDB);
-                        $extNamesMap = getAsteriskExtensionNamesMap($pDB);
+                                $entitiesMaps = getAsteriskEntitiesMaps($pDB);
+                                $extNamesMap = $entitiesMaps['extensions'];
+                                $groupsMap = $entitiesMaps['all_groups'];
                                 ?>
                                 <?php foreach ($pageList as $value): ?>
                                     <?php
@@ -1239,6 +1399,8 @@ function renderFullMonitoringDashboard($smarty, $module_name, $local_templates_d
                                             "<a href='".htmlspecialchars($downloadUrl, ENT_QUOTES)."' target='_blank' style='background: rgba(255,255,255,0.08); color: #6d28d9; border: 1px solid rgba(124,58,237,0.4); border-radius: 20px; padding: 3px 10px; font-weight: 600; font-size: 10px; text-decoration: none; transition: all 0.2s;'>⬇️ Baixar</a>".
                                             "</div>";
                                     }
+
+                                    $dstHtml = renderDestinationBadge($dst, $src, $entitiesMaps, $abContactsMap, $stats7dMap);
                                     ?>
                                     <tr>
                                         <?php if ($bPuedeBorrar): ?>
@@ -1246,13 +1408,6 @@ function renderFullMonitoringDashboard($smarty, $module_name, $local_templates_d
                                                 <input type="checkbox" name="selected_uniqueids[]" value="<?php echo htmlspecialchars($uniqueId); ?>" class="chk-mon-row" />
                                             </td>
                                         <?php endif; ?>
-                                        <?php
-                                        if (!empty($dst) && isset($groupsMap[$dst])) {
-                                            $dstHtml = "<span title='🏢 Fila: " . htmlspecialchars($dst . " - " . $groupsMap[$dst], ENT_QUOTES) . "' style='background:#ede9fe; color:#6d28d9; padding:3px 8px; border-radius:6px; font-weight:700; font-size:11px; cursor:help; border:1px solid #ddd6fe; display:inline-flex; align-items:center; gap:4px;'><i class='fa fa-users'></i> " . htmlspecialchars($dst) . "</span>";
-                                        } else {
-                                            $dstHtml = "<span style='background:#ede9fe; color:#6d28d9; padding:3px 8px; border-radius:6px; font-weight:600; font-size:11px;'>🎯 " . htmlspecialchars($dst) . "</span>";
-                                        }
-                                        ?>
                                         
                                         <td><span style="color:#334155; font-size:11px; font-weight:600;">📅 <?php echo htmlspecialchars($calldate); ?></span></td>
                                         <td>

@@ -31,8 +31,14 @@ function formatPhoneBr($num) {
     if (empty($num) || $num == '-') return '-';
     $clean = preg_replace('/[^0-9]/', '', $num);
     
-    if (strlen($clean) >= 12 && substr($clean, 0, 2) === '00') {
+    // Trata prefixo internacional brasileiro 55 ou 0055 ou discagem com 0
+    if (strlen($clean) >= 12 && substr($clean, 0, 2) === '55') {
         $clean = substr($clean, 2);
+    } elseif (strlen($clean) >= 12 && substr($clean, 0, 2) === '00') {
+        $clean = substr($clean, 2);
+        if (strlen($clean) >= 12 && substr($clean, 0, 2) === '55') {
+            $clean = substr($clean, 2);
+        }
     } elseif (strlen($clean) >= 11 && substr($clean, 0, 1) === '0') {
         $clean = substr($clean, 1);
     }
@@ -41,6 +47,10 @@ function formatPhoneBr($num) {
         return sprintf('(%s) %s-%s', substr($clean, 0, 2), substr($clean, 2, 5), substr($clean, 7, 4));
     } elseif (strlen($clean) == 10) {
         return sprintf('(%s) %s-%s', substr($clean, 0, 2), substr($clean, 2, 4), substr($clean, 6, 4));
+    } elseif (strlen($clean) == 9) {
+        return sprintf('%s-%s', substr($clean, 0, 5), substr($clean, 5, 4));
+    } elseif (strlen($clean) == 8) {
+        return sprintf('%s-%s', substr($clean, 0, 4), substr($clean, 4, 4));
     }
     return $num;
 }
