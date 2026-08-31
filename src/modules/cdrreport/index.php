@@ -715,12 +715,12 @@ function renderCelDetailsHtml($pDB, $uniqueid)
             top: 50% !important;
             left: 50% !important;
             transform: translate(-50%, -50%) !important;
-            width: 520px !important;
+            z-index: 999999 !important;
+            width: max-content !important;
             min-width: 480px !important;
-            max-width: calc(100vw - 32px) !important;
+            max-width: 90vw !important;
             height: auto !important;
             background: transparent !important;
-            z-index: 2147483647 !important;
             display: none;
             margin: 0 !important;
             padding: 0 !important;
@@ -757,6 +757,8 @@ function renderCelDetailsHtml($pDB, $uniqueid)
             display: flex !important;
             justify-content: space-between !important;
             align-items: center !important;
+            width: 100% !important;
+            box-sizing: border-box !important;
             padding-top: 14px !important;
             border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
             flex-wrap: nowrap !important;
@@ -765,6 +767,9 @@ function renderCelDetailsHtml($pDB, $uniqueid)
         .btn-audio-download {
             white-space: nowrap !important;
             flex-shrink: 0 !important;
+            width: auto !important;
+            overflow: visible !important;
+            text-overflow: clip !important;
             display: inline-flex !important;
             align-items: center !important;
             gap: 6px !important;
@@ -2338,50 +2343,50 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
     
         
         <!-- Janela Flutuante de Reprodução de Gravação (Floating Audio Player Widget) -->
-        <div id="audioPlayerModal" class="audio-modal-overlay" onclick="if(event.target === this) closeAudioPlayerModal();">
-            <div class="audio-modal-card" style="background:linear-gradient(145deg, #1e1b4b 0%, #0f172a 100%) !important; border:1px solid rgba(139,92,246,0.4) !important; border-radius:16px !important; box-shadow:0 25px 50px -12px rgba(0,0,0,0.8), 0 0 30px rgba(124,58,237,0.3) !important; width:92% !important; max-width:520px !important; overflow:hidden !important; color:#ffffff !important; font-family:'Segoe UI', sans-serif !important;">
+        <div id="audioPlayerModal" class="audio-modal-overlay" onclick="if(event.target === this) closeAudioPlayerModal();" style="position:fixed !important; top:50% !important; left:50% !important; transform:translate(-50%, -50%) !important; z-index:999999 !important; width:max-content !important; min-width:480px !important; max-width:90vw !important; box-sizing:border-box !important; display:none; background:transparent !important; margin:0 !important; padding:0 !important; pointer-events:auto !important;">
+            <div class="audio-modal-card" style="background:linear-gradient(145deg, #1e1b4b 0%, #0f172a 100%) !important; border:1px solid rgba(139,92,246,0.65) !important; border-radius:16px !important; box-shadow:0 25px 60px -10px rgba(0,0,0,0.85), 0 0 35px rgba(124,58,237,0.45) !important; width:100% !important; min-width:480px !important; max-width:520px !important; box-sizing:border-box !important; overflow:hidden !important; color:#ffffff !important; font-family:'Segoe UI', sans-serif !important;">
                 <!-- Header do Popup -->
-                <div class="audio-modal-header" style="padding:16px 20px; background:rgba(255,255,255,0.05); border-bottom:1px solid rgba(255,255,255,0.1); display:flex; justify-content:space-between; align-items:center;">
-                    <div class="audio-modal-title-box" style="display:flex; align-items:center; gap:12px;">
-                        <span class="audio-modal-icon" style="font-size:24px; background:rgba(124,58,237,0.3); border:1px solid rgba(139,92,246,0.4); padding:8px; border-radius:10px; display:flex; align-items:center; justify-content:center;">🎧</span>
+                <div class="audio-modal-header" style="padding:16px 20px !important; background:rgba(255,255,255,0.06) !important; border-bottom:1px solid rgba(255,255,255,0.1) !important; display:flex !important; justify-content:space-between !important; align-items:center !important;">
+                    <div class="audio-modal-title-box" style="display:flex !important; align-items:center !important; gap:12px !important;">
+                        <span class="audio-modal-icon" style="font-size:24px !important; background:rgba(124,58,237,0.3) !important; border:1px solid rgba(139,92,246,0.4) !important; padding:8px !important; border-radius:10px !important; display:flex !important; align-items:center !important; justify-content:center !important;">🎧</span>
                         <div>
-                            <h3 class="audio-modal-title" style="margin:0; font-size:16px; font-weight:800; color:#f8fafc;">Reproduzindo Gravação</h3>
-                            <div class="audio-modal-meta" style="margin-top:3px; font-size:12px; color:#cbd5e1; font-weight:600;">
+                            <h3 class="audio-modal-title" style="margin:0 !important; font-size:16px !important; font-weight:800 !important; color:#f8fafc !important;">Reproduzindo Gravação</h3>
+                            <div class="audio-modal-meta" style="margin-top:3px !important; font-size:12px !important; color:#cbd5e1 !important; font-weight:600 !important;">
                                 <span id="stkCaller">📞 Origem: -</span> ➔ <span id="stkTarget">🎯 Destino: -</span>
                             </div>
                         </div>
                     </div>
-                    <button type="button" class="audio-modal-close-btn" onclick="closeAudioPlayerModal()" title="Fechar" style="background:rgba(255,255,255,0.1); color:#e2e8f0; border:1px solid rgba(255,255,255,0.15); font-size:15px; font-weight:bold; cursor:pointer; width:32px; height:32px; border-radius:8px; display:flex; align-items:center; justify-content:center;">✖</button>
+                    <button type="button" class="audio-modal-close-btn" onclick="closeAudioPlayerModal()" title="Fechar" style="background:rgba(255,255,255,0.1) !important; color:#e2e8f0 !important; border:1px solid rgba(255,255,255,0.15) !important; font-size:15px !important; font-weight:bold !important; cursor:pointer !important; width:32px !important; height:32px !important; border-radius:8px !important; display:flex !important; align-items:center !important; justify-content:center !important;">✖</button>
                 </div>
 
                 <!-- Body do Popup -->
-                <div class="audio-modal-body" style="padding:20px;">
+                <div class="audio-modal-body" style="padding:20px !important;">
                     <!-- Barra de Progresso e Tempo -->
-                    <div class="audio-progress-container" style="margin-bottom:18px;">
-                        <div class="audio-time-row" style="display:flex; justify-content:space-between; font-size:12px; color:#94a3b8; font-weight:700; margin-bottom:6px;">
+                    <div class="audio-progress-container" style="margin-bottom:18px !important;">
+                        <div class="audio-time-row" style="display:flex !important; justify-content:space-between !important; font-size:12px !important; color:#94a3b8 !important; font-weight:700 !important; margin-bottom:6px !important;">
                             <span id="stkCurTime" class="time-text">00:00</span>
                             <span id="stkTotalTime" class="time-text">00:00</span>
                         </div>
-                        <input type="range" id="stkProgressBar" min="0" max="100" value="0" step="0.1" oninput="stkSeekTo(this.value)" class="audio-range-slider" style="width:100%; height:6px; border-radius:3px; background:rgba(255,255,255,0.2); outline:none; cursor:pointer; accent-color:#8b5cf6;" />
+                        <input type="range" id="stkProgressBar" min="0" max="100" value="0" step="0.1" oninput="stkSeekTo(this.value)" class="audio-range-slider" style="width:100% !important; height:6px !important; border-radius:3px !important; background:rgba(255,255,255,0.2) !important; outline:none !important; cursor:pointer !important; accent-color:#8b5cf6 !important;" />
                     </div>
 
                     <!-- Controles Principais -->
-                    <div class="audio-controls-row" style="display:flex; justify-content:center; align-items:center; gap:14px; margin-bottom:20px;">
-                        <button type="button" class="btn-audio-ctrl" onclick="stkSeekRelative(-5)" title="Voltar 5 segundos" style="background:rgba(255,255,255,0.1); color:#ffffff; border:1px solid rgba(255,255,255,0.15); padding:8px 14px; border-radius:8px; font-size:13px; font-weight:700; cursor:pointer;">⏮ -5s</button>
-                        <button type="button" id="stkPlayPauseBtn" class="btn-audio-ctrl btn-play-main" onclick="stkTogglePlay()" style="background:linear-gradient(135deg, #7c3aed 0%, #6366f1 100%); color:#ffffff; border:none; padding:10px 24px; border-radius:8px; font-size:14px; font-weight:700; cursor:pointer; box-shadow:0 4px 12px rgba(124,58,237,0.4);">⏸ Pausar</button>
-                        <button type="button" class="btn-audio-ctrl" onclick="stkSeekRelative(5)" title="Avançar 5 segundos" style="background:rgba(255,255,255,0.1); color:#ffffff; border:1px solid rgba(255,255,255,0.15); padding:8px 14px; border-radius:8px; font-size:13px; font-weight:700; cursor:pointer;">+5s ⏭</button>
+                    <div class="audio-controls-row" style="display:flex !important; justify-content:center !important; align-items:center !important; gap:14px !important; margin-bottom:20px !important;">
+                        <button type="button" class="btn-audio-ctrl" onclick="stkSeekRelative(-5)" title="Voltar 5 segundos" style="background:rgba(255,255,255,0.1) !important; color:#ffffff !important; border:1px solid rgba(255,255,255,0.15) !important; padding:8px 14px !important; border-radius:8px !important; font-size:13px !important; font-weight:700 !important; cursor:pointer !important;">⏮ -5s</button>
+                        <button type="button" id="stkPlayPauseBtn" class="btn-audio-ctrl btn-play-main" onclick="stkTogglePlay()" style="background:linear-gradient(135deg, #7c3aed 0%, #6366f1 100%) !important; color:#ffffff !important; border:none !important; padding:10px 24px !important; border-radius:8px !important; font-size:14px !important; font-weight:700 !important; cursor:pointer !important; box-shadow:0 4px 12px rgba(124,58,237,0.4) !important;">⏸ Pausar</button>
+                        <button type="button" class="btn-audio-ctrl" onclick="stkSeekRelative(5)" title="Avançar 5 segundos" style="background:rgba(255,255,255,0.1) !important; color:#ffffff !important; border:1px solid rgba(255,255,255,0.15) !important; padding:8px 14px !important; border-radius:8px !important; font-size:13px !important; font-weight:700 !important; cursor:pointer !important;">+5s ⏭</button>
                     </div>
 
                     <!-- Velocidade de Reprodução e Download -->
-                    <div class="audio-footer-row" style="display:flex; justify-content:space-between; align-items:center; padding-top:14px; border-top:1px solid rgba(255,255,255,0.1); flex-wrap:nowrap; gap:12px;">
-                        <div class="audio-speed-group" style="display:flex; align-items:center; gap:5px; flex-shrink:0;">
-                            <span class="speed-label" style="font-size:11px; color:#94a3b8; font-weight:600; margin-right:2px;">Velocidade:</span>
-                            <button type="button" class="speed-btn active" onclick="stkSetSpeed(1.0, this)" style="background:#8b5cf6; border:1px solid #8b5cf6; color:#ffffff; border-radius:6px; font-size:11px; font-weight:700; padding:4px 8px; cursor:pointer;">1.0x</button>
-                            <button type="button" class="speed-btn" onclick="stkSetSpeed(1.25, this)" style="background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.12); color:#94a3b8; border-radius:6px; font-size:11px; font-weight:700; padding:4px 8px; cursor:pointer;">1.25x</button>
-                            <button type="button" class="speed-btn" onclick="stkSetSpeed(1.5, this)" style="background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.12); color:#94a3b8; border-radius:6px; font-size:11px; font-weight:700; padding:4px 8px; cursor:pointer;">1.5x</button>
-                            <button type="button" class="speed-btn" onclick="stkSetSpeed(2.0, this)" style="background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.12); color:#94a3b8; border-radius:6px; font-size:11px; font-weight:700; padding:4px 8px; cursor:pointer;">2.0x</button>
+                    <div class="audio-footer-row" style="display:flex !important; justify-content:space-between !important; align-items:center !important; width:100% !important; box-sizing:border-box !important; padding-top:14px !important; border-top:1px solid rgba(255,255,255,0.1) !important; flex-wrap:nowrap !important; gap:12px !important;">
+                        <div class="audio-speed-group" style="display:flex !important; align-items:center !important; gap:5px !important; flex-shrink:0 !important;">
+                            <span class="speed-label" style="font-size:11px !important; color:#94a3b8 !important; font-weight:600 !important; margin-right:2px !important;">Velocidade:</span>
+                            <button type="button" class="speed-btn active" onclick="stkSetSpeed(1.0, this)" style="background:#8b5cf6 !important; border:1px solid #8b5cf6 !important; color:#ffffff !important; border-radius:6px !important; font-size:11px !important; font-weight:700 !important; padding:4px 8px !important; cursor:pointer !important;">1.0x</button>
+                            <button type="button" class="speed-btn" onclick="stkSetSpeed(1.25, this)" style="background:rgba(255,255,255,0.08) !important; border:1px solid rgba(255,255,255,0.12) !important; color:#94a3b8 !important; border-radius:6px !important; font-size:11px !important; font-weight:700 !important; padding:4px 8px !important; cursor:pointer !important;">1.25x</button>
+                            <button type="button" class="speed-btn" onclick="stkSetSpeed(1.5, this)" style="background:rgba(255,255,255,0.08) !important; border:1px solid rgba(255,255,255,0.12) !important; color:#94a3b8 !important; border-radius:6px !important; font-size:11px !important; font-weight:700 !important; padding:4px 8px !important; cursor:pointer !important;">1.5x</button>
+                            <button type="button" class="speed-btn" onclick="stkSetSpeed(2.0, this)" style="background:rgba(255,255,255,0.08) !important; border:1px solid rgba(255,255,255,0.12) !important; color:#94a3b8 !important; border-radius:6px !important; font-size:11px !important; font-weight:700 !important; padding:4px 8px !important; cursor:pointer !important;">2.0x</button>
                         </div>
-                        <a id="stkDownloadBtn" href="#" target="_blank" class="btn-audio-download" title="Baixar Gravação" style="background:rgba(16,185,129,0.2); border:1px solid rgba(16,185,129,0.4); color:#34d399; padding:6px 14px; border-radius:6px; font-size:11px; font-weight:700; text-decoration:none; display:inline-flex; align-items:center; gap:6px; white-space:nowrap; flex-shrink:0;">⬇️ Baixar Gravação</a>
+                        <a id="stkDownloadBtn" href="#" target="_blank" class="btn-audio-download" title="Baixar Gravação" style="white-space:nowrap !important; flex-shrink:0 !important; width:auto !important; overflow:visible !important; text-overflow:clip !important; display:inline-flex !important; align-items:center !important; gap:6px !important; background:rgba(16,185,129,0.2) !important; border:1px solid rgba(16,185,129,0.4) !important; color:#34d399 !important; padding:6px 14px !important; border-radius:6px !important; font-size:11px !important; font-weight:700 !important; text-decoration:none !important;">⬇️ Baixar Gravação</a>
                     </div>
                 </div>
             </div>
@@ -2603,7 +2608,7 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
                 if (aud) {
                     aud.addEventListener('timeupdate', function() {
                         var cur = aud.currentTime || 0;
-                        var dur = aud.duration || 0;
+                        var dur = dur = aud.duration || 0;
                         var bar = document.getElementById('stkProgressBar');
                         if (bar && dur > 0) {
                             bar.value = (cur / dur) * 100;
@@ -2619,6 +2624,13 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
                     });
                 }
             });
+
+            if (typeof $ !== 'undefined') {
+                $(document).ready(function() {
+                    ensureAudioModalInBody();
+                });
+            }
+            setTimeout(ensureAudioModalInBody, 300);
 
             
 
