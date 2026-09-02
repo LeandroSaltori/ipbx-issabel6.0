@@ -258,10 +258,11 @@ function getAsteriskEntitiesMaps($pDB = null) {
     static $entities = null;
     if ($entities !== null) return $entities;
     $entities = array(
-        'extensions'  => array(),
-        'queues'      => array(),
-        'ringgroups'  => array(),
-        'all_groups'  => array()
+        'extensions'        => array(),
+        'queues'            => array(),
+        'ringgroups'        => array(),
+        'all_groups'        => array(),
+        'all_group_members' => array()
     );
     if (!is_object($pDB)) return $entities;
 
@@ -294,13 +295,34 @@ function getAsteriskEntitiesMaps($pDB = null) {
         }
     }
 
+    // Membros das Filas (asterisk.queues_details ou queues_config)
+    $sqlQM = "SELECT id as extension, data FROM asterisk.queues_details WHERE keyword = 'member'";
+    $resQM = @$pDB->fetchTable($sqlQM, true);
+    if (is_array($resQM)) {
+        foreach ($resQM as $row) {
+            $qExt = $row['extension'];
+            $data = $row['data'];
+            if (preg_match('/([0-9]{2,5})/', $data, $m)) {
+                $entities['all_group_members'][$qExt][] = $m[1];
+            }
+        }
+    }
+
     // 3. Grupos de Chamada / Ring Groups (asterisk.ringgroups)
-    $sqlRG = "SELECT grpnum, description FROM asterisk.ringgroups WHERE grpnum IS NOT NULL AND grpnum != ''";
+    $sqlRG = "SELECT grpnum, description, grplist FROM asterisk.ringgroups WHERE grpnum IS NOT NULL AND grpnum != ''";
     $resRG = @$pDB->fetchTable($sqlRG, true);
     if (is_array($resRG)) {
         foreach ($resRG as $row) {
             $entities['ringgroups'][$row['grpnum']] = trim($row['description']);
             $entities['all_groups'][$row['grpnum']] = trim($row['description']);
+            if (!empty($row['grplist'])) {
+                $mList = preg_split('/[\s\-\,]+/', trim($row['grplist']));
+                foreach ($mList as $mExt) {
+                    if (is_numeric($mExt)) {
+                        $entities['all_group_members'][$row['grpnum']][] = $mExt;
+                    }
+                }
+            }
         }
     }
 
@@ -310,6 +332,155 @@ function getAsteriskEntitiesMaps($pDB = null) {
 function getAsteriskExtensionNamesMap($pDB = null) {
     $ent = getAsteriskEntitiesMaps($pDB);
     return $ent['extensions'];
+}
+
+function extractExtensionFromChannel($channel) {
+    if (empty($channel) || $channel === '-') return '';
+    if (preg_match('/^(?:SIP|PJSIP|IAX2|DAHDI|Local)\/([0-9]{2,5})(?:@|\/|-|$)/i', $channel, $m)) {
+        return $m[1];
+    }
+    if (preg_match('/\/([0-9]{2,5})@from-queue/i', $channel, $m)) {
+        return $m[1];
+    }
+    if (preg_match('/Local\/([0-9]{2,5})@/i', $channel, $m)) {
+        return $m[1];
+    }
+    return '';
+}
+
+function consolidateCdrQueueLegs($rawList, $groupsMap = array()) {
+    if (!is_array($rawList) || empty($rawList)) return array();
+
+    $grouped = array();
+    $nonUnique = array();
+
+    foreach ($rawList as $r) {
+        $uId = !empty($r[6]) ? trim($r[6]) : '';
+        if (empty($uId)) {
+            $nonUnique[] = $r;
+            continue;
+        }
+        $grouped[$uId][] = $r;
+    }
+
+    $consolidated = array();
+
+    foreach ($grouped as $uId => $records) {
+        if (count($records) === 1) {
+            $rec = $records[0];
+            $dstc = !empty($rec[4]) ? $rec[4] : '';
+            $ext = extractExtensionFromChannel($dstc);
+            if (!empty($ext)) {
+                $st = strtoupper(trim($rec[5]));
+                $rec['attempted_exts'] = array(
+                    $ext => array(
+                        'dur' => formatSecsCdr($rec[8]),
+                        'st'  => ($st === 'ANSWERED' ? 'Atendeu' : 'Não Atendeu')
+                    )
+                );
+            }
+            $consolidated[] = $rec;
+            continue;
+        }
+
+        $answeredRec = null;
+        $attempted = array();
+        $longestNoAns = null;
+        $maxDur = -1;
+
+        foreach ($records as $rec) {
+            $st = strtoupper(trim($rec[5]));
+            $dur = (int)$rec[8];
+            $dstc = !empty($rec[4]) ? $rec[4] : '';
+            $ext = extractExtensionFromChannel($dstc);
+            if (empty($ext) && is_numeric($rec[2]) && strlen($rec[2]) <= 5 && !isset($groupsMap[$rec[2]])) {
+                $ext = $rec[2];
+            }
+
+            if (!empty($ext)) {
+                $attempted[$ext] = array(
+                    'dur' => formatSecsCdr($dur),
+                    'st'  => ($st === 'ANSWERED' ? 'Atendeu' : 'Não Atendeu')
+                );
+            }
+
+            if ($st === 'ANSWERED' && ($answeredRec === null || $dur >= (int)$answeredRec[8])) {
+                $answeredRec = $rec;
+            }
+
+            if ($dur > $maxDur) {
+                $maxDur = $dur;
+                $longestNoAns = $rec;
+            }
+        }
+
+        if ($answeredRec !== null) {
+            $primary = $answeredRec;
+        } else {
+            $primary = $longestNoAns !== null ? $longestNoAns : $records[0];
+        }
+
+        $primary['attempted_exts'] = $attempted;
+        $consolidated[] = $primary;
+    }
+
+    if (!empty($nonUnique)) {
+        $consolidated = array_merge($consolidated, $nonUnique);
+    }
+
+    usort($consolidated, function($a, $b) {
+        $tA = isset($a[0]) ? strtotime($a[0]) : 0;
+        $tB = isset($b[0]) ? strtotime($b[0]) : 0;
+        if ($tA == $tB) return 0;
+        return ($tA > $tB) ? -1 : 1;
+    });
+
+    return $consolidated;
+}
+
+function renderQueueGroupBadge($raw_rg, $val_dst, $entities = array(), $attemptedExts = array()) {
+    $groupsMap  = isset($entities['all_groups']) ? $entities['all_groups'] : array();
+    $membersMap = isset($entities['all_group_members']) ? $entities['all_group_members'] : array();
+    $extNames   = isset($entities['extensions']) ? $entities['extensions'] : array();
+
+    $qNum = '';
+    if (!empty($raw_rg) && (isset($groupsMap[$raw_rg]) || is_numeric($raw_rg))) {
+        $qNum = $raw_rg;
+    } elseif (!empty($val_dst) && isset($groupsMap[$val_dst])) {
+        $qNum = $val_dst;
+    }
+
+    if (empty($qNum) || $qNum === '-') {
+        return "<span style='color:#cbd5e1;'>-</span>";
+    }
+
+    $qName = isset($groupsMap[$qNum]) && !empty($groupsMap[$qNum]) ? $groupsMap[$qNum] : "Fila $qNum";
+    $fullName = "$qNum - $qName";
+
+    $tooltip = "🏢 Fila / Grupo: $fullName";
+
+    if (isset($membersMap[$qNum]) && !empty($membersMap[$qNum])) {
+        $uniqueMembers = array_unique($membersMap[$qNum]);
+        $mStrList = array();
+        foreach ($uniqueMembers as $mExt) {
+            $mName = isset($extNames[$mExt]) ? " ({$extNames[$mExt]})" : "";
+            $mStrList[] = "• Ramal $mExt$mName";
+        }
+        $tooltip .= "\n👥 Ramais Configurados:\n  " . implode("\n  ", $mStrList);
+    }
+
+    if (!empty($attemptedExts) && is_array($attemptedExts)) {
+        $attStrList = array();
+        foreach ($attemptedExts as $aExt => $aInfo) {
+            $aName = isset($extNames[$aExt]) ? " ({$extNames[$aExt]})" : "";
+            $aDur = is_array($aInfo) && isset($aInfo['dur']) ? " - " . $aInfo['dur'] : (is_string($aInfo) ? " - $aInfo" : "");
+            $aSt = is_array($aInfo) && isset($aInfo['st']) ? " [{$aInfo['st']}]" : "";
+            $attStrList[] = "🔔 Ramal $aExt$aName$aDur$aSt";
+        }
+        $tooltip .= "\n\n📞 Tentativas de Toque nesta Chamada:\n  " . implode("\n  ", $attStrList);
+    }
+
+    return "<span title='" . htmlspecialchars($tooltip, ENT_QUOTES) . "' class='queue-badge-compact' style='cursor:help; background:linear-gradient(135deg, rgba(237,233,254,0.95), rgba(224,231,255,0.95)); color:#5b21b6; border:1px solid #c4b5fd; font-weight:700; padding:3px 9px; border-radius:8px; display:inline-flex; align-items:center; gap:5px; box-shadow:0 1px 2px rgba(124,58,237,0.08); transition:all 0.2s;'>🏢 " . htmlspecialchars($fullName) . "</span>";
 }
 
 function renderDirectionTrunkBadge($did, $raw_src, $val_dst, $channel = '', $dstchannel = '', $entities = array()) {
@@ -385,13 +556,15 @@ function renderDirectionTrunkBadge($did, $raw_src, $val_dst, $channel = '', $dst
     return "<span style='background:#f0fdf4; color:#166534; border:1px solid #bbf7d0; padding:4px 10px; border-radius:12px; font-weight:700; font-size:11px; display:inline-flex; align-items:center; gap:5px;'><i class='fa fa-arrow-down'></i> Entrada</span>";
 }
 
-function renderDestinationBadge($raw_dst, $raw_src = '', $entities = array(), $contactsMap = array(), $stats7d = array(), $did = '') {
+function renderDestinationBadge($raw_dst, $raw_src = '', $entities = array(), $contactsMap = array(), $stats7d = array(), $did = '', $dstchannel = '', $raw_st = '', $raw_rg = '') {
     if (empty($raw_dst) || $raw_dst == '-') {
         return "<span style='color:#cbd5e1;'>-</span>";
     }
 
     $val_dst_clean = preg_replace('/\D/', '', $raw_dst);
     $formatted_dst = formatPhoneBrCdr($raw_dst);
+    $extNames = isset($entities['extensions']) ? $entities['extensions'] : array();
+    $groupsMap = isset($entities['all_groups']) ? $entities['all_groups'] : array();
 
     // 1. EXTENSÃO 's' -> URA / Menu Automático / Início de Dialplan
     if (strtolower($raw_dst) === 's') {
@@ -405,7 +578,35 @@ function renderDestinationBadge($raw_dst, $raw_src = '', $entities = array(), $c
         return "<span title='" . htmlspecialchars($tooltip, ENT_QUOTES) . "' style='background:rgba(6,182,212,0.12); color:#0891b2; border:1px solid rgba(6,182,212,0.3); padding:3px 8px; border-radius:6px; font-weight:700; font-size:11px; display:inline-flex; align-items:center; gap:4px;'><i class='fa fa-phone-square'></i> Captura <span style='font-size:10px; color:#0e7490; font-weight:normal;'>({$raw_dst})</span></span>";
     }
 
-    // 3. OUTROS CÓDIGOS DE RECURSOS DO PBX (Feature Codes)
+    // 3. SE DESTINO OU ROTA FOR UMA FILA OU GRUPO:
+    $isQueueOrGroup = isset($groupsMap[$raw_dst]) || isset($groupsMap[$raw_rg]) || (!empty($raw_rg) && is_numeric($raw_rg));
+    if ($isQueueOrGroup) {
+        $qCode = isset($groupsMap[$raw_dst]) ? $raw_dst : $raw_rg;
+        $qName = isset($groupsMap[$qCode]) ? $groupsMap[$qCode] : "Fila $qCode";
+        
+        $ansExt = extractExtensionFromChannel($dstchannel);
+
+        if (strtoupper($raw_st) === 'ANSWERED' && !empty($ansExt)) {
+            $extName = isset($extNames[$ansExt]) ? $extNames[$ansExt] : '';
+            $label = !empty($extName) ? "Ramal $ansExt - $extName" : "Ramal $ansExt";
+            $tooltip = "👤 Atendido por: $label\n🏢 Entrada via Fila/Grupo: $qCode - $qName\n📟 Canal: $dstchannel";
+            return "<div style='display:inline-flex; align-items:center; gap:4px; flex-wrap:wrap;'>".
+                "<span title='" . htmlspecialchars($tooltip, ENT_QUOTES) . "' style='background:#f1f5f9; color:#0f172a; border:1px solid #cbd5e1; padding:3px 8px; border-radius:6px; font-weight:700; font-size:11px; display:inline-flex; align-items:center; gap:4px;'>".
+                "👤 " . htmlspecialchars($label) .
+                "</span>".
+                "</div>";
+        } elseif (strtoupper($raw_st) === 'ANSWERED') {
+            $label = !empty($qName) ? "Fila $qCode - $qName" : "Fila $qCode";
+            $tooltip = "✅ Chamada Atendida na Fila: $label";
+            return "<span title='" . htmlspecialchars($tooltip, ENT_QUOTES) . "' style='background:#ede9fe; color:#6d28d9; border:1px solid #ddd6fe; padding:3px 8px; border-radius:6px; font-weight:700; font-size:11px; display:inline-flex; align-items:center; gap:4px;'><i class='fa fa-users'></i> Atendida na " . htmlspecialchars($label) . "</span>";
+        } else {
+            $label = !empty($qName) ? "$qCode - $qName" : "$qCode";
+            $tooltip = "📵 Não Atendida / Abandonada na Fila: $label\nNenhum operador atendeu antes do encerramento.";
+            return "<span title='" . htmlspecialchars($tooltip, ENT_QUOTES) . "' style='color:#94a3b8; font-size:11px; font-weight:600; display:inline-flex; align-items:center; gap:4px;'><i class='fa fa-users'></i> " . htmlspecialchars($label) . " <span style='font-size:10px; color:#ef4444;'>(Não Atendeu)</span></span>";
+        }
+    }
+
+    // 4. OUTROS CÓDIGOS DE RECURSOS DO PBX (Feature Codes)
     if ($raw_dst === '*97' || $raw_dst === '*98') {
         return "<span title='📼 Correio de Voz / Caixa Postal' style='background:#fef3c7; color:#92400e; border:1px solid #fde68a; padding:3px 8px; border-radius:6px; font-weight:700; font-size:11px; display:inline-flex; align-items:center; gap:4px;'><i class='fa fa-envelope'></i> Caixa Postal ({$raw_dst})</span>";
     } elseif ($raw_dst === '*43') {
@@ -414,24 +615,8 @@ function renderDestinationBadge($raw_dst, $raw_src = '', $entities = array(), $c
         return "<span title='⚙️ Código de Serviço: {$raw_dst}' style='background:#f1f5f9; color:#475569; border:1px solid #e2e8f0; padding:3px 8px; border-radius:6px; font-weight:600; font-size:11px; display:inline-flex; align-items:center; gap:4px;'>⚙️ " . htmlspecialchars($raw_dst) . "</span>";
     }
 
-    // 4. FILA DE ATENDIMENTO (Queues)
-    if (isset($entities['queues'][$raw_dst])) {
-        $qName = $entities['queues'][$raw_dst];
-        $label = !empty($qName) ? "{$raw_dst} - {$qName}" : "Fila {$raw_dst}";
-        $tooltip = "👥 Fila de Atendimento: {$label}\nDistribuição de chamadas para a equipe de atendentes.";
-        return "<span title='" . htmlspecialchars($tooltip, ENT_QUOTES) . "' style='background:#ede9fe; color:#6d28d9; border:1px solid #ddd6fe; padding:3px 8px; border-radius:6px; font-weight:700; font-size:11px; display:inline-flex; align-items:center; gap:4px;'><i class='fa fa-users'></i> " . htmlspecialchars($label) . "</span>";
-    }
-
-    // 5. GRUPO DE CHAMADAS (Ring Groups)
-    if (isset($entities['ringgroups'][$raw_dst])) {
-        $rgName = $entities['ringgroups'][$raw_dst];
-        $label = !empty($rgName) ? "{$raw_dst} - {$rgName}" : "Grupo {$raw_dst}";
-        $tooltip = "🏢 Grupo de Ramais: {$label}\nToque sincronizado para o grupo de ramais.";
-        return "<span title='" . htmlspecialchars($tooltip, ENT_QUOTES) . "' style='background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd; padding:3px 8px; border-radius:6px; font-weight:700; font-size:11px; display:inline-flex; align-items:center; gap:4px;'><i class='fa fa-building'></i> " . htmlspecialchars($label) . "</span>";
-    }
-
-    // 6. RAMAL INTERNO (asterisk.users ou 2 a 5 dígitos numéricos)
-    $extName = isset($entities['extensions'][$raw_dst]) ? $entities['extensions'][$raw_dst] : (isset($entities['extensions'][$val_dst_clean]) ? $entities['extensions'][$val_dst_clean] : '');
+    // 5. RAMAL INTERNO DIRETO (asterisk.users ou 2 a 5 dígitos numéricos)
+    $extName = isset($extNames[$raw_dst]) ? $extNames[$raw_dst] : (isset($extNames[$val_dst_clean]) ? $extNames[$val_dst_clean] : '');
     $isExtNum = (strlen($val_dst_clean) >= 2 && strlen($val_dst_clean) <= 5 && is_numeric($val_dst_clean));
 
     if (!empty($extName) || $isExtNum) {
@@ -440,7 +625,7 @@ function renderDestinationBadge($raw_dst, $raw_src = '', $entities = array(), $c
         return "<span title='" . htmlspecialchars($tooltip, ENT_QUOTES) . "' style='background:#f1f5f9; color:#334155; border:1px solid #e2e8f0; padding:3px 8px; border-radius:6px; font-weight:600; font-size:11px; display:inline-flex; align-items:center; gap:4px;'>👤 " . htmlspecialchars($label) . "</span>";
     }
 
-    // 7. CONTATO DA AGENDA PÚBLICA (Address Book)
+    // 6. CONTATO DA AGENDA PÚBLICA (Address Book)
     $contact = null;
     if (isset($contactsMap[$raw_dst])) {
         $contact = $contactsMap[$raw_dst];
@@ -461,7 +646,7 @@ function renderDestinationBadge($raw_dst, $raw_src = '', $entities = array(), $c
             "</div>";
     }
 
-    // 8. NÚMERO EXTERNO (PSTN / Celular / Fixo)
+    // 7. NÚMERO EXTERNO (PSTN / Celular / Fixo)
     $tooltip = "📞 Número Externo: {$formatted_dst}";
     $html = "<div style='display:inline-flex; align-items:center; gap:6px;'>".
         "<span title='" . htmlspecialchars($tooltip, ENT_QUOTES) . "' style='font-weight:600; color:#1e293b; cursor:help;'>📞 " . htmlspecialchars($formatted_dst) . "</span>";
@@ -1284,6 +1469,12 @@ function handleCdrExportExcel($oCDR, $module_name)
         $min_duration = 1;
     }
 
+    $dsn_asterisk = generarDSNSistema('asteriskuser', 'asterisk');
+    $pDB_asterisk = new paloDB($dsn_asterisk);
+    $entitiesMaps = getAsteriskEntitiesMaps($pDB_asterisk);
+    $groupsMap    = $entitiesMaps['all_groups'];
+    $extNamesMap  = $entitiesMaps['extensions'];
+
     $paramFiltro = array(
         'date_start'    => $date_start . ' 00:00:00',
         'date_end'      => $date_end . ' 23:59:59',
@@ -1296,6 +1487,8 @@ function handleCdrExportExcel($oCDR, $module_name)
     );
 
     $arrResult = $oCDR->listarCDRs($paramFiltro, 100000, 0, true);
+    $rawListAll = is_array($arrResult['cdrs']) ? $arrResult['cdrs'] : array();
+    $rawList = consolidateCdrQueueLegs($rawListAll, $groupsMap);
 
     header('Content-Type: text/csv; charset=utf-8');
     header('Content-Disposition: attachment; filename=Relatorio_Ligacoes_' . date('Ymd_His') . '.csv');
@@ -1304,37 +1497,45 @@ function handleCdrExportExcel($oCDR, $module_name)
     fprintf($output, chr(0xEF).chr(0xBB).chr(0xBF));
     fputcsv($output, array('Data/Hora', 'Origem', 'Grupo/Fila', 'Destino', 'Canal Origem', 'Canal Destino', 'Status', 'Duracao', 'DID', 'Gravacao'), ';');
 
-    if (is_array($arrResult['cdrs'])) {
-        foreach ($arrResult['cdrs'] as $r) {
-            $srcNum = !empty($r[1]) ? $r[1] : '';
-            $dstNum = !empty($r[2]) ? $r[2] : '';
-            $didNum = !empty($r[16]) ? $r[16] : '';
-            $sDigits = preg_replace('/\D/', '', (string)$srcNum);
-            $dDigits = preg_replace('/\D/', '', (string)$dstNum);
-            $isInternal = (empty($didNum) || $didNum == '-') && (!empty($sDigits) && strlen($sDigits) <= 5 && !empty($dDigits) && strlen($dDigits) <= 5);
+    foreach ($rawList as $r) {
+        $srcNum = !empty($r[1]) ? $r[1] : '';
+        $dstNum = !empty($r[2]) ? $r[2] : '';
+        $didNum = !empty($r[16]) ? $r[16] : '';
+        $sDigits = preg_replace('/\D/', '', (string)$srcNum);
+        $dDigits = preg_replace('/\D/', '', (string)$dstNum);
+        $isInternal = (empty($didNum) || $didNum == '-') && (!empty($sDigits) && strlen($sDigits) <= 5 && !empty($dDigits) && strlen($dDigits) <= 5);
 
-            if ($call_scope == 'internal' && !$isInternal) continue;
-            if ($call_scope == 'external' && $isInternal) continue;
+        if ($call_scope == 'internal' && !$isInternal) continue;
+        if ($call_scope == 'external' && $isInternal) continue;
 
-            $durSecs = (int)$r[8];
-            if ($min_duration > 0 && $durSecs < $min_duration) continue;
+        $durSecs = (int)$r[8];
+        if ($min_duration > 0 && $durSecs < $min_duration) continue;
 
-            $recInfo = resolveCdrRecording($r);
-            if ($only_recorded == 1 && !$recInfo['valid']) continue;
+        $recInfo = resolveCdrRecording($r);
+        if ($only_recorded == 1 && !$recInfo['valid']) continue;
 
-            $dt     = formatDateBrCdr($r[0]);
-            $src    = !empty($r[1]) ? $r[1] : '-';
-            $rg     = !empty($r[11]) ? $r[11] : '-';
-            $dst    = !empty($r[2]) ? $r[2] : '-';
-            $cSrc   = !empty($r[3]) ? $r[3] : '-';
-            $cDst   = !empty($r[4]) ? $r[4] : '-';
-            $st     = !empty($r[5]) ? $r[5] : '-';
-            $dur    = formatSecsCdr($r[8]);
-            $did    = !empty($r[16]) ? $r[16] : '-';
-            $rec    = $recInfo['valid'] ? $recInfo['filename'] : '-';
+        $dt     = formatDateBrCdr($r[0]);
+        $src    = !empty($r[1]) ? $r[1] : '-';
+        $raw_rg = !empty($r[11]) ? trim($r[11]) : '';
+        $cSrc   = !empty($r[3]) ? $r[3] : '-';
+        $cDst   = !empty($r[4]) ? $r[4] : '-';
+        $st     = !empty($r[5]) ? $r[5] : '-';
+        $dur    = formatSecsCdr($r[8]);
+        $did    = !empty($r[16]) ? $r[16] : '-';
+        $rec    = $recInfo['valid'] ? $recInfo['filename'] : '-';
 
-            fputcsv($output, array($dt, $src, $rg, $dst, $cSrc, $cDst, $st, $dur, $did, $rec), ';');
+        $qCode = isset($groupsMap[$dstNum]) ? $dstNum : (isset($groupsMap[$raw_rg]) ? $raw_rg : '');
+        $rg = !empty($qCode) ? "$qCode - " . (isset($groupsMap[$qCode]) ? $groupsMap[$qCode] : '') : (!empty($raw_rg) ? $raw_rg : '-');
+
+        $ansExt = extractExtensionFromChannel($cDst);
+        if (!empty($ansExt) && strtoupper($st) === 'ANSWERED' && !empty($qCode)) {
+            $extName = isset($extNamesMap[$ansExt]) ? $extNamesMap[$ansExt] : '';
+            $dst = !empty($extName) ? "Ramal $ansExt - $extName (via Fila $qCode)" : "Ramal $ansExt (via Fila $qCode)";
+        } else {
+            $dst = !empty($dstNum) ? $dstNum : '-';
         }
+
+        fputcsv($output, array($dt, $src, $rg, $dst, $cSrc, $cDst, $st, $dur, $did, $rec), ';');
     }
     fclose($output);
     exit;
@@ -1358,6 +1559,12 @@ function handleCdrExportPdf($oCDR, $module_name)
         $min_duration = 1;
     }
 
+    $dsn_asterisk = generarDSNSistema('asteriskuser', 'asterisk');
+    $pDB_asterisk = new paloDB($dsn_asterisk);
+    $entitiesMaps = getAsteriskEntitiesMaps($pDB_asterisk);
+    $groupsMap    = $entitiesMaps['all_groups'];
+    $extNamesMap  = $entitiesMaps['extensions'];
+
     $paramFiltro = array(
         'date_start'    => $date_start . ' 00:00:00',
         'date_end'      => $date_end . ' 23:59:59',
@@ -1370,27 +1577,28 @@ function handleCdrExportPdf($oCDR, $module_name)
     );
 
     $arrResult = $oCDR->listarCDRs($paramFiltro, 100000, 0, true);
+    $rawListAll = is_array($arrResult['cdrs']) ? $arrResult['cdrs'] : array();
+    $rawList = consolidateCdrQueueLegs($rawListAll, $groupsMap);
+
     $cdrsPdf = array();
-    if (is_array($arrResult['cdrs'])) {
-        foreach ($arrResult['cdrs'] as $r) {
-            $srcNum = !empty($r[1]) ? $r[1] : '';
-            $dstNum = !empty($r[2]) ? $r[2] : '';
-            $didNum = !empty($r[16]) ? $r[16] : '';
-            $sDigits = preg_replace('/\D/', '', (string)$srcNum);
-            $dDigits = preg_replace('/\D/', '', (string)$dstNum);
-            $isInternal = (empty($didNum) || $didNum == '-') && (!empty($sDigits) && strlen($sDigits) <= 5 && !empty($dDigits) && strlen($dDigits) <= 5);
+    foreach ($rawList as $r) {
+        $srcNum = !empty($r[1]) ? $r[1] : '';
+        $dstNum = !empty($r[2]) ? $r[2] : '';
+        $didNum = !empty($r[16]) ? $r[16] : '';
+        $sDigits = preg_replace('/\D/', '', (string)$srcNum);
+        $dDigits = preg_replace('/\D/', '', (string)$dstNum);
+        $isInternal = (empty($didNum) || $didNum == '-') && (!empty($sDigits) && strlen($sDigits) <= 5 && !empty($dDigits) && strlen($dDigits) <= 5);
 
-            if ($call_scope == 'internal' && !$isInternal) continue;
-            if ($call_scope == 'external' && $isInternal) continue;
+        if ($call_scope == 'internal' && !$isInternal) continue;
+        if ($call_scope == 'external' && $isInternal) continue;
 
-            $durSecs = (int)$r[8];
-            if ($min_duration > 0 && $durSecs < $min_duration) continue;
+        $durSecs = (int)$r[8];
+        if ($min_duration > 0 && $durSecs < $min_duration) continue;
 
-            $recInfo = resolveCdrRecording($r);
-            if ($only_recorded == 1 && !$recInfo['valid']) continue;
+        $recInfo = resolveCdrRecording($r);
+        if ($only_recorded == 1 && !$recInfo['valid']) continue;
 
-            $cdrsPdf[] = $r;
-        }
+        $cdrsPdf[] = $r;
     }
 
     ?>
@@ -1583,7 +1791,8 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
     );
 
     $arrResultAll = $oCDR->listarCDRs($paramFiltro, 100000, 0, true);
-    $rawList      = is_array($arrResultAll['cdrs']) ? $arrResultAll['cdrs'] : array();
+    $rawListAll   = is_array($arrResultAll['cdrs']) ? $arrResultAll['cdrs'] : array();
+    $rawList      = consolidateCdrQueueLegs($rawListAll, $groupsMap);
 
     // Helper to check if a call is internal (Ramal para Ramal)
     $fnIsInternalCdr = function($src, $dst, $did) {
@@ -2395,7 +2604,7 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
                         }
                         $abContactsMap = getAddressBookContactsMap();
                         $stats7dMap = getCdr7DaysStatsMap($pageSrcList, $pDB);
-                        $entitiesMaps = getAsteriskEntitiesMaps($pDB);
+                        $entitiesMaps = getAsteriskEntitiesMaps($pDB_asterisk);
                         $extNamesMap = $entitiesMaps['extensions'];
                         $groupsMap = $entitiesMaps['all_groups'];
                         ?>
@@ -2406,25 +2615,23 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
                             $val_src   = formatPhoneBrCdr($raw_src);
                             $raw_rg    = !empty($r[11]) ? trim($r[11]) : '';
                             $val_dst   = !empty($r[2]) ? $r[2] : '-';
+                            $channel   = !empty($r[3]) ? $r[3] : '';
+                            $dstchannel = !empty($r[4]) ? $r[4] : '';
                             $raw_st    = strtoupper(trim($r[5]));
                             $val_dur   = formatSecsCdr($r[8]);
                             $uniqueId  = !empty($r[6]) ? $r[6] : '';
                             $did       = !empty($r[16]) ? $r[16] : '-';
+                            $attemptedExts = isset($r['attempted_exts']) ? $r['attempted_exts'] : array();
 
                             $recInfo   = resolveCdrRecording($r);
                             $recFile   = $recInfo['filename'];
                             $hasValidAudio = $recInfo['valid'];
 
-                            if (!empty($raw_rg) && isset($groupsMap[$raw_rg])) {
-                                $fullName = "$raw_rg - " . $groupsMap[$raw_rg];
-                                $val_rg_html = "<span title='" . htmlspecialchars($fullName, ENT_QUOTES) . "' class='queue-badge-compact'>🏢 $raw_rg</span>";
-                            } elseif (!empty($raw_rg) && is_numeric($raw_rg) && strlen($raw_rg) >= 3) {
-                                $val_rg_html = "<span title='Fila / Grupo $raw_rg' class='queue-badge-compact'>🏢 $raw_rg</span>";
-                            } else {
-                                $val_rg_html = "<span style='color:#cbd5e1;'>-</span>";
-                            }
+                            $val_rg_html  = renderQueueGroupBadge($raw_rg, $val_dst, $entitiesMaps, $attemptedExts);
+                            $val_dst_html = renderDestinationBadge($val_dst, $raw_src, $entitiesMaps, $abContactsMap, $stats7dMap, $did, $dstchannel, $raw_st, $raw_rg);
 
-                            $val_dst_html = renderDestinationBadge($val_dst, $raw_src, $entitiesMaps, $abContactsMap, $stats7dMap, $did);
+                            $ansExt = extractExtensionFromChannel($dstchannel);
+                            $targetLabel = (!empty($ansExt) && isset($extNamesMap[$ansExt])) ? "Ramal $ansExt - {$extNamesMap[$ansExt]}" : ((!empty($ansExt)) ? "Ramal $ansExt" : $val_dst);
                             ?>
                             <tr>
                                 <td><span style='color:#334155; font-size:11px; font-weight:600;'>📅 <?php echo htmlspecialchars($val_data); ?></span></td>
@@ -2451,8 +2658,6 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
                                 <td><span style='color:#0f172a; font-weight:700; font-size:11px;'>⏱️ <?php echo htmlspecialchars($val_dur); ?></span></td>
                                 <td>
                                     <?php
-                                    $channel = !empty($r[3]) ? $r[3] : '';
-                                    $dstchannel = !empty($r[4]) ? $r[4] : '';
                                     echo renderDirectionTrunkBadge($did, $raw_src, $val_dst, $channel, $dstchannel, $entitiesMaps);
                                     ?>
                                 </td>
@@ -2464,7 +2669,7 @@ function renderFullCdrDashboard($oCDR, $pDB, $module_name, $smarty)
                                         $downUrl   = "?menu=" . htmlspecialchars($module_name) . "&rawmode=yes&action=download_audio&file=" . $fileEnc;
                                         ?>
                                         <div style="display:flex; gap:6px; align-items:center;">
-                                            <button type="button" onclick="playCdrAudio('<?php echo htmlspecialchars($streamUrl, ENT_QUOTES); ?>', '<?php echo htmlspecialchars($raw_src, ENT_QUOTES); ?>', '<?php echo htmlspecialchars($val_dst, ENT_QUOTES); ?>', '<?php echo htmlspecialchars($downUrl, ENT_QUOTES); ?>')" style="background: linear-gradient(135deg, #7c3aed, #6d28d9); color: #ffffff; border: none; padding: 4px 10px; border-radius: 20px; font-weight: 700; font-size: 10px; cursor: pointer; box-shadow: 0 2px 6px rgba(124,58,237,0.3); transition: all 0.2s;" title="🎧 Ouvir Gravação">▶ Ouvir</button>
+                                            <button type="button" onclick="playCdrAudio('<?php echo htmlspecialchars($streamUrl, ENT_QUOTES); ?>', '<?php echo htmlspecialchars($raw_src, ENT_QUOTES); ?>', '<?php echo htmlspecialchars($targetLabel, ENT_QUOTES); ?>', '<?php echo htmlspecialchars($downUrl, ENT_QUOTES); ?>')" style="background: linear-gradient(135deg, #7c3aed, #6d28d9); color: #ffffff; border: none; padding: 4px 10px; border-radius: 20px; font-weight: 700; font-size: 10px; cursor: pointer; box-shadow: 0 2px 6px rgba(124,58,237,0.3); transition: all 0.2s;" title="🎧 Ouvir Gravação">▶ Ouvir</button>
                                             <a href="<?php echo htmlspecialchars($downUrl, ENT_QUOTES); ?>" target="_blank" style="background: rgba(255,255,255,0.08); color: #6d28d9; border: 1px solid rgba(124,58,237,0.4); padding: 3px 9px; border-radius: 20px; font-weight: 600; font-size: 10px; text-decoration: none; transition: all 0.2s;" title="⬇️ Baixar Arquivo de Áudio">⬇️ Baixar</a>
                                         </div>
                                     <?php else: ?>
