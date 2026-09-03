@@ -1,5 +1,20 @@
-# Issabel LDAP Directory
-A simple LDAP server to serve Issabel address book and extensions contacts
+# 📇 Servidor LDAP de Ramais e Agenda (`issabel-ldap`)
+
+Servidor LDAP leve e de alto desempenho para sincronizar em tempo real a lista de ramais do Asterisk/FreePBX e os contatos da Agenda telefônica do Issabel com aparelhos telefônicos IP (Grandstream, Fanvil, Yealink, Snom, Intelbras).
+
+---
+
+## 📌 Opção do Menu Interativo: **[18] Servidor LDAP**
+
+Ao selecionar a opção **`[18]`** no menu **`ipbx-update`** (`ipbx-menu.sh`), o binário compilado `/usr/local/bin/issabel-ldap` e o serviço systemd `issabel-ldap.service` são instalados, com porta **10389/TCP** liberada no firewall/iptables e senha configurada.
+
+### 🔑 Credenciais e Parâmetros Padrão do Projeto:
+- **Porta:** `10389` (TCP)
+- **Base DN:** `dc=pbx,dc=com`
+- **Usuário Administrador (Bind DN):** `cn=admin,dc=pbx,dc=com`
+- **Senha Padrão:** `Prisma@500` (configurada em `/etc/sysconfig/issabel-ldap`)
+
+---
 
 ## How it works
 It starts the LDAP service on port 10389 and responds to directory search 
@@ -8,7 +23,7 @@ and Issabel SQLite Address book
 
 If a ldap password is supplied in startup parameters, then ldap queries will
 be authenticated with user: cn=admin,dc=pbx,dc=com and the password supplied
-in the command line -ldappass parameter
+in the command line -ldappass parameter (Default: `Prisma@500`)
 
 If no ldap password is supplied, then the server will allow anonymous/guest
 queries with no authentication

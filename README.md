@@ -40,6 +40,7 @@ O menu interativo permite escolher exatamente o que deseja atualizar, recarrega 
 ╔══════════════════════════════════════════════════════════════════════╗
 ║       IPBX PRISMA TELECOM - MENU DE ATUALIZAÇÃO MODULAR              ║
 ╠══════════════════════════════════════════════════════════════════════╣
+║                                                                      ║
 ║  APARÊNCIA E INTERFACE                                               ║
 ║   [1]  Terminal (MOTD)              [2]  Tema e Favicon              ║
 ║   [3]  Painel Admin                [4]  Traduções (lang)             ║
@@ -57,17 +58,112 @@ O menu interativo permite escolher exatamente o que deseja atualizar, recarrega 
 ║   [15] Call Center                 [16] ChanSpy (Escuta)             ║
 ║   [17] Mensagens Texto (PJSIP)     [18] Servidor LDAP                ║
 ║                                                                      ║
-║  SISTEMA E CONFIGURAÇÕES                                             ║
-║   [19] Música de Espera (MOH)      [20] Telegram (Notificações)      ║
+║  SISTEMA, SEGURANÇA E REDE                                           ║
+║   [19] Música de Espera (MOH)      [20] Monitor Segurança Telegram   ║
 ║   [21] Ferramentas Diagnóstico     [22] Features Asterisk            ║
 ║   [23] PJSIP User-Agent            [24] Auto-Update Semanal          ║
-║   [25] Web Developer               [26] Instalar Rollback            ║
+║   [25] Web Developer               [26] Configurar Domínio e SSL     ║
+║   [27] Limpeza de Logs e Disco     [28] Servidor OpenVPN (EasyVPN)   ║
+║   [29] Rollback (Restauro/Instalar)[30] Data/Hora e NTP (São Paulo)  ║
 ║                                                                      ║
 ╠══════════════════════════════════════════════════════════════════════╣
 ║   [A]  INSTALAR TUDO (igual ao install.sh completo)                  ║
 ║   [0]  Sair                                                          ║
 ╚══════════════════════════════════════════════════════════════════════╝
 ```
+
+---
+
+## 📖 Guia Completo: O que faz cada opção do Menu Modular
+
+| Opção | Nome da Opção | O que faz no Sistema | Arquivos / Pastas Afetados |
+| :---: | :--- | :--- | :--- |
+| **`[1]`** | **Terminal (MOTD)** | Instala a tela de boas-vindas do terminal SSH com logotipo da Prisma Telecom, status de serviços, IPs e contatos de suporte. | `scripts/motd.sh` ➔ `/etc/profile.d/motd.sh` |
+| **`[2]`** | **Tema e Favicon** | Aplica o tema escuro moderno **Prisma v5** (glassmorphism/paleta escura), define o favicon customizado e ativa o tema em `settings.db`. | `src/themes/prisma_v5/`, `src/favicon.ico` |
+| **`[3]`** | **Painel Admin** | Atualiza os scripts da interface administrativa do IssabelPBX/FreePBX, corrigindo compatibilidade com PHP 7/8 e sessões web. | `src/admin/` ➔ `/var/www/html/admin/` |
+| **`[4]`** | **Traduções (lang)** | Instala os dicionários traduzidos para Português do Brasil (`pt-br.lang`), corrigindo termos em espanhol/inglês. | `src/lang/` ➔ `/var/www/html/lang/` |
+| **`[5]`** | **Módulos Web (todos)** | Atualiza todos os módulos web do Issabel de uma só vez, aplicando permissões `asterisk:asterisk`. | `src/modules/` ➔ `/var/www/html/modules/` |
+| **`[6]`** | **Agenda Telefônica** | Instala a interface web da Agenda Telefônica e sincroniza o banco SQLite com a lista de discagem rápida. | `src/agenda.php`, `scripts/update-addressbook` |
+| **`[7]`** | **Webphone WebRTC** | Instala o softphone WebRTC no navegador com suporte a WSS (porta 8089), PWA e codecs Opus/G.711. | `src/webphone/` ➔ `/var/www/html/webphone/` |
+| **`[8]`** | **Click-to-Dial** | Configura a API de discagem rápida no PBX e disponibiliza a extensão para navegadores Chrome/Edge. | `src/extensions/` ➔ `/var/www/html/` |
+| **`[9]`** | **Painel IPbx** | Instala e atualiza o painel visual com status de ramais, troncos e filas em tempo real. | `src/modules/control_panel/`, `_issabelpanel/` |
+| **`[10]`** | **Nome dos Ramais** | Instala o módulo para personalização e exibição de apelidos/nomes dos ramais nos relatórios. | `src/nome_ramais/` ➔ `/var/www/html/modules/nome_ramais/` |
+| **`[11]`** | **Relatório Geral (CDR)** | Instala o relatório de chamadas CDR com player flutuante em HTML5 `<dialog>` nativo na Top Layer, downloads e filtros. | `src/modules/cdrreport/`, `src/modules/asternic_cdr/` |
+| **`[12]`** | **Relatório de Filas** | Atualiza os relatórios de atendimento, tempo médio de espera, tempo de atendimento (TMA) e abandono de chamadas. | `src/modules/relatorio_de_filas/`, `src/modules/queues/` |
+| **`[13]`** | **Relatórios Extras** | Instala gráficos de volume de tráfego, relatório de chamadas perdidas e distribuição por canal. | `src/modules/graphic_report/`, `summary_by_extension/`, etc. |
+| **`[14]`** | **Pesquisa de Satisfação** | Instala a URA de pesquisa (notas de 1 a 5 após a chamada) e o módulo web de auditoria das respostas. | `src/dialplan/pesquisa_satisfacao.conf`, `src/modules/pesquisa/` |
+| **`[15]`** | **Call Center** | Atualiza a console do agente, discadores preditivos/progressivos, pausas e campanhas ativas e receptivas. | `src/modules/callcenter_config/`, `src/modules/agent_console/` |
+| **`[16]`** | **ChanSpy (Escuta)** | Configura os dialplans de monitoramento em tempo real (escuta secreta, sussurro e intervenção em chamada). | `src/dialplan/chanspy.conf` ➔ `/etc/asterisk/chanspy.conf` |
+| **`[17]`** | **Mensagens Texto (PJSIP)** | Habilita o roteamento de mensagens de texto instantâneas (SIP MESSAGE) entre ramais PJSIP e softphones. | `src/dialplan/textmessages.conf` ➔ `/etc/asterisk/textmessages.conf` |
+| **`[18]`** | **Servidor LDAP** | Instala o servidor `issabel-ldap` nativo na porta 10389 com credenciais padronizadas (`Prisma@500`) e regras de firewall/iptables. | `src/ldap/issabel-ldap`, `/etc/sysconfig/issabel-ldap` |
+| **`[19]`** | **Música de Espera (MOH)** | Instala a coleção de músicas de espera em alta fidelidade e áudios padronizados para o Asterisk. | `src/sounds/moh/` ➔ `/var/lib/asterisk/moh/` |
+| **`[20]`** | **Monitor Segurança Telegram** | Configura o bot de monitoramento no Telegram para alertas em tempo real de web shells (Emad), firewall e novos usuários. | `scripts/monitor_prisma.sh` ➔ `/etc/cron.d/monitor_prisma` |
+| **`[21]`** | **Ferramentas Diagnóstico** | Instala utilitários essenciais de terminal (`tcpdump`, `sngrep`, `nmtui`) e a API de diagnóstico AMI de ramais. | `src/ramais/` ➔ `/var/www/html/ramais/` |
+| **`[22]`** | **Features Asterisk** | Ajusta os timeouts de transferência para 7s / 30s e ativa os BIPs de confirmação (`courtesytone=beep`). | `src/dialplan/features_general_custom.conf` |
+| **`[23]`** | **PJSIP User-Agent** | Padroniza o cabeçalho `User-Agent: IPBX PRISMA` no transporte SIP/PJSIP para maior segurança contra scanners. | `/etc/asterisk/pjsip.transports_custom.conf` |
+| **`[24]`** | **Auto-Update Semanal** | Instala a rotina automática no cron semanal para manter correções de segurança e relatórios sempre sincronizados. | `scripts/ipbx-autoupdate.sh` ➔ `/etc/cron.weekly/ipbx-autoupdate` |
+| **`[25]`** | **Web Developer** | Instala o módulo de desenvolvimento para inspecionar banco de dados, compilar Smarty e testar códigos PHP. | `src/modules/web_developer/` |
+| **`[26]`** | **Configurar Domínio e SSL** | Executa o assistente `auto_dominio.sh` para apontar o domínio do cliente, emitir SSL Let's Encrypt e sincronizar WSS. | `scripts/auto_dominio.sh` |
+| **`[27]`** | **Limpeza de Logs e Disco** | Executa a limpeza segura de logs truncando arquivos >50MB e liberando espaço sem apagar CDRs ou gravações. | `scripts/limpa_logs.sh` |
+| **`[28]`** | **Servidor OpenVPN (EasyVPN)** | Instala o servidor OpenVPN corporativo com Easy-RSA 3.0.8, painel web `ovpn2`, rotas e regras NAT para ramais remotos. | `scripts/ipbx-openvpn.sh`, `scripts/ipbx-openvpn-sync.sh` |
+| **`[29]`** | **Rollback (Restauro/Instalar)** | Abre o assistente de restauração por data/hora para reverter qualquer alteração com zero perda de dados. | `rollback.sh` ➔ `/usr/local/bin/ipbx-rollback` |
+| **`[30]`** | **Data/Hora e NTP (São Paulo)** | Ajusta timezone oficial `America/Sao_Paulo` (Brasília) no Linux, PHP e Asterisk, sincronizando com servidores NTP. | `scripts/ipbx-timezone.sh` |
+| **`[A]`** | **INSTALAR TUDO** | Executa a suíte completa de atualização com criação prévia de snapshot, igual ao `install.sh`. | Aplica todas as opções [1] a [30] em lote |
+| **`[0]`** | **Sair** | Encerra o menu interativo com segurança. | N/A |
+
+---
+
+## 📇 Servidor LDAP de Ramais (Opção [18]) & Provisionamento Grandstream GDMS
+
+O servidor LDAP nativo (`issabel-ldap`) roda como serviço em segundo plano na porta **`10389`** (TCP), permitindo que aparelhos IP consultem ramais e a agenda corporativa em tempo real.
+
+### 🔑 Credenciais Padronizadas:
+- **Endereço do Servidor:** Domínio FQDN ou IP do PABX do cliente (ex: `cliente.ipbxprisma.cloud`)
+- **Porta:** `10389`
+- **Base DN:** `dc=pbx,dc=com`
+- **Usuário Administrador (Bind DN):** `cn=admin,dc=pbx,dc=com`
+- **Senha Padrão:** `Prisma@500` (configurada em `/etc/sysconfig/issabel-ldap`)
+
+### 📋 Template XML Pronto para o GDMS da Grandstream:
+Para provisionar centenas de aparelhos via nuvem no GDMS com 1 clique:
+
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<gs_provision>
+    <config version="2">
+        <item name="ldap">
+            <!-- Endereço do Servidor do Cliente -->
+            <part name="server">cliente.ipbxprisma.cloud</part>
+            <part name="port">10389</part>
+            <part name="base">dc=pbx,dc=com</part>
+            <part name="protocol">LDAP</part>
+            <part name="version">3</part>
+            <part name="username">cn=admin,dc=pbx,dc=com</part>
+            <part name="password">Prisma@500</part>
+            <part name="ldapDisplayName">%cn</part>
+            <part name="ldapNumberFilter">(homePhone=%)</part>
+            <part name="ldapNumberAttributes">homePhone</part>
+            <part name="ldapNameFilter">(|(cn=%)(displayName=%))</part>
+            <part name="ldapNameAttributes">cn displayName</part>
+            <part name="ldapMailFilter"></part>
+            <part name="ldapMailAttributes"></part>
+            <part name="ldapPositionFilter"></part>
+            <part name="ldapPositionAttributes"></part>
+            <part name="ldapDepartmentFilter"></part>
+            <part name="ldapDepartmentAttributes"></part>
+        </item>
+    </config>
+</gs_provision>
+```
+
+### 🧪 Teste Rápido no Terminal do PBX:
+```bash
+ldapsearch -x -H ldap://127.0.0.1:10389 \
+  -D "cn=admin,dc=pbx,dc=com" \
+  -w "Prisma@500" \
+  -b "dc=pbx,dc=com" "(homePhone=*)"
+```
+
 
 ---
 

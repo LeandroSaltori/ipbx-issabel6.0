@@ -1,6 +1,12 @@
-# 📞 Módulo e API de Ramais
+# 📞 Módulo e API de Ramais (`src/ramais/`)
 
 Este módulo fornece interface e scripts PHP para comunicação AMI (Asterisk Manager Interface), testes de registros de ramais e status do PABX.
+
+---
+
+## 📌 Opção do Menu Interativo: **[21] Ferramentas Diagnóstico**
+
+Ao selecionar a opção **`[21]`** no menu **`ipbx-update`** (`ipbx-menu.sh`), esta API é instalada em `/var/www/html/ramais/` juntamente com utilitários de rede (`tcpdump`, `sngrep`, `nmtui`).
 
 ## 📁 Arquivos Incluídos
 
