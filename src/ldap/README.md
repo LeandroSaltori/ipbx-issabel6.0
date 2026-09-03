@@ -195,17 +195,18 @@ LDAP Sorting Results: Enabled
 ```
 ### GrandStream Phones
 
+#### Configuração Manual na Interface Web:
 ```
 LDAP Protocol: LDAP
-Dirección del servidor: 172.16.1.242
+Dirección del servidor: IP_DO_PABX
 Puerto: 10389
-Base: asterisk
-Nombre de Usuario: cn-admin,dc=pbx,dc=com
-Contraseña: password
+Base: dc=pbx,dc=com
+Nombre de Usuario: cn=admin,dc=pbx,dc=com
+Contraseña: issabelPBX
 LDAP Numero de Filtro: (|(telephoneNumber=%)(homePhone=%))
-LDAP Nombre de Filtro: (|(cn=%)(sn=%))
+LDAP Nombre de Filtro: (|(cn=%)(displayName=%))
 versión LDAP: 3
-LDAP Nombre de Atributos: cn sn an
+LDAP Nombre de Atributos: cn displayName
 LDAP Numero de Atributos: telephoneNumber homePhone
 LDAP Mostar el Nombre: %cn
 Max. Visitas: 50
@@ -213,3 +214,33 @@ Búsqueda de tiempo de espera: 30
 Búsqueda LDAP: check Llamadas Entrantes y Llamadas Salientes
 Busqueda de nombre para mostrar: %cn
 ```
+
+#### Template XML para Provisionamento Automático via GDMS:
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<gs_provision>
+    <config version="2">
+        <item name="ldap">
+            <part name="server">SEU_DOMINIO_OU_IP</part>
+            <part name="port">10389</part>
+            <part name="base">dc=pbx,dc=com</part>
+            <part name="protocol">LDAP</part>
+            <part name="version">3</part>
+            <part name="username">cn=admin,dc=pbx,dc=com</part>
+            <part name="password">issabelPBX</part>
+            <part name="ldapDisplayName">%cn</part>
+            <part name="ldapNumberFilter">(homePhone=%)</part>
+            <part name="ldapNumberAttributes">homePhone</part>
+            <part name="ldapNameFilter">(|(cn=%)(displayName=%))</part>
+            <part name="ldapNameAttributes">cn displayName</part>
+            <part name="ldapMailFilter"></part>
+            <part name="ldapMailAttributes"></part>
+            <part name="ldapPositionFilter"></part>
+            <part name="ldapPositionAttributes"></part>
+            <part name="ldapDepartmentFilter"></part>
+            <part name="ldapDepartmentAttributes"></part>
+        </item>
+    </config>
+</gs_provision>
+```
+

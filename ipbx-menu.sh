@@ -1114,6 +1114,17 @@ update_ldap() {
             firewall-cmd --reload 2>/dev/null || true
         fi
 
+        # Libera porta 10389 no iptables caso ativo
+        if command -v iptables &>/dev/null; then
+            iptables -C INPUT -p tcp --dport 10389 -j ACCEPT 2>/dev/null || iptables -I INPUT -p tcp --dport 10389 -j ACCEPT 2>/dev/null || true
+            service iptables save 2>/dev/null || iptables-save > /etc/sysconfig/iptables 2>/dev/null || true
+        fi
+
+        # Garante permissões para o usuário asterisk ler configs e agenda
+        chown root:asterisk /etc/issabel.conf 2>/dev/null || true
+        chmod 644 /etc/issabel.conf 2>/dev/null || chmod 660 /etc/issabel.conf 2>/dev/null || true
+        chown -R asterisk:asterisk /var/www/db 2>/dev/null || true
+
         systemctl daemon-reload
         systemctl enable issabel-ldap.service 2>/dev/null || true
         systemctl restart issabel-ldap.service 2>/dev/null || true
