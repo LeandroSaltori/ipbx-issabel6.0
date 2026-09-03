@@ -20,7 +20,7 @@ Este manual orienta a configuração do **Servidor LDAP de Ramais e Agenda** nos
 - **Port:** `10389`
 - **Base DN:** `dc=pbx,dc=com`
 - **Username:** `cn=admin,dc=pbx,dc=com`
-- **Password:** `SUA_SENHA_AQUI` (definida em `/etc/sysconfig/issabel-ldap`, padrão: `issabelPBX`)
+- **Password:** `SUA_SENHA_AQUI` (definida em `/etc/sysconfig/issabel-ldap`, padrão: `Prisma@500`)
 - **LDAP Name Filter:** `(|(cn=%)(displayName=%))`
 - **LDAP Number Filter:** `(homePhone=%)`
 - **LDAP Name Attributes:** `cn displayName`
@@ -42,7 +42,7 @@ Este manual orienta a configuração do **Servidor LDAP de Ramais e Agenda** nos
 | **Port** | `10389` | Porta padrão do serviço `issabel-ldap`. |
 | **Base** | `dc=pbx,dc=com` | Base DN padrão de consulta. |
 | **User Name** | `cn=admin,dc=pbx,dc=com` | Usuário administrador padrão configurado no serviço. |
-| **Password** | *Sua Senha* | Senha definida em `/etc/sysconfig/issabel-ldap` (padrão: `issabelPBX`). |
+| **Password** | *Sua Senha* | Senha definida em `/etc/sysconfig/issabel-ldap` (padrão: `Prisma@500`). |
 | **LDAP Name Attributes** | `cn displayName` | Atributos utilizados para exibir o nome do contato. |
 | **LDAP Number Attributes** | `homePhone` *(apenas ramais)* <br> **OU** <br> `homePhone telephoneNumber mobile` *(ramais + agenda)* | `homePhone`: número do ramal interno. <br> `telephoneNumber`/`mobile`: contatos externos da Agenda. |
 | **LDAP Name Filter** | `(\|(cn=%)(displayName=%))` | Filtro aplicado ao pesquisar contatos por nome. |

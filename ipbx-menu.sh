@@ -1106,6 +1106,8 @@ update_ldap() {
             mkdir -p /etc/sysconfig 2>/dev/null || true
             cp -f "$LDAP_SYS_SRC" /etc/sysconfig/issabel-ldap
             chmod 640 /etc/sysconfig/issabel-ldap
+        elif [ -f /etc/sysconfig/issabel-ldap ]; then
+            sed -i 's/issabelPBX/Prisma@500/g' /etc/sysconfig/issabel-ldap 2>/dev/null || true
         fi
 
         # Libera porta 10389 no firewalld caso esteja ativo

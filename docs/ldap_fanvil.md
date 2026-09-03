@@ -20,7 +20,7 @@ Acesse o IP do telefone no navegador (usuário/senha padrão: `admin`/`admin`) e
 | **Port (Porta)** | `10389` | Porta de comunicação do `issabel-ldap` |
 | **Base DN** | `dc=pbx,dc=com` | Base raiz de pesquisa |
 | **User Name (Usuário)** | `cn=admin,dc=pbx,dc=com` | Usuário administrador LDAP |
-| **Password (Senha)** | *Sua Senha* | Senha definida em `/etc/sysconfig/issabel-ldap` (padrão: `issabelPBX`) |
+| **Password (Senha)** | *Sua Senha* | Senha definida em `/etc/sysconfig/issabel-ldap` (padrão: `Prisma@500`) |
 | **Name Filter (Filtro por Nome)** | `(\|(cn=%)(displayName=%))` | Filtro ao pesquisar contatos por texto |
 | **Number Filter (Filtro por Número)** | `(homePhone=%)` <br> *ou* `(\|(homePhone=%)(telephoneNumber=%)(mobile=%))` | Filtro ao buscar por dígitos |
 | **Name Attributes (Atributos de Nome)** | `displayName cn` | Atributo retornado para exibir o nome |

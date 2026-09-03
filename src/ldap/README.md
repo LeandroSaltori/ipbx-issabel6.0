@@ -202,7 +202,7 @@ Dirección del servidor: IP_DO_PABX
 Puerto: 10389
 Base: dc=pbx,dc=com
 Nombre de Usuario: cn=admin,dc=pbx,dc=com
-Contraseña: issabelPBX
+Contraseña: Prisma@500
 LDAP Numero de Filtro: (|(telephoneNumber=%)(homePhone=%))
 LDAP Nombre de Filtro: (|(cn=%)(displayName=%))
 versión LDAP: 3
@@ -221,13 +221,14 @@ Busqueda de nombre para mostrar: %cn
 <gs_provision>
     <config version="2">
         <item name="ldap">
-            <part name="server">SEU_DOMINIO_OU_IP</part>
+            <!-- Dirección del servidor: Domínio FQDN ou IP do PABX do cliente -->
+            <part name="server">cliente.ipbxprisma.cloud</part>
             <part name="port">10389</part>
             <part name="base">dc=pbx,dc=com</part>
             <part name="protocol">LDAP</part>
             <part name="version">3</part>
             <part name="username">cn=admin,dc=pbx,dc=com</part>
-            <part name="password">issabelPBX</part>
+            <part name="password">Prisma@500</part>
             <part name="ldapDisplayName">%cn</part>
             <part name="ldapNumberFilter">(homePhone=%)</part>
             <part name="ldapNumberAttributes">homePhone</part>

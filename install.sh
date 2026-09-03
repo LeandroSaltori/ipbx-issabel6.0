@@ -1268,6 +1268,8 @@ if [ -f "$REPO_DIR/src/ldap/issabel-ldap" ]; then
         mkdir -p /etc/sysconfig 2>/dev/null || true
         cp -f "$REPO_DIR/src/ldap/systemd/issabel-ldap.sysconfig" /etc/sysconfig/issabel-ldap
         chmod 640 /etc/sysconfig/issabel-ldap
+    elif [ -f /etc/sysconfig/issabel-ldap ]; then
+        sed -i 's/issabelPBX/Prisma@500/g' /etc/sysconfig/issabel-ldap 2>/dev/null || true
     fi
 
     # Libera porta 10389 no firewalld caso esteja ativo

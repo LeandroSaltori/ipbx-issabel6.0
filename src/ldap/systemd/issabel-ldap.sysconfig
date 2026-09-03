@@ -1,1 +1,1 @@
-OPTIONS="-ldappass issabelPBX"
+OPTIONS="-ldapuser cn=admin,dc=pbx,dc=com -ldappass Prisma@500"
