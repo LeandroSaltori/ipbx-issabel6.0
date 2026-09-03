@@ -56,6 +56,15 @@ menu_read() {
     else
         read "$@" < /dev/tty
     fi
+    local var_name="${!#}"
+    if [ -n "$var_name" ] && [[ "$var_name" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]]; then
+        local val="${!var_name}"
+        val="${val//$'\r'/}"
+        val="${val//$'\n'/}"
+        val="${val// /}"
+        val="${val//$'\t'/}"
+        printf -v "$var_name" '%s' "$val"
+    fi
 }
 
 # --- DIRETÓRIO DO REPOSITÓRIO ---
@@ -1132,10 +1141,12 @@ update_moh() {
 # --- 20. TELEGRAM (NOTIFICAÇÕES) ---
 update_telegram() {
     log_info "Configurando Notificações via Telegram..."
-    TELEGRAM_SRC="$REPO_DIR/scripts/monitor_issabel_users.sh"
+    TELEGRAM_SRC="$REPO_DIR/scripts/monitor_prisma.sh"
+    [ ! -f "$TELEGRAM_SRC" ] && TELEGRAM_SRC="$REPO_DIR/scripts/monitor_issabel_users.sh"
     if [ -f "$TELEGRAM_SRC" ]; then
         cp -f "$TELEGRAM_SRC" /usr/local/bin/monitor_issabel_users.sh
-        chmod +x /usr/local/bin/monitor_issabel_users.sh
+        cp -f "$TELEGRAM_SRC" /usr/local/bin/monitor_prisma.sh
+        chmod +x /usr/local/bin/monitor_issabel_users.sh /usr/local/bin/monitor_prisma.sh
 
         if ! crontab -l 2>/dev/null | grep -q "monitor_issabel_users.sh"; then
             (crontab -l 2>/dev/null; echo "* * * * * /usr/local/bin/monitor_issabel_users.sh") | crontab -
@@ -1144,7 +1155,7 @@ update_telegram() {
             log_info "Agendamento Telegram já existe no crontab."
         fi
     else
-        log_error "Script monitor_issabel_users.sh não encontrado no repositório."
+        log_error "Script monitor_prisma.sh / monitor_issabel_users.sh não encontrado no repositório."
     fi
 }
 
@@ -1343,6 +1354,10 @@ update_rollback() {
     echo ""
     echo -ne "${CYAN}Escolha o que deseja fazer [1/2/0]: ${NC}"
     menu_read -r OPCAO_ROLLBACK
+    OPCAO_ROLLBACK="${OPCAO_ROLLBACK//$'\r'/}"
+    OPCAO_ROLLBACK="${OPCAO_ROLLBACK//$'\n'/}"
+    OPCAO_ROLLBACK="${OPCAO_ROLLBACK// /}"
+    OPCAO_ROLLBACK="${OPCAO_ROLLBACK//$'\t'/}"
 
     case "$OPCAO_ROLLBACK" in
         1)
@@ -1477,6 +1492,10 @@ while true; do
     show_menu
     echo -ne "${CYAN}  Escolha uma opção: ${NC}"
     menu_read -r OPCAO
+    OPCAO="${OPCAO//$'\r'/}"
+    OPCAO="${OPCAO//$'\n'/}"
+    OPCAO="${OPCAO// /}"
+    OPCAO="${OPCAO//$'\t'/}"
 
     case "$OPCAO" in
         1)  create_snapshot "Terminal (MOTD)"; update_motd; reload_services ;;

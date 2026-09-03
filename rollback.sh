@@ -58,6 +58,14 @@ menu_read() {
     else
         eval "$var_name=\"\""
     fi
+    if [ -n "$var_name" ] && [[ "$var_name" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]]; then
+        local val="${!var_name}"
+        val="${val//$'\r'/}"
+        val="${val//$'\n'/}"
+        val="${val// /}"
+        val="${val//$'\t'/}"
+        printf -v "$var_name" '%s' "$val"
+    fi
 }
 
 DRY_RUN=false
