@@ -218,6 +218,16 @@ update_tema() {
     else
         log_error "Pasta src/themes/prisma_v5 não encontrada no repositório."
     fi
+
+    # Publica o mapa de arquitetura e documentações
+    if [ -f "$REPO_DIR/docs/architecture/ipbx_architecture.html" ]; then
+        mkdir -p /var/www/html/docs
+        /bin/cp -f "$REPO_DIR/docs/architecture/ipbx_architecture.html" /var/www/html/docs/index.html
+        /bin/cp -f "$REPO_DIR/docs/architecture/ipbx_architecture.html" /var/www/html/docs/ipbx_architecture.html
+        chown -R asterisk:asterisk /var/www/html/docs
+        chmod -R 755 /var/www/html/docs
+        log_success "Mapa interativo de arquitetura publicado em /var/www/html/docs/."
+    fi
 }
 
 # --- 3. PAINEL ADMIN ---

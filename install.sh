@@ -1364,6 +1364,19 @@ if [ -f "$REPO_DIR/scripts/ipbx-autoupdate.sh" ]; then
 fi
 
 # ==============================================================================
+# PUBLICAÇÃO DO MAPA DE ARQUITETURA INTERATIVO E DOCUMENTAÇÃO WEB
+# ==============================================================================
+if [ -f "$REPO_DIR/docs/architecture/ipbx_architecture.html" ]; then
+    log_info "Publicando mapa interativo de arquitetura em /var/www/html/docs/..."
+    mkdir -p /var/www/html/docs
+    /bin/cp -f "$REPO_DIR/docs/architecture/ipbx_architecture.html" /var/www/html/docs/index.html
+    /bin/cp -f "$REPO_DIR/docs/architecture/ipbx_architecture.html" /var/www/html/docs/ipbx_architecture.html
+    chown -R asterisk:asterisk /var/www/html/docs
+    chmod -R 755 /var/www/html/docs
+    log_success "Mapa interativo publicado em /var/www/html/docs/."
+fi
+
+# ==============================================================================
 # RECARGA DE SERVIÇOS E FINALIZAÇÃO
 # ==============================================================================
 log_info "Limpando cache de templates do Smarty e recarregando serviços..."
