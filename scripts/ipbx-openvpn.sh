@@ -123,6 +123,11 @@ chmod 440 /etc/sudoers.d/99-openvpn-asterisk 2>/dev/null || true
 log_info "Instalando bridge de serviço (FIX 1)..."
 cat << 'EOFHELP' > /usr/local/bin/ipbx-openvpn-helper.sh
 #!/bin/bash
+# Auto-elevação via sudo se executado pelo Apache (usuário asterisk)
+if [ "$EUID" -ne 0 ]; then
+    exec sudo /usr/local/bin/ipbx-openvpn-helper.sh "$@"
+fi
+
 ACTION="${1:-status}"
 
 # Sanitiza máscara inválida no server.conf antes de iniciar o serviço
@@ -139,6 +144,23 @@ case "$ACTION" in
         chmod 644 /etc/openvpn/server/openvpn-status.log /etc/openvpn/server/ipp.txt 2>/dev/null || true
         chmod 755 /etc/openvpn/server 2>/dev/null || true
         
+        # Garante links simbólicos caso o config esteja em /etc/openvpn/
+        if [ -f /etc/openvpn/server.conf ] && [ ! -f /etc/openvpn/server/server.conf ]; then
+            ln -sfn /etc/openvpn/server.conf /etc/openvpn/server/server.conf 2>/dev/null || true
+        fi
+        if [ -f /etc/openvpn/server/server.conf ] && [ ! -f /etc/openvpn/server.conf ]; then
+            ln -sfn /etc/openvpn/server/server.conf /etc/openvpn/server.conf 2>/dev/null || true
+        fi
+
+        # Libera porta 1194/udp no firewall se aplicável
+        if command -v firewall-cmd &>/dev/null && systemctl is-active firewalld &>/dev/null; then
+            firewall-cmd --add-port=1194/udp --permanent 2>/dev/null || true
+            firewall-cmd --reload 2>/dev/null || true
+        elif command -v iptables &>/dev/null; then
+            iptables -C INPUT -p udp --dport 1194 -j ACCEPT 2>/dev/null || iptables -I INPUT -p udp --dport 1194 -j ACCEPT 2>/dev/null || true
+            iptables -t nat -C POSTROUTING -s 10.8.0.0/24 -j MASQUERADE 2>/dev/null || iptables -t nat -A POSTROUTING -s 10.8.0.0/24 -j MASQUERADE 2>/dev/null || true
+        fi
+
         systemctl daemon-reload 2>/dev/null || true
         systemctl restart openvpn-server@server.service 2>/dev/null || \
         systemctl restart openvpn@server.service 2>/dev/null || true
