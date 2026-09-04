@@ -21,4 +21,6 @@ Esta pasta reúne os manuais práticos, guias passo a passo e procedimentos de c
 | [**`painel_ipbx.md`**](./painel_ipbx.md) | Instalação e Uso do Painel Visual de Ramais e Troncos | **[9]** |
 | [**`pesquisa_satisfacao_web.md`**](./pesquisa_satisfacao_web.md) | URA de Avaliação de Atendimento (1 a 5) e Painel Web de Auditoria | **[14]** |
 | [**`tftp_install.md`**](./tftp_install.md) | Instalação e Provisionamento de Aparelhos via Servidor TFTP | **Auxiliar** |
+| [**`architecture/README.md`**](./architecture/README.md) | Mapeamento Visual da Arquitetura (Archify HTML e mindwalk 3D) | **Auxiliar** |
+| [**`security/MANTIS_SECURITY_AUDIT.md`**](./security/MANTIS_SECURITY_AUDIT.md) | Relatório de Auditoria de Vulnerabilidades (Google Mantis) | **[20]** |
 | [**`alterar_link.md`**](./alterar_link.md) | Como Modificar Menus e Links Internos do Issabel | **Auxiliar** |

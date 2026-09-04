@@ -12,3 +12,6 @@ Thumbs.db
 */.DS_Store
 *.DS_Store
 .DS_Store
+
+# Temporary work & scratch
+scratch/

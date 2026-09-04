@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "IPBX Issabel 6.0 - Arquitetura de Servicos e Telefonia",
+    "quality_profile": "showcase",
+    "viewBox": [1180, 680],
+    "views": [
+      {
+        "id": "fluxo-chamadas",
+        "label": "Fluxo de Voz e Gravacao",
+        "focus": ["phones", "firewall", "asterisk", "dialplan", "audio_spool", "mysql"],
+        "note": "Acompanha o trajeto de uma chamada SIP desde o ramal ate a gravacao e registro no CDR."
+      },
+      {
+        "id": "gestao-web",
+        "label": "Gestao Web e Relatorios",
+        "focus": ["admin", "firewall", "apache", "modules", "mysql", "sqlite", "audio_spool"],
+        "note": "Exibe o acesso da interface web aos modulos de relatorios, banco de dados e player nativo."
+      },
+      {
+        "id": "provisionamento-ldap",
+        "label": "Provisionamento e LDAP",
+        "focus": ["gdms", "ldap", "sqlite", "phones"],
+        "note": "Fluxo de sincronizacao de agenda e contatos via porta 10389 com credencial padronizada."
+      }
+    ]
+  },
+  "components": [
+    { "id": "phones", "type": "external", "label": "Ramais e Telefones", "sublabel": "SIP / PJSIP / WebRTC", "pos": [40, 180], "size": [140, 66] },
+    { "id": "admin", "type": "external", "label": "Navegador Web", "sublabel": "HTTPS :443 / Operador", "pos": [40, 360], "size": [140, 66] },
+    { "id": "gdms", "type": "external", "label": "Grandstream GDMS", "sublabel": "Provisionamento XML", "pos": [40, 520], "size": [140, 66] },
+    { "id": "firewall", "type": "security", "label": "Borda e Firewall", "sublabel": "Fail2ban + IPTables", "tag": "Filtro Ativo", "pos": [250, 270], "size": [140, 66] },
+    { "id": "asterisk", "type": "backend", "label": "Asterisk Engine", "sublabel": "PBX Core :5060/:8089", "tag": "Canais e RTP", "pos": [460, 180], "size": [146, 68] },
+    { "id": "apache", "type": "cloud", "label": "Servidor Apache", "sublabel": "Apache 2.4 + PHP 7.x", "tag": "VirtualHost", "pos": [460, 360], "size": [146, 68] },
+    { "id": "ldap", "type": "backend", "label": "Servico LDAP", "sublabel": "issabel-ldap :10389", "tag": "Prisma@500", "pos": [460, 520], "size": [146, 68] },
+    { "id": "dialplan", "type": "backend", "label": "Dialplan e Macros", "sublabel": "extensions_custom.conf", "pos": [680, 110], "size": [146, 66] },
+    { "id": "ami_agi", "type": "messagebus", "label": "Interfaces AMI / AGI", "sublabel": "AMI :5038 e FastAGI", "pos": [680, 250], "size": [146, 66] },
+    { "id": "modules", "type": "frontend", "label": "Modulos Issabel", "sublabel": "CDR, Pesquisa, Filas", "tag": "HTML5 Dialog", "pos": [680, 390], "size": [146, 66] },
+    { "id": "audio_spool", "type": "backend", "label": "Spool de Audio", "sublabel": "/var/spool/asterisk/monitor", "pos": [920, 180], "size": [140, 66] },
+    { "id": "mysql", "type": "database", "label": "MySQL / MariaDB", "sublabel": "asteriskcdrdb.cdr", "brand": "mysql", "pos": [920, 320], "size": [140, 66] },
+    { "id": "sqlite", "type": "database", "label": "Bases SQLite", "sublabel": "address_book, acl, menu", "pos": [920, 460], "size": [140, 66] }
+  ],
+  "boundaries": [
+    { "kind": "region", "label": "Servidor IPBX Issabel 6.0 (Rocky / CentOS)", "wraps": ["firewall", "asterisk", "apache", "ldap", "dialplan", "ami_agi", "modules", "audio_spool", "mysql", "sqlite"] },
+    { "kind": "security-group", "label": "Subsistema Asterisk e Telefonia", "wraps": ["asterisk", "dialplan", "ami_agi", "audio_spool"] }
+  ],
+  "connections": [
+    { "id": "phones-to-fw", "from": "phones", "to": "firewall", "label": "SIP / RTP", "variant": "emphasis" },
+    { "id": "admin-to-fw", "from": "admin", "to": "firewall", "label": "HTTPS :443", "variant": "emphasis" },
+    { "id": "gdms-to-ldap", "from": "gdms", "to": "ldap", "label": "LDAP :10389", "variant": "emphasis" },
+    { "id": "fw-to-asterisk", "from": "firewall", "to": "asterisk", "label": "Voz Autorizada", "variant": "security", "labelAt": [350, 215] },
+    { "id": "fw-to-apache", "from": "firewall", "to": "apache", "label": "Web GUI", "variant": "security" },
+    { "id": "asterisk-to-dialplan", "from": "asterisk", "to": "dialplan", "label": "Rotas e URA" },
+    { "id": "asterisk-to-ami", "from": "asterisk", "to": "ami_agi", "label": "Eventos AMI" },
+    { "id": "asterisk-to-spool", "from": "asterisk", "to": "audio_spool", "label": "Gravacao WAV", "fromSide": "top", "toSide": "top", "via": [[533, 70], [990, 70]], "labelAt": [760, 60] },
+    { "id": "apache-to-modules", "from": "apache", "to": "modules", "label": "Execucao PHP" },
+    { "id": "modules-to-ami", "from": "modules", "to": "ami_agi", "label": "Comandos AMI" },
+    { "id": "modules-to-mysql", "from": "modules", "to": "mysql", "label": "Consultas CDR", "labelDx": -50 },
+    { "id": "modules-to-sqlite", "from": "modules", "to": "sqlite", "label": "Agenda e Menus" },
+    { "id": "modules-to-spool", "from": "modules", "to": "audio_spool", "label": "Player Nativo" },
+    { "id": "ldap-to-sqlite", "from": "ldap", "to": "sqlite", "label": "Sincronia Ramais" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "Telefonia e Asterisk Engine", "items": ["Sinalizacao SIP/PJSIP e WebRTC em tempo real", "Gravacao no spool de audio com retencao e player nativo", "Conexao bidirecional com AMI :5038 para monitoramento"] },
+    { "dot": "emerald", "title": "Plataforma Web e Modulos", "items": ["Framework paloSanto com tema Dark e acabamento Glass", "Player modal flutuante com tag HTML5 dialog na Top Layer", "Relatorios gerenciais consolidados da base asteriskcdrdb"] },
+    { "dot": "amber", "title": "Seguranca e Provisionamento", "items": ["Servico issabel-ldap nativo na porta :10389 para Grandstream/Fanvil", "Hardening de Apache, Fail2ban e politicas anti-regressao", "Ponto de restauracao com rollback seguro nao-destrutivo"] }
+  ]
+}

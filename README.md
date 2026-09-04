@@ -314,6 +314,8 @@ O repositório disponibiliza diversos scripts independentes na pasta [`scripts/`
 
 Para instruções detalhadas de configuração de cada recurso, acesse os manuais na pasta [`docs/`](./docs/):
 
+- 🗺️ [Mapeamento Visual de Arquitetura (Archify HTML & mindwalk 3D)](./docs/architecture/README.md)
+- 🛡️ [Relatório de Auditoria de Vulnerabilidades Google Mantis](./docs/security/MANTIS_SECURITY_AUDIT.md)
 - 🛡️ [Servidor OpenVPN (EasyVPN) - Configuração e Softphones/Telefones IP](./docs/openvpn_server.md)
 - 📇 [Servidor LDAP Integrado (issabel-ldap na porta 10389)](./docs/ldap_server.md)
 - ☎️ [Provisionamento LDAP Grandstream (GRP2601/Série GRP) com XML](./docs/ldap_grandstream.md)
