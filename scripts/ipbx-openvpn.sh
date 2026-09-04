@@ -1,15 +1,8 @@
 #!/bin/bash
 # ==============================================================================
-# CONFIGURADOR DO OPENVPN/EASYVPN - IPBX ISSABEL 6
-# ==============================================================================
-# Corrige exatamente os dois problemas do Issabel 6 (Rocky Linux 8):
-#   1. Nome do serviço mudou: openvpn@server -> openvpn-server@server.service
-#   2. Wizard escreve máscara inválida: 255.255.225.0 -> 255.255.255.0
-#
-# O módulo EasyVPN (issabel-easyvpn) já cria/revoga certificados corretamente,
-# igual ao Issabel 4. Não alteramos nada nessa lógica.
-#
-# Autor: Leandro Saltori / Prisma Telecom
+# OPENVPN / EASYVPN PARA ISSABEL 5 (ROCKY LINUX 8)
+# Baseado 100% no procedimento oficial da Comunidade Issabel:
+# https://forum.issabel.org/d/16950-issabel-easyvpn
 # ==============================================================================
 
 set -e
@@ -17,10 +10,12 @@ set -e
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 CYAN='\033[0;36m'
+YELLOW='\033[1;33m'
 NC='\033[0m'
 
 log_info()    { echo -e "${CYAN}[INFO]${NC} $1"; }
 log_success() { echo -e "${GREEN}[SUCESSO]${NC} $1"; }
+log_warn()    { echo -e "${YELLOW}[AVISO]${NC} $1"; }
 log_error()   { echo -e "${RED}[ERRO]${NC} $1"; }
 
 if [ "$EUID" -ne 0 ]; then
@@ -28,236 +23,100 @@ if [ "$EUID" -ne 0 ]; then
     exit 1
 fi
 
-log_info "Sistema detectado: $(. /etc/os-release && echo "$NAME $VERSION")"
+echo ""
+log_info "Iniciando configuração limpa do OpenVPN (Base Fórum Issabel)..."
 
-# ─────────────────────────────────────────────────────────────────────────────
-# 1. Instala pacotes necessários
-# ─────────────────────────────────────────────────────────────────────────────
-log_info "Instalando OpenVPN e EasyVPN..."
-if command -v dnf &>/dev/null; then
-    dnf install -y epel-release 2>/dev/null || true
-    dnf install -y openvpn easy-rsa tar wget curl iptables-services 2>/dev/null || true
-    dnf install -y issabel-easyvpn 2>/dev/null || true
-elif command -v yum &>/dev/null; then
-    yum install -y epel-release 2>/dev/null || true
-    yum install -y openvpn easy-rsa tar wget curl iptables-services 2>/dev/null || true
-    yum install -y issabel-easyvpn 2>/dev/null || true
-fi
+# 0. Limpeza de serviços e customizações anteriores (Reset limpo)
+log_info "Removendo configurações customizadas anteriores..."
+systemctl stop ipbx-openvpn-sanitize.service ipbx-openvpn-sanitize.path 2>/dev/null || true
+systemctl disable ipbx-openvpn-sanitize.service ipbx-openvpn-sanitize.path 2>/dev/null || true
+rm -f /etc/systemd/system/ipbx-openvpn-sanitize.* 2>/dev/null || true
+rm -f /etc/cron.d/ipbx-openvpn 2>/dev/null || true
+rm -f /usr/local/bin/ipbx-openvpn-helper.sh 2>/dev/null || true
+systemctl daemon-reload 2>/dev/null || true
 
-# Remove symlinks anteriores para garantir que a reinstalação traga o arquivo original
-rm -f /usr/share/issabel/privileged/openvpn 2>/dev/null || true
-
-# Reinstala o módulo web SEMPRE para garantir arquivos íntegros
-log_info "Garantindo módulo web do issabel-easyvpn..."
-if command -v dnf &>/dev/null; then
-    dnf reinstall -y issabel-easyvpn 2>/dev/null || dnf install -y issabel-easyvpn 2>/dev/null || true
-else
-    yum reinstall -y issabel-easyvpn 2>/dev/null || yum install -y issabel-easyvpn 2>/dev/null || true
-fi
-
-# Salva o script privilegiado original (que lida com os clientes conectados)
-if [ -f /usr/share/issabel/privileged/openvpn ] && [ ! -L /usr/share/issabel/privileged/openvpn ]; then
-    cp -f /usr/share/issabel/privileged/openvpn /usr/share/issabel/privileged/openvpn.orig
-    chmod +x /usr/share/issabel/privileged/openvpn.orig
-fi
-
-# Corrige permissões dos arquivos do módulo para o Apache/PHP conseguir ler
-for MODDIR in /var/www/html/modules/easy_vpn /var/www/html/modules/easyvpn; do
-    [ -d "$MODDIR" ] || continue
-    chown -R asterisk:asterisk "$MODDIR" 2>/dev/null || true
-    find "$MODDIR" -type d -exec chmod 755 {} \; 2>/dev/null || true
-    find "$MODDIR" -type f -exec chmod 644 {} \; 2>/dev/null || true
-    find "$MODDIR" -name "*.sh" -exec chmod 755 {} \; 2>/dev/null || true
-    log_success "Permissões do módulo corrigidas em $MODDIR"
-    break
-done
-
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# 2. Easy-RSA 3.0.8 (versão que o módulo issabel-easyvpn espera)
-# ─────────────────────────────────────────────────────────────────────────────
-log_info "Configurando Easy-RSA 3.0.8..."
-mkdir -p /usr/share/easy-rsa/3.0.8/ /usr/share/easy-rsa/3/ 2>/dev/null || true
+# 1. Passos 1 e 2 do Fórum: Easy-RSA 3.0.8
+log_info "1. Configurando Easy-RSA 3.0.8..."
+mkdir -p /usr/share/easy-rsa/3.0.8/
 
 if [ ! -f /usr/share/easy-rsa/3.0.8/easyrsa ]; then
-    TMP=/tmp/easyrsa_setup
+    TMP="/tmp/easyrsa_setup_$$"
     rm -rf "$TMP" && mkdir -p "$TMP"
-    curl -sSL "https://github.com/OpenVPN/easy-rsa/releases/download/v3.0.8/EasyRSA-3.0.8.tgz" \
-        -o "$TMP/EasyRSA-3.0.8.tgz" 2>/dev/null || \
-    wget -q "https://github.com/OpenVPN/easy-rsa/releases/download/v3.0.8/EasyRSA-3.0.8.tgz" \
-        -O "$TMP/EasyRSA-3.0.8.tgz" 2>/dev/null || true
-    if [ -f "$TMP/EasyRSA-3.0.8.tgz" ]; then
-        tar -xzf "$TMP/EasyRSA-3.0.8.tgz" -C "$TMP" 2>/dev/null || true
-        cp -rpf "$TMP/EasyRSA-3.0.8/"* /usr/share/easy-rsa/3.0.8/ 2>/dev/null || true
-        cp -rpf "$TMP/EasyRSA-3.0.8/"* /usr/share/easy-rsa/3/ 2>/dev/null || true
-    fi
+    cd "$TMP"
+    wget -q https://github.com/OpenVPN/easy-rsa/releases/download/v3.0.8/EasyRSA-3.0.8.tgz || \
+    curl -sSL -o EasyRSA-3.0.8.tgz https://github.com/OpenVPN/easy-rsa/releases/download/v3.0.8/EasyRSA-3.0.8.tgz
+    
+    tar -xzf EasyRSA-3.0.8.tgz
+    cp -rpf EasyRSA-3.0.8/* /usr/share/easy-rsa/3.0.8/
+    cd /root
     rm -rf "$TMP"
 fi
-chmod -R 755 /usr/share/easy-rsa 2>/dev/null || true
-log_success "Easy-RSA 3.0.8 OK."
+chmod -R 755 /usr/share/easy-rsa/3.0.8/
+log_success "Easy-RSA 3.0.8 OK em /usr/share/easy-rsa/3.0.8/"
 
-# ─────────────────────────────────────────────────────────────────────────────
+# 2. Passo 3 do Fórum: Instalar issabel-easyvpn
+log_info "2. Instalando pacote issabel-easyvpn..."
+if command -v dnf &>/dev/null; then
+    dnf install -y issabel-easyvpn openvpn
+else
+    yum install -y issabel-easyvpn openvpn
+fi
+log_success "Pacote issabel-easyvpn instalado."
+
 # 3. IP Forwarding
-# ─────────────────────────────────────────────────────────────────────────────
 echo "net.ipv4.ip_forward = 1" > /etc/sysctl.d/99-openvpn.conf
 sysctl -p /etc/sysctl.d/99-openvpn.conf 2>/dev/null || sysctl -w net.ipv4.ip_forward=1 2>/dev/null || true
 
-# ─────────────────────────────────────────────────────────────────────────────
-# 4. Estrutura de diretórios e permissões
-# ─────────────────────────────────────────────────────────────────────────────
-mkdir -p /etc/openvpn/server /etc/openvpn/client /etc/openvpn/ccd /var/log/openvpn 2>/dev/null || true
+# 4. Estrutura de diretórios do Rocky Linux 8
+mkdir -p /etc/openvpn/server /etc/openvpn/client /etc/openvpn/ccd /var/log/openvpn
 
-# sudo para o usuário asterisk (servidor web do Issabel) controlar o serviço
-cat << 'EOF' > /etc/sudoers.d/99-openvpn-asterisk
-asterisk ALL=(ALL) NOPASSWD: /usr/bin/systemctl, /bin/systemctl, /usr/sbin/openvpn, /usr/bin/openvpn, /etc/init.d/openvpn, /usr/share/issabel/privileged/openvpn, /usr/local/bin/ipbx-openvpn-helper.sh
-EOF
-chmod 440 /etc/sudoers.d/99-openvpn-asterisk 2>/dev/null || true
+# 5. Resolução do erro '--crl-verify fails with crl.pem' e sincronização de certificados
+log_info "3. Verificando certificados e gerando crl.pem..."
 
-# ─────────────────────────────────────────────────────────────────────────────
-# FIX 1: Bridge de serviço (init.d → openvpn-server@server.service)
-# O módulo web chama /etc/init.d/openvpn e /usr/share/issabel/privileged/openvpn.
-# No Rocky Linux 8 o serviço se chama openvpn-server@server.service.
-# Este helper faz a tradução transparentemente.
-# ─────────────────────────────────────────────────────────────────────────────
-log_info "Instalando bridge de serviço (FIX 1)..."
-cat << 'EOFHELP' > /usr/local/bin/ipbx-openvpn-helper.sh
-#!/bin/bash
-# Auto-elevação via sudo se executado pelo Apache (usuário asterisk)
-if [ "$EUID" -ne 0 ]; then
-    exec sudo /usr/local/bin/ipbx-openvpn-helper.sh "$@"
+# Se crl.pem não existe na PKI, gera com o easyrsa
+for EASYDIR in /usr/share/easy-rsa/3.0.8 /etc/openvpn/easy-rsa; do
+    if [ -d "$EASYDIR/pki" ] && [ -f "$EASYDIR/easyrsa" ]; then
+        if [ ! -f "$EASYDIR/pki/crl.pem" ]; then
+            log_info "Gerando crl.pem via easyrsa em $EASYDIR..."
+            (cd "$EASYDIR" && ./easyrsa gen-crl 2>/dev/null || true)
+        fi
+        # Copia da PKI para /etc/openvpn e /etc/openvpn/server
+        [ -f "$EASYDIR/pki/crl.pem" ] && cp -f "$EASYDIR/pki/crl.pem" /etc/openvpn/crl.pem && cp -f "$EASYDIR/pki/crl.pem" /etc/openvpn/server/crl.pem
+        [ -f "$EASYDIR/pki/ca.crt" ] && cp -f "$EASYDIR/pki/ca.crt" /etc/openvpn/ca.crt && cp -f "$EASYDIR/pki/ca.crt" /etc/openvpn/server/ca.crt
+        [ -f "$EASYDIR/pki/issued/server.crt" ] && cp -f "$EASYDIR/pki/issued/server.crt" /etc/openvpn/server.crt && cp -f "$EASYDIR/pki/issued/server.crt" /etc/openvpn/server/server.crt
+        [ -f "$EASYDIR/pki/private/server.key" ] && cp -f "$EASYDIR/pki/private/server.key" /etc/openvpn/server.key && cp -f "$EASYDIR/pki/private/server.key" /etc/openvpn/server/server.key
+        [ -f "$EASYDIR/pki/dh.pem" ] && cp -f "$EASYDIR/pki/dh.pem" /etc/openvpn/dh.pem && cp -f "$EASYDIR/pki/dh.pem" /etc/openvpn/server/dh.pem
+        break
+    fi
+done
+
+# Garante que crl.pem exista em ambas as pastas
+if [ -f /etc/openvpn/crl.pem ] && [ ! -f /etc/openvpn/server/crl.pem ]; then
+    cp -f /etc/openvpn/crl.pem /etc/openvpn/server/crl.pem
+elif [ -f /etc/openvpn/server/crl.pem ] && [ ! -f /etc/openvpn/crl.pem ]; then
+    cp -f /etc/openvpn/server/crl.pem /etc/openvpn/crl.pem
 fi
 
-ACTION="${1:-status}"
+# Se server.conf existir em /etc/openvpn, copia para /etc/openvpn/server/ (diretório de trabalho do Rocky 8)
+if [ -f /etc/openvpn/server.conf ]; then
+    cp -f /etc/openvpn/server.conf /etc/openvpn/server/server.conf
+fi
+if [ -f /etc/openvpn/server/server.conf ]; then
+    cp -f /etc/openvpn/server/server.conf /etc/openvpn/server.conf
+fi
 
-# Sanitiza máscara inválida no server.conf antes de iniciar o serviço
-for CFG in /etc/openvpn/server/server.conf /etc/openvpn/server.conf; do
-    [ -f "$CFG" ] || continue
-    sed -i 's/255\.255\.225\.0/255.255.255.0/g' "$CFG" 2>/dev/null || true
-    sed -i -E 's/^(server [0-9.]+) 255\.255\.[0-9]+\.0/\1 255.255.255.0/g' "$CFG" 2>/dev/null || true
-done
-
-case "$ACTION" in
-    start|restart|reload)
-        # Garante que os arquivos existam com permissão antes do serviço subir
-        touch /etc/openvpn/server/openvpn-status.log /etc/openvpn/server/ipp.txt 2>/dev/null || true
-        chmod 644 /etc/openvpn/server/openvpn-status.log /etc/openvpn/server/ipp.txt 2>/dev/null || true
-        chmod 755 /etc/openvpn/server 2>/dev/null || true
-        
-        # Garante links simbólicos caso o config esteja em /etc/openvpn/
-        if [ -f /etc/openvpn/server.conf ] && [ ! -f /etc/openvpn/server/server.conf ]; then
-            ln -sfn /etc/openvpn/server.conf /etc/openvpn/server/server.conf 2>/dev/null || true
-        fi
-        if [ -f /etc/openvpn/server/server.conf ] && [ ! -f /etc/openvpn/server.conf ]; then
-            ln -sfn /etc/openvpn/server/server.conf /etc/openvpn/server.conf 2>/dev/null || true
-        fi
-
-        # NAT para a rede da VPN (áudio e roteamento interno)
-        if command -v iptables &>/dev/null; then
-            iptables -t nat -C POSTROUTING -s 10.8.0.0/24 -j MASQUERADE 2>/dev/null || iptables -t nat -A POSTROUTING -s 10.8.0.0/24 -j MASQUERADE 2>/dev/null || true
-        fi
-
-        systemctl daemon-reload 2>/dev/null || true
-        systemctl restart openvpn-server@server.service 2>/dev/null || \
-        systemctl restart openvpn@server.service 2>/dev/null || true
-        ;;
-    stop)
-        systemctl stop openvpn-server@server.service 2>/dev/null || \
-        systemctl stop openvpn@server.service 2>/dev/null || true
-        ;;
-    status)
-        if systemctl is-active openvpn-server@server.service &>/dev/null || \
-           systemctl is-active openvpn@server.service &>/dev/null || \
-           pgrep -x openvpn &>/dev/null; then
-            echo "OpenVPN is running"
-            exit 0
-        else
-            echo "OpenVPN is stopped"
-            exit 1
-        fi
-        ;;
-    *)
-        # Delega qualquer outra chamada (como get_connected_clients) para o script original
-        if [ -x /usr/share/issabel/privileged/openvpn.orig ]; then
-            exec /usr/share/issabel/privileged/openvpn.orig "$@"
-        else
-            systemctl "$ACTION" openvpn-server@server.service 2>/dev/null || true
-        fi
-        ;;
-esac
-EOFHELP
-chmod +x /usr/local/bin/ipbx-openvpn-helper.sh
-
-# Registra o helper como o ponto de entrada para todos os caminhos que o módulo web usa
-mkdir -p /usr/share/issabel/privileged /etc/init.d 2>/dev/null || true
-ln -sfn /usr/local/bin/ipbx-openvpn-helper.sh /etc/init.d/openvpn 2>/dev/null || true
-ln -sfn /usr/local/bin/ipbx-openvpn-helper.sh /usr/share/issabel/privileged/openvpn 2>/dev/null || true
-log_success "Bridge de serviço instalado."
-
-# ─────────────────────────────────────────────────────────────────────────────
-# FIX 2: Sanitizador de máscara via Systemd Path (reage instantaneamente)
-# O wizard salva 255.255.225.0 no server.conf. O path unit detecta a mudança
-# no arquivo e corrige antes que o OpenVPN tente iniciar com conf inválida.
-# ─────────────────────────────────────────────────────────────────────────────
-log_info "Instalando watchdog de máscara (FIX 2)..."
-
-cat << 'EOFSVC' > /etc/systemd/system/ipbx-openvpn-sanitize.service
-[Unit]
-Description=IPBX - Corrige server.conf e inicia OpenVPN
-After=network.target
-
-[Service]
-Type=oneshot
-ExecStart=/usr/local/bin/ipbx-openvpn-helper.sh restart
-RemainAfterExit=no
-EOFSVC
-
-cat << 'EOFPATH' > /etc/systemd/system/ipbx-openvpn-sanitize.path
-[Unit]
-Description=IPBX - Monitora alterações no server.conf do OpenVPN
-
-[Path]
-PathModified=/etc/openvpn/server/server.conf
-PathModified=/etc/openvpn/server.conf
-Unit=ipbx-openvpn-sanitize.service
-
-[Install]
-WantedBy=multi-user.target
-EOFPATH
-
-systemctl daemon-reload 2>/dev/null || true
-systemctl enable ipbx-openvpn-sanitize.path 2>/dev/null || true
-systemctl start  ipbx-openvpn-sanitize.path 2>/dev/null || true
-log_success "Watchdog de máscara instalado."
-
-# Cron de fallback a cada 5 minutos (garante CRL atualizada e serviço no ar)
-cat << 'EOFCRON' > /etc/cron.d/ipbx-openvpn
-*/5 * * * * root /usr/local/bin/ipbx-openvpn-helper.sh status >/dev/null 2>&1 || /usr/local/bin/ipbx-openvpn-helper.sh start >/dev/null 2>&1
-EOFCRON
-chmod 644 /etc/cron.d/ipbx-openvpn 2>/dev/null || true
-
-# ─────────────────────────────────────────────────────────────────────────────
-# 5. Permissões da CRL e Sincronização dos Certificados (Sem links quebrados)
-# ─────────────────────────────────────────────────────────────────────────────
-for EASYRSA_DIR in /usr/share/easy-rsa/3.0.8 /usr/share/easy-rsa/3 /etc/openvpn/easy-rsa; do
-    [ -f "$EASYRSA_DIR/easyrsa" ] || continue
-    (cd "$EASYRSA_DIR" && ./easyrsa gen-crl 2>/dev/null || true)
-    
-    # Restaura certificados reais da PKI para ambas as pastas (evita links quebrados)
-    PKI_DIR="$EASYRSA_DIR/pki"
-    if [ -d "$PKI_DIR" ]; then
-        [ -f "$PKI_DIR/ca.crt" ] && cp -f "$PKI_DIR/ca.crt" /etc/openvpn/ca.crt && cp -f "$PKI_DIR/ca.crt" /etc/openvpn/server/ca.crt
-        [ -f "$PKI_DIR/issued/server.crt" ] && cp -f "$PKI_DIR/issued/server.crt" /etc/openvpn/server.crt && cp -f "$PKI_DIR/issued/server.crt" /etc/openvpn/server/server.crt
-        [ -f "$PKI_DIR/private/server.key" ] && cp -f "$PKI_DIR/private/server.key" /etc/openvpn/server.key && cp -f "$PKI_DIR/private/server.key" /etc/openvpn/server/server.key
-        [ -f "$PKI_DIR/dh.pem" ] && cp -f "$PKI_DIR/dh.pem" /etc/openvpn/dh.pem && cp -f "$PKI_DIR/dh.pem" /etc/openvpn/server/dh.pem
-        [ -f "$PKI_DIR/crl.pem" ] && cp -f "$PKI_DIR/crl.pem" /etc/openvpn/crl.pem && cp -f "$PKI_DIR/crl.pem" /etc/openvpn/server/crl.pem
+# Copia todos os certificados e chaves para /etc/openvpn/server/
+for f in ca.crt server.crt server.key dh.pem dh2048.pem crl.pem; do
+    if [ -f "/etc/openvpn/$f" ] && [ ! -f "/etc/openvpn/server/$f" ]; then
+        cp -f "/etc/openvpn/$f" "/etc/openvpn/server/$f"
     fi
-    break
+    if [ -f "/etc/openvpn/server/$f" ] && [ ! -f "/etc/openvpn/$f" ]; then
+        cp -f "/etc/openvpn/server/$f" "/etc/openvpn/$f"
+    fi
 done
 
-# Compatibilidade DH (dh.pem vs dh2048.pem)
+# Compatibilidade dh.pem e dh2048.pem
 for D in /etc/openvpn /etc/openvpn/server; do
-    [ -d "$D" ] || continue
     if [ -f "$D/dh2048.pem" ] && [ ! -f "$D/dh.pem" ]; then
         cp -f "$D/dh2048.pem" "$D/dh.pem"
     elif [ -f "$D/dh.pem" ] && [ ! -f "$D/dh2048.pem" ]; then
@@ -265,65 +124,31 @@ for D in /etc/openvpn /etc/openvpn/server; do
     fi
 done
 
-# Sincroniza server.conf entre /etc/openvpn/ e /etc/openvpn/server/
-if [ -f /etc/openvpn/server.conf ] && [ ! -s /etc/openvpn/server/server.conf ]; then
-    cp -f /etc/openvpn/server.conf /etc/openvpn/server/server.conf 2>/dev/null || true
-elif [ -f /etc/openvpn/server/server.conf ] && [ ! -s /etc/openvpn/server.conf ]; then
-    cp -f /etc/openvpn/server/server.conf /etc/openvpn/server.conf 2>/dev/null || true
-fi
-
-# Ajusta permissões dos certificados
+# Permissões seguras
 chmod 600 /etc/openvpn/server.key /etc/openvpn/server/server.key 2>/dev/null || true
 chmod 644 /etc/openvpn/*.crt /etc/openvpn/*.pem /etc/openvpn/server/*.crt /etc/openvpn/server/*.pem 2>/dev/null || true
 
-# Cria arquivos dinâmicos antecipadamente para ajustar permissão de leitura (asterisk)
-touch /etc/openvpn/server/openvpn-status.log /etc/openvpn/server/ipp.txt /etc/openvpn/openvpn-status.log /etc/openvpn/ipp.txt 2>/dev/null || true
-chmod 664 /etc/openvpn/server/openvpn-status.log /etc/openvpn/server/ipp.txt /etc/openvpn/openvpn-status.log /etc/openvpn/ipp.txt 2>/dev/null || true
-chown asterisk:asterisk /etc/openvpn/server/openvpn-status.log /etc/openvpn/server/ipp.txt /etc/openvpn/openvpn-status.log /etc/openvpn/ipp.txt 2>/dev/null || true
+# 6. Passo 4 do Fórum: Habilitar e iniciar o serviço
+log_info "4. Habilitando e iniciando openvpn-server@server.service..."
+systemctl daemon-reload
+systemctl -f enable openvpn-server@server.service 2>/dev/null || true
+systemctl restart openvpn-server@server.service 2>/dev/null || true
 
-# ─────────────────────────────────────────────────────────────────────────────
-# 6. Habilita e inicia o serviço (openvpn-server@server no Rocky 8)
-# ─────────────────────────────────────────────────────────────────────────────
-systemctl daemon-reload 2>/dev/null || true
-if systemctl list-unit-files 2>/dev/null | grep -q "openvpn-server@"; then
-    systemctl -f enable openvpn-server@server.service 2>/dev/null || true
-    if [ -s /etc/openvpn/server/server.conf ] || [ -s /etc/openvpn/server.conf ]; then
-        /usr/local/bin/ipbx-openvpn-helper.sh restart 2>/dev/null || true
-    fi
-elif systemctl list-unit-files 2>/dev/null | grep -q "openvpn@"; then
-    systemctl -f enable openvpn@server.service 2>/dev/null || true
-    if [ -s /etc/openvpn/server.conf ]; then
-        /usr/local/bin/ipbx-openvpn-helper.sh restart 2>/dev/null || true
-    fi
-fi
-
-# ─────────────────────────────────────────────────────────────────────────────
-# 8. Link simbólico do módulo web + Menu do Issabel
-# O módulo no disco se chama easy_vpn. O menu ID deve ser easy_vpn para que
-# a URL ?menu=easy_vpn carregue o módulo corretamente.
-# ─────────────────────────────────────────────────────────────────────────────
-
-# O pacote issabel-easyvpn já registra o menu corretamente.
-# Apenas garantimos permissão nos bancos e limpamos o cache Smarty.
-if command -v sqlite3 &>/dev/null; then
-    chown asterisk:asterisk /var/www/db/menu.db /var/www/db/acl.db 2>/dev/null || true
-    chmod 666 /var/www/db/menu.db /var/www/db/acl.db 2>/dev/null || true
-fi
-rm -rf /var/www/html/var/templates_c/* /tmp/smarty* 2>/dev/null || true
+# 7. Sudo para interface web controlar o serviço sem senha
+cat << 'EOF' > /etc/sudoers.d/99-openvpn-asterisk
+asterisk ALL=(ALL) NOPASSWD: /usr/bin/systemctl * openvpn-server@server.service, /usr/bin/systemctl * openvpn-server@server
+EOF
+chmod 440 /etc/sudoers.d/99-openvpn-asterisk 2>/dev/null || true
 
 echo ""
-log_info "Verificando status do OpenVPN no sistema..."
-if systemctl is-active openvpn-server@server.service &>/dev/null || systemctl is-active openvpn@server.service &>/dev/null || pgrep -x openvpn &>/dev/null; then
+log_info "Verificando status do serviço..."
+if systemctl is-active openvpn-server@server.service &>/dev/null; then
     log_success "Servidor OpenVPN está ATIVO e RODANDO com sucesso!"
     ss -tulpn | grep openvpn || true
 else
-    log_warn "O serviço ainda não iniciou automaticamente. Verificando log:"
-    journalctl -u openvpn-server@server.service -n 10 --no-pager 2>/dev/null || journalctl -u openvpn@server.service -n 10 --no-pager 2>/dev/null || true
+    log_warn "O serviço ainda não subiu. Verificando log recente:"
+    journalctl -u openvpn-server@server.service -n 10 --no-pager 2>/dev/null || true
 fi
 
 echo ""
-log_success "=================================================================="
-log_success "  OPENVPN CONFIGURADO E SINCRONIZADO!"
-log_success "  Acesse: Sistema → Segurança → OpenVPN"
-log_success "=================================================================="
-echo ""
+log_success "Concluído conforme guia oficial do Fórum Issabel."
