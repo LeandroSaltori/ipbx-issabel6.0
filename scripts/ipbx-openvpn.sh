@@ -100,8 +100,19 @@ log_success "issabel-easyvpn instalado com sucesso."
 # A interface web grava em /etc/openvpn/.
 # Criamos a estrutura para que ambos enxerguem os mesmos arquivos.
 # ─────────────────────────────────────────────────────────────────────────────
-log_info "Configurando compatibilidade de diretórios para Rocky Linux 8..."
-mkdir -p /etc/openvpn/server /etc/openvpn/client /etc/openvpn/ccd /var/log/openvpn
+log_info "Configurando compatibilidade de diretórios e volumes elFinder..."
+mkdir -p /etc/openvpn/server /etc/openvpn/client /etc/openvpn/ccd /var/log/openvpn /etc/openvpn/clientkeys
+
+# Garante diretório clientkeys para o gerenciador de arquivos web (elFinder)
+for D in /var/www/html/modules/easy_vpn /var/www/html/modules/easyvpn; do
+    [ -d "$D" ] || continue
+    mkdir -p "$D/clientkeys"
+    chown -R asterisk:asterisk "$D"
+    chmod -R 775 "$D"
+done
+mkdir -p /etc/openvpn/clientkeys
+chown -R asterisk:asterisk /etc/openvpn /usr/share/easy-rsa 2>/dev/null || true
+chmod -R 775 /etc/openvpn /usr/share/easy-rsa 2>/dev/null || true
 
 # IP Forwarding
 echo "net.ipv4.ip_forward = 1" > /etc/sysctl.d/99-openvpn.conf
