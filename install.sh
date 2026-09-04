@@ -1377,6 +1377,25 @@ if [ -f "$REPO_DIR/docs/architecture/ipbx_architecture.html" ]; then
 fi
 
 # ==============================================================================
+# PADRONIZAÇÃO DE IDIOMA GLOBAL DO ASTERISK (PT_BR)
+# ==============================================================================
+if [ -f /etc/asterisk/asterisk.conf ]; then
+    if grep -qE "defaultlanguage[[:space:]]*=[[:space:]]*en" /etc/asterisk/asterisk.conf 2>/dev/null; then
+        log_info "Padronizando idioma global do Asterisk para pt_BR em /etc/asterisk/asterisk.conf..."
+        sed -i 's/defaultlanguage[[:space:]]*=[[:space:]]*en/defaultlanguage=pt_BR/g' /etc/asterisk/asterisk.conf 2>/dev/null || true
+    elif ! grep -q "defaultlanguage" /etc/asterisk/asterisk.conf 2>/dev/null; then
+        log_info "Definindo defaultlanguage = pt_BR em /etc/asterisk/asterisk.conf..."
+        sed -i '/\[options\]/a defaultlanguage = pt_BR' /etc/asterisk/asterisk.conf 2>/dev/null || true
+    fi
+fi
+
+# Garante links simbólicos de compatibilidade para pastas de áudio em português
+if [ -d /var/lib/asterisk/sounds/pt_BR ]; then
+    [ ! -e /var/lib/asterisk/sounds/br ] && ln -sfn /var/lib/asterisk/sounds/pt_BR /var/lib/asterisk/sounds/br 2>/dev/null || true
+    [ ! -e /var/lib/asterisk/sounds/pt ] && ln -sfn /var/lib/asterisk/sounds/pt_BR /var/lib/asterisk/sounds/pt 2>/dev/null || true
+fi
+
+# ==============================================================================
 # RECARGA DE SERVIÇOS E FINALIZAÇÃO
 # ==============================================================================
 log_info "Limpando cache de templates do Smarty e recarregando serviços..."

@@ -164,6 +164,19 @@ reload_services() {
     chmod 755 /var/log/asterisk/cdr-csv /var/log/asterisk/cdr-custom 2>/dev/null || true
     chmod 664 /var/log/asterisk/cdr-csv/Master.csv 2>/dev/null || true
 
+    # Padroniza idioma global do Asterisk para pt_BR e links simbólicos
+    if [ -f /etc/asterisk/asterisk.conf ]; then
+        if grep -qE "defaultlanguage[[:space:]]*=[[:space:]]*en" /etc/asterisk/asterisk.conf 2>/dev/null; then
+            sed -i 's/defaultlanguage[[:space:]]*=[[:space:]]*en/defaultlanguage=pt_BR/g' /etc/asterisk/asterisk.conf 2>/dev/null || true
+        elif ! grep -q "defaultlanguage" /etc/asterisk/asterisk.conf 2>/dev/null; then
+            sed -i '/\[options\]/a defaultlanguage = pt_BR' /etc/asterisk/asterisk.conf 2>/dev/null || true
+        fi
+    fi
+    if [ -d /var/lib/asterisk/sounds/pt_BR ]; then
+        [ ! -e /var/lib/asterisk/sounds/br ] && ln -sfn /var/lib/asterisk/sounds/pt_BR /var/lib/asterisk/sounds/br 2>/dev/null || true
+        [ ! -e /var/lib/asterisk/sounds/pt ] && ln -sfn /var/lib/asterisk/sounds/pt_BR /var/lib/asterisk/sounds/pt 2>/dev/null || true
+    fi
+
     rm -rf /var/www/html/var/templates_c/* 2>/dev/null || true
     rm -rf /tmp/smarty* 2>/dev/null || true
     asterisk -rx "module reload" 2>/dev/null || asterisk -rx "core reload" 2>/dev/null || true
@@ -172,7 +185,7 @@ reload_services() {
     elif systemctl is-active apache2 &>/dev/null; then
         systemctl restart apache2 2>/dev/null || true
     fi
-    log_success "Serviços recarregados."
+    log_success "Serviços recarregados e idioma pt_BR garantido."
 }
 
 # --- DETECÇÃO DE SENHA MYSQL ---
