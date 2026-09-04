@@ -30,7 +30,7 @@ log_info "=================================================================="
 echo ""
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 1. REMOVE TUDO DO OPENVPN / CERTIFICADOS ANTERIORES (RESET DO ZERO)
+# 1. REMOVE TUDO DO OPENVPN / CERTIFICADOS ANTERIORES (RESET TOTAL DO ZERO)
 # ─────────────────────────────────────────────────────────────────────────────
 log_warn "Parando todos os serviços OpenVPN..."
 systemctl stop openvpn-server@server.service openvpn@server.service openvpn 2>/dev/null || true
@@ -38,10 +38,14 @@ systemctl disable openvpn-server@server.service openvpn@server.service 2>/dev/nu
 systemctl stop ipbx-openvpn-sanitize.service ipbx-openvpn-sanitize.path 2>/dev/null || true
 systemctl disable ipbx-openvpn-sanitize.service ipbx-openvpn-sanitize.path 2>/dev/null || true
 
-log_warn "Removendo certificados antigos, configurações e módulos..."
+log_warn "Removendo certificados antigos, chaves de clientes, bancos e módulos..."
 rm -rf /etc/openvpn
 rm -rf /usr/share/easy-rsa/3.0.8
 rm -rf /var/log/openvpn
+rm -rf /var/www/html/modules/easy_vpn/clientkeys/* 2>/dev/null || true
+rm -rf /var/www/html/modules/easyvpn/clientkeys/* 2>/dev/null || true
+rm -f /var/www/db/*vpn*.db /var/www/db/*easy*.db 2>/dev/null || true
+rm -rf /var/www/html/var/templates_c/* /tmp/smarty* 2>/dev/null || true
 rm -f /etc/sudoers.d/*openvpn*
 rm -f /etc/systemd/system/ipbx-openvpn*
 rm -f /etc/cron.d/ipbx-openvpn
@@ -54,7 +58,8 @@ if command -v dnf &>/dev/null; then
 else
     yum remove -y issabel-easyvpn 2>/dev/null || true
 fi
-log_success "Ambiente OpenVPN anterior 100% limpo e removido."
+rm -rf /var/www/html/modules/easy_vpn /var/www/html/modules/easyvpn 2>/dev/null || true
+log_success "Ambiente OpenVPN anterior 100% limpo e zerado."
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 2. PASSO 1 E 2 DO FÓRUM: EASY-RSA 3.0.8
