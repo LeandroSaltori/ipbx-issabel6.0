@@ -241,49 +241,62 @@ EOFCRON
 chmod 644 /etc/cron.d/ipbx-openvpn 2>/dev/null || true
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 5. Permissões da CRL (crl.pem precisa ser legível pelo daemon openvpn)
+# 5. Permissões da CRL e Sincronização dos Certificados (Sem links quebrados)
 # ─────────────────────────────────────────────────────────────────────────────
 for EASYRSA_DIR in /usr/share/easy-rsa/3.0.8 /usr/share/easy-rsa/3 /etc/openvpn/easy-rsa; do
     [ -f "$EASYRSA_DIR/easyrsa" ] || continue
     (cd "$EASYRSA_DIR" && ./easyrsa gen-crl 2>/dev/null || true)
-    if [ -f "$EASYRSA_DIR/pki/crl.pem" ]; then
-        cp -f "$EASYRSA_DIR/pki/crl.pem" /etc/openvpn/server/crl.pem 2>/dev/null || true
-        cp -f "$EASYRSA_DIR/pki/crl.pem" /etc/openvpn/crl.pem 2>/dev/null || true
-        chmod 644 /etc/openvpn/server/crl.pem /etc/openvpn/crl.pem 2>/dev/null || true
+    
+    # Restaura certificados reais da PKI para ambas as pastas (evita links quebrados)
+    PKI_DIR="$EASYRSA_DIR/pki"
+    if [ -d "$PKI_DIR" ]; then
+        [ -f "$PKI_DIR/ca.crt" ] && cp -f "$PKI_DIR/ca.crt" /etc/openvpn/ca.crt && cp -f "$PKI_DIR/ca.crt" /etc/openvpn/server/ca.crt
+        [ -f "$PKI_DIR/issued/server.crt" ] && cp -f "$PKI_DIR/issued/server.crt" /etc/openvpn/server.crt && cp -f "$PKI_DIR/issued/server.crt" /etc/openvpn/server/server.crt
+        [ -f "$PKI_DIR/private/server.key" ] && cp -f "$PKI_DIR/private/server.key" /etc/openvpn/server.key && cp -f "$PKI_DIR/private/server.key" /etc/openvpn/server/server.key
+        [ -f "$PKI_DIR/dh.pem" ] && cp -f "$PKI_DIR/dh.pem" /etc/openvpn/dh.pem && cp -f "$PKI_DIR/dh.pem" /etc/openvpn/server/dh.pem
+        [ -f "$PKI_DIR/crl.pem" ] && cp -f "$PKI_DIR/crl.pem" /etc/openvpn/crl.pem && cp -f "$PKI_DIR/crl.pem" /etc/openvpn/server/crl.pem
     fi
     break
 done
 
-# ─────────────────────────────────────────────────────────────────────────────
-# 6. Links simbólicos e permissões de arquivos dinâmicos (status/ipp)
-# ─────────────────────────────────────────────────────────────────────────────
-if [ -f /etc/openvpn/server/server.conf ] && [ ! -e /etc/openvpn/server.conf ]; then
-    ln -sfn /etc/openvpn/server/server.conf /etc/openvpn/server.conf 2>/dev/null || true
-elif [ -f /etc/openvpn/server.conf ] && [ ! -f /etc/openvpn/server/server.conf ]; then
-    ln -sfn /etc/openvpn/server.conf /etc/openvpn/server/server.conf 2>/dev/null || true
-fi
-
-# Cria arquivos dinâmicos antecipadamente para ajustar permissão de leitura (asterisk)
-touch /etc/openvpn/server/openvpn-status.log /etc/openvpn/server/ipp.txt 2>/dev/null || true
-chmod 644 /etc/openvpn/server/openvpn-status.log /etc/openvpn/server/ipp.txt 2>/dev/null || true
-
-for f in ca.crt server.crt server.key dh2048.pem dh.pem ipp.txt openvpn-status.log crl.pem; do
-    # Força o symlink para o Issabel (que espera em /etc/openvpn/)
-    ln -sfn "/etc/openvpn/server/$f" "/etc/openvpn/$f" 2>/dev/null || true
+# Compatibilidade DH (dh.pem vs dh2048.pem)
+for D in /etc/openvpn /etc/openvpn/server; do
+    [ -d "$D" ] || continue
+    if [ -f "$D/dh2048.pem" ] && [ ! -f "$D/dh.pem" ]; then
+        cp -f "$D/dh2048.pem" "$D/dh.pem"
+    elif [ -f "$D/dh.pem" ] && [ ! -f "$D/dh2048.pem" ]; then
+        cp -f "$D/dh.pem" "$D/dh2048.pem"
+    fi
 done
 
+# Sincroniza server.conf entre /etc/openvpn/ e /etc/openvpn/server/
+if [ -f /etc/openvpn/server.conf ] && [ ! -s /etc/openvpn/server/server.conf ]; then
+    cp -f /etc/openvpn/server.conf /etc/openvpn/server/server.conf 2>/dev/null || true
+elif [ -f /etc/openvpn/server/server.conf ] && [ ! -s /etc/openvpn/server.conf ]; then
+    cp -f /etc/openvpn/server/server.conf /etc/openvpn/server.conf 2>/dev/null || true
+fi
+
+# Ajusta permissões dos certificados
+chmod 600 /etc/openvpn/server.key /etc/openvpn/server/server.key 2>/dev/null || true
+chmod 644 /etc/openvpn/*.crt /etc/openvpn/*.pem /etc/openvpn/server/*.crt /etc/openvpn/server/*.pem 2>/dev/null || true
+
+# Cria arquivos dinâmicos antecipadamente para ajustar permissão de leitura (asterisk)
+touch /etc/openvpn/server/openvpn-status.log /etc/openvpn/server/ipp.txt /etc/openvpn/openvpn-status.log /etc/openvpn/ipp.txt 2>/dev/null || true
+chmod 664 /etc/openvpn/server/openvpn-status.log /etc/openvpn/server/ipp.txt /etc/openvpn/openvpn-status.log /etc/openvpn/ipp.txt 2>/dev/null || true
+chown asterisk:asterisk /etc/openvpn/server/openvpn-status.log /etc/openvpn/server/ipp.txt /etc/openvpn/openvpn-status.log /etc/openvpn/ipp.txt 2>/dev/null || true
+
 # ─────────────────────────────────────────────────────────────────────────────
-# 7. Habilita e inicia o serviço (se server.conf já existir)
+# 6. Habilita e inicia o serviço (openvpn-server@server no Rocky 8)
 # ─────────────────────────────────────────────────────────────────────────────
 systemctl daemon-reload 2>/dev/null || true
 if systemctl list-unit-files 2>/dev/null | grep -q "openvpn-server@"; then
-    systemctl enable openvpn-server@server.service 2>/dev/null || true
-    if [ -f /etc/openvpn/server/server.conf ] || [ -f /etc/openvpn/server.conf ]; then
+    systemctl -f enable openvpn-server@server.service 2>/dev/null || true
+    if [ -s /etc/openvpn/server/server.conf ] || [ -s /etc/openvpn/server.conf ]; then
         /usr/local/bin/ipbx-openvpn-helper.sh restart 2>/dev/null || true
     fi
 elif systemctl list-unit-files 2>/dev/null | grep -q "openvpn@"; then
-    systemctl enable openvpn@server.service 2>/dev/null || true
-    if [ -f /etc/openvpn/server.conf ]; then
+    systemctl -f enable openvpn@server.service 2>/dev/null || true
+    if [ -s /etc/openvpn/server.conf ]; then
         /usr/local/bin/ipbx-openvpn-helper.sh restart 2>/dev/null || true
     fi
 fi
@@ -303,8 +316,18 @@ fi
 rm -rf /var/www/html/var/templates_c/* /tmp/smarty* 2>/dev/null || true
 
 echo ""
+log_info "Verificando status do OpenVPN no sistema..."
+if systemctl is-active openvpn-server@server.service &>/dev/null || systemctl is-active openvpn@server.service &>/dev/null || pgrep -x openvpn &>/dev/null; then
+    log_success "Servidor OpenVPN está ATIVO e RODANDO com sucesso!"
+    ss -tulpn | grep 1194 || true
+else
+    log_warn "O serviço ainda não iniciou automaticamente. Verificando log:"
+    journalctl -u openvpn-server@server.service -n 10 --no-pager 2>/dev/null || journalctl -u openvpn@server.service -n 10 --no-pager 2>/dev/null || true
+fi
+
+echo ""
 log_success "=================================================================="
-log_success "  OPENVPN CONFIGURADO COM SUCESSO!"
+log_success "  OPENVPN CONFIGURADO E SINCRONIZADO!"
 log_success "  Acesse: Sistema → Segurança → OpenVPN"
 log_success "=================================================================="
 echo ""
