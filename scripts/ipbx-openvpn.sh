@@ -152,12 +152,8 @@ case "$ACTION" in
             ln -sfn /etc/openvpn/server/server.conf /etc/openvpn/server.conf 2>/dev/null || true
         fi
 
-        # Libera porta 1194/udp no firewall se aplicável
-        if command -v firewall-cmd &>/dev/null && systemctl is-active firewalld &>/dev/null; then
-            firewall-cmd --add-port=1194/udp --permanent 2>/dev/null || true
-            firewall-cmd --reload 2>/dev/null || true
-        elif command -v iptables &>/dev/null; then
-            iptables -C INPUT -p udp --dport 1194 -j ACCEPT 2>/dev/null || iptables -I INPUT -p udp --dport 1194 -j ACCEPT 2>/dev/null || true
+        # NAT para a rede da VPN (áudio e roteamento interno)
+        if command -v iptables &>/dev/null; then
             iptables -t nat -C POSTROUTING -s 10.8.0.0/24 -j MASQUERADE 2>/dev/null || iptables -t nat -A POSTROUTING -s 10.8.0.0/24 -j MASQUERADE 2>/dev/null || true
         fi
 
@@ -319,7 +315,7 @@ echo ""
 log_info "Verificando status do OpenVPN no sistema..."
 if systemctl is-active openvpn-server@server.service &>/dev/null || systemctl is-active openvpn@server.service &>/dev/null || pgrep -x openvpn &>/dev/null; then
     log_success "Servidor OpenVPN está ATIVO e RODANDO com sucesso!"
-    ss -tulpn | grep 1194 || true
+    ss -tulpn | grep openvpn || true
 else
     log_warn "O serviço ainda não iniciou automaticamente. Verificando log:"
     journalctl -u openvpn-server@server.service -n 10 --no-pager 2>/dev/null || journalctl -u openvpn@server.service -n 10 --no-pager 2>/dev/null || true
