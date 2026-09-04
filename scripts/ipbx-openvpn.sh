@@ -124,19 +124,25 @@ cat << 'EOFPRIV' > /usr/share/issabel/privileged/openvpn
 ACTION="${1:-status}"
 case "$ACTION" in
     start)
-        # Sincroniza arquivos de /etc/openvpn para /etc/openvpn/server se existirem
+        # Sincroniza arquivos bidirecionalmente entre /etc/openvpn e /etc/openvpn/server/
         for f in /etc/openvpn/*; do
             [ -f "$f" ] && cp -f "$f" /etc/openvpn/server/ 2>/dev/null || true
+        done
+        for f in /etc/openvpn/server/*; do
+            [ -f "$f" ] && cp -f "$f" /etc/openvpn/ 2>/dev/null || true
         done
         # Garante crl.pem se ainda não existir
         if [ ! -f /etc/openvpn/server/crl.pem ] && [ -f /etc/openvpn/crl.pem ]; then
             cp -f /etc/openvpn/crl.pem /etc/openvpn/server/crl.pem 2>/dev/null || true
         elif [ ! -f /etc/openvpn/server/crl.pem ] && [ -f /usr/share/easy-rsa/3.0.8/pki/crl.pem ]; then
             cp -f /usr/share/easy-rsa/3.0.8/pki/crl.pem /etc/openvpn/server/crl.pem 2>/dev/null || true
+            cp -f /usr/share/easy-rsa/3.0.8/pki/crl.pem /etc/openvpn/crl.pem 2>/dev/null || true
         elif [ ! -f /etc/openvpn/server/crl.pem ] && [ -x /usr/share/easy-rsa/3.0.8/easyrsa ]; then
             (cd /usr/share/easy-rsa/3.0.8 && ./easyrsa gen-crl 2>/dev/null || true)
             [ -f /usr/share/easy-rsa/3.0.8/pki/crl.pem ] && cp -f /usr/share/easy-rsa/3.0.8/pki/crl.pem /etc/openvpn/server/crl.pem 2>/dev/null || true
+            [ -f /usr/share/easy-rsa/3.0.8/pki/crl.pem ] && cp -f /usr/share/easy-rsa/3.0.8/pki/crl.pem /etc/openvpn/crl.pem 2>/dev/null || true
         fi
+        chmod 644 /etc/openvpn/*.crt /etc/openvpn/*.pem /etc/openvpn/server/*.crt /etc/openvpn/server/*.pem 2>/dev/null || true
         systemctl restart openvpn-server@server.service
         ;;
     stop)
