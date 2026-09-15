@@ -82,35 +82,45 @@ else
 fi
 
 # 4. Verificação/Instalação do parser de log (parselog.php / Asternic Lite)
-if [ ! -f /usr/local/parselog/parselog.php ] && [ ! -f /var/www/html/stats/parselog.php ]; then
+mkdir -p /usr/local/parselog
+SCRIPT_DIR_REL="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd || echo "")"
+if [ -d "$SCRIPT_DIR_REL/parselog" ]; then
+  cp -rf "$SCRIPT_DIR_REL/parselog/"* /usr/local/parselog/
+fi
+
+if [ ! -f /usr/local/parselog/parselog.php ]; then
   echo "[+] Baixando componentes do Asternic Lite para processamento de logs (parselog.php)..."
   cd /tmp
   rm -rf asternic-stats*
-  wget -q http://download.asternic.net/asternic-stats-1.5.tar.gz -O asternic-stats-1.5.tar.gz 2>/dev/null
-  if [ -f asternic-stats-1.5.tar.gz ]; then
-    tar -zxf asternic-stats-1.5.tar.gz
-    mkdir -p /usr/local/parselog
-    if [ -f asternic-stats/parselog.php ]; then
-      cp -f asternic-stats/parselog.php /usr/local/parselog/
-    elif [ -f asternic-stats/html/parselog.php ]; then
-      cp -f asternic-stats/html/parselog.php /usr/local/parselog/
+  curl -k -sSL "https://download.asternic.net/asternic-stats-1.8.tgz" -o asternic-stats-1.8.tgz 2>/dev/null || \
+  wget --no-check-certificate -q "https://download.asternic.net/asternic-stats-1.8.tgz" -O asternic-stats-1.8.tgz 2>/dev/null || true
+  if [ -f asternic-stats-1.8.tgz ]; then
+    tar -zxf asternic-stats-1.8.tgz
+    if [ -d asternic-stats/parselog ]; then
+      cp -rf asternic-stats/parselog/* /usr/local/parselog/
     fi
-    
-    # Ajusta credencial no parselog.php
-    if [ -f /usr/local/parselog/parselog.php ]; then
-      sed -i "s/\$dbuser = .*/\$dbuser = 'root';/" /usr/local/parselog/parselog.php
-      sed -i "s/\$dbpass = .*/\$dbpass = '$MYSQL_PWD';/" /usr/local/parselog/parselog.php
-    fi
-
-    # Adiciona no Crontab para atualizar estatísticas a cada minuto
-    if ! crontab -l 2>/dev/null | grep -q "parselog.php"; then
-      (crontab -l 2>/dev/null; echo "* * * * * php /usr/local/parselog/parselog.php > /dev/null 2>&1") | crontab -
-    fi
-
-    # Roda uma vez para processar logs atuais
-    php /usr/local/parselog/parselog.php &>/dev/null || true
   fi
 fi
+
+# Ajusta credencial no config.php do parselog
+if [ -f /usr/local/parselog/config.php ]; then
+  sed -i "s/\$dbuser = .*/\$dbuser = 'root';/" /usr/local/parselog/config.php
+  sed -i "s/\$dbpass = .*/\$dbpass = '$MYSQL_PWD';/" /usr/local/parselog/config.php
+fi
+chmod +x /usr/local/parselog/parselog.php 2>/dev/null || true
+
+# Garante queue_log do Asterisk
+touch /var/log/asterisk/queue_log 2>/dev/null || true
+chown asterisk:asterisk /var/log/asterisk/queue_log 2>/dev/null || true
+chmod 664 /var/log/asterisk/queue_log 2>/dev/null || true
+
+# Adiciona no Crontab para atualizar estatísticas a cada minuto
+if ! crontab -l 2>/dev/null | grep -q "parselog.php"; then
+  (crontab -l 2>/dev/null; echo "* * * * * php /usr/local/parselog/parselog.php > /dev/null 2>&1") | crontab -
+fi
+
+# Roda uma vez para processar logs atuais
+php /usr/local/parselog/parselog.php &>/dev/null || true
 
 # 5. Baixar e atualizar a pasta Relatorio_de_filas do GitHub
 echo "[+] Baixando os arquivos do Relatório de Filas do GitHub..."

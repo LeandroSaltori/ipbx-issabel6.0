@@ -42,7 +42,15 @@ $conn = @mysqli_connect($dbHost, $dbUser, $dbPass);
 if (!$conn) {
     die('<div style="padding:40px;font-family:monospace;color:red;">Erro ao conectar ao MySQL: ' . mysqli_connect_error() . '</div>');
 }
-mysqli_select_db($conn, $dbName) or die('<div style="padding:40px;font-family:monospace;color:red;">Banco qstatslite n&atilde;o encontrado.</div>');
+if (!@mysqli_select_db($conn, $dbName)) {
+    @mysqli_query($conn, "CREATE DATABASE IF NOT EXISTS qstatslite DEFAULT CHARACTER SET utf8 COLLATE utf8_general_ci");
+    @mysqli_select_db($conn, $dbName);
+}
+// Garante tabelas basicas do qstatslite caso ainda nao existam
+@mysqli_query($conn, "CREATE TABLE IF NOT EXISTS `qname` (`qname_id` int(11) NOT NULL AUTO_INCREMENT, `queue` varchar(50) NOT NULL DEFAULT '', PRIMARY KEY (`qname_id`), KEY `queue` (`queue`)) ENGINE=InnoDB DEFAULT CHARSET=utf8");
+@mysqli_query($conn, "CREATE TABLE IF NOT EXISTS `qagent` (`agent_id` int(11) NOT NULL AUTO_INCREMENT, `agent` varchar(50) NOT NULL DEFAULT '', PRIMARY KEY (`agent_id`), KEY `agent` (`agent`)) ENGINE=InnoDB DEFAULT CHARSET=utf8");
+@mysqli_query($conn, "CREATE TABLE IF NOT EXISTS `qevent` (`event_id` int(11) NOT NULL AUTO_INCREMENT, `event` varchar(50) NOT NULL DEFAULT '', PRIMARY KEY (`event_id`), KEY `event` (`event`)) ENGINE=InnoDB DEFAULT CHARSET=utf8");
+@mysqli_query($conn, "CREATE TABLE IF NOT EXISTS `queue_stats` (`datetime` datetime NOT NULL DEFAULT '0000-00-00 00:00:00', `qname` int(11) NOT NULL DEFAULT '0', `qagent` int(11) NOT NULL DEFAULT '0', `qevent` int(11) NOT NULL DEFAULT '0', `info1` varchar(100) NOT NULL DEFAULT '', `info2` varchar(100) NOT NULL DEFAULT '', `info3` varchar(100) NOT NULL DEFAULT '', `info4` varchar(100) NOT NULL DEFAULT '', `info5` varchar(100) NOT NULL DEFAULT '', `uniqueid` varchar(32) NOT NULL DEFAULT '', KEY `datetime` (`datetime`), KEY `qname` (`qname`), KEY `qagent` (`qagent`), KEY `qevent` (`qevent`), KEY `uniqueid` (`uniqueid`)) ENGINE=InnoDB DEFAULT CHARSET=utf8");
 mysqli_set_charset($conn, 'utf8');
 mysqli_query($conn, "SET NAMES 'utf8'");
 
@@ -283,9 +291,48 @@ if ($rDevices) {
     }
 }
 
-// --- Lista de filas e agentes para o formul&#225;rio --------------------------------------
+// --- Sincronização Inteligente de Filas cadastradas no PBX (Asterisk) ---
+$pbxQueues = array();
+$rPbxQ1 = @mysqli_query($conn, "SELECT DISTINCT extension FROM asterisk.queues_config WHERE extension != ''");
+if ($rPbxQ1) {
+    while ($pq = mysqli_fetch_assoc($rPbxQ1)) {
+        $ext = trim($pq['extension']);
+        if ($ext != '') $pbxQueues[$ext] = true;
+    }
+}
+$rPbxQ2 = @mysqli_query($conn, "SELECT DISTINCT queue FROM asterisk.queues WHERE queue != ''");
+if ($rPbxQ2) {
+    while ($pq = mysqli_fetch_assoc($rPbxQ2)) {
+        $ext = trim($pq['queue']);
+        if ($ext != '') $pbxQueues[$ext] = true;
+    }
+}
+// Garante que todas as filas do PBX existam na tabela qname
+$existingQnames = array();
+$rExisting = @mysqli_query($conn, "SELECT queue FROM qname");
+if ($rExisting) {
+    while ($exRow = mysqli_fetch_assoc($rExisting)) {
+        $existingQnames[$exRow['queue']] = true;
+    }
+}
+foreach (array_keys($pbxQueues) as $pQueue) {
+    if (!isset($existingQnames[$pQueue])) {
+        $pQueueEsc = mysqli_real_escape_string($conn, $pQueue);
+        @mysqli_query($conn, "INSERT INTO qname (queue) VALUES ('$pQueueEsc')");
+        $existingQnames[$pQueue] = true;
+    }
+}
+
+// Executa parser em segundo plano para processar novos registros do queue_log
+if (file_exists('/usr/local/parselog/parselog.php')) {
+    @exec('php /usr/local/parselog/parselog.php > /dev/null 2>&1 &');
+} elseif (file_exists(__DIR__ . '/parselog/parselog.php')) {
+    @exec('php ' . escapeshellarg(__DIR__ . '/parselog/parselog.php') . ' > /dev/null 2>&1 &');
+}
+
+// --- Lista de filas e agentes para o formulário --------------------------------------
 $filas = array();
-$rFilas = mysqli_query($conn, "SELECT qname_id, queue FROM qname WHERE queue != 'NONE' ORDER BY queue");
+$rFilas = mysqli_query($conn, "SELECT qname_id, queue FROM qname WHERE queue != 'NONE' AND queue != '' ORDER BY queue");
 if ($rFilas) {
     while ($row = mysqli_fetch_assoc($rFilas)) {
         $qRaw = $row['queue'];

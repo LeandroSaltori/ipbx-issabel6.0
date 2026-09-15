@@ -48,6 +48,17 @@ systemctl stop issabel-ldap.service
 journalctl -u issabel-ldap.service -f
 ```
 
+### Validação e Teste no Terminal (`ldapsearch`):
+O comando `ldapsearch` é fornecido pelo pacote `openldap-clients` (instalado automaticamente):
+
+```bash
+# Consultar ramais cadastrados autenticando como admin:
+ldapsearch -x -H ldap://127.0.0.1:10389 \
+  -D "cn=admin,dc=pbx,dc=com" \
+  -w "Prisma@500" \
+  -b "dc=pbx,dc=com" "(homePhone=*)"
+```
+
 ---
 
 ## 🔒 Parâmetros e Configuração de Acesso

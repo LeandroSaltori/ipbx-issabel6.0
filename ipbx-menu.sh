@@ -808,54 +808,80 @@ CREATE TABLE IF NOT EXISTS `queue_stats` (
 EOF
 
     # Parselog do Asternic
-    if [ ! -f /usr/local/parselog/parselog.php ] || [ ! -d /var/www/html/stats ]; then
-        log_info "Baixando e configurando Asternic Stats Lite..."
+    log_info "Configurando Asternic Stats Lite e parser de filas (parselog.php)..."
+    mkdir -p /usr/local/parselog
+
+    # Implanta componentes do parselog embutidos no repositório
+    if [ -d "$QUEUE_SRC/parselog" ]; then
+        /bin/cp -rf "$QUEUE_SRC/parselog/"* /usr/local/parselog/
+    fi
+
+    # Fallback: Se por algum motivo parselog não estiver presente, baixa a versão 1.8 oficial
+    if [ ! -f /usr/local/parselog/parselog.php ]; then
         TMP_ASTERNIC="/tmp/asternic-stats-install"
         rm -rf "$TMP_ASTERNIC"
         mkdir -p "$TMP_ASTERNIC"
 
-        curl -sSL "http://download.asternic.net/asternic-stats-1.5.tar.gz" -o "$TMP_ASTERNIC/asternic-stats-1.5.tar.gz" 2>/dev/null || \
-        wget -q "http://download.asternic.net/asternic-stats-1.5.tar.gz" -O "$TMP_ASTERNIC/asternic-stats-1.5.tar.gz" 2>/dev/null || true
+        curl -k -sSL "https://download.asternic.net/asternic-stats-1.8.tgz" -o "$TMP_ASTERNIC/asternic-stats-1.8.tgz" 2>/dev/null || \
+        curl -sSL "http://download.asternic.net/asternic-stats-1.8.tgz" -o "$TMP_ASTERNIC/asternic-stats-1.8.tgz" 2>/dev/null || \
+        wget --no-check-certificate -q "https://download.asternic.net/asternic-stats-1.8.tgz" -O "$TMP_ASTERNIC/asternic-stats-1.8.tgz" 2>/dev/null || true
 
-        if [ -f "$TMP_ASTERNIC/asternic-stats-1.5.tar.gz" ]; then
-            tar -xzf "$TMP_ASTERNIC/asternic-stats-1.5.tar.gz" -C "$TMP_ASTERNIC" 2>/dev/null || true
-            mkdir -p /usr/local/parselog
-            if [ -f "$TMP_ASTERNIC/asternic-stats/parselog.php" ]; then
-                cp -f "$TMP_ASTERNIC/asternic-stats/parselog.php" /usr/local/parselog/
-            elif [ -f "$TMP_ASTERNIC/asternic-stats/html/parselog.php" ]; then
-                cp -f "$TMP_ASTERNIC/asternic-stats/html/parselog.php" /usr/local/parselog/
+        if [ -f "$TMP_ASTERNIC/asternic-stats-1.8.tgz" ]; then
+            tar -xzf "$TMP_ASTERNIC/asternic-stats-1.8.tgz" -C "$TMP_ASTERNIC" 2>/dev/null || true
+            if [ -d "$TMP_ASTERNIC/asternic-stats/parselog" ]; then
+                cp -rf "$TMP_ASTERNIC/asternic-stats/parselog/"* /usr/local/parselog/
             fi
-            if [ -f /usr/local/parselog/parselog.php ]; then
-                sed -i "s/\$dbuser = .*/\$dbuser = 'root';/" /usr/local/parselog/parselog.php
-                sed -i "s/\$dbpass = .*/\$dbpass = '$MYSQL_PWD';/" /usr/local/parselog/parselog.php
-            fi
-            if [ -d "$TMP_ASTERNIC/asternic-stats/html" ]; then
+            if [ -d "$TMP_ASTERNIC/asternic-stats/html" ] && [ ! -d /var/www/html/stats ]; then
                 mkdir -p /var/www/html/stats
                 /bin/cp -rf "$TMP_ASTERNIC/asternic-stats/html/"* /var/www/html/stats/
-                if [ -f /var/www/html/stats/config.php ]; then
-                    sed -i "s/\$dbuser = .*/\$dbuser = 'root';/" /var/www/html/stats/config.php
-                    sed -i "s/\$dbpass = .*/\$dbpass = '$MYSQL_PWD';/" /var/www/html/stats/config.php
-                fi
-                chown -R asterisk:asterisk /var/www/html/stats
-                chmod -R 755 /var/www/html/stats
             fi
-            if ! crontab -l 2>/dev/null | grep -q "parselog.php"; then
-                (crontab -l 2>/dev/null; echo "* * * * * php /usr/local/parselog/parselog.php > /dev/null 2>&1") | crontab -
-            fi
-            php /usr/local/parselog/parselog.php &>/dev/null || true
         fi
         rm -rf "$TMP_ASTERNIC"
     fi
 
+    # Configura credenciais no config.php do parselog caso existam
+    if [ -f /usr/local/parselog/config.php ]; then
+        sed -i "s/\$dbuser = .*/\$dbuser = 'root';/" /usr/local/parselog/config.php
+        sed -i "s/\$dbpass = .*/\$dbpass = '$MYSQL_PWD';/" /usr/local/parselog/config.php
+    fi
+    chmod +x /usr/local/parselog/parselog.php 2>/dev/null || true
+
+    # Implanta interface web Asternic Stats Lite em /var/www/html/stats
+    if [ -d "$QUEUE_SRC/stats" ]; then
+        mkdir -p /var/www/html/stats
+        /bin/cp -rf "$QUEUE_SRC/stats/"* /var/www/html/stats/
+        if [ -f /var/www/html/stats/config.php ]; then
+            sed -i "s/\$dbuser = .*/\$dbuser = 'root';/" /var/www/html/stats/config.php
+            sed -i "s/\$dbpass = .*/\$dbpass = '$MYSQL_PWD';/" /var/www/html/stats/config.php
+        fi
+    fi
+    if [ -d /var/www/html/stats ]; then
+        chown -R asterisk:asterisk /var/www/html/stats
+        chmod -R 755 /var/www/html/stats
+    fi
+
+    # Garante existência e permissões do arquivo queue_log do Asterisk
+    touch /var/log/asterisk/queue_log 2>/dev/null || true
+    chown asterisk:asterisk /var/log/asterisk/queue_log 2>/dev/null || true
+    chmod 664 /var/log/asterisk/queue_log 2>/dev/null || true
+
+    # Agendamento no Crontab para processar logs de fila a cada minuto
+    if ! crontab -l 2>/dev/null | grep -q "parselog.php"; then
+        (crontab -l 2>/dev/null; echo "* * * * * php /usr/local/parselog/parselog.php > /dev/null 2>&1") | crontab -
+        log_success "Agendamento do parselog.php criado no crontab."
+    fi
+
+    # Executa imediatamente a primeira rodada do parselog
+    php /usr/local/parselog/parselog.php &>/dev/null || true
+
     # Relatório de Filas customizado
     if [ -d "$QUEUE_SRC" ]; then
-        mkdir -p /var/www/html/modules/relatorio_de_filas /var/www/html/Relatorio_de_filas /var/www/html/relatorio_de_filas /var/www/html/stats
+        mkdir -p /var/www/html/modules/relatorio_de_filas /var/www/html/Relatorio_de_filas /var/www/html/relatorio_de_filas
         /bin/cp -rf "$QUEUE_SRC/"* /var/www/html/modules/relatorio_de_filas/
         /bin/cp -rf "$QUEUE_SRC/"* /var/www/html/Relatorio_de_filas/ 2>/dev/null || true
         /bin/cp -rf "$QUEUE_SRC/"* /var/www/html/relatorio_de_filas/ 2>/dev/null || true
-        /bin/cp -rf "$QUEUE_SRC/"* /var/www/html/stats/ 2>/dev/null || true
-        chown -R asterisk:asterisk /var/www/html/modules/relatorio_de_filas /var/www/html/Relatorio_de_filas /var/www/html/relatorio_de_filas /var/www/html/stats
-        chmod -R 755 /var/www/html/modules/relatorio_de_filas /var/www/html/Relatorio_de_filas /var/www/html/relatorio_de_filas /var/www/html/stats
+        chown -R asterisk:asterisk /var/www/html/modules/relatorio_de_filas /var/www/html/Relatorio_de_filas /var/www/html/relatorio_de_filas
+        chmod -R 755 /var/www/html/modules/relatorio_de_filas /var/www/html/Relatorio_de_filas /var/www/html/relatorio_de_filas
 
         if command -v sqlite3 &>/dev/null; then
             sqlite3 /var/www/db/acl.db "INSERT OR IGNORE INTO acl_resource (name, description) VALUES ('relatorio_de_filas', 'Relatório de Filas');" 2>/dev/null || true
@@ -1116,6 +1142,12 @@ update_ldap() {
     LDAP_SVC_SRC="$REPO_DIR/src/ldap/systemd/issabel-ldap.service"
     LDAP_SYS_SRC="$REPO_DIR/src/ldap/systemd/issabel-ldap.sysconfig"
 
+    # Instala ferramentas do cliente LDAP (ldapsearch) se não estiverem presentes
+    if ! command -v ldapsearch &>/dev/null; then
+        log_info "Instalando openldap-clients (ldapsearch)..."
+        yum install -y openldap-clients 2>/dev/null || dnf install -y openldap-clients 2>/dev/null || true
+    fi
+
     if [ -f "$LDAP_BIN_SRC" ]; then
         cp -f "$LDAP_BIN_SRC" /usr/local/bin/issabel-ldap
         chmod 755 /usr/local/bin/issabel-ldap
@@ -1207,9 +1239,9 @@ update_diagnostico() {
                 yum install -y sngrep 2>/dev/null || true
             fi
         fi
-        yum install -y net-tools tcpdump sngrep NetworkManager-tui 2>/dev/null || true
+        yum install -y net-tools tcpdump sngrep NetworkManager-tui openldap-clients 2>/dev/null || true
     elif command -v dnf &>/dev/null; then
-        dnf install -y net-tools tcpdump sngrep NetworkManager-tui 2>/dev/null || true
+        dnf install -y net-tools tcpdump sngrep NetworkManager-tui openldap-clients 2>/dev/null || true
     fi
     systemctl enable NetworkManager 2>/dev/null || true
     systemctl start NetworkManager 2>/dev/null || true
@@ -1438,6 +1470,16 @@ update_timezone() {
     fi
 }
 
+# --- 31. ÁUDIOS E SONS PT-BR (ASTERISK) ---
+update_sounds_ptbr() {
+    log_info "Abrindo Gerenciador de Áudios e Sons PT-BR..."
+    if [ -f "$REPO_DIR/scripts/ipbx-sounds-ptbr.sh" ]; then
+        bash "$REPO_DIR/scripts/ipbx-sounds-ptbr.sh"
+    else
+        log_error "Script scripts/ipbx-sounds-ptbr.sh não encontrado no repositório."
+    fi
+}
+
 # --- INSTALAR TUDO ---
 install_all() {
     echo ""
@@ -1471,6 +1513,9 @@ install_all() {
     update_autoupdate
     update_limpalogs
     update_openvpn
+    if [ -f "$REPO_DIR/scripts/ipbx-sounds-ptbr.sh" ]; then
+        bash "$REPO_DIR/scripts/ipbx-sounds-ptbr.sh" --cirurgico || true
+    fi
     # Garante que o comando ipbx-rollback esteja disponível
     if [ -f "$REPO_DIR/rollback.sh" ]; then
         /bin/cp -f "$REPO_DIR/rollback.sh" /usr/local/bin/ipbx-rollback
@@ -1515,6 +1560,7 @@ show_menu() {
     echo -e "${BLUE}║${NC}   ${WHITE}[25]${NC} Web Developer               ${WHITE}[26]${NC} Configurar Domínio e SSL  ${BLUE}║${NC}"
     echo -e "${BLUE}║${NC}   ${WHITE}[27]${NC} Limpeza de Logs e Disco     ${WHITE}[28]${NC} Servidor OpenVPN (EasyVPN)${BLUE}║${NC}"
     echo -e "${BLUE}║${NC}   ${WHITE}[29]${NC} Rollback (Restauro/Instalar)${WHITE}[30]${NC} Data/Hora e NTP (São Paulo)${BLUE}║${NC}"
+    echo -e "${BLUE}║${NC}   ${WHITE}[31]${NC} Áudios e Sons PT-BR (Asterisk)                              ${BLUE}║${NC}"
     echo -e "${BLUE}║${NC}                                                                    ${BLUE}║${NC}"
     echo -e "${BLUE}╠══════════════════════════════════════════════════════════════════════╣${NC}"
     echo -e "${BLUE}║${NC}   ${YELLOW}[A]${NC}  ${YELLOW}INSTALAR TUDO${NC} (igual ao install.sh completo)                ${BLUE}║${NC}"
@@ -1532,6 +1578,7 @@ while true; do
     OPCAO="${OPCAO//$'\n'/}"
     OPCAO="${OPCAO// /}"
     OPCAO="${OPCAO//$'\t'/}"
+    OPCAO="${OPCAO//[^a-zA-Z0-9]/}"
 
     case "$OPCAO" in
         1)  create_snapshot "Terminal (MOTD)"; update_motd; reload_services ;;
@@ -1564,6 +1611,7 @@ while true; do
         28) create_snapshot "Servidor OpenVPN"; update_openvpn; reload_services ;;
         29) update_rollback ;;
         30) create_snapshot "Data/Hora e NTP Brasil"; update_timezone; reload_services ;;
+        31) create_snapshot "Áudios e Sons PT-BR"; update_sounds_ptbr; reload_services ;;
         [aA]) create_snapshot "Instalação Completa"; install_all ;;
         0)
             echo ""

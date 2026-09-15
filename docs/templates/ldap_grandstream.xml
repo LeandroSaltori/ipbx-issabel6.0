@@ -2,13 +2,13 @@
 <gs_provision>
     <config version="2">
         <item name="ldap">
-            <part name="server">macboot.ipbxprisma.cloud</part>
+            <part name="server">cliente.ipbxprisma.cloud</part>
             <part name="port">10389</part>
             <part name="base">dc=pbx,dc=com</part>
             <part name="protocol">LDAP</part>
             <part name="version">3</part>
             <part name="username">cn=admin,dc=pbx,dc=com</part>
-            <part name="password">COLOQUE_A_SENHA_AQUI</part>
+            <part name="password">Prisma@500</part>
             <part name="ldapDisplayName">%cn</part>
             <part name="ldapNumberFilter">(homePhone=%)</part>
             <part name="ldapNumberAttributes">homePhone</part>

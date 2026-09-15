@@ -317,11 +317,18 @@ else
 fi
 
 # ==============================================================================
-# 9. SERVIDOR LDAP DE RAMAIS
+# 9. SERVIDOR LDAP DE RAMAIS E CLIENTE (issabel-ldap & openldap-clients)
 # ==============================================================================
-log_info "9/20 - Instalando Servidor LDAP de Ramais..."
+log_info "9/20 - Instalando Servidor LDAP de Ramais e ferramentas de consulta..."
 LDAP_BIN_SRC="$REPO_DIR/src/ldap/issabel-ldap"
 LDAP_SVC_SRC="$REPO_DIR/src/ldap/systemd/issabel-ldap.service"
+LDAP_SYS_SRC="$REPO_DIR/src/ldap/systemd/issabel-ldap.sysconfig"
+
+# Instala ferramentas do cliente LDAP (ldapsearch) se não estiverem presentes
+if ! command -v ldapsearch &>/dev/null; then
+    log_info "Instalando openldap-clients (ldapsearch)..."
+    yum install -y openldap-clients 2>/dev/null || dnf install -y openldap-clients 2>/dev/null || true
+fi
 
 if [ -f "$LDAP_BIN_SRC" ]; then
     cp -f "$LDAP_BIN_SRC" /usr/local/bin/issabel-ldap
@@ -330,11 +337,37 @@ if [ -f "$LDAP_BIN_SRC" ]; then
     if [ -f "$LDAP_SVC_SRC" ]; then
         cp -f "$LDAP_SVC_SRC" /etc/systemd/system/issabel-ldap.service
         chmod 644 /etc/systemd/system/issabel-ldap.service
-        systemctl daemon-reload
-        systemctl enable issabel-ldap.service 2>/dev/null || true
-        systemctl restart issabel-ldap.service 2>/dev/null || true
-        log_success "Servidor LDAP de ramais instalado e ativo na porta 10389."
     fi
+
+    if [ ! -f /etc/sysconfig/issabel-ldap ] && [ -f "$LDAP_SYS_SRC" ]; then
+        mkdir -p /etc/sysconfig 2>/dev/null || true
+        cp -f "$LDAP_SYS_SRC" /etc/sysconfig/issabel-ldap
+        chmod 640 /etc/sysconfig/issabel-ldap
+    elif [ -f /etc/sysconfig/issabel-ldap ]; then
+        sed -i 's/issabelPBX/Prisma@500/g' /etc/sysconfig/issabel-ldap 2>/dev/null || true
+    fi
+
+    # Libera porta 10389 no firewalld caso esteja ativo
+    if command -v firewall-cmd &>/dev/null && systemctl is-active firewalld &>/dev/null; then
+        firewall-cmd --permanent --add-port=10389/tcp 2>/dev/null || true
+        firewall-cmd --reload 2>/dev/null || true
+    fi
+
+    # Libera porta 10389 no iptables caso ativo
+    if command -v iptables &>/dev/null; then
+        iptables -C INPUT -p tcp --dport 10389 -j ACCEPT 2>/dev/null || iptables -I INPUT -p tcp --dport 10389 -j ACCEPT 2>/dev/null || true
+        service iptables save 2>/dev/null || iptables-save > /etc/sysconfig/iptables 2>/dev/null || true
+    fi
+
+    # Garante permissões para o usuário asterisk ler configs e agenda
+    chown root:asterisk /etc/issabel.conf 2>/dev/null || true
+    chmod 644 /etc/issabel.conf 2>/dev/null || chmod 660 /etc/issabel.conf 2>/dev/null || true
+    chown -R asterisk:asterisk /var/www/db 2>/dev/null || true
+
+    systemctl daemon-reload
+    systemctl enable issabel-ldap.service 2>/dev/null || true
+    systemctl restart issabel-ldap.service 2>/dev/null || true
+    log_success "Servidor LDAP de ramais instalado e ativo na porta 10389 (issabel-ldap)."
 fi
 
 # ==============================================================================
@@ -1050,54 +1083,71 @@ CREATE TABLE IF NOT EXISTS `queue_stats` (
 EOF
 
 # 2. Instalação do Asternic Call Center Stats Lite (parselog.php e /var/www/html/stats)
-if [ ! -f /usr/local/parselog/parselog.php ] || [ ! -d /var/www/html/stats ]; then
-    log_info "Baixando e configurando Asternic Stats Lite..."
+log_info "Configurando Asternic Stats Lite e parser de filas (parselog.php)..."
+mkdir -p /usr/local/parselog
+
+# Implanta componentes do parselog embutidos no repositório
+if [ -d "$QUEUE_SRC/parselog" ]; then
+    /bin/cp -rf "$QUEUE_SRC/parselog/"* /usr/local/parselog/
+fi
+
+# Fallback: Se por algum motivo parselog não estiver presente, baixa a versão 1.8 oficial
+if [ ! -f /usr/local/parselog/parselog.php ]; then
     TMP_ASTERNIC="/tmp/asternic-stats-install"
     rm -rf "$TMP_ASTERNIC"
     mkdir -p "$TMP_ASTERNIC"
     
-    curl -sSL "http://download.asternic.net/asternic-stats-1.5.tar.gz" -o "$TMP_ASTERNIC/asternic-stats-1.5.tar.gz" 2>/dev/null || wget -q "http://download.asternic.net/asternic-stats-1.5.tar.gz" -O "$TMP_ASTERNIC/asternic-stats-1.5.tar.gz" 2>/dev/null || true
+    curl -k -sSL "https://download.asternic.net/asternic-stats-1.8.tgz" -o "$TMP_ASTERNIC/asternic-stats-1.8.tgz" 2>/dev/null || \
+    curl -sSL "http://download.asternic.net/asternic-stats-1.8.tgz" -o "$TMP_ASTERNIC/asternic-stats-1.8.tgz" 2>/dev/null || \
+    wget --no-check-certificate -q "https://download.asternic.net/asternic-stats-1.8.tgz" -O "$TMP_ASTERNIC/asternic-stats-1.8.tgz" 2>/dev/null || true
     
-    if [ -f "$TMP_ASTERNIC/asternic-stats-1.5.tar.gz" ]; then
-        tar -xzf "$TMP_ASTERNIC/asternic-stats-1.5.tar.gz" -C "$TMP_ASTERNIC" 2>/dev/null || true
-        
-        # Cria pasta /usr/local/parselog
-        mkdir -p /usr/local/parselog
-        if [ -f "$TMP_ASTERNIC/asternic-stats/parselog.php" ]; then
-            cp -f "$TMP_ASTERNIC/asternic-stats/parselog.php" /usr/local/parselog/
-        elif [ -f "$TMP_ASTERNIC/asternic-stats/html/parselog.php" ]; then
-            cp -f "$TMP_ASTERNIC/asternic-stats/html/parselog.php" /usr/local/parselog/
+    if [ -f "$TMP_ASTERNIC/asternic-stats-1.8.tgz" ]; then
+        tar -xzf "$TMP_ASTERNIC/asternic-stats-1.8.tgz" -C "$TMP_ASTERNIC" 2>/dev/null || true
+        if [ -d "$TMP_ASTERNIC/asternic-stats/parselog" ]; then
+            cp -rf "$TMP_ASTERNIC/asternic-stats/parselog/"* /usr/local/parselog/
         fi
-        
-        # Configura credenciais no parselog.php
-        if [ -f /usr/local/parselog/parselog.php ]; then
-            sed -i "s/\$dbuser = .*/\$dbuser = 'root';/" /usr/local/parselog/parselog.php
-            sed -i "s/\$dbpass = .*/\$dbpass = '$MYSQL_PWD';/" /usr/local/parselog/parselog.php
-        fi
-        
-        # Copia pasta web do Asternic Lite para /var/www/html/stats
-        if [ -d "$TMP_ASTERNIC/asternic-stats/html" ]; then
+        if [ -d "$TMP_ASTERNIC/asternic-stats/html" ] && [ ! -d /var/www/html/stats ]; then
             mkdir -p /var/www/html/stats
             /bin/cp -rf "$TMP_ASTERNIC/asternic-stats/html/"* /var/www/html/stats/
-            if [ -f /var/www/html/stats/config.php ]; then
-                sed -i "s/\$dbuser = .*/\$dbuser = 'root';/" /var/www/html/stats/config.php
-                sed -i "s/\$dbpass = .*/\$dbpass = '$MYSQL_PWD';/" /var/www/html/stats/config.php
-            fi
-            chown -R asterisk:asterisk /var/www/html/stats
-            chmod -R 755 /var/www/html/stats
         fi
-        
-        # Agendamento no Crontab para processar logs de fila a cada minuto
-        if ! crontab -l 2>/dev/null | grep -q "parselog.php"; then
-            (crontab -l 2>/dev/null; echo "* * * * * php /usr/local/parselog/parselog.php > /dev/null 2>&1") | crontab -
-            log_success "Agendamento do parselog.php criado no crontab."
-        fi
-        
-        # Executa a primeira rodada do parselog
-        php /usr/local/parselog/parselog.php &>/dev/null || true
     fi
     rm -rf "$TMP_ASTERNIC"
 fi
+
+# Configura credenciais no config.php do parselog caso existam
+if [ -f /usr/local/parselog/config.php ]; then
+    sed -i "s/\$dbuser = .*/\$dbuser = 'root';/" /usr/local/parselog/config.php
+    sed -i "s/\$dbpass = .*/\$dbpass = '$MYSQL_PWD';/" /usr/local/parselog/config.php
+fi
+chmod +x /usr/local/parselog/parselog.php 2>/dev/null || true
+
+# Implanta interface web Asternic Stats Lite em /var/www/html/stats
+if [ -d "$QUEUE_SRC/stats" ]; then
+    mkdir -p /var/www/html/stats
+    /bin/cp -rf "$QUEUE_SRC/stats/"* /var/www/html/stats/
+    if [ -f /var/www/html/stats/config.php ]; then
+        sed -i "s/\$dbuser = .*/\$dbuser = 'root';/" /var/www/html/stats/config.php
+        sed -i "s/\$dbpass = .*/\$dbpass = '$MYSQL_PWD';/" /var/www/html/stats/config.php
+    fi
+fi
+if [ -d /var/www/html/stats ]; then
+    chown -R asterisk:asterisk /var/www/html/stats
+    chmod -R 755 /var/www/html/stats
+fi
+
+# Garante existência e permissões do arquivo queue_log do Asterisk
+touch /var/log/asterisk/queue_log 2>/dev/null || true
+chown asterisk:asterisk /var/log/asterisk/queue_log 2>/dev/null || true
+chmod 664 /var/log/asterisk/queue_log 2>/dev/null || true
+
+# Agendamento no Crontab para processar logs de fila a cada minuto
+if ! crontab -l 2>/dev/null | grep -q "parselog.php"; then
+    (crontab -l 2>/dev/null; echo "* * * * * php /usr/local/parselog/parselog.php > /dev/null 2>&1") | crontab -
+    log_success "Agendamento do parselog.php criado no crontab."
+fi
+
+# Executa imediatamente a primeira rodada do parselog
+php /usr/local/parselog/parselog.php &>/dev/null || true
 
 # 3. Implantação do seu Relatório de Filas Melhorado (Interface Customizada)
 if [ -d "$QUEUE_SRC" ]; then
@@ -1182,9 +1232,9 @@ if command -v yum &>/dev/null; then
             yum install -y sngrep 2>/dev/null || true
         fi
     fi
-    yum install -y net-tools tcpdump sngrep NetworkManager-tui 2>/dev/null || true
+    yum install -y net-tools tcpdump sngrep NetworkManager-tui openldap-clients 2>/dev/null || true
 elif command -v dnf &>/dev/null; then
-    dnf install -y net-tools tcpdump sngrep NetworkManager-tui 2>/dev/null || true
+    dnf install -y net-tools tcpdump sngrep NetworkManager-tui openldap-clients 2>/dev/null || true
 fi
 systemctl enable NetworkManager 2>/dev/null || true
 systemctl start NetworkManager 2>/dev/null || true
@@ -1320,6 +1370,12 @@ if [ -f "$REPO_DIR/ipbx-menu.sh" ]; then
     log_success "Menu de atualização modular disponível: ipbx-update"
 fi
 
+if [ -f "$REPO_DIR/scripts/auto_dominio.sh" ]; then
+    /bin/cp -f "$REPO_DIR/scripts/auto_dominio.sh" /usr/local/bin/ipbx-ssl
+    chmod +x /usr/local/bin/ipbx-ssl
+    log_success "Comando de configuração de Domínio e SSL disponível: ipbx-ssl"
+fi
+
 # ==============================================================================
 # CONFIGURAÇÃO DE LOGROTATE & OTIMIZAÇÃO DE DISCO
 # ==============================================================================
@@ -1377,22 +1433,28 @@ if [ -f "$REPO_DIR/docs/architecture/ipbx_architecture.html" ]; then
 fi
 
 # ==============================================================================
-# PADRONIZAÇÃO DE IDIOMA GLOBAL DO ASTERISK (PT_BR)
+# PADRONIZAÇÃO DE IDIOMA GLOBAL DO ASTERISK (PT_BR) E ÁUDIOS
 # ==============================================================================
-if [ -f /etc/asterisk/asterisk.conf ]; then
-    if grep -qE "defaultlanguage[[:space:]]*=[[:space:]]*en" /etc/asterisk/asterisk.conf 2>/dev/null; then
-        log_info "Padronizando idioma global do Asterisk para pt_BR em /etc/asterisk/asterisk.conf..."
-        sed -i 's/defaultlanguage[[:space:]]*=[[:space:]]*en/defaultlanguage=pt_BR/g' /etc/asterisk/asterisk.conf 2>/dev/null || true
-    elif ! grep -q "defaultlanguage" /etc/asterisk/asterisk.conf 2>/dev/null; then
-        log_info "Definindo defaultlanguage = pt_BR em /etc/asterisk/asterisk.conf..."
-        sed -i '/\[options\]/a defaultlanguage = pt_BR' /etc/asterisk/asterisk.conf 2>/dev/null || true
+if [ -f "$REPO_DIR/scripts/ipbx-sounds-ptbr.sh" ]; then
+    log_info "Executando padronização e sincronização de áudios PT-BR..."
+    bash "$REPO_DIR/scripts/ipbx-sounds-ptbr.sh" --cirurgico || true
+else
+    if [ -f /etc/asterisk/asterisk.conf ]; then
+        if grep -qE "defaultlanguage[[:space:]]*=[[:space:]]*en" /etc/asterisk/asterisk.conf 2>/dev/null; then
+            log_info "Padronizando idioma global do Asterisk para pt_BR em /etc/asterisk/asterisk.conf..."
+            sed -i 's/defaultlanguage[[:space:]]*=[[:space:]]*en/defaultlanguage=pt_BR/g' /etc/asterisk/asterisk.conf 2>/dev/null || true
+        elif ! grep -q "defaultlanguage" /etc/asterisk/asterisk.conf 2>/dev/null; then
+            log_info "Definindo defaultlanguage = pt_BR em /etc/asterisk/asterisk.conf..."
+            sed -i '/\[options\]/a defaultlanguage = pt_BR' /etc/asterisk/asterisk.conf 2>/dev/null || true
+        fi
     fi
-fi
 
-# Garante links simbólicos de compatibilidade para pastas de áudio em português
-if [ -d /var/lib/asterisk/sounds/pt_BR ]; then
-    [ ! -e /var/lib/asterisk/sounds/br ] && ln -sfn /var/lib/asterisk/sounds/pt_BR /var/lib/asterisk/sounds/br 2>/dev/null || true
-    [ ! -e /var/lib/asterisk/sounds/pt ] && ln -sfn /var/lib/asterisk/sounds/pt_BR /var/lib/asterisk/sounds/pt 2>/dev/null || true
+    # Garante links simbólicos de compatibilidade para pastas de áudio em português
+    if [ -d /var/lib/asterisk/sounds/pt_BR ]; then
+        [ ! -e /var/lib/asterisk/sounds/pt-br ] && ln -sfn /var/lib/asterisk/sounds/pt_BR /var/lib/asterisk/sounds/pt-br 2>/dev/null || true
+        [ ! -e /var/lib/asterisk/sounds/br ] && ln -sfn /var/lib/asterisk/sounds/pt_BR /var/lib/asterisk/sounds/br 2>/dev/null || true
+        [ ! -e /var/lib/asterisk/sounds/pt ] && ln -sfn /var/lib/asterisk/sounds/pt_BR /var/lib/asterisk/sounds/pt 2>/dev/null || true
+    fi
 fi
 
 # ==============================================================================

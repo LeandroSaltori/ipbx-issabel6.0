@@ -20,7 +20,7 @@ Este manual orienta a configuração do **Servidor LDAP de Ramais e Agenda** nos
 - **Port:** `10389`
 - **Base DN:** `dc=pbx,dc=com`
 - **Username:** `cn=admin,dc=pbx,dc=com`
-- **Password:** `SUA_SENHA_AQUI` (definida em `/etc/sysconfig/issabel-ldap`, padrão: `Prisma@500`)
+- **Password:** `Prisma@500` (definida em `/etc/sysconfig/issabel-ldap`)
 - **LDAP Name Filter:** `(|(cn=%)(displayName=%))`
 - **LDAP Number Filter:** `(homePhone=%)`
 - **LDAP Name Attributes:** `cn displayName`
