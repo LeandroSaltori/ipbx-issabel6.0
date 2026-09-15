@@ -37,15 +37,15 @@ function check_queue($queue_name) {
     }
 
     $query = "SELECT qname_id,queue FROM qname WHERE queue='$queue_name'";
-    $res = $midb->consulta($query,0,0);
+    $res = $midb->consulta($query);
 
     if($midb->num_rows($res)>0) {
         $row = $midb->fetch_row($res);
         return $row[0];
     } else {
         $query = "INSERT INTO qname (queue) VALUES ('$queue_name')";
-        $res = $midb->consulta($query,0,0);
-        $id = $midb->insert_id($res);
+        $res = $midb->consulta($query);
+        $id = $midb->insert_id();
         $queuecache["$queue_name"]=$id;
         return $id;
     }
@@ -77,8 +77,8 @@ function check_agent($agent) {
         return $row[0];
     } else {
         $query = "INSERT INTO qagent (agent) VALUES ('$agent')";
-        $res = $midb->consulta($query,0,0);
-        $id = $midb->insert_id($res);
+        $res = $midb->consulta($query);
+        $id = $midb->insert_id();
         $agentcache["$agent"]=$id;
         return $id;
     }

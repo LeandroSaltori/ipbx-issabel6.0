@@ -349,25 +349,45 @@ if ($rAgentes) while ($row = mysqli_fetch_assoc($rAgentes)) $agentesLista[] = $r
 
 // --- Condi&#231;&#227;o WHERE base ------------------------------------------------------------
 $whereCond  = "WHERE DATE(qs.datetime) BETWEEN '$dataInicioEsc' AND '$dataFimEsc'";
-$filasIn = array();
-foreach($filaFiltro as $f) {
-    $fClean = mysqli_real_escape_string($conn, $f);
-    if($fClean != '') $filasIn[] = "'$fClean'";
-}
-if (count($filasIn) > 0) {
-    $whereCond .= " AND qs.qname IN (" . implode(',', $filasIn) . ")";
-}
-
-// --- Nomes das filas para exibi&#231;&#227;o no topo ----------------------------------------------------
+$filasInIds = array();
 $numsFilasSelecionadas = array();
 $descrsFilasSelecionadas = array();
-foreach($filaFiltro as $f) {
-    if($f != '') {
-        $qRaw = isset($qnameMapRaw[$f]) ? $qnameMapRaw[$f] : $f;
+
+foreach ($filaFiltro as $f) {
+    $f = trim($f);
+    if ($f === '') continue;
+
+    // Se $f for o ID numérico direto em qnameMapRaw
+    if (isset($qnameMapRaw[$f])) {
+        $filasInIds[] = intval($f);
+        $qRaw = $qnameMapRaw[$f];
         $numsFilasSelecionadas[] = $qRaw;
         $descrsFilasSelecionadas[] = getQueueDescription($qRaw, $queueDescrMap);
+    } else {
+        // Se $f for o nome/número da fila (ex: "5001")
+        $matched = false;
+        foreach ($qnameMapRaw as $qid => $qnameStr) {
+            if (strcasecmp(trim($qnameStr), $f) === 0) {
+                $filasInIds[] = intval($qid);
+                $numsFilasSelecionadas[] = $qnameStr;
+                $descrsFilasSelecionadas[] = getQueueDescription($qnameStr, $queueDescrMap);
+                $matched = true;
+            }
+        }
+        if (!$matched) {
+            $numsFilasSelecionadas[] = $f;
+            $descrsFilasSelecionadas[] = getQueueDescription($f, $queueDescrMap);
+        }
     }
 }
+
+$filasInIds = array_unique($filasInIds);
+if (count($filasInIds) > 0) {
+    $whereCond .= " AND qs.qname IN (" . implode(',', $filasInIds) . ")";
+}
+
+$numsFilasSelecionadas   = array_unique($numsFilasSelecionadas);
+$descrsFilasSelecionadas = array_unique($descrsFilasSelecionadas);
 $textoFilasExibicao = count($numsFilasSelecionadas) > 0 ? implode(', ', $numsFilasSelecionadas) : 'Todas as Filas';
 $textoFilasTooltip  = count($descrsFilasSelecionadas) > 0 ? implode(' | ', $descrsFilasSelecionadas) : 'Todas as Filas de Atendimento';
 
@@ -395,7 +415,11 @@ $agentRingNoAnswer = array();
 
 if ($rDetalhe) {
     while ($row = mysqli_fetch_assoc($rDetalhe)) {
-        $uid   = $row['uniqueid'];
+        $uid = trim($row['uniqueid']);
+        if ($uid === '' || $uid === 'NONE') {
+            continue;
+        }
+
         $ev    = isset($eventMap[$row['event_id']]) ? $eventMap[$row['event_id']] : $row['event_id'];
         $agent = isset($agentMap[$row['agent_id']]) ? $agentMap[$row['agent_id']] : $row['agent_id'];
         $rawQueue = isset($qnameMapRaw[$row['qname_id']]) ? $qnameMapRaw[$row['qname_id']] : $row['qname_id'];
@@ -514,8 +538,9 @@ if ($agenteFiltro != '' || $statusFiltro != '' || $numeroFiltro != '') {
         return true;
     });
     $chamadas = array_values($chamadas);
+}
 
-// &#9472;&#9472;&#9472; Complemento Inteligente via CDR (Resgatar BINA e Ramal de chamadas transferidas/capturadas) &#9472;&#9472;&#9472;
+// ─── Complemento Inteligente via CDR (Resgatar BINA e Ramal de chamadas transferidas/capturadas) ───
 $uidsMissing = array();
 foreach ($chamadas as $idx => $c) {
     if (empty($c['numero']) || $c['numero'] == 'NONE' || empty($c['agente']) || $c['agente'] == 'NONE') {
@@ -554,7 +579,6 @@ if (!empty($uidsMissing)) {
             }
         }
     }
-}
 }
 
 // --- M&#201;TRICAS RESUMO E SLA -----------------------------------------------------------
