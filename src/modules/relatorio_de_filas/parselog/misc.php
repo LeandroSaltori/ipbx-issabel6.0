@@ -84,44 +84,85 @@ function check_agent($agent) {
     }
 }
 
-function procesa($linea) {
+function check_event($event_name) {
+    global $event_array, $midb;
 
+    if ($event_name == "") {
+        return 0;
+    }
+
+    if (isset($event_array["$event_name"])) {
+        return $event_array["$event_name"];
+    }
+
+    $query = "SELECT event_id, event FROM qevent WHERE event = '%s'";
+    $res = $midb->consulta($query, array($event_name));
+
+    if ($midb->num_rows($res) > 0) {
+        $row = $midb->fetch_row($res);
+        $event_array["$event_name"] = $row[0];
+        return $row[0];
+    } else {
+        $resMax = $midb->consulta("SELECT COALESCE(MAX(event_id), 0) + 1 FROM qevent");
+        $rowMax = $midb->fetch_row($resMax);
+        $nextId = intval($rowMax[0]);
+
+        $query = "INSERT IGNORE INTO qevent (event_id, event) VALUES (%d, '%s')";
+        $midb->consulta($query, array($nextId, $event_name));
+        $event_array["$event_name"] = $nextId;
+        return $nextId;
+    }
+}
+
+function procesa($linea) {
     global $event_array;
     global $last_event_ts;
     global $midb;
+    global $processed_count, $inserted_count;
 
-    $linea = rtrim($linea);
-    //list ($date,$uniqueid,$queue_name,$agent,$event,$data1,$data2,$data3) = preg_split("/\|/",$linea,8);
-    $partes     = preg_split("/\|/",$linea,8);
-    $date       = array_shift($partes);
-    $uniqueid   = array_shift($partes);
-    $queue_name = array_shift($partes);
-    $agent      = array_shift($partes);
-    $event      = array_shift($partes);
-    if(count($partes)>0) { $data1 = array_shift($partes); } else { $data1=''; }
-    if(count($partes)>0) { $data2 = array_shift($partes); } else { $data2=''; }
-    if(count($partes)>0) { $data3 = array_shift($partes); } else { $data3=''; }
+    $linea = trim($linea);
+    if ($linea === '') return;
 
-    if (preg_match('/[^0-9]/', $date)) {
-        print "return preg match\n";
+    $partes     = preg_split("/\|/", $linea, 8);
+    $date_raw   = trim(array_shift($partes));
+    $uniqueid   = trim(array_shift($partes));
+    $queue_name = trim(array_shift($partes));
+    $agent      = trim(array_shift($partes));
+    $event      = trim(array_shift($partes));
+    $data1      = count($partes) > 0 ? trim(array_shift($partes)) : '';
+    $data2      = count($partes) > 0 ? trim(array_shift($partes)) : '';
+    $data3      = count($partes) > 0 ? trim(array_shift($partes)) : '';
+
+    if ($date_raw === '') return;
+
+    // Suporte para timestamps inteiros ou com ponto flutuante (ex: 1726437600 ou 1726437600.123)
+    if (is_numeric($date_raw)) {
+        $epoch = intval(floatval($date_raw));
+    } else {
+        $epoch = strtotime($date_raw);
+    }
+
+    if (!$epoch || $epoch <= 0) {
         return;
     }
 
-    if($date < $last_event_ts || $date == "") {
+    if ($epoch < $last_event_ts) {
         return;
     }
 
-    $date = strftime("%Y-%m-%d %H:%M:%S",$date);
+    $date_formatted = date("Y-m-d H:i:s", $epoch);
     $queue_id = check_queue($queue_name);
     $agent_id = check_agent($agent);
+    $event_id = check_event($event);
 
-    if(array_key_exists($event,$event_array)) {
-        $event_id = $event_array["$event"];
-        if($agent_id <> -1) {
-            $query = "INSERT IGNORE INTO queue_stats (uniqueid, datetime, qname, qagent, qevent, info1, info2, info3) ";
-            $query.= "VALUES ('%s','%s','%s','%s','%s','%s','%s','%s')";
-            $res = $midb->consulta($query,array($uniqueid,$date,$queue_id,$agent_id,$event_id,$data1,$data2,$data3));
+    if ($agent_id <> -1 && $event_id > 0) {
+        $query = "INSERT IGNORE INTO queue_stats (uniqueid, datetime, qname, qagent, qevent, info1, info2, info3) ";
+        $query .= "VALUES ('%s','%s','%s','%s','%s','%s','%s','%s')";
+        $res = $midb->consulta($query, array($uniqueid, $date_formatted, $queue_id, $agent_id, $event_id, $data1, $data2, $data3));
+        if ($res) {
+            $inserted_count++;
         }
     }
+    $processed_count++;
 }
 ?>

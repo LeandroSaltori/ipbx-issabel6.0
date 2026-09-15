@@ -76,17 +76,24 @@ while($row = $midb->fetch_row($res)) {
 }
 
 $filename = "$queue_log_dir/$queue_log_file";
-$dataFile = fopen( $filename, "r" );
+if (!file_exists($filename)) {
+    die("Arquivo de log não encontrado: $filename\n");
+}
 
-if ( $dataFile ) {
+$processed_count = 0;
+$inserted_count  = 0;
+
+$dataFile = fopen($filename, "r");
+
+if ($dataFile) {
     while (!feof($dataFile)) {
         $buffer = fgets($dataFile, 4096);
         procesa($buffer);
     }
     fclose($dataFile);
-} 
-else {
-    die( "fopen failed for $filename" ) ;
+    echo "Sucesso: $processed_count linhas processadas ($inserted_count novos eventos inseridos no qstatslite).\n";
+} else {
+    die("Erro ao abrir $filename\n");
 }
 
 ?>
