@@ -62,6 +62,15 @@ if($midb->num_rows($res)>0) {
 // Populates an array with the EVENTS ids
 $query = "SELECT * FROM qevent ORDER BY event_id";
 $res = $midb->consulta($query);
+if ($midb->num_rows($res) == 0) {
+    $midb->consulta("INSERT IGNORE INTO qevent (event_id, event) VALUES 
+        (1,'ABANDON'),(2,'AGENTDUMP'),(3,'AGENTLOGIN'),(4,'AGENTCALLBACKLOGIN'),
+        (5,'AGENTLOGOFF'),(6,'AGENTCALLBACKLOGOFF'),(7,'COMPLETEAGENT'),(8,'COMPLETECALLER'),
+        (9,'CONFIGRELOAD'),(10,'CONNECT'),(11,'ENTERQUEUE'),(12,'EXITWITHKEY'),
+        (13,'EXITWITHTIMEOUT'),(14,'QUEUESTART'),(15,'SYSCOMPAT'),(16,'TRANSFER'),
+        (17,'PAUSE'),(18,'UNPAUSE')");
+    $res = $midb->consulta($query);
+}
 while($row = $midb->fetch_row($res)) {
     $event_array["$row[1]"] = $row[0];
 }
