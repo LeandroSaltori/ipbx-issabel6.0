@@ -42,16 +42,7 @@ $conn = @mysqli_connect($dbHost, $dbUser, $dbPass);
 if (!$conn) {
     die('<div style="padding:40px;font-family:monospace;color:red;">Erro ao conectar ao MySQL: ' . mysqli_connect_error() . '</div>');
 }
-if (!@mysqli_select_db($conn, $dbName)) {
-    @mysqli_query($conn, "CREATE DATABASE IF NOT EXISTS qstatslite DEFAULT CHARACTER SET utf8 COLLATE utf8_general_ci");
-    @mysqli_select_db($conn, $dbName);
-}
-// Garante tabelas basicas do qstatslite caso ainda nao existam
-@mysqli_query($conn, "CREATE TABLE IF NOT EXISTS `qname` (`qname_id` int(11) NOT NULL AUTO_INCREMENT, `queue` varchar(50) NOT NULL DEFAULT '', PRIMARY KEY (`qname_id`), KEY `queue` (`queue`)) ENGINE=InnoDB DEFAULT CHARSET=utf8");
-@mysqli_query($conn, "CREATE TABLE IF NOT EXISTS `qagent` (`agent_id` int(11) NOT NULL AUTO_INCREMENT, `agent` varchar(50) NOT NULL DEFAULT '', PRIMARY KEY (`agent_id`), KEY `agent` (`agent`)) ENGINE=InnoDB DEFAULT CHARSET=utf8");
-@mysqli_query($conn, "CREATE TABLE IF NOT EXISTS `qevent` (`event_id` int(11) NOT NULL AUTO_INCREMENT, `event` varchar(50) NOT NULL DEFAULT '', PRIMARY KEY (`event_id`), KEY `event` (`event`)) ENGINE=InnoDB DEFAULT CHARSET=utf8");
-@mysqli_query($conn, "INSERT IGNORE INTO `qevent` (`event_id`, `event`) VALUES (1,'ABANDON'),(2,'AGENTDUMP'),(3,'AGENTLOGIN'),(4,'AGENTCALLBACKLOGIN'),(5,'AGENTLOGOFF'),(6,'AGENTCALLBACKLOGOFF'),(7,'COMPLETEAGENT'),(8,'COMPLETECALLER'),(9,'CONFIGRELOAD'),(10,'CONNECT'),(11,'ENTERQUEUE'),(12,'EXITWITHKEY'),(13,'EXITWITHTIMEOUT'),(14,'QUEUESTART'),(15,'SYSCOMPAT'),(16,'TRANSFER'),(17,'PAUSE'),(18,'UNPAUSE')");
-@mysqli_query($conn, "CREATE TABLE IF NOT EXISTS `queue_stats` (`datetime` datetime NOT NULL DEFAULT '0000-00-00 00:00:00', `qname` int(11) NOT NULL DEFAULT '0', `qagent` int(11) NOT NULL DEFAULT '0', `qevent` int(11) NOT NULL DEFAULT '0', `info1` varchar(100) NOT NULL DEFAULT '', `info2` varchar(100) NOT NULL DEFAULT '', `info3` varchar(100) NOT NULL DEFAULT '', `info4` varchar(100) NOT NULL DEFAULT '', `info5` varchar(100) NOT NULL DEFAULT '', `uniqueid` varchar(32) NOT NULL DEFAULT '', KEY `datetime` (`datetime`), KEY `qname` (`qname`), KEY `qagent` (`qagent`), KEY `qevent` (`qevent`), KEY `uniqueid` (`uniqueid`)) ENGINE=InnoDB DEFAULT CHARSET=utf8");
+mysqli_select_db($conn, $dbName) or die('<div style="padding:40px;font-family:monospace;color:red;">Banco qstatslite n&atilde;o encontrado.</div>');
 mysqli_set_charset($conn, 'utf8');
 mysqli_query($conn, "SET NAMES 'utf8'");
 
@@ -292,48 +283,9 @@ if ($rDevices) {
     }
 }
 
-// --- Sincronização Inteligente de Filas cadastradas no PBX (Asterisk) ---
-$pbxQueues = array();
-$rPbxQ1 = @mysqli_query($conn, "SELECT DISTINCT extension FROM asterisk.queues_config WHERE extension != ''");
-if ($rPbxQ1) {
-    while ($pq = mysqli_fetch_assoc($rPbxQ1)) {
-        $ext = trim($pq['extension']);
-        if ($ext != '') $pbxQueues[$ext] = true;
-    }
-}
-$rPbxQ2 = @mysqli_query($conn, "SELECT DISTINCT queue FROM asterisk.queues WHERE queue != ''");
-if ($rPbxQ2) {
-    while ($pq = mysqli_fetch_assoc($rPbxQ2)) {
-        $ext = trim($pq['queue']);
-        if ($ext != '') $pbxQueues[$ext] = true;
-    }
-}
-// Garante que todas as filas do PBX existam na tabela qname
-$existingQnames = array();
-$rExisting = @mysqli_query($conn, "SELECT queue FROM qname");
-if ($rExisting) {
-    while ($exRow = mysqli_fetch_assoc($rExisting)) {
-        $existingQnames[$exRow['queue']] = true;
-    }
-}
-foreach (array_keys($pbxQueues) as $pQueue) {
-    if (!isset($existingQnames[$pQueue])) {
-        $pQueueEsc = mysqli_real_escape_string($conn, $pQueue);
-        @mysqli_query($conn, "INSERT INTO qname (queue) VALUES ('$pQueueEsc')");
-        $existingQnames[$pQueue] = true;
-    }
-}
-
-// Executa parser em segundo plano para processar novos registros do queue_log
-if (file_exists('/usr/local/parselog/parselog.php')) {
-    @exec('php /usr/local/parselog/parselog.php > /dev/null 2>&1 &');
-} elseif (file_exists(__DIR__ . '/parselog/parselog.php')) {
-    @exec('php ' . escapeshellarg(__DIR__ . '/parselog/parselog.php') . ' > /dev/null 2>&1 &');
-}
-
-// --- Lista de filas e agentes para o formulário --------------------------------------
+// --- Lista de filas e agentes para o formul&#225;rio --------------------------------------
 $filas = array();
-$rFilas = mysqli_query($conn, "SELECT qname_id, queue FROM qname WHERE queue != 'NONE' AND queue != '' ORDER BY queue");
+$rFilas = mysqli_query($conn, "SELECT qname_id, queue FROM qname WHERE queue != 'NONE' ORDER BY queue");
 if ($rFilas) {
     while ($row = mysqli_fetch_assoc($rFilas)) {
         $qRaw = $row['queue'];
@@ -349,45 +301,25 @@ if ($rAgentes) while ($row = mysqli_fetch_assoc($rAgentes)) $agentesLista[] = $r
 
 // --- Condi&#231;&#227;o WHERE base ------------------------------------------------------------
 $whereCond  = "WHERE DATE(qs.datetime) BETWEEN '$dataInicioEsc' AND '$dataFimEsc'";
-$filasInIds = array();
+$filasIn = array();
+foreach($filaFiltro as $f) {
+    $fClean = mysqli_real_escape_string($conn, $f);
+    if($fClean != '') $filasIn[] = "'$fClean'";
+}
+if (count($filasIn) > 0) {
+    $whereCond .= " AND qs.qname IN (" . implode(',', $filasIn) . ")";
+}
+
+// --- Nomes das filas para exibi&#231;&#227;o no topo ----------------------------------------------------
 $numsFilasSelecionadas = array();
 $descrsFilasSelecionadas = array();
-
-foreach ($filaFiltro as $f) {
-    $f = trim($f);
-    if ($f === '') continue;
-
-    // Se $f for o ID numérico direto em qnameMapRaw
-    if (isset($qnameMapRaw[$f])) {
-        $filasInIds[] = intval($f);
-        $qRaw = $qnameMapRaw[$f];
+foreach($filaFiltro as $f) {
+    if($f != '') {
+        $qRaw = isset($qnameMapRaw[$f]) ? $qnameMapRaw[$f] : $f;
         $numsFilasSelecionadas[] = $qRaw;
         $descrsFilasSelecionadas[] = getQueueDescription($qRaw, $queueDescrMap);
-    } else {
-        // Se $f for o nome/número da fila (ex: "5001")
-        $matched = false;
-        foreach ($qnameMapRaw as $qid => $qnameStr) {
-            if (strcasecmp(trim($qnameStr), $f) === 0) {
-                $filasInIds[] = intval($qid);
-                $numsFilasSelecionadas[] = $qnameStr;
-                $descrsFilasSelecionadas[] = getQueueDescription($qnameStr, $queueDescrMap);
-                $matched = true;
-            }
-        }
-        if (!$matched) {
-            $numsFilasSelecionadas[] = $f;
-            $descrsFilasSelecionadas[] = getQueueDescription($f, $queueDescrMap);
-        }
     }
 }
-
-$filasInIds = array_unique($filasInIds);
-if (count($filasInIds) > 0) {
-    $whereCond .= " AND qs.qname IN (" . implode(',', $filasInIds) . ")";
-}
-
-$numsFilasSelecionadas   = array_unique($numsFilasSelecionadas);
-$descrsFilasSelecionadas = array_unique($descrsFilasSelecionadas);
 $textoFilasExibicao = count($numsFilasSelecionadas) > 0 ? implode(', ', $numsFilasSelecionadas) : 'Todas as Filas';
 $textoFilasTooltip  = count($descrsFilasSelecionadas) > 0 ? implode(' | ', $descrsFilasSelecionadas) : 'Todas as Filas de Atendimento';
 
@@ -415,11 +347,7 @@ $agentRingNoAnswer = array();
 
 if ($rDetalhe) {
     while ($row = mysqli_fetch_assoc($rDetalhe)) {
-        $uid = trim($row['uniqueid']);
-        if ($uid === '' || $uid === 'NONE') {
-            continue;
-        }
-
+        $uid   = $row['uniqueid'];
         $ev    = isset($eventMap[$row['event_id']]) ? $eventMap[$row['event_id']] : $row['event_id'];
         $agent = isset($agentMap[$row['agent_id']]) ? $agentMap[$row['agent_id']] : $row['agent_id'];
         $rawQueue = isset($qnameMapRaw[$row['qname_id']]) ? $qnameMapRaw[$row['qname_id']] : $row['qname_id'];
@@ -538,9 +466,8 @@ if ($agenteFiltro != '' || $statusFiltro != '' || $numeroFiltro != '') {
         return true;
     });
     $chamadas = array_values($chamadas);
-}
 
-// ─── Complemento Inteligente via CDR (Resgatar BINA e Ramal de chamadas transferidas/capturadas) ───
+// &#9472;&#9472;&#9472; Complemento Inteligente via CDR (Resgatar BINA e Ramal de chamadas transferidas/capturadas) &#9472;&#9472;&#9472;
 $uidsMissing = array();
 foreach ($chamadas as $idx => $c) {
     if (empty($c['numero']) || $c['numero'] == 'NONE' || empty($c['agente']) || $c['agente'] == 'NONE') {
@@ -579,6 +506,7 @@ if (!empty($uidsMissing)) {
             }
         }
     }
+}
 }
 
 // --- M&#201;TRICAS RESUMO E SLA -----------------------------------------------------------

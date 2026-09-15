@@ -1082,72 +1082,55 @@ CREATE TABLE IF NOT EXISTS `queue_stats` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 EOF
 
-# 2. Instalação do Asternic Call Center Stats Lite (parselog.php e /var/www/html/stats)
-log_info "Configurando Asternic Stats Lite e parser de filas (parselog.php)..."
-mkdir -p /usr/local/parselog
-
-# Implanta componentes do parselog embutidos no repositório
-if [ -d "$QUEUE_SRC/parselog" ]; then
-    /bin/cp -rf "$QUEUE_SRC/parselog/"* /usr/local/parselog/
-fi
-
-# Fallback: Se por algum motivo parselog não estiver presente, baixa a versão 1.8 oficial
-if [ ! -f /usr/local/parselog/parselog.php ]; then
-    TMP_ASTERNIC="/tmp/asternic-stats-install"
-    rm -rf "$TMP_ASTERNIC"
-    mkdir -p "$TMP_ASTERNIC"
-    
-    curl -k -sSL "https://download.asternic.net/asternic-stats-1.8.tgz" -o "$TMP_ASTERNIC/asternic-stats-1.8.tgz" 2>/dev/null || \
-    curl -sSL "http://download.asternic.net/asternic-stats-1.8.tgz" -o "$TMP_ASTERNIC/asternic-stats-1.8.tgz" 2>/dev/null || \
-    wget --no-check-certificate -q "https://download.asternic.net/asternic-stats-1.8.tgz" -O "$TMP_ASTERNIC/asternic-stats-1.8.tgz" 2>/dev/null || true
-    
-    if [ -f "$TMP_ASTERNIC/asternic-stats-1.8.tgz" ]; then
-        tar -xzf "$TMP_ASTERNIC/asternic-stats-1.8.tgz" -C "$TMP_ASTERNIC" 2>/dev/null || true
-        if [ -d "$TMP_ASTERNIC/asternic-stats/parselog" ]; then
-            cp -rf "$TMP_ASTERNIC/asternic-stats/parselog/"* /usr/local/parselog/
+    # 2. Instalação do Asternic Call Center Stats Lite (parselog.php e /var/www/html/stats)
+    if [ ! -f /usr/local/parselog/parselog.php ] || [ ! -d /var/www/html/stats ]; then
+        log_info "Baixando e configurando Asternic Stats Lite..."
+        TMP_ASTERNIC="/tmp/asternic-stats-install"
+        rm -rf "$TMP_ASTERNIC"
+        mkdir -p "$TMP_ASTERNIC"
+        
+        curl -sSL "http://download.asternic.net/asternic-stats-1.5.tar.gz" -o "$TMP_ASTERNIC/asternic-stats-1.5.tar.gz" 2>/dev/null || wget -q "http://download.asternic.net/asternic-stats-1.5.tar.gz" -O "$TMP_ASTERNIC/asternic-stats-1.5.tar.gz" 2>/dev/null || true
+        
+        if [ -f "$TMP_ASTERNIC/asternic-stats-1.5.tar.gz" ]; then
+            tar -xzf "$TMP_ASTERNIC/asternic-stats-1.5.tar.gz" -C "$TMP_ASTERNIC" 2>/dev/null || true
+            
+            # Cria pasta /usr/local/parselog
+            mkdir -p /usr/local/parselog
+            if [ -f "$TMP_ASTERNIC/asternic-stats/parselog.php" ]; then
+                cp -f "$TMP_ASTERNIC/asternic-stats/parselog.php" /usr/local/parselog/
+            elif [ -f "$TMP_ASTERNIC/asternic-stats/html/parselog.php" ]; then
+                cp -f "$TMP_ASTERNIC/asternic-stats/html/parselog.php" /usr/local/parselog/
+            fi
+            
+            # Configura credenciais no parselog.php
+            if [ -f /usr/local/parselog/parselog.php ]; then
+                sed -i "s/\$dbuser = .*/\$dbuser = 'root';/" /usr/local/parselog/parselog.php
+                sed -i "s/\$dbpass = .*/\$dbpass = '$MYSQL_PWD';/" /usr/local/parselog/parselog.php
+            fi
+            
+            # Copia pasta web do Asternic Lite para /var/www/html/stats
+            if [ -d "$TMP_ASTERNIC/asternic-stats/html" ]; then
+                mkdir -p /var/www/html/stats
+                /bin/cp -rf "$TMP_ASTERNIC/asternic-stats/html/"* /var/www/html/stats/
+                if [ -f /var/www/html/stats/config.php ]; then
+                    sed -i "s/\$dbuser = .*/\$dbuser = 'root';/" /var/www/html/stats/config.php
+                    sed -i "s/\$dbpass = .*/\$dbpass = '$MYSQL_PWD';/" /var/www/html/stats/config.php
+                fi
+                chown -R asterisk:asterisk /var/www/html/stats
+                chmod -R 755 /var/www/html/stats
+            fi
+            
+            # Agendamento no Crontab para processar logs de fila a cada minuto
+            if ! crontab -l 2>/dev/null | grep -q "parselog.php"; then
+                (crontab -l 2>/dev/null; echo "* * * * * php /usr/local/parselog/parselog.php > /dev/null 2>&1") | crontab -
+                log_success "Agendamento do parselog.php criado no crontab."
+            fi
+            
+            # Executa a primeira rodada do parselog
+            php /usr/local/parselog/parselog.php &>/dev/null || true
         fi
-        if [ -d "$TMP_ASTERNIC/asternic-stats/html" ] && [ ! -d /var/www/html/stats ]; then
-            mkdir -p /var/www/html/stats
-            /bin/cp -rf "$TMP_ASTERNIC/asternic-stats/html/"* /var/www/html/stats/
-        fi
+        rm -rf "$TMP_ASTERNIC"
     fi
-    rm -rf "$TMP_ASTERNIC"
-fi
-
-# Configura credenciais no config.php do parselog caso existam
-if [ -f /usr/local/parselog/config.php ]; then
-    sed -i "s/\$dbuser = .*/\$dbuser = 'root';/" /usr/local/parselog/config.php
-    sed -i "s/\$dbpass = .*/\$dbpass = '$MYSQL_PWD';/" /usr/local/parselog/config.php
-fi
-chmod +x /usr/local/parselog/parselog.php 2>/dev/null || true
-
-# Implanta interface web Asternic Stats Lite em /var/www/html/stats
-if [ -d "$QUEUE_SRC/stats" ]; then
-    mkdir -p /var/www/html/stats
-    /bin/cp -rf "$QUEUE_SRC/stats/"* /var/www/html/stats/
-    if [ -f /var/www/html/stats/config.php ]; then
-        sed -i "s/\$dbuser = .*/\$dbuser = 'root';/" /var/www/html/stats/config.php
-        sed -i "s/\$dbpass = .*/\$dbpass = '$MYSQL_PWD';/" /var/www/html/stats/config.php
-    fi
-fi
-if [ -d /var/www/html/stats ]; then
-    chown -R asterisk:asterisk /var/www/html/stats
-    chmod -R 755 /var/www/html/stats
-fi
-
-# Garante existência e permissões do arquivo queue_log do Asterisk
-touch /var/log/asterisk/queue_log 2>/dev/null || true
-chown asterisk:asterisk /var/log/asterisk/queue_log 2>/dev/null || true
-chmod 664 /var/log/asterisk/queue_log 2>/dev/null || true
-
-# Agendamento no Crontab para processar logs de fila a cada minuto
-if ! crontab -l 2>/dev/null | grep -q "parselog.php"; then
-    (crontab -l 2>/dev/null; echo "* * * * * php /usr/local/parselog/parselog.php > /dev/null 2>&1") | crontab -
-    log_success "Agendamento do parselog.php criado no crontab."
-fi
-
-# Executa imediatamente a primeira rodada do parselog
-php /usr/local/parselog/parselog.php &>/dev/null || true
 
 # 3. Implantação do seu Relatório de Filas Melhorado (Interface Customizada)
 if [ -d "$QUEUE_SRC" ]; then
