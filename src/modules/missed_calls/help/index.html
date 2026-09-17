@@ -2,7 +2,8 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <title>Chamadas Perdidas - Guia Completo e Manual</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Relatório de Chamadas Perdidas - Guia do Usuário e Manual</title>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -12,7 +13,7 @@
             line-height: 1.6;
         }
         .container {
-            max-width: 950px;
+            max-width: 980px;
             margin: 0 auto;
             background: #ffffff;
             border-radius: 12px;
@@ -25,47 +26,346 @@
             margin-top: 0;
             border-bottom: 2px solid #e2e8f0;
             padding-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
         }
         h2 {
             color: #1e293b;
-            font-size: 18px;
-            margin-top: 30px;
+            font-size: 19px;
+            margin-top: 32px;
             display: flex;
             align-items: center;
             gap: 8px;
             border-bottom: 1px solid #f1f5f9;
             padding-bottom: 8px;
         }
-        .card {
+        h3 {
+            color: #334155;
+            font-size: 15px;
+            margin-top: 20px;
+            margin-bottom: 10px;
+        }
+        .card-alert {
             background: #fef2f2;
             border-left: 4px solid #ef4444;
             padding: 16px 20px;
             border-radius: 8px;
             margin: 20px 0;
+            font-size: 14px;
         }
+        .card-info {
+            background: #eff6ff;
+            border-left: 4px solid #3b82f6;
+            padding: 16px 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            font-size: 14px;
+        }
+        .grid-kpis {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+            gap: 12px;
+            margin: 20px 0;
+        }
+        .kpi-sample {
+            background: #ffffff;
+            border-radius: 8px;
+            padding: 14px 16px;
+            border: 1px solid #e2e8f0;
+            border-left: 4px solid #ef4444;
+            text-align: left;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+        .kpi-sample.red { border-left-color: #ef4444; }
+        .kpi-sample.amber { border-left-color: #f59e0b; }
+        .kpi-sample.purple { border-left-color: #8b5cf6; }
+        .kpi-sample.slate { border-left-color: #64748b; }
+        .kpi-sample h4 {
+            margin: 0;
+            font-size: 11px;
+            font-weight: 800;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+        }
+        .kpi-sample .num {
+            font-size: 22px;
+            font-weight: 800;
+            color: #0f172a;
+            margin: 6px 0 2px 0;
+        }
+        .kpi-sample .desc {
+            font-size: 11px;
+            color: #94a3b8;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 18px 0;
+            font-size: 13px;
+        }
+        th, td {
+            padding: 10px 14px;
+            text-align: left;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        th {
+            background-color: #f8fafc;
+            color: #475569;
+            font-weight: 700;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+        }
+        tr:hover td {
+            background-color: #f8fafc;
+        }
+        .badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+        .badge-noans { background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; }
+        .badge-busy { background: #fef3c7; color: #b45309; border: 1px solid #fde68a; }
+        .badge-fail { background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; }
+        .badge-queue { background: #ede9fe; color: #6d28d9; border: 1px solid #ddd6fe; }
+        .badge-ext { background: #f1f5f9; color: #334155; border: 1px solid #e2e8f0; }
+        .badge-group { background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; }
+        .badge-ura { background: rgba(245,158,11,0.12); color: #b45309; border: 1px solid rgba(245,158,11,0.3); }
+        .badge-btn-ab { background: rgba(59,130,246,0.12); color: #2563eb; border: 1px solid rgba(59,130,246,0.3); padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: bold; cursor: help; }
         ul { padding-left: 20px; }
         li { margin-bottom: 8px; }
-        .badge { display: inline-block; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; }
-        .badge-red { background: #fee2e2; color: #b91c1c; }
-        .badge-yellow { background: #fef3c7; color: #b45309; }
+        code {
+            background: #f1f5f9;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 12px;
+            color: #0f172a;
+            border: 1px solid #e2e8f0;
+            font-family: Consolas, Monaco, monospace;
+        }
+        .filter-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 12px;
+            background: #f8fafc;
+            padding: 16px;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+            margin: 15px 0;
+        }
+        .filter-item strong { display: block; font-size: 11px; text-transform: uppercase; color: #475569; margin-bottom: 4px; }
+        .filter-item p { margin: 0; font-size: 12px; color: #64748b; }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>📵 Relatório de Chamadas Perdidas - Manual do Usuário</h1>
         
-        <p>O <strong>Relatório de Chamadas Perdidas (Missed Calls)</strong> registra todas as ligações que não foram atendidas pelos operadores ou ramais de destino.</p>
+        <p>O <strong>Relatório de Chamadas Perdidas (Missed Calls)</strong> é o módulo de inteligência e gestão do IPbx Prisma Telecom desenvolvido para rastrear, analisar e recuperar todas as tentativas de contato telefônico que não resultaram em atendimento efetivo pelos ramais ou operadores.</p>
 
-        <div class="card">
-            <strong>⚠️ Atenção à Retenção:</strong> Acompanhar as chamadas perdidas permite que sua equipe realize o retorno (callback) para os clientes não atendidos, reduzindo o índice de insatisfação.
+        <div class="card-alert">
+            <strong>🎯 Gestão Ativa de Retenção (Call Recovery / Callback):</strong> 
+            Acompanhar as ligações perdidas em tempo real permite que a equipe realize o retorno imediato aos clientes que não conseguiram atendimento, reduzindo drasticamente o índice de cancelamentos, reclamações e perda de oportunidades comerciais.
         </div>
 
-        <h2>📈 1. Categorias de Ligações Perdidas</h2>
+        <!-- SEÇÃO 1: PAINEL DE INDICADORES (KPIS) -->
+        <h2>📊 1. Indicadores Executivos (Cards de KPIs)</h2>
+        <p>No topo da tela são exibidos cinco cartões estratégicos calculados dinamicamente com base no período e filtros aplicados:</p>
+
+        <div class="grid-kpis">
+            <div class="kpi-sample red">
+                <h4>📵 Chamadas Perdidas</h4>
+                <div class="num">518</div>
+                <div class="desc">Total no período</div>
+            </div>
+            <div class="kpi-sample red">
+                <h4>🚫 Não Atendidas</h4>
+                <div class="num">246</div>
+                <div class="desc">Sem resposta no ramal</div>
+            </div>
+            <div class="kpi-sample amber">
+                <h4>🟡 Ramal Ocupado</h4>
+                <div class="num">271</div>
+                <div class="desc">Ocupado no atendimento</div>
+            </div>
+            <div class="kpi-sample purple">
+                <h4>✖ Falhas Técnicas</h4>
+                <div class="num">1</div>
+                <div class="desc">Erro de rota/sinal</div>
+            </div>
+            <div class="kpi-sample slate">
+                <h4>⏳ Tempo Médio Espera</h4>
+                <div class="num">00:06</div>
+                <div class="desc">Antes de desligar</div>
+            </div>
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th style="width: 25%;">Indicador</th>
+                    <th>Significado e Aplicação Operacional</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>📵 Chamadas Perdidas</strong></td>
+                    <td>Soma global de todas as ligações registradas no período que terminaram sem conexão humana (com exceção das atendidas).</td>
+                </tr>
+                <tr>
+                    <td><strong>🚫 Não Atendidas (NO ANSWER)</strong></td>
+                    <td>Chamadas que tocaram nos ramais ou filas de atendimento até o esgotamento do tempo limite (timeout) sem que nenhum operador atendesse.</td>
+                </tr>
+                <tr>
+                    <td><strong>🟡 Ramal Ocupado (BUSY)</strong></td>
+                    <td>Tentativas de ligação direcionadas a ramais ou troncos que estavam no momento engajados em outra chamada telefônica.</td>
+                </tr>
+                <tr>
+                    <td><strong>✖ Falhas Técnicas (FAILED / CONGESTION)</strong></td>
+                    <td>Chamadas que não puderam ser concluídas por erro de rota de saída, indisponibilidade momentânea da operadora de telefonia, ausência de canais livres ou sinalização SIP de rejeição.</td>
+                </tr>
+                <tr>
+                    <td><strong>⏳ Tempo Médio Espera</strong></td>
+                    <td>Média aritmética (em minutos e segundos) do tempo que os chamadores aguardaram na linha ouvindo tom de chamada antes de desligar por desistência.</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <!-- SEÇÃO 2: GRÁFICOS ANALÍTICOS -->
+        <h2>📈 2. Gráficos Analíticos Dinâmicos</h2>
+        <p>A tela conta com dois gráficos integrados (Chart.js) que convertem dados brutos em inteligência visual instantânea:</p>
+
+        <h3>📊 Volume de Chamadas Perdidas por Horário (00h - 23h)</h3>
         <ul>
-            <li><span class="badge badge-red">NO ANSWER</span>: O telefone tocou mas ninguém atendeu dentro do tempo limite.</li>
-            <li><span class="badge badge-yellow">BUSY</span>: O ramal ou linha de destino estava ocupado no momento da chamada.</li>
-            <li><span class="badge badge-red">FAILED</span>: Ocorreu uma falha na rota de saída ou sinalização da operadora.</li>
-            <li><strong>Voicemail / Caixa Postal:</strong> A ligação foi direcionada para recado de áudio após não ser atendida.</li>
+            <li><strong>Mapeamento Hora a Hora:</strong> Gráfico de barras verticais que identifica visualmente os períodos de maior incidência de ligações não atendidas ao longo do dia.</li>
+            <li><strong>Tomada de Decisão:</strong> Essencial para coordenadores e supervisores identificarem sobrecargas em horários de pico (ex: 05h-06h, horário de almoço ou trocas de turno), permitindo redimensionar a escala de atendentes e escalonamento de pausas.</li>
+        </ul>
+
+        <h3>🚦 Motivo do Não Atendimento (Gráfico Donut)</h3>
+        <ul>
+            <li><strong>Distribuição Proporcional:</strong> Gráfico de rosca que divide as ocorrências nas três categorias principais: 
+                <span class="badge badge-noans">Não Atendeu</span>, 
+                <span class="badge badge-busy">Ocupado</span> e 
+                <span class="badge badge-fail">Falha</span>.
+            </li>
+            <li><strong>Diagnóstico de Infraestrutura:</strong> Se o percentual de <span class="badge badge-busy">Ocupado</span> for elevado, indica necessidade de mais ramais na fila ou ativação de chamada em espera; se <span class="badge badge-fail">Falha</span> estiver alto, indica instabilidade na rota da operadora.</li>
+        </ul>
+
+        <!-- SEÇÃO 3: FILTROS E PESQUISA -->
+        <h2>🔍 3. Filtros e Pesquisa Avançada</h2>
+        <p>Utilize a barra de parâmetros para restringir as análises a períodos ou alvos específicos:</p>
+
+        <div class="filter-grid">
+            <div class="filter-item">
+                <strong>📅 Data Inicial</strong>
+                <p>Data de início da consulta no banco de dados CDR.</p>
+            </div>
+            <div class="filter-item">
+                <strong>📅 Data Final</strong>
+                <p>Data de término da consulta de chamadas perdidas.</p>
+            </div>
+            <div class="filter-item">
+                <strong>📌 Buscar Campo</strong>
+                <p>Define se a pesquisa será feita por <code>Destino (dst)</code> ou <code>Origem (src)</code>.</p>
+            </div>
+            <div class="filter-item">
+                <strong>📞 Padrão / Número</strong>
+                <p>Filtro textual ou numérico (ex: <code>5001</code> para fila de suporte, ou o ramal de um atendente).</p>
+            </div>
+        </div>
+        <p>Clique em <strong>🔍 Filtrar Perdidas</strong> para processar a busca ou em <strong>🔄 Reset</strong> para restaurar os valores padrão da data atual.</p>
+
+        <!-- SEÇÃO 4: GRADE DE DADOS E COLUNAS -->
+        <h2>📋 4. Colunas da Tabela de Registros</h2>
+        <p>A grade principal lista detalhadamente cada tentativa de ligação não completada:</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Coluna</th>
+                    <th>Descrição dos Dados</th>
+                    <th>Exemplo Visual</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Data / Hora</strong></td>
+                    <td>Data e horário exato do início da tentativa de chamada registrada pelo Asterisk.</td>
+                    <td><code>📅 2026-09-17 11:04:10</code></td>
+                </tr>
+                <tr>
+                    <td><strong>Origem (BINA)</strong></td>
+                    <td>
+                        Número do chamador devidamente tratado e formatado no padrão telefônico brasileiro.<br>
+                        • Se for cliente externo, exibe o botão <span class="badge-btn-ab">📇</span> para salvar na Agenda Pública.<br>
+                        • Ao passar o mouse, exibe <strong>tooltip inteligente</strong> com o histórico dos últimos 7 dias (quantas vezes o cliente ligou e quantas vezes a empresa ligou para ele).
+                    </td>
+                    <td>
+                        <code>(16) 3601-0500</code> <span class="badge-btn-ab">📇</span><br>
+                        <span class="badge badge-ext">👤 Ramal 3126 - 3126</span>
+                    </td>
+                </tr>
+                <tr>
+                    <td><strong>Destino / Fila</strong></td>
+                    <td>
+                        Identificação visual do alvo que não atendeu a ligação:<br>
+                        • <span class="badge badge-queue">👥 Fila de Atendimento</span>: Fila configurada no PBX.<br>
+                        • <span class="badge badge-ext">👤 Ramal Interno</span>: Ramal direto com nome do usuário.<br>
+                        • <span class="badge badge-group">🏢 Grupo de Ramais</span>: Grupo de toque coletivo.<br>
+                        • <span class="badge badge-ura">🎛️ URA / Menu (s)</span>: Atendimento automático do PBX.
+                    </td>
+                    <td>
+                        <span class="badge badge-queue">👥 5001 - HP-Tecle 1</span><br>
+                        <span class="badge badge-ext">👤 Ramal 3102 - Monitoramento</span>
+                    </td>
+                </tr>
+                <tr>
+                    <td><strong>Status / Motivo</strong></td>
+                    <td>
+                        Motivo do encerramento da chamada:<br>
+                        • <span class="badge badge-noans">📵 NÃO ATENDEU</span>: Tocou sem resposta até o timeout.<br>
+                        • <span class="badge badge-busy">🟡 OCUPADO</span>: Destino em outra ligação.<br>
+                        • <span class="badge badge-fail">✖ CONGESTION</span>: Tronco congestionado ou rota ocupada.<br>
+                        • <span class="badge badge-fail">✖ FAILED</span>: Erro de sinalização ou falha da operadora.
+                    </td>
+                    <td>
+                        <span class="badge badge-noans">📵 NÃO ATENDEU</span><br>
+                        <span class="badge badge-fail">✖ CONGESTION</span>
+                    </td>
+                </tr>
+                <tr>
+                    <td><strong>Tempo de Espera</strong></td>
+                    <td>Tempo total que a chamada ficou tocando no destino antes de ser desconectada.</td>
+                    <td><code>⏱️ 00:03</code>, <code>⏱️ 00:17</code></td>
+                </tr>
+                <tr>
+                    <td><strong>Última Aplicação</strong></td>
+                    <td>Comando do Asterisk que processava a chamada no instante da queda (ex: <code>Dial</code> para discagem direta a ramal, <code>Queue</code> para chamada em fila).</td>
+                    <td><code>Dial</code>, <code>Queue</code></td>
+                </tr>
+            </tbody>
+        </table>
+
+        <!-- SEÇÃO 5: CADASTRO NA AGENDA PÚBLICA -->
+        <h2>📇 5. Integração com a Agenda Pública (Address Book)</h2>
+        <p>Ao identificar uma chamada perdida de um número externo ainda não identificado, qualquer operador pode clicar no ícone <span class="badge-btn-ab">📇</span> ao lado do número na coluna de Origem.</p>
+        
+        <div class="card-info">
+            <strong>🌐 Cadastro Centralizado e Compartilhado:</strong>
+            Abre instantaneamente o formulário flutuante para registrar <strong>Nome, Sobrenome, Empresa, E-mail e Observações</strong>. O contato é salvo no banco de dados da Agenda Pública do Issabel (<code>address_book.db</code>) e passa a ser exibido automaticamente em todos os relatórios do PBX com o nome do cliente.
+        </div>
+
+        <!-- SEÇÃO 6: BOAS PRÁTICAS DE RETENÇÃO -->
+        <h2>💡 6. Recomendações para Recuperação de Ligações (Callback)</h2>
+        <ul>
+            <li><strong>Prioridade para Menor Tempo de Espera:</strong> Chamadores que desligaram com poucos segundos (ex: 00:03) frequentemente estavam com pressa ou enfrentaram urgência; priorize o retorno imediato.</li>
+            <li><strong>Atenção a Filas de Atendimento:</strong> Chamadas perdidas direcionadas a filas como <span class="badge badge-queue">5001 - Suporte</span> representam clientes que passaram pela URA e foram abandonados; retorno prioritário reduz cancelamentos.</li>
+            <li><strong>Consulta de Recorrência (7 Dias):</strong> Ao posicionar o cursor sobre o chamador, verifique o balanço de chamadas nos últimos 7 dias. Múltiplas ligações sem atendimento indicam cliente crítico com dificuldade recorrente de contato.</li>
         </ul>
     </div>
 </body>
