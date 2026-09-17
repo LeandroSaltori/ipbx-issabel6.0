@@ -222,9 +222,28 @@ executar_restauracao() {
 }
 
 # ------------------------------------------------------------------------------
+# LEITURA ROBUSTA DE TERMINAL (SUPORTE A PIPES E /DEV/TTY)
+# ------------------------------------------------------------------------------
+sound_read() {
+    if [ -t 0 ]; then
+        read "$@"
+    elif [ -e /dev/tty ]; then
+        read "$@" < /dev/tty
+    else
+        read "$@"
+    fi
+}
+
+# ------------------------------------------------------------------------------
 # MODO INTERATIVO (MENU PRÓPRIO)
 # ------------------------------------------------------------------------------
 menu_audios() {
+    # Se não for terminal e /dev/tty não estiver disponível, evita loop infinito
+    if [ ! -t 0 ] && [ ! -e /dev/tty ]; then
+        log_warn "Terminal interativo não detectado. Use: bash $0 --cirurgico"
+        return 0
+    fi
+
     while true; do
         clear
         echo -e "${BLUE}╔══════════════════════════════════════════════════════════════════════╗${NC}"
@@ -245,12 +264,28 @@ menu_audios() {
         echo -e "${BLUE}╚══════════════════════════════════════════════════════════════════════╝${NC}"
         echo ""
         echo -ne "${CYAN}Escolha uma opção: ${NC}"
-        read -r OPCAO_AUDIO
+        
+        OPCAO_AUDIO=""
+        if ! sound_read -r OPCAO_AUDIO; then
+            echo ""
+            log_warn "Entrada encerrada ou EOF recebido. Saindo..."
+            break
+        fi
+
+        # Sanitiza quebras de linha e espaços do Windows/MobaXterm
+        OPCAO_AUDIO="${OPCAO_AUDIO//$'\r'/}"
+        OPCAO_AUDIO="${OPCAO_AUDIO//$'\n'/}"
+        OPCAO_AUDIO="${OPCAO_AUDIO// /}"
+        OPCAO_AUDIO="${OPCAO_AUDIO//$'\t'/}"
+
+        if [ -z "$OPCAO_AUDIO" ]; then
+            continue
+        fi
 
         case "$OPCAO_AUDIO" in
-            1) executar_correcao_cirurgica; echo ""; read -p "Pressione ENTER para continuar..." ;;
-            2) executar_geracao_tts; echo ""; read -p "Pressione ENTER para continuar..." ;;
-            3) executar_restauracao; echo ""; read -p "Pressione ENTER para continuar..." ;;
+            1) executar_correcao_cirurgica; echo ""; sound_read -rp "Pressione ENTER para continuar..." dummy ;;
+            2) executar_geracao_tts; echo ""; sound_read -rp "Pressione ENTER para continuar..." dummy ;;
+            3) executar_restauracao; echo ""; sound_read -rp "Pressione ENTER para continuar..." dummy ;;
             0) break ;;
             *) echo -e "${RED}Opção inválida!${NC}"; sleep 1 ;;
         esac

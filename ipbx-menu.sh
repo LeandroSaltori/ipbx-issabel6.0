@@ -1447,7 +1447,11 @@ update_timezone() {
 update_sounds_ptbr() {
     log_info "Abrindo Gerenciador de Áudios e Sons PT-BR..."
     if [ -f "$REPO_DIR/scripts/ipbx-sounds-ptbr.sh" ]; then
-        bash "$REPO_DIR/scripts/ipbx-sounds-ptbr.sh"
+        if [ -e /dev/tty ]; then
+            bash "$REPO_DIR/scripts/ipbx-sounds-ptbr.sh" < /dev/tty
+        else
+            bash "$REPO_DIR/scripts/ipbx-sounds-ptbr.sh"
+        fi
     else
         log_error "Script scripts/ipbx-sounds-ptbr.sh não encontrado no repositório."
     fi
