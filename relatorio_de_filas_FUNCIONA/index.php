@@ -315,102 +315,46 @@ if ($rDevices) {
     }
 }
 
-// --- Lista DINÂMICA de Filas diretamente do PABX (Zero Duplicação) ------------
-$filasDict = array();
+// --- Lista 100% DINÂMICA das Filas ATIVAS no PABX (Zero Quebra / Zero Órfãs) ---
+$filas = array();
 
-// 1. Busca todas as filas criadas no FreePBX / Asterisk
-$rAstQueues = @mysqli_query($conn, "SELECT extension, descr FROM asterisk.queues_config WHERE extension != '' ORDER BY extension");
+// Busca EXCLUSIVAMENTE as filas que estão configuradas e ativas no PABX (FreePBX)
+$rAstQueues = @mysqli_query($conn, "SELECT extension, descr FROM asterisk.queues_config WHERE extension != '' ORDER BY CAST(extension AS UNSIGNED), extension ASC");
 if ($rAstQueues) {
     while ($row = mysqli_fetch_assoc($rAstQueues)) {
         $ext = trim($row['extension']);
         $desc = trim($row['descr']);
-        if ($ext != '') {
-            $filasDict[$ext] = array(
-                'queue_num'   => $ext,
-                'queue_descr' => ($desc != '' && strcasecmp($desc, $ext) !== 0) ? "$desc ($ext)" : "Fila $ext",
-                'label'       => ($desc != '' && strcasecmp($desc, $ext) !== 0) ? "$ext: $desc" : $ext
-            );
-        }
-    }
-}
+        if ($ext === '') continue;
 
-// 2. Busca caso o FreePBX use estrutura chave-valor (description ou displayname)
-$rAstQueuesKV = @mysqli_query($conn, "SELECT extension, value FROM asterisk.queues_config WHERE keyword IN ('description', 'displayname') AND extension != ''");
-if ($rAstQueuesKV) {
-    while ($row = mysqli_fetch_assoc($rAstQueuesKV)) {
-        $ext = trim($row['extension']);
-        $desc = trim($row['value']);
-        if ($ext != '' && !isset($filasDict[$ext])) {
-            $filasDict[$ext] = array(
-                'queue_num'   => $ext,
-                'queue_descr' => ($desc != '' && strcasecmp($desc, $ext) !== 0) ? "$desc ($ext)" : "Fila $ext",
-                'label'       => ($desc != '' && strcasecmp($desc, $ext) !== 0) ? "$ext: $desc" : $ext
-            );
-        } elseif ($ext != '' && isset($filasDict[$ext]) && $desc != '') {
-            $filasDict[$ext]['queue_descr'] = "$desc ($ext)";
-            $filasDict[$ext]['label'] = "$ext: $desc";
+        // Se descr estiver vazia ou for igual ao número, tenta mapa alternativo
+        if (($desc === '' || $desc === $ext) && isset($queueDescrMap[$ext])) {
+            $desc = $queueDescrMap[$ext];
         }
-    }
-}
 
-// 3. Lê do arquivo /etc/asterisk/queues_additional.conf se existir
-if (file_exists('/etc/asterisk/queues_additional.conf')) {
-    $qLines = file('/etc/asterisk/queues_additional.conf', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-    foreach ($qLines as $ql) {
-        if (preg_match('/^\[(\d+)\]/', trim($ql), $qm)) {
-            $ext = $qm[1];
-            if (!isset($filasDict[$ext])) {
-                $filasDict[$ext] = array(
-                    'queue_num'   => $ext,
-                    'queue_descr' => "Fila $ext",
-                    'label'       => $ext
-                );
+        // Obtém ou registra o qname_id correspondente em qname para filtragem
+        $escQ = mysqli_real_escape_string($conn, $ext);
+        $rQn = @mysqli_query($conn, "SELECT qname_id FROM qname WHERE queue = '$escQ' LIMIT 1");
+        if ($rQn && $rowQn = mysqli_fetch_assoc($rQn)) {
+            $qnId = (int)$rowQn['qname_id'];
+        } else {
+            @mysqli_query($conn, "INSERT IGNORE INTO qname (queue) VALUES ('$escQ')");
+            $qnId = (int)mysqli_insert_id($conn);
+            if (!$qnId) {
+                $rQn2 = @mysqli_query($conn, "SELECT qname_id FROM qname WHERE queue = '$escQ' LIMIT 1");
+                if ($rQn2 && $rowQn2 = mysqli_fetch_assoc($rQn2)) $qnId = (int)$rowQn2['qname_id'];
             }
         }
+
+        $label = ($desc !== '' && strcasecmp($desc, $ext) !== 0) ? "$ext: $desc" : $ext;
+        $tooltip = ($desc !== '' && strcasecmp($desc, $ext) !== 0) ? "$desc ($ext)" : "Fila $ext";
+
+        $filas[] = array(
+            'qname_id'    => $qnId,
+            'queue_num'   => $ext,
+            'queue_descr' => $tooltip,
+            'label'       => $label
+        );
     }
-}
-
-// 4. Também traz qualquer fila histórica de qname com dados de chamadas
-$rFilasHist = @mysqli_query($conn, "SELECT DISTINCT queue FROM qname WHERE queue != 'NONE' AND queue != ''");
-if ($rFilasHist) {
-    while ($row = mysqli_fetch_assoc($rFilasHist)) {
-        $ext = trim($row['queue']);
-        if ($ext != '' && !isset($filasDict[$ext])) {
-            $d = getQueueDescription($ext, $queueDescrMap);
-            $filasDict[$ext] = array(
-                'queue_num'   => $ext,
-                'queue_descr' => $d,
-                'label'       => $ext
-            );
-        }
-    }
-}
-
-// Ordena naturalmente pelas filas (5001, 5002, ...)
-ksort($filasDict, SORT_NATURAL);
-
-// 5. Monta a lista indexada com o id de qname (sem duplicação)
-$filas = array();
-foreach ($filasDict as $ext => $qData) {
-    $escQ = mysqli_real_escape_string($conn, $ext);
-    $rQId = @mysqli_query($conn, "SELECT qname_id FROM qname WHERE queue = '$escQ' LIMIT 1");
-    if ($rQId && $rowId = mysqli_fetch_assoc($rQId)) {
-        $qnId = (int)$rowId['qname_id'];
-    } else {
-        @mysqli_query($conn, "INSERT IGNORE INTO qname (queue) VALUES ('$escQ')");
-        $qnId = mysqli_insert_id($conn);
-        if (!$qnId) {
-            $rQId2 = @mysqli_query($conn, "SELECT qname_id FROM qname WHERE queue = '$escQ' LIMIT 1");
-            if ($rQId2 && $rowId2 = mysqli_fetch_assoc($rQId2)) $qnId = (int)$rowId2['qname_id'];
-        }
-    }
-
-    $filas[] = array(
-        'qname_id'    => $qnId,
-        'queue_num'   => $qData['queue_num'],
-        'queue_descr' => $qData['queue_descr'],
-        'label'       => $qData['label']
-    );
 }
 
 $agentesLista = array();
