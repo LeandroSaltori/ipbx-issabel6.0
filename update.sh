@@ -45,9 +45,23 @@ curl -s -k -o /var/www/html/modules/graphic_report/index.php https://raw.githubu
 curl -s -k -o /var/www/html/agenda.php https://raw.githubusercontent.com/LeandroSaltori/ipbx-issabel6.0/main/src/agenda.php
 cp -f /var/www/html/agenda.php /var/www/html/Agenda.php 2>/dev/null || true
 
+# Relatório de Filas e Parser
+mkdir -p /var/www/html/Relatorio_de_filas /var/www/html/modules/relatorio_de_filas /var/www/html/relatorio_de_filas /usr/local/parselog
+curl -s -k -o /var/www/html/Relatorio_de_filas/index.php https://raw.githubusercontent.com/LeandroSaltori/ipbx-issabel6.0/main/src/modules/relatorio_de_filas/index.php
+cp -f /var/www/html/Relatorio_de_filas/index.php /var/www/html/modules/relatorio_de_filas/index.php 2>/dev/null || true
+cp -f /var/www/html/Relatorio_de_filas/index.php /var/www/html/relatorio_de_filas/index.php 2>/dev/null || true
+curl -s -k -o /usr/local/parselog/parselog.php https://raw.githubusercontent.com/LeandroSaltori/ipbx-issabel6.0/main/src/modules/relatorio_de_filas/parselog/parselog.php
+chmod +x /usr/local/parselog/parselog.php 2>/dev/null || true
+
+if ! crontab -l 2>/dev/null | grep -q "parselog.php"; then
+    (crontab -l 2>/dev/null; echo "* * * * * /usr/bin/php /usr/local/parselog/parselog.php > /dev/null 2>&1") | crontab -
+fi
+
 # Permissões
 chown asterisk:asterisk /var/www/html/agenda.php /var/www/html/Agenda.php 2>/dev/null || true
 chmod 644 /var/www/html/agenda.php /var/www/html/Agenda.php 2>/dev/null || true
+chown -R asterisk:asterisk /var/www/html/Relatorio_de_filas /var/www/html/modules/relatorio_de_filas /var/www/html/relatorio_de_filas /usr/local/parselog
+chmod -R 755 /var/www/html/Relatorio_de_filas /var/www/html/modules/relatorio_de_filas /var/www/html/relatorio_de_filas /usr/local/parselog
 chown -R asterisk:asterisk /var/www/html/
 
 # Limpar cache do Smarty e recarregar Apache para limpar OpCache
