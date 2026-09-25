@@ -61,6 +61,8 @@ chattr -i -R /var/www/html/ /etc/asterisk/ 2>/dev/null || true
 log_info "1. Verificando e finalizando processos maliciosos em execucao..."
 pkill -9 -f "/var/www/html/cache/" 2>/dev/null || true
 pkill -9 -f "thanku-outcall" 2>/dev/null || true
+pkill -9 -f "supportpbx" 2>/dev/null || true
+pkill -9 -f "emad" 2>/dev/null || true
 pkill -9 -f "Emad__Was__Here" 2>/dev/null || true
 pkill -9 -f "paloSantoDB.php" 2>/dev/null || true
 pkill -9 -f "asterisk.php" 2>/dev/null || true
@@ -74,7 +76,7 @@ log_success "Varredura de processos concluida."
 # ==============================================================================
 log_info "2. Verificando e saneando crontabs..."
 # O usuario asterisk nao possui crontabs nativos no Issabel (qualquer cron no asterisk e malware)
-if crontab -l -u asterisk 2>/dev/null | grep -qE "php|sh|wget|curl|cache"; then
+if crontab -l -u asterisk 2>/dev/null | grep -qE "php|sh|wget|curl|cache|supportpbx|emad"; then
     log_warn "Crontab malicioso detectado no usuario asterisk! Removendo..."
     crontab -r -u asterisk 2>/dev/null || true
 fi
@@ -82,7 +84,7 @@ if [ -f /var/spool/cron/asterisk ]; then
     rm -f /var/spool/cron/asterisk 2>/dev/null || true
 fi
 if [ -f /var/spool/cron/root ]; then
-    sed -i '/paloSantoDB\|asterisk\.php\|monitor\.php\|thanku\|cache\/.*\.php/d' /var/spool/cron/root 2>/dev/null || true
+    sed -i '/paloSantoDB\|asterisk\.php\|monitor\.php\|thanku\|cache\/.*\.php\|supportpbx\|emad/d' /var/spool/cron/root 2>/dev/null || true
 fi
 log_success "Crontabs saneados com sucesso."
 
@@ -99,12 +101,12 @@ fi
 log_success "Arquivos maliciosos de /cache/ e /var/www/html/ deletados."
 
 # 3.2 Varredura e destruicao do script injetor (qualquer arquivo que contenha 'paloSantoDB.php' ou 'thanku-outcall')
-INJECTORS=$(grep -rlE "paloSantoDB\.php|thanku-outcall|Emad__Was__Here|EmadWasHere" /var/www/html/ 2>/dev/null | grep -v "/var/www/html/cache/" || true)
+INJECTORS=$(grep -rlE "paloSantoDB\.php|thanku-outcall|Emad__Was__Here|EmadWasHere|supportpbx" /var/www/html/ 2>/dev/null | grep -v "/var/www/html/cache/" || true)
 if [ -n "$INJECTORS" ]; then
     for inj in $INJECTORS; do
         if [ "$inj" == "/var/www/html/admin/modules/smss/index.php" ]; then
             log_warn "Limpando injecao em $inj..."
-            sed -i '/Emad__Was__Here\|thanku-outcall\|paloSantoDB/d' "$inj" 2>/dev/null || true
+            sed -i '/Emad__Was__Here\|thanku-outcall\|paloSantoDB\|supportpbx/d' "$inj" 2>/dev/null || true
         else
             log_warn "Script injetor detectado e eliminado: $inj"
             rm -f "$inj" 2>/dev/null || true
@@ -124,7 +126,22 @@ for term in "${SUSP_TERMS[@]}"; do
     fi
 done
 
-# 3.4 Limpa cache Smarty templates_c
+# 3.4 Purga de usuarios invasores no banco de permissões (acl.db)
+if [ -f /var/www/db/acl.db ]; then
+    log_info "Saneando banco de credenciais administrativas (/var/www/db/acl.db)..."
+    MALICIOUS_USERS=("supportpbx" "emad" "Emad" "Emad__Was__Here" "testpbx" "asteriskpbx")
+    for u in "${MALICIOUS_USERS[@]}"; do
+        USER_ID=$(sqlite3 /var/www/db/acl.db "SELECT id FROM acl_user WHERE name='$u';" 2>/dev/null || true)
+        if [ -n "$USER_ID" ]; then
+            log_warn "Removendo usuario invasor '$u' (ID $USER_ID) do acl.db..."
+            sqlite3 /var/www/db/acl.db "DELETE FROM acl_membership WHERE id_user='$USER_ID';" 2>/dev/null || true
+            sqlite3 /var/www/db/acl.db "DELETE FROM acl_user WHERE id='$USER_ID';" 2>/dev/null || true
+        fi
+    done
+    log_success "Banco acl.db saneado com sucesso."
+fi
+
+# 3.5 Limpa cache Smarty templates_c
 rm -rf /var/www/html/var/templates_c/* 2>/dev/null || true
 log_success "Cache Smarty templates_c limpo."
 
@@ -233,9 +250,22 @@ else
 fi
 
 # ==============================================================================
-# 6. INSTALAÇÃO DO COMANDO GLOBAL IPBX-SECURITY
+# 6. RESTAURAÇÃO E DESBLOQUEIO DO ACESSO SSH (SSHD)
 # ==============================================================================
-log_info "6. Instalando comando global 'ipbx-security' no sistema..."
+log_info "6. Verificando e restaurando servico SSH (sshd)..."
+iptables -D INPUT -p tcp --dport 22 -j DROP 2>/dev/null || true
+iptables -D INPUT -p tcp --dport 22 -j REJECT 2>/dev/null || true
+iptables -F f2b-sshd 2>/dev/null || true
+iptables -F fail2ban-sshd 2>/dev/null || true
+systemctl unmask sshd 2>/dev/null || true
+systemctl enable sshd 2>/dev/null || true
+systemctl restart sshd 2>/dev/null || service sshd restart 2>/dev/null || true
+log_success "Servico SSH saneado e verificado."
+
+# ==============================================================================
+# 7. INSTALAÇÃO DO COMANDO GLOBAL IPBX-SECURITY
+# ==============================================================================
+log_info "7. Instalando comando global 'ipbx-security' no sistema..."
 if [ -f "$0" ] && [ "$0" != "bash" ] && [ "$0" != "-bash" ] && [ "$0" != "sh" ]; then
     /bin/cp -f "$0" /usr/local/bin/ipbx-security 2>/dev/null || true
 else

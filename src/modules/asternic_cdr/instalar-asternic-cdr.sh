@@ -1,7 +1,7 @@
 #!/bin/bash
 # ==============================================================================
 # Script de Instalação Automatizada - Asternic CDR Report (Issabel 4 / Issabel 5)
-# Repositório: https://github.com/LeandroSaltori/ipbx-issabel5
+# Repositório: https://github.com/LeandroSaltori/ipbx-issabel6.0
 # ==============================================================================
 
 # 1. Verifica se o usuário é root
@@ -26,10 +26,10 @@ elif [ -d "$SCRIPT_DIR/admin/modules/asternic_cdr" ] && [ -f "$SCRIPT_DIR/admin/
   SOURCE_DIR="$SCRIPT_DIR/admin/modules/asternic_cdr"
 else
   echo "[+] Baixando os arquivos do repositório GitHub..."
-  TMP_REPO="/tmp/ipbx-issabel5-asternic-install"
+  TMP_REPO="/tmp/ipbx-issabel6-asternic-install"
   rm -rf "$TMP_REPO"
   if command -v git &>/dev/null; then
-    git clone --depth 1 https://github.com/LeandroSaltori/ipbx-issabel5.git "$TMP_REPO" &>/dev/null
+    git clone --depth 1 https://github.com/LeandroSaltori/ipbx-issabel6.0.git "$TMP_REPO" &>/dev/null
   else
     echo "[-] Erro: git não encontrado. Instalando dependências..."
     if command -v dnf &>/dev/null; then
@@ -37,13 +37,15 @@ else
     elif command -v yum &>/dev/null; then
       yum install -y git wget tar &>/dev/null
     fi
-    git clone --depth 1 https://github.com/LeandroSaltori/ipbx-issabel5.git "$TMP_REPO" &>/dev/null
+    git clone --depth 1 https://github.com/LeandroSaltori/ipbx-issabel6.0.git "$TMP_REPO" &>/dev/null
   fi
 
-  if [ -d "$TMP_REPO/asternic_cdr" ]; then
+  if [ -d "$TMP_REPO/src/modules/asternic_cdr" ]; then
+    SOURCE_DIR="$TMP_REPO/src/modules/asternic_cdr"
+  elif [ -d "$TMP_REPO/src/admin/modules/asternic_cdr" ]; then
+    SOURCE_DIR="$TMP_REPO/src/admin/modules/asternic_cdr"
+  elif [ -d "$TMP_REPO/asternic_cdr" ]; then
     SOURCE_DIR="$TMP_REPO/asternic_cdr"
-  elif [ -d "$TMP_REPO/admin/modules/asternic_cdr" ]; then
-    SOURCE_DIR="$TMP_REPO/admin/modules/asternic_cdr"
   else
     echo "[-] Erro: Não foi possível localizar a pasta do Asternic CDR no repositório."
     rm -rf "$TMP_REPO"
@@ -109,6 +111,17 @@ fwconsole reload 2>/dev/null || true
 if command -v asterisk &>/dev/null; then
   asterisk -rx "module reload" &>/dev/null || true
 fi
+
+# Registro do menu "Relatorio Geral" na aba Relatórios do Issabel
+if command -v sqlite3 &>/dev/null; then
+  sqlite3 /var/www/db/acl.db "INSERT OR IGNORE INTO acl_resource (name, description) VALUES ('relatorio_geral', 'Relatorio Geral');" 2>/dev/null || true
+  sqlite3 /var/www/db/acl.db "INSERT OR IGNORE INTO acl_resource (name, description) VALUES ('relatorio_cdr', 'Relatorio Geral');" 2>/dev/null || true
+  sqlite3 /var/www/db/menu.db "DELETE FROM menu WHERE id = 'relatorio_geral' OR id = 'relatorio_cdr' OR id = 'asternic_cdr';" 2>/dev/null || true
+  sqlite3 /var/www/db/menu.db "INSERT INTO menu (id, IdParent, Link, Name, Type, order_no) VALUES ('relatorio_geral', 'reports', 'admin/config.php?display=asternic_cdr', 'Relatorio Geral', 'framed', 10);" 2>/dev/null || true
+  sqlite3 /var/www/db/acl.db "INSERT OR IGNORE INTO acl_group_permission (id_action, id_group, id_resource) SELECT 1, 1, id FROM acl_resource WHERE name = 'relatorio_geral';" 2>/dev/null || true
+  sqlite3 /var/www/db/acl.db "INSERT OR IGNORE INTO acl_group_permission (id_action, id_group, id_resource) SELECT 1, 1, id FROM acl_resource WHERE name = 'relatorio_cdr';" 2>/dev/null || true
+fi
+
 
 # Limpeza de repositório temporário
 if [ -n "$TMP_REPO" ] && [ -d "$TMP_REPO" ]; then

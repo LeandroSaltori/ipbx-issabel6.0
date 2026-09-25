@@ -19,7 +19,7 @@ O repositório possui um script automatizado que realiza todo o processo de down
 Conecte-se ao seu servidor Issabel por SSH como `root` e execute o comando abaixo:
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/LeandroSaltori/ipbx-issabel5/main/asternic_cdr/instalar-asternic-cdr.sh | bash
+curl -sSL https://raw.githubusercontent.com/LeandroSaltori/ipbx-issabel6.0/main/src/modules/asternic_cdr/instalar-asternic-cdr.sh | bash
 ```
 
 ### Opção B: Execução Local após Clonar o Repositório

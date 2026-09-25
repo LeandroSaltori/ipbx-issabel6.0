@@ -5,7 +5,7 @@
 Execute o comando abaixo como `root` no servidor Issabel:
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/LeandroSaltori/ipbx-issabel5/main/asternic_cdr/instalar-asternic-cdr.sh | bash
+curl -sSL https://raw.githubusercontent.com/LeandroSaltori/ipbx-issabel6.0/main/src/modules/asternic_cdr/instalar-asternic-cdr.sh | bash
 ```
 
 ---
@@ -30,7 +30,7 @@ curl -sSL https://raw.githubusercontent.com/LeandroSaltori/ipbx-issabel5/main/as
    mv /var/www/html/admin/modules/asternic_cdr /var/www/html/admin/modules/asternic_cdr_OLD
 
    # Puxa/copia a pasta alterada do seu repositório
-   cp -rf /caminho/do/repositorio/ipbx-issabel5/asternic_cdr /var/www/html/admin/modules/asternic_cdr
+   cp -rf /caminho/do/repositorio/ipbx-issabel6.0/src/modules/asternic_cdr /var/www/html/admin/modules/asternic_cdr
 
    # Ajusta as permissões de arquivo
    chown -R asterisk:asterisk /var/www/html/admin/modules/asternic_cdr

@@ -134,7 +134,7 @@ if [ -f "$CURRENT_DIR/parselog/parselog.php" ]; then
   /bin/cp -f "$CURRENT_DIR/parselog/parselog.php" /usr/local/parselog/parselog.php
   PARSER_INSTALLED=true
 elif [ -f "$CURRENT_DIR/parselog.php" ]; then
-  /bin/cp -f "$CURRENT_DIR/parselog.php" /usr/local/parselog/parselog.php
+  /bin/cp -f "$CURRENT_DIR/parselog/parselog.php" /usr/local/parselog/parselog.php
   PARSER_INSTALLED=true
 fi
 

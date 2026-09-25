@@ -4,7 +4,7 @@ echo "📥 Baixando módulos do GitHub..."
 
 # Caminho temporário
 TMP_DIR="/tmp/issabel-dev-install"
-REPO="https://github.com/LeandroSaltori/ipbx-issabel5.git"
+REPO="https://github.com/LeandroSaltori/ipbx-issabel6.0.git"
 
 # Remove se já existe
 rm -rf "$TMP_DIR"

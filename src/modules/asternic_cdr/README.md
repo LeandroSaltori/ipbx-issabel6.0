@@ -9,7 +9,7 @@ O **Asternic CDR Report** é um módulo de relatórios avançados de chamadas (C
 Para instalar o módulo de forma rápida e automatizada diretamente no seu servidor Issabel:
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/LeandroSaltori/ipbx-issabel5/main/asternic_cdr/instalar-asternic-cdr.sh | bash
+curl -sSL https://raw.githubusercontent.com/LeandroSaltori/ipbx-issabel6.0/main/src/modules/asternic_cdr/instalar-asternic-cdr.sh | bash
 ```
 
 Ou, se você já possui este repositório clonado no servidor:

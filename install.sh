@@ -227,16 +227,28 @@ if [ -d "$REPO_DIR/src/modules/asternic_cdr" ]; then
             rm -rf "$ASTERNIC_DEST"
         fi
     fi
-    /bin/cp -rf "$REPO_DIR/src/modules/asternic_cdr" "$ASTERNIC_DEST"
+    mkdir -p "$ASTERNIC_DEST"
+    /bin/cp -rf "$REPO_DIR/src/modules/asternic_cdr/"* "$ASTERNIC_DEST/"
     chown -R asterisk:asterisk "$ASTERNIC_DEST"
     chmod -R 755 "$ASTERNIC_DEST"
-    
+
+    MYSQL_PWD=""
+    if [ -f /etc/issabel.conf ]; then
+        MYSQL_PWD=$(grep -i mysqlrootpwd /etc/issabel.conf 2>/dev/null | cut -d'=' -f2 | tr -d ' ')
+    elif [ -f /etc/amportal.conf ]; then
+        MYSQL_PWD=$(grep -i AMPDBPASS /etc/amportal.conf 2>/dev/null | cut -d'=' -f2 | tr -d ' ')
+    fi
+    mysql -u root ${MYSQL_PWD:+-p"$MYSQL_PWD"} asterisk -e "INSERT INTO modules (modulename, version, enabled, signature) VALUES ('asternic_cdr', '1.6.6', 1, '') ON DUPLICATE KEY UPDATE enabled=1, version='1.6.6';" 2>/dev/null || true
+    mysql -u root ${MYSQL_PWD:+-p"$MYSQL_PWD"} asterisk -e "UPDATE ampusers SET sections='*' WHERE username='admin';" 2>/dev/null || true
+
     if command -v fwconsole &>/dev/null; then
         fwconsole ma install asternic_cdr 2>/dev/null || true
         fwconsole ma enable asternic_cdr 2>/dev/null || true
+        fwconsole reload 2>/dev/null || true
     elif command -v amportal &>/dev/null; then
         amportal a ma install asternic_cdr 2>/dev/null || true
         amportal a ma enable asternic_cdr 2>/dev/null || true
+        amportal a r 2>/dev/null || true
     fi
 
     # Registra o menu "Relatorio Geral" (Asternic CDR) dentro da aba Reports (Relatórios)
@@ -1027,13 +1039,32 @@ log_success "Módulo Call Center instalado e ativado."
 log_info "16/20 - Instalando Asternic Call Center Stats Lite e Relatório de Filas..."
 QUEUE_SRC="$REPO_DIR/src/modules/relatorio_de_filas"
 
-# 1. Criação do banco de dados qstatslite no MySQL / MariaDB
+# 1. Garantir que o Asterisk registre logs de fila (queue_log = yes)
+if [ -d /etc/asterisk ]; then
+    LOGGER_CUSTOM="/etc/asterisk/logger_general_custom.conf"
+    if [ -f "$LOGGER_CUSTOM" ]; then
+        if ! grep -qi "queue_log" "$LOGGER_CUSTOM"; then
+            echo "queue_log = yes" >> "$LOGGER_CUSTOM"
+            asterisk -rx "logger reload" 2>/dev/null || true
+        fi
+    elif [ -f /etc/asterisk/logger.conf ]; then
+        if ! grep -qi "queue_log\s*=\s*yes" /etc/asterisk/logger.conf; then
+            echo "queue_log = yes" >> /etc/asterisk/logger_general_custom.conf 2>/dev/null || true
+            asterisk -rx "logger reload" 2>/dev/null || true
+        fi
+    fi
+fi
+
+# 2. Criação e Saneamento do banco de dados qstatslite no MySQL / MariaDB
 MYSQL_PWD=""
 if [ -f /etc/issabel.conf ]; then
     MYSQL_PWD=$(grep -i mysqlrootpwd /etc/issabel.conf 2>/dev/null | cut -d'=' -f2 | tr -d ' ')
+elif [ -f /etc/amportal.conf ]; then
+    MYSQL_PWD=$(grep -i AMPDBPASS /etc/amportal.conf 2>/dev/null | cut -d'=' -f2 | tr -d ' ')
 fi
 
-mysql -u root -p"$MYSQL_PWD" -e "CREATE DATABASE IF NOT EXISTS qstatslite DEFAULT CHARACTER SET utf8 COLLATE utf8_general_ci;" 2>/dev/null || mysql -u root -e "CREATE DATABASE IF NOT EXISTS qstatslite DEFAULT CHARACTER SET utf8 COLLATE utf8_general_ci;" 2>/dev/null || true
+mysql -u root ${MYSQL_PWD:+-p"$MYSQL_PWD"} -e "CREATE DATABASE IF NOT EXISTS qstatslite DEFAULT CHARACTER SET utf8 COLLATE utf8_general_ci;" 2>/dev/null || \
+mysql -u root -e "CREATE DATABASE IF NOT EXISTS qstatslite DEFAULT CHARACTER SET utf8 COLLATE utf8_general_ci;" 2>/dev/null || true
 
 if [ -n "$MYSQL_PWD" ]; then
     MYSQL_CMD="mysql -u root -p$MYSQL_PWD qstatslite"
@@ -1046,24 +1077,26 @@ CREATE TABLE IF NOT EXISTS `qname` (
   `qname_id` int(11) NOT NULL AUTO_INCREMENT,
   `queue` varchar(50) NOT NULL DEFAULT '',
   PRIMARY KEY (`qname_id`),
-  KEY `queue` (`queue`)
+  UNIQUE KEY `idx_queue` (`queue`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 CREATE TABLE IF NOT EXISTS `qagent` (
   `agent_id` int(11) NOT NULL AUTO_INCREMENT,
   `agent` varchar(50) NOT NULL DEFAULT '',
   PRIMARY KEY (`agent_id`),
-  KEY `agent` (`agent`)
+  UNIQUE KEY `idx_agent` (`agent`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 CREATE TABLE IF NOT EXISTS `qevent` (
-  `event_id` int(11) NOT NULL AUTO_INCREMENT,
+  `event_id` int(11) NOT NULL,
   `event` varchar(50) NOT NULL DEFAULT '',
   PRIMARY KEY (`event_id`),
-  KEY `event` (`event`)
+  UNIQUE KEY `idx_event` (`event`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 CREATE TABLE IF NOT EXISTS `queue_stats` (
+  `queue_stats_id` int(12) NOT NULL AUTO_INCREMENT,
+  `uniqueid` varchar(40) NOT NULL DEFAULT '',
   `datetime` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
   `qname` int(11) NOT NULL DEFAULT '0',
   `qagent` int(11) NOT NULL DEFAULT '0',
@@ -1073,80 +1106,70 @@ CREATE TABLE IF NOT EXISTS `queue_stats` (
   `info3` varchar(100) NOT NULL DEFAULT '',
   `info4` varchar(100) NOT NULL DEFAULT '',
   `info5` varchar(100) NOT NULL DEFAULT '',
-  `uniqueid` varchar(32) NOT NULL DEFAULT '',
-  KEY `datetime` (`datetime`),
-  KEY `qname` (`qname`),
-  KEY `qagent` (`qagent`),
-  KEY `qevent` (`qevent`),
-  KEY `uniqueid` (`uniqueid`)
+  PRIMARY KEY (`queue_stats_id`),
+  KEY `idx_dt` (`datetime`),
+  KEY `idx_uid` (`uniqueid`),
+  KEY `idx_qn` (`qname`),
+  KEY `idx_qa` (`qagent`),
+  KEY `idx_qe` (`qevent`),
+  UNIQUE KEY `unico` (`uniqueid`, `datetime`, `qname`, `qagent`, `qevent`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+INSERT IGNORE INTO `qevent` (`event_id`, `event`) VALUES
+(1,'ABANDON'),(2,'AGENTDUMP'),(3,'AGENTLOGIN'),(4,'AGENTCALLBACKLOGIN'),
+(5,'AGENTLOGOFF'),(6,'AGENTCALLBACKLOGOFF'),(7,'COMPLETEAGENT'),(8,'COMPLETECALLER'),
+(9,'CONFIGRELOAD'),(10,'CONNECT'),(11,'ENTERQUEUE'),(12,'EXITWITHKEY'),
+(13,'EXITWITHTIMEOUT'),(14,'QUEUESTART'),(15,'SYSCOMPAT'),(16,'TRANSFER'),
+(17,'PAUSE'),(18,'UNPAUSE'),(19,'RINGNOANSWER'),(20,'EXITEMPTY'),
+(21,'PAUSEALL'),(22,'UNPAUSEALL');
+
+INSERT IGNORE INTO `qname` (`queue`) VALUES ('NONE');
+INSERT IGNORE INTO `qagent` (`agent`) VALUES ('NONE');
 EOF
 
-    # 2. Instalação do Asternic Call Center Stats Lite (parselog.php e /var/www/html/stats)
-    if [ ! -f /usr/local/parselog/parselog.php ] || [ ! -d /var/www/html/stats ]; then
-        log_info "Baixando e configurando Asternic Stats Lite..."
-        TMP_ASTERNIC="/tmp/asternic-stats-install"
-        rm -rf "$TMP_ASTERNIC"
-        mkdir -p "$TMP_ASTERNIC"
-        
-        curl -sSL "http://download.asternic.net/asternic-stats-1.5.tar.gz" -o "$TMP_ASTERNIC/asternic-stats-1.5.tar.gz" 2>/dev/null || wget -q "http://download.asternic.net/asternic-stats-1.5.tar.gz" -O "$TMP_ASTERNIC/asternic-stats-1.5.tar.gz" 2>/dev/null || true
-        
-        if [ -f "$TMP_ASTERNIC/asternic-stats-1.5.tar.gz" ]; then
-            tar -xzf "$TMP_ASTERNIC/asternic-stats-1.5.tar.gz" -C "$TMP_ASTERNIC" 2>/dev/null || true
-            
-            # Cria pasta /usr/local/parselog
-            mkdir -p /usr/local/parselog
-            if [ -f "$TMP_ASTERNIC/asternic-stats/parselog.php" ]; then
-                cp -f "$TMP_ASTERNIC/asternic-stats/parselog.php" /usr/local/parselog/
-            elif [ -f "$TMP_ASTERNIC/asternic-stats/html/parselog.php" ]; then
-                cp -f "$TMP_ASTERNIC/asternic-stats/html/parselog.php" /usr/local/parselog/
-            fi
-            
-            # Configura credenciais no parselog.php
-            if [ -f /usr/local/parselog/parselog.php ]; then
-                sed -i "s/\$dbuser = .*/\$dbuser = 'root';/" /usr/local/parselog/parselog.php
-                sed -i "s/\$dbpass = .*/\$dbpass = '$MYSQL_PWD';/" /usr/local/parselog/parselog.php
-            fi
-            
-            # Copia pasta web do Asternic Lite para /var/www/html/stats
-            if [ -d "$TMP_ASTERNIC/asternic-stats/html" ]; then
-                mkdir -p /var/www/html/stats
-                /bin/cp -rf "$TMP_ASTERNIC/asternic-stats/html/"* /var/www/html/stats/
-                if [ -f /var/www/html/stats/config.php ]; then
-                    sed -i "s/\$dbuser = .*/\$dbuser = 'root';/" /var/www/html/stats/config.php
-                    sed -i "s/\$dbpass = .*/\$dbpass = '$MYSQL_PWD';/" /var/www/html/stats/config.php
-                fi
-                chown -R asterisk:asterisk /var/www/html/stats
-                chmod -R 755 /var/www/html/stats
-            fi
-            
-            # Agendamento no Crontab para processar logs de fila a cada minuto
-            if ! crontab -l 2>/dev/null | grep -q "parselog.php"; then
-                (crontab -l 2>/dev/null; echo "* * * * * php /usr/local/parselog/parselog.php > /dev/null 2>&1") | crontab -
-                log_success "Agendamento do parselog.php criado no crontab."
-            fi
-            
-            # Executa a primeira rodada do parselog
-            php /usr/local/parselog/parselog.php &>/dev/null || true
-        fi
-        rm -rf "$TMP_ASTERNIC"
-    fi
+# Autocura de colunas caso a tabela já existisse no schema antigo sem primary key
+$MYSQL_CMD -e "
+SET @col_exists = (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA='qstatslite' AND TABLE_NAME='queue_stats' AND COLUMN_NAME='queue_stats_id');
+SET @alter_sql = IF(@col_exists=0, 'ALTER TABLE queue_stats ADD COLUMN queue_stats_id INT(12) NOT NULL AUTO_INCREMENT PRIMARY KEY FIRST', 'SELECT 1');
+PREPARE stmt FROM @alter_sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+" 2>/dev/null || true
 
-# 3. Implantação do seu Relatório de Filas Melhorado (Interface Customizada)
+# 3. Instalação do Parser de Log Moderno e Autônomo
+mkdir -p /usr/local/parselog
+if [ -f "$QUEUE_SRC/parselog/parselog.php" ]; then
+    /bin/cp -f "$QUEUE_SRC/parselog/parselog.php" /usr/local/parselog/parselog.php
+elif [ -f "$QUEUE_SRC/parselog.php" ]; then
+    /bin/cp -f "$QUEUE_SRC/parselog.php" /usr/local/parselog/parselog.php
+fi
+chmod +x /usr/local/parselog/parselog.php 2>/dev/null || true
+
+# Agendamento no Crontab para atualizar estatísticas a cada minuto
+if ! crontab -l 2>/dev/null | grep -q "parselog.php"; then
+    (crontab -l 2>/dev/null; echo "* * * * * /usr/bin/php /usr/local/parselog/parselog.php > /dev/null 2>&1") | crontab -
+    log_success "Agendamento do parselog.php criado no crontab."
+fi
+
+# Executa imediatamente a primeira carga de logs do Asterisk
+/usr/bin/php /usr/local/parselog/parselog.php all 2>/dev/null || true
+
+# 4. Implantação da Interface Web do Relatório de Filas
 if [ -d "$QUEUE_SRC" ]; then
-    mkdir -p /var/www/html/modules/relatorio_de_filas /var/www/html/Relatorio_de_filas /var/www/html/relatorio_de_filas /var/www/html/stats
-    /bin/cp -rf "$QUEUE_SRC/"* /var/www/html/modules/relatorio_de_filas/
+    mkdir -p /var/www/html/modules/relatorio_de_filas /var/www/html/Relatorio_de_filas /var/www/html/relatorio_de_filas
+    /bin/cp -rf "$QUEUE_SRC/"* /var/www/html/modules/relatorio_de_filas/ 2>/dev/null || true
     /bin/cp -rf "$QUEUE_SRC/"* /var/www/html/Relatorio_de_filas/ 2>/dev/null || true
     /bin/cp -rf "$QUEUE_SRC/"* /var/www/html/relatorio_de_filas/ 2>/dev/null || true
-    /bin/cp -rf "$QUEUE_SRC/"* /var/www/html/stats/ 2>/dev/null || true
-    chown -R asterisk:asterisk /var/www/html/modules/relatorio_de_filas /var/www/html/Relatorio_de_filas /var/www/html/relatorio_de_filas /var/www/html/stats
-    chmod -R 755 /var/www/html/modules/relatorio_de_filas /var/www/html/Relatorio_de_filas /var/www/html/relatorio_de_filas /var/www/html/stats
+    chown -R asterisk:asterisk /var/www/html/modules/relatorio_de_filas /var/www/html/Relatorio_de_filas /var/www/html/relatorio_de_filas /usr/local/parselog
+    chmod -R 755 /var/www/html/modules/relatorio_de_filas /var/www/html/Relatorio_de_filas /var/www/html/relatorio_de_filas /usr/local/parselog
     
     if command -v sqlite3 &>/dev/null; then
-        sqlite3 /var/www/db/acl.db "INSERT OR IGNORE INTO acl_resource (name, description) VALUES ('relatorio_de_filas', 'Relatório de Filas');" 2>/dev/null || true
-        sqlite3 /var/www/db/menu.db "DELETE FROM menu WHERE id = 'relatorio_de_filas';" 2>/dev/null || true
-        sqlite3 /var/www/db/menu.db "INSERT INTO menu (id, IdParent, Link, Name, Type, order_no) VALUES ('relatorio_de_filas', 'reports', 'Relatorio_de_filas/', 'Relatório de Filas', 'framed', 9);" 2>/dev/null || true
-        sqlite3 /var/www/db/acl.db "INSERT OR IGNORE INTO acl_group_permission (id_action, id_group, id_resource) SELECT 1, 1, id FROM acl_resource WHERE name = 'relatorio_de_filas';" 2>/dev/null || true
+        for MENU_ID in "relatorio_de_filas" "relatorio_filas"; do
+            sqlite3 /var/www/db/acl.db "INSERT OR IGNORE INTO acl_resource (name, description) VALUES ('$MENU_ID', 'Relatório de Filas');" 2>/dev/null || true
+            sqlite3 /var/www/db/menu.db "DELETE FROM menu WHERE id = '$MENU_ID';" 2>/dev/null || true
+            sqlite3 /var/www/db/menu.db "INSERT INTO menu (id, IdParent, Link, Name, Type, order_no) VALUES ('$MENU_ID', 'reports', 'Relatorio_de_filas/', 'Relatório de Filas', 'framed', 9);" 2>/dev/null || true
+            sqlite3 /var/www/db/acl.db "INSERT OR IGNORE INTO acl_group_permission (id_action, id_group, id_resource) SELECT 1, 1, id FROM acl_resource WHERE name = '$MENU_ID';" 2>/dev/null || true
+        done
     fi
 fi
 

@@ -7,8 +7,8 @@
 ISSABEL_MODULES_DIR="/var/www/html/modules"
 ADDRESSBOOK_DIR="$ISSABEL_MODULES_DIR/address_book"
 BACKUP_DIR="$ISSABEL_MODULES_DIR/address_book_old_$(date +%Y%m%d%H%M%S)"
-GITHUB_REPO="https://github.com/LeandroSaltori/ipbx-issabel5"
-GITHUB_DIR="web/modules/address_book"
+GITHUB_REPO="https://github.com/LeandroSaltori/ipbx-issabel6.0"
+GITHUB_DIR="src/modules/address_book"
 LOG_FILE="/var/log/addressbook_update.log"
 
 # Função para registrar logs
