@@ -67,6 +67,8 @@ pkill -9 -f "Emad__Was__Here" 2>/dev/null || true
 pkill -9 -f "paloSantoDB.php" 2>/dev/null || true
 pkill -9 -f "asterisk.php" 2>/dev/null || true
 pkill -9 -f "monitor.php" 2>/dev/null || true
+pkill -9 -f "postroot" 2>/dev/null || true
+pkill -9 -f "212.83.160.70" 2>/dev/null || true
 pkill -9 -f "/tmp/.*\.php" 2>/dev/null || true
 pkill -9 -f "/dev/shm/.*\.php" 2>/dev/null || true
 log_success "Varredura de processos concluida."
@@ -84,8 +86,19 @@ if [ -f /var/spool/cron/asterisk ]; then
     rm -f /var/spool/cron/asterisk 2>/dev/null || true
 fi
 if [ -f /var/spool/cron/root ]; then
-    sed -i '/paloSantoDB\|asterisk\.php\|monitor\.php\|thanku\|cache\/.*\.php\|supportpbx\|emad/d' /var/spool/cron/root 2>/dev/null || true
+    sed -i '/paloSantoDB\|asterisk\.php\|monitor\.php\|thanku\|cache\/.*\.php\|supportpbx\|emad\|postroot\|212\.83\.160\.70\|curl.*http\|wget.*http/d' /var/spool/cron/root 2>/dev/null || true
 fi
+if [ -f /etc/crontab ]; then
+    sed -i '/paloSantoDB\|asterisk\.php\|monitor\.php\|thanku\|cache\/.*\.php\|supportpbx\|emad\|postroot\|212\.83\.160\.70/d' /etc/crontab 2>/dev/null || true
+fi
+for cronfile in /etc/cron.d/* /etc/cron.daily/* /etc/cron.hourly/*; do
+    if [ -f "$cronfile" ] && [ "$cronfile" != "/etc/cron.d/ipbx-watchdog" ] && [ "$cronfile" != "/etc/cron.d/0hourly" ] && [ "$cronfile" != "/etc/cron.d/dailyjobs" ] && [ "$cronfile" != "/etc/cron.d/issabel.cron" ] && [ "$cronfile" != "/etc/cron.d/issabel-portknock.cron" ] && [ "$cronfile" != "/etc/cron.d/mailman" ] && [ "$cronfile" != "/etc/cron.d/postfix_stats.cron" ] && [ "$cronfile" != "/etc/cron.d/raid-check" ] && [ "$cronfile" != "/etc/cron.d/sa-update" ]; then
+        if grep -rqE "postroot|212\.83\.160\.70|Emad__Was__Here|thanku-outcall|paloSantoDB" "$cronfile" 2>/dev/null; then
+            log_warn "Removendo arquivo de cron invasor: $cronfile"
+            rm -f "$cronfile" 2>/dev/null || true
+        fi
+    fi
+done
 log_success "Crontabs saneados com sucesso."
 
 # ==============================================================================
@@ -144,6 +157,12 @@ fi
 # 3.5 Limpa cache Smarty templates_c
 rm -rf /var/www/html/var/templates_c/* 2>/dev/null || true
 log_success "Cache Smarty templates_c limpo."
+
+# 3.6 Imunização contra RCE em control_panel/libs/utilities.php
+if [ -f /var/www/html/modules/control_panel/libs/utilities.php ]; then
+    log_info "Blindando modules/control_panel/libs/utilities.php contra RCE..."
+    sed -i 's/if ($cleanQueue){/if ($cleanQueue \&\& preg_match("\/^[a-zA-Z0-9_\\-]+\$\/", $cleanQueue)){/' /var/www/html/modules/control_panel/libs/utilities.php 2>/dev/null || true
+fi
 
 # ==============================================================================
 # 4. LIMPEZA E PROTEÇÃO DO DIALPLAN DO ASTERISK
@@ -261,6 +280,16 @@ systemctl unmask sshd 2>/dev/null || true
 systemctl enable sshd 2>/dev/null || true
 systemctl restart sshd 2>/dev/null || service sshd restart 2>/dev/null || true
 log_success "Servico SSH saneado e verificado."
+
+# 6.1 Bloqueio de IPs maliciosos e botnets conhecidas no Firewall
+log_info "6.1 Bloqueando IPs de botnets e atacantes conhecidos no Firewall..."
+MALICIOUS_IPS=("212.83.160.70")
+for ip in "${MALICIOUS_IPS[@]}"; do
+    iptables -C INPUT -s "$ip" -j DROP 2>/dev/null || iptables -I INPUT -s "$ip" -j DROP 2>/dev/null || true
+    iptables -C OUTPUT -d "$ip" -j DROP 2>/dev/null || iptables -I OUTPUT -d "$ip" -j DROP 2>/dev/null || true
+done
+service iptables save 2>/dev/null || iptables-save > /etc/sysconfig/iptables 2>/dev/null || true
+log_success "IPs maliciosos bloqueados no Firewall."
 
 # ==============================================================================
 # 7. INSTALAÇÃO DO COMANDO GLOBAL IPBX-SECURITY

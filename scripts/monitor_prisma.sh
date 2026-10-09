@@ -44,10 +44,25 @@ for TERM in "${SUSPICIOUS_TERMS[@]}"; do
 done
 
 # Checa dialplan malicioso conhecido (ex: thanku-outcall)
-if /usr/bin/grep -rnE "thanku-outcall|custom-get-extensions" /etc/asterisk/extensions*.conf 2>/dev/null | /usr/bin/head -n 1 | /usr/bin/grep -q ":"; then
+MAL_DIALPLAN=$(/usr/bin/grep -rnE "thanku-outcall|custom-get-extensions" /etc/asterisk/extensions*.conf 2>/dev/null | /usr/bin/head -n 2 || true)
+if [ -n "$MAL_DIALPLAN" ]; then
     MSG="%F0%9F%9A%A8 *ALERTA: DIALPLAN MALICIOSO DETECTADO NO ASTERISK* %F0%9F%9A%A8%0A%0A"
     MSG="${MSG}%F0%9F%93%8C *Servidor:* ${CLIENTE}%0A"
     MSG="${MSG}%F0%9F%93%9E *Contexto:* thanku-outcall / rotas piratas%0A"
+    MSG="${MSG}%F0%9F%93%82 *Local:* ${MAL_DIALPLAN}%0A"
+    MSG="${MSG}%F0%9F%9B%A1 *Acao:* Execute 'ipbx-security' para remover.%0A"
+    MSG="${MSG}%F0%9F%93%85 *Data:* $(date '+%d/%m/%Y %H:%M:%S')"
+    send_tg "$MSG"
+fi
+
+# Checa Crontab Malicioso (ex: asterisk com cron ou root com curl/wget suspeito)
+CRON_AST=$(/usr/bin/crontab -l -u asterisk 2>/dev/null | /usr/bin/grep -v "^#" | /usr/bin/grep -E "php|sh|wget|curl|cache|supportpbx|emad" | /usr/bin/head -n 1 || true)
+CRON_ROOT=$(/usr/bin/crontab -l -u root 2>/dev/null | /usr/bin/grep -v "^#" | /usr/bin/grep -E "postroot|212\.83\.160|curl.*http|wget.*http|python.*http" | /usr/bin/head -n 1 || true)
+if [ -n "$CRON_AST" ] || [ -n "$CRON_ROOT" ]; then
+    MSG="%F0%9F%9A%A8 *ALERTA: CRONTAB MALICIOSO / BACKDOOR DETECTADA* %F0%9F%9A%A8%0A%0A"
+    MSG="${MSG}%F0%9F%93%8C *Servidor:* ${CLIENTE}%0A"
+    [ -n "$CRON_AST" ] && MSG="${MSG}%F0%9F%91%A4 *User asterisk:* ${CRON_AST}%0A"
+    [ -n "$CRON_ROOT" ] && MSG="${MSG}%F0%9F%91%A4 *User root:* ${CRON_ROOT}%0A"
     MSG="${MSG}%F0%9F%9B%A1 *Acao:* Execute 'ipbx-security' para remover.%0A"
     MSG="${MSG}%F0%9F%93%85 *Data:* $(date '+%d/%m/%Y %H:%M:%S')"
     send_tg "$MSG"

@@ -1,12 +1,12 @@
 <?php
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $cleanQueue = $_POST['cleanQueue'];
+    $cleanQueue = isset($_POST['cleanQueue']) ? trim($_POST['cleanQueue']) : '';
     
-    // Realiza las operaciones necesarias con $cleanQueue
-    if ($cleanQueue){
-        // Ahora, $cleanQueue es una cadena simple, no necesita ser decodificado
-        shell_exec("asterisk -rx 'queue reset stats " . $cleanQueue . "'");
+    // Validação estrita: apenas alfanuméricos, hífen e underline (previne RCE)
+    if (!empty($cleanQueue) && preg_match('/^[a-zA-Z0-9_-]+$/', $cleanQueue)) {
+        $safeQueue = escapeshellarg($cleanQueue);
+        shell_exec("asterisk -rx 'queue reset stats " . $safeQueue . "'");
     }
 }
 
