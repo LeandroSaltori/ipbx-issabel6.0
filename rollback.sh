@@ -152,22 +152,21 @@ if [ ${#DIRS[@]} -eq 0 ]; then
     done
 
     if $HAS_OLD; then
-        log_info "Backups _old legados encontrados. Restaurando backups _old..."
-        if [ -e /var/www/html/admin_old ]; then
-            rm -rf /var/www/html/admin
-            mv /var/www/html/admin_old /var/www/html/admin
-            log_success "Admin restaurado de admin_old"
-        fi
-        if [ -e /var/www/html/lang_old ]; then
-            rm -rf /var/www/html/lang
-            mv /var/www/html/lang_old /var/www/html/lang
-            log_success "Lang restaurado de lang_old"
-        fi
-        if [ -e /var/www/html/modules_old ]; then
-            rm -rf /var/www/html/modules
-            mv /var/www/html/modules_old /var/www/html/modules
-            log_success "Modules restaurado de modules_old"
-        fi
+        log_info "Backups _old legados encontrados. Restaurando backups _old (sem apagar pastas)..."
+        # Restauração não-destrutiva: sobrepõe o conteúdo de <pasta>_old em <pasta>
+        # (cp -rpf), sem rm -rf e sem remover a pasta _old original.
+        for legacy_name in admin lang modules; do
+            legacy_dir="/var/www/html/${legacy_name}_old"
+            if [ -e "$legacy_dir" ]; then
+                if $DRY_RUN; then
+                    log_dry "Restauraria ${legacy_name} a partir de ${legacy_name}_old"
+                else
+                    mkdir -p "/var/www/html/${legacy_name}"
+                    cp -rpf "$legacy_dir/." "/var/www/html/${legacy_name}/"
+                    log_success "${legacy_name} restaurado de ${legacy_name}_old"
+                fi
+            fi
+        done
         log_success "Restauração de backups legados concluída."
         exit 0
     else
@@ -200,6 +199,14 @@ fi
 log_info "Ponto de restauração selecionado: $(basename "$SELECTED_BACKUP")"
 if [ -f "$SELECTED_BACKUP/manifesto.txt" ]; then
     echo -e "${CYAN}Detalhes:${NC} $(cat "$SELECTED_BACKUP/manifesto.txt")"
+fi
+
+# Sem terminal interativo não há como confirmar: só prossegue com --latest ou --dry-run.
+HAS_TTY=false
+if [ -t 0 ] || ( : < /dev/tty ) 2>/dev/null; then HAS_TTY=true; fi
+if ! $HAS_TTY && ! $RESTORE_LATEST && ! $DRY_RUN; then
+    log_error "Sem terminal interativo para confirmar. Use --latest (restaura o mais recente) ou --dry-run."
+    exit 1
 fi
 
 echo ""
