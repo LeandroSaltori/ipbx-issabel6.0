@@ -991,7 +991,7 @@ fi
 
     # Registra o atalho de discagem e transferencia 8996 no Asterisk
     if [ -f /etc/asterisk/extensions_custom.conf ]; then
-        if ! grep -q "exten => 8996" /etc/asterisk/extensions_custom.conf; then
+        if ! grep -q "CHAMADA DIRETA PARA PESQUISA DE SATISFACAO 8996" /etc/asterisk/extensions_custom.conf; then
             cat << 'EOF' >> /etc/asterisk/extensions_custom.conf
 
 ;==========================================================
