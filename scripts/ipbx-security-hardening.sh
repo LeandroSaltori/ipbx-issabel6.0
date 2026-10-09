@@ -185,6 +185,7 @@ log_success "Dialplans do Asterisk limpos e recarregados."
 # ==============================================================================
 log_info "5. Aplicando regras de Apache Hardening em pastas estaticas, uploads e cache..."
 
+mkdir -p /etc/httpd/conf.d
 cat <<'EOF' > /etc/httpd/conf.d/ipbx-security-hardening.conf
 # ==============================================================================
 # REGRAS DE HARDENING DE SEGURANÇA - IPBX PRISMA TELECOM

@@ -5,7 +5,7 @@ O repositório original não foi alterado (push bloqueado no clone).
 
 > **Escopo:** validação estática (sintaxe, padrões, leitura de código) e testes isolados do `rollback.sh` numa sandbox.
 > **Não houve teste em um Issabel/Asterisk real.** Este relatório não atesta que o repositório está "100% operacional".
-> Faltou `shellcheck` no ambiente, então não há análise de lint além do `bash -n`.
+> Rodada 2: `shellcheck` 0.11.0 e execução em sandbox com comandos simulados (stubs) de `install.sh` (2x) e das opções 1–28, 30, 31, `[A]` do `ipbx-menu.sh`. Stubs não validam Asterisk, MySQL, Apache nem Let's Encrypt reais.
 
 ## 1. Verificado e sem achados
 
@@ -37,3 +37,23 @@ O repositório original não foi alterado (push bloqueado no clone).
 ## 4. Só pode ser validado num Issabel real
 
 Execução do `install.sh` e do `ipbx-menu.sh` (30 opções), recargas do Asterisk, renderização dos `.tpl` Smarty no tema `prisma_v5`, módulos do Call Center, OpenVPN, LDAP e a restauração por snapshot completa.
+
+## 5. Rodada 2: testes em sandbox (stubs) e correções adicionais
+
+Corrigido (commits em `audit/claude`):
+
+1. **`fix(php8)`**: `each()`, `ereg/eregi` e `get/set_magic_quotes_*` (removidos no PHP 7/8) em `fpdf.php`, `makefont.php`, `Agentes.class.php`, `paloSantoUploadFile.class.php`, `class.Linux.inc.php` e `php-upgrade.override.php`. Teste: geração de PDF com PNG via FPDF no PHP 8.3 dava "Call to undefined function get_magic_quotes_runtime()" e agora gera `%PDF-1.3`.
+2. **`fix(install)`**: o guard `grep -q "exten => 8996"` casava com o próprio dialplan da pesquisa, então o atalho 8996 em `[from-internal-custom]` nunca era instalado (`install.sh` e `ipbx-menu.sh`). Teste: após 2 instalações seguidas há exatamente 1 atalho.
+3. **`fix(shell)`**: `scripts/motd.sh` usa arrays e `let` com shebang `#!/bin/sh` (agora `#!/bin/bash`); `ipbx-security-hardening.sh` gravava em `/etc/httpd/conf.d` sem garantir a pasta (agora `mkdir -p`).
+
+Resultado do menu na sandbox: opções 1–25, 27, 28, 30, 31 e `[A]` terminam sem erro de shell. A 26 pede domínio e falha corretamente no Let's Encrypt simulado. A 29 só foi exercitada até o submenu (o rollback em si foi testado antes).
+
+Pendente ou defeitos conhecidos (não alterados):
+
+- **Opção 19 (MOH) e a parte de MOH do `install.sh`/`[A]`**: `src/sounds/moh/` não existe no repositório, então a opção sempre mostra erro. O README diz que a pasta existe. É preciso adicionar os `.wav`.
+- **ACL duplicada ao reinstalar**: `INSERT OR IGNORE` em `acl_resource` só evita duplicata se houver `UNIQUE`. Confira no servidor: `sqlite3 /var/www/db/acl.db ".schema acl_resource"`.
+- Entradas de menu duplicadas `relatorio_de_filas` e `relatorio_filas`.
+- `src/admin/modules/trunkbalance/agi-bin/sqltrunkbal.php` usa `mysql_*` (fatal no PHP 7+).
+- `toastr.js` do applet IssabelNetwork é uma página HTML, não JavaScript (não usado).
+- Hardening do Apache: o script só mantém o arquivo se `apachectl/httpd -t` passar; não foi possível validar a sintaxe do `.conf` aqui.
+- `motd.sh`, linha 53: `[ "$IPADDR[@]" = "" ]` nunca é verdadeiro (herdado do Issabel, sem efeito prático).
