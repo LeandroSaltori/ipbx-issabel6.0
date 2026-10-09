@@ -906,8 +906,8 @@ function Image($file,$x,$y,$w=0,$h=0,$type='',$link='')
 			$type=substr($file,$pos+1);
 		}
 		$type=strtolower($type);
-		$mqr=get_magic_quotes_runtime();
-		set_magic_quotes_runtime(0);
+		$mqr=function_exists('get_magic_quotes_runtime') ? @get_magic_quotes_runtime() : 0;
+		if(function_exists('set_magic_quotes_runtime')) @set_magic_quotes_runtime(0);
 		if($type=='jpg' or $type=='jpeg')
 			$info=$this->_parsejpg($file);
 		elseif($type=='png')
@@ -920,7 +920,7 @@ function Image($file,$x,$y,$w=0,$h=0,$type='',$link='')
 				$this->Error('Unsupported image type: '.$type);
 			$info=$this->$mtd($file);
 		}
-		set_magic_quotes_runtime($mqr);
+		if(function_exists('set_magic_quotes_runtime')) @set_magic_quotes_runtime($mqr);
 		$info['i']=count($this->images)+1;
 		$this->images[$file]=$info;
 	}
@@ -1160,8 +1160,8 @@ function _putfonts()
 		$this->_out('endobj');
 	}
         if (version_compare(PHP_VERSION, '5.3.0', '<')) {
-	    $mqr=get_magic_quotes_runtime();
-	    set_magic_quotes_runtime(0);
+	    $mqr=function_exists('get_magic_quotes_runtime') ? @get_magic_quotes_runtime() : 0;
+	    if(function_exists('set_magic_quotes_runtime')) @set_magic_quotes_runtime(0);
 	}
 	foreach($this->FontFiles as $file=>$info)
 	{
@@ -1186,7 +1186,7 @@ function _putfonts()
 		$this->_out('endobj');
 	}
         if (version_compare(PHP_VERSION, '5.3.0', '<')) {
-	    set_magic_quotes_runtime($mqr);
+	    if(function_exists('set_magic_quotes_runtime')) @set_magic_quotes_runtime($mqr);
 	}
 	foreach($this->fonts as $k=>$font)
 	{
@@ -1259,7 +1259,7 @@ function _putimages()
 {
 	$filter=($this->compress) ? '/Filter /FlateDecode ' : '';
 	reset($this->images);
-	while(list($file,$info)=each($this->images))
+	foreach($this->images as $file=>$info)
 	{
 		$this->_newobj();
 		$this->images[$file]['n']=$this->n;

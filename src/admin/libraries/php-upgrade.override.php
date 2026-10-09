@@ -1,4 +1,8 @@
 <?php
+// Compat PHP 8: get_magic_quotes_gpc() foi removida no PHP 8.0 (sempre retornava false desde o PHP 5.4).
+if (!function_exists('get_magic_quotes_gpc')) {
+    function get_magic_quotes_gpc() { return false; }
+}
 /**
  * api:         php
  * title:       upgrade.php

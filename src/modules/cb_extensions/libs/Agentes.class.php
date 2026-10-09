@@ -234,7 +234,7 @@ class Agentes
 
     function deleteAgent($id_agent)
     {
-        if (!ereg('^[[:digit:]]+$', $id_agent)) {
+        if (!preg_match('/^[[:digit:]]+$/', $id_agent)) {
             $this->errMsg = '(internal) Invalid agent information';
             return FALSE;
         }

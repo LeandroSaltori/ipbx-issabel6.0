@@ -111,7 +111,7 @@ class paloSantoUploadFile
     				// Línea vacía
     			} elseif (strlen($tupla[0]) > 0 && $tupla[0][0] == '#') {
     				// Línea que empieza por numeral
-    			} elseif (!ereg('^[[:digit:]#*]+$', $tupla[0])) {
+    			} elseif (!preg_match('/^[[:digit:]#*]+$/', $tupla[0])) {
                     if ($iNumLinea == 1) {
                         // Podría ser una cabecera de nombres de columnas
                         array_shift($tupla);
