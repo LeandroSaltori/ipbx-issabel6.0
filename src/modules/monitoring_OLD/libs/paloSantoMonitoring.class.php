@@ -254,7 +254,7 @@ SQL_COND_EXTENSION;
 
         /* Si la ruta almacenada en recordingfile es absoluta, sólo se acepta
          * si luego de canonicalizar inicia en /var/spool/asterisk/monitor */
-        if ($file{0} == '/') {
+        if ($file[0] == '/') {
             $dir = realpath(dirname($file)); // FALSE si el directorio no existe
             if ($dir === FALSE || strpos($dir.'/', $basedir) !== 0)
                 return NULL;
@@ -280,7 +280,7 @@ SQL_COND_EXTENSION;
              * exactamente 8 dígitos y empezará con 2. */
             foreach (explode('-', $file) as $test_token) {
                 if (strlen($test_token) == 8 && ctype_digit($test_token) &&
-                    $test_token{0} == '2') {
+                    $test_token[0] == '2') {
                     // /var/spool/asterisk/monitor/2010/12/31/
                     $testdir = substr($test_token, 0, 4).'/'.
                         substr($test_token, 4, 2).'/'.
