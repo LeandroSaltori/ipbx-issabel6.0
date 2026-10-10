@@ -3125,6 +3125,14 @@ function deleteSystemUser($id) {
 function getLoggedUser() {
     // Na web só vale o usuário da sessão; o padrão administrador é apenas para CLI (AGI/cron)
     $user_id = $_SESSION['logged_user_id'] ?? (PHP_SAPI === 'cli' ? 1 : 0);
+    // Login desligado (set_auth.php off): atua como o primeiro Administrador ativo
+    if (empty($_SESSION['logged_user_id']) && PHP_SAPI !== 'cli' && function_exists('authDisabled') && authDisabled()) {
+        global $db;
+        try {
+            $aid = $db->query("SELECT id FROM system_users WHERE role = 'Administrador' AND status = 'Ativo' ORDER BY id ASC LIMIT 1")->fetchColumn();
+            if ($aid) $user_id = (int)$aid;
+        } catch (Exception $e) {}
+    }
     $u = getSystemUserById($user_id);
     if (!$u && PHP_SAPI !== 'cli') {
         return null;

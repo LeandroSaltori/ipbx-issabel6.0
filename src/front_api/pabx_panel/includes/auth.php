@@ -218,8 +218,14 @@ button{width:100%;margin-top:20px;padding:12px;border:0;border-radius:12px;backg
  * $mode: 'page' (HTML/redirect), 'json' (401 JSON) ou 'plain' (401 texto).
  * Retorna sem fazer nada quando já autenticado ou em execução CLI.
  */
+/** Modo de teste: login desligado por `php set_auth.php off` (setting auth_disabled=1). */
+function authDisabled() {
+    return function_exists('getSetting') && getSetting('auth_disabled') === '1';
+}
+
 function authGate($mode = 'page') {
     if (authIsCli()) return;
+    if (authDisabled()) return; // painel aberto (somente para testes em rede confiável)
 
     if ($mode === 'page') {
         if (($_POST['auth_action'] ?? '') === 'login' && $_SERVER['REQUEST_METHOD'] === 'POST') {

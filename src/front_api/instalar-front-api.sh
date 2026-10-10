@@ -116,6 +116,14 @@ chmod -R 755 "$DEST_DIR"
 [ -f "$DEST_DIR/.ht_whatsapp_config.sqlite" ] && chmod 666 "$DEST_DIR/.ht_whatsapp_config.sqlite" 2>/dev/null || true
 [ -f "$DEST_DIR/pabx_panel/.ht_whatsapp_config.sqlite" ] && chmod 666 "$DEST_DIR/pabx_panel/.ht_whatsapp_config.sqlite" 2>/dev/null || true
 
+# Opcional: --sem-login (painel aberto, só para testes) ou --com-login (volta a exigir senha)
+for arg in "$@"; do
+  case "$arg" in
+    --sem-login) php "$DEST_DIR/pabx_panel/set_auth.php" off || true ;;
+    --com-login) php "$DEST_DIR/pabx_panel/set_auth.php" on || true ;;
+  esac
+done
+
 # Senha inicial do painel: só gera se ninguém tiver senha definida ainda
 if command -v php &>/dev/null && [ -f "$DEST_DIR/pabx_panel/set_password.php" ]; then
   echo "[+] Verificando senha de acesso do painel..."
