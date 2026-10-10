@@ -568,7 +568,8 @@ if (file_exists($jsonSmtpFile)) {
             if (!d.success) {
                 content.innerHTML = `<div class="p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-rose-300">
                     <strong><i class="fa-solid fa-circle-xmark"></i> Não foi possível analisar a chamada</strong>
-                    <p class="mt-1">${aiEsc(d.error || 'Erro desconhecido')}</p></div>`;
+                    <p class="mt-1">${aiEsc(d.error || 'Erro desconhecido')}</p>
+                    ${d.transcript ? `<details class="mt-2"><summary class="cursor-pointer text-[11px] font-bold text-slate-400">Ver transcrição obtida</summary><p class="mt-1 text-slate-300 whitespace-pre-wrap">${aiEsc(d.transcript)}</p></details>` : ''}</div>`;
                 return;
             }
             const sat = (d.satisfacao == null) ? 'não inferida' : d.satisfacao + ' / 5';

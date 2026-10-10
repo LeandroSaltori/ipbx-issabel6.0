@@ -761,6 +761,11 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
             foreach (['resumo', 'sentimento', 'recomendacao'] as $f) if (isset($j[$f]) && is_array($j[$f])) $j[$f] = implode(' ', array_map('strval', $j[$f]));
             if (!isset($j['satisfacao']) && isset($j['satisfação'])) $j['satisfacao'] = $j['satisfação'];
         }
+        if (is_array($j) && trim((string)($j['resumo'] ?? '')) === '') {
+            // A IA entendeu o pedido mas não achou conteúdo para resumir (áudio curto, ruído, só toque)
+            echo json_encode(['success' => false, 'error' => 'A IA não encontrou conteúdo suficiente para resumir. A transcrição tem ' . mb_strlen($tr['text']) . ' caracteres (chamada muito curta, só ruído ou sem conversa).', 'transcript' => $tr['text']]);
+            exit;
+        }
         if (!is_array($j) || empty($j['resumo'])) {
             if ($raw === '') { echo json_encode(['success' => false, 'error' => 'A IA devolveu resposta vazia (modelo ' . $cfg['model'] . ').', 'transcript' => $tr['text']]); exit; }
             // Resposta em texto livre: mostra como resumo, sem inventar métricas
