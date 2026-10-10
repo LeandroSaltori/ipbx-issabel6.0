@@ -16,6 +16,7 @@ $caller_id  = trim($argv[1] ?? '');
 $event_type = trim($argv[2] ?? 'no_answer');
 $called_ext = trim($argv[3] ?? '');
 $queue_name = trim($argv[4] ?? '');
+if ($queue_name === '0') $queue_name = '';
 
 // Se caller_id ou ramal não vier nos argumentos CLI, ler do fluxo AGI STDIN
 if (empty($caller_id) || strpos($caller_id, '$') !== false) {
@@ -75,6 +76,8 @@ if (strlen($clean_caller) <= 5) {
             pabx_log('whatsapp', 'INFO', "Ramal interno {$clean_caller} mapeado para o WhatsApp {$target_number}");
         }
     } else {
+        // Sem WhatsApp cadastrado: não tentar enviar para o número do ramal (ex: "201")
+        $target_number = '';
         if (function_exists('pabx_log')) {
             pabx_log('whatsapp', 'WARNING', "Ramal interno {$clean_caller} não possui WhatsApp cadastrado no menu Ramais -> Editar Nome");
         }
@@ -84,15 +87,28 @@ if (strlen($clean_caller) <= 5) {
 // -------------------------------------------------------------
 // 1. NOTIFICAR O ATENDENTE DO RAMAL (Chamada Perdida de Ramal)
 // -------------------------------------------------------------
-if (!empty($called_ext) && ($event_type === 'no_answer' || $event_type === 'missed_extension')) {
+$ext_info = null;
+if (!empty($called_ext)) {
     $ext_info = getExtensionCustomData($called_ext);
-    if ($ext_info && !empty($ext_info['whatsapp_number']) && !empty($ext_info['notify_agent_missed'])) {
+}
+if (!empty($called_ext) && ($event_type === 'no_answer' || $event_type === 'missed_extension')) {
+    $caller_is_internal = (strlen($clean_caller) <= 5);
+    $flag_col = $caller_is_internal ? 'notify_agent_internal' : 'notify_agent_missed';
+    if ($ext_info && !empty($ext_info['whatsapp_number']) && !empty($ext_info[$flag_col])) {
         $wa_atendente   = preg_replace('/\D/', '', $ext_info['whatsapp_number']);
         $nome_atendente = !empty($ext_info['agent_name']) ? $ext_info['agent_name'] : "Ramal {$called_ext}";
 
-        $msg_atendente = "⚠️ *Notificação de Chamada Perdida*\n\nOlá *{$nome_atendente}*! O cliente número *{$clean_caller}* tentou ligar no seu ramal *{$called_ext}* às *{$data_hora}* e a chamada não foi atendida.";
+        $tpl_agente = function_exists('getRule') ? getRule('missed_agent_msg') : '';
+        if (empty($tpl_agente)) {
+            $tpl_agente = "⚠️ *Notificação de Chamada Perdida*\n\nOlá *{ATENDENTE}*! O cliente número *{CLIENTE}* tentou ligar no seu ramal *{RAMAL}* às *{DATA_HORA}* e a chamada não foi atendida.";
+        }
+        $msg_atendente = str_replace(
+            ['{CLIENTE}', '{ATENDENTE}', '{RAMAL}', '{DATA_HORA}', '{NOME_FILA}'],
+            [$clean_caller, $nome_atendente, $called_ext, $data_hora, ($queue_name ?: 'Atendimento')],
+            $tpl_agente
+        );
 
-        sendWhatsAppMessageViaZPro($api_url, $api_token, $wa_atendente, $msg_atendente);
+        sendWhatsAppMessageViaZPro($api_url, $api_token, $wa_atendente, $msg_atendente, 'AGI_' . time(), $called_ext, 'ATENDENTE_NAO_ATENDEU');
     }
 }
 
@@ -107,7 +123,9 @@ $DEFAULT_TEMPLATES = [
 ];
 
 $template = '';
-if ($event_type === 'no_answer' || $event_type === 'missed_extension') {
+if ($event_type === 'missed_extension') {
+    $template = (function_exists('getRule') && getRule('missed_client_msg')) ? getRule('missed_client_msg') : (getSetting('prismabot_msg_audio') ?: $DEFAULT_TEMPLATES['no_answer']);
+} elseif ($event_type === 'no_answer') {
     $template = (function_exists('getRule') && getRule('queue_abandon_msg_default')) ? getRule('queue_abandon_msg_default') : (getSetting('prismabot_msg_no_answer') ?: $DEFAULT_TEMPLATES['no_answer']);
 } elseif ($event_type === 'nps') {
     $template = (function_exists('getRule') && getRule('nps_msg')) ? getRule('nps_msg') : (getSetting('prismabot_msg_nps') ?: $DEFAULT_TEMPLATES['nps']);
@@ -127,7 +145,8 @@ if (!empty($template) && !empty($target_number)) {
         $template
     );
 
-    $sent = sendWhatsAppMessageViaZPro($api_url, $api_token, $target_number, $msg_cliente);
+    $rule_map = ['no_answer' => 'FILA_ABANDONO', 'missed_extension' => 'ATENDENTE_NAO_ATENDEU', 'nps' => 'NPS', 'transbordo' => 'TRANSBORDO', 'audio' => 'AUDIO'];
+    $sent = sendWhatsAppMessageViaZPro($api_url, $api_token, $target_number, $msg_cliente, 'AGI_' . time(), ($called_ext ?: 'AGI'), ($rule_map[$event_type] ?? 'AGI_ZPRO'));
     if (function_exists('pabx_log')) {
         pabx_log('whatsapp', $sent ? 'INFO' : 'ERROR', "Resultado do envio da mensagem de evento '{$event_type}'", [
             'target_number' => $target_number,

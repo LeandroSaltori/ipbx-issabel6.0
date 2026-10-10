@@ -521,6 +521,25 @@ if (empty($currentPbxToken) && !empty($currentPbxPass) && $_SERVER['REQUEST_METH
                 </div>
             </form>
 
+            <!-- WEBHOOK DE RESPOSTAS NPS (Z-PRO -> PABX) -->
+            <?php
+                $wh_token = getSetting('webhook_token');
+                if (empty($wh_token)) { $wh_token = bin2hex(random_bytes(16)); saveSetting('webhook_token', $wh_token); }
+                $wh_scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+                $wh_dir    = rtrim(dirname($_SERVER['SCRIPT_NAME'] ?? '/front_api/index.php'), '/');
+                $wh_url    = $wh_scheme . '://' . ($_SERVER['HTTP_HOST'] ?? 'IP_DO_PABX') . $wh_dir . '/index.php?api_action=whatsapp_webhook&token=' . $wh_token;
+            ?>
+            <div class="pt-4 border-t border-slate-800/80">
+                <div class="bg-slate-950/80 p-4 rounded-2xl border border-amber-500/30 space-y-2">
+                    <div class="flex items-center gap-2 border-b border-slate-800 pb-2">
+                        <i class="fa-solid fa-star text-amber-400 text-base"></i>
+                        <strong class="text-white text-xs">Webhook de respostas da Pesquisa NPS</strong>
+                    </div>
+                    <p class="text-[11px] text-slate-400">Cadastre esta URL como webhook de mensagens recebidas no Z-PRO. Respostas de 1 a 5 a uma pesquisa NPS enviada nas últimas 48h são gravadas no painel.</p>
+                    <input type="text" readonly value="<?php echo htmlspecialchars($wh_url); ?>" onclick="this.select()" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-[11px] font-mono text-amber-200">
+                </div>
+            </div>
+
             <!-- CAIXA DE TESTE DE DISPARO DIRETO NA PRÓPRIA TELA -->
             <div class="pt-4 border-t border-slate-800/80">
                 <form method="POST" action="index.php?module=configuracoes&action=api" class="bg-slate-950/80 p-4 rounded-2xl border border-indigo-500/30 space-y-3">

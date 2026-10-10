@@ -3983,7 +3983,7 @@ function getExtensionCustomData($ext) {
 /**
  * Envia uma mensagem via REST API Z-PRO (Prismabot) com cURL seguro
  */
-function sendWhatsAppMessageViaZPro($api_url, $api_token, $number, $message) {
+function sendWhatsAppMessageViaZPro($api_url, $api_token, $number, $message, $call_id = '', $extension = 'AGI', $rule_type = 'AGI_ZPRO') {
     if (empty($api_url) || empty($api_token) || empty($number) || empty($message)) {
         return false;
     }
@@ -3995,10 +3995,22 @@ function sendWhatsAppMessageViaZPro($api_url, $api_token, $number, $message) {
         $clean_num = '55' . $clean_num;
     }
 
-    $payload = json_encode([
-        'number'  => $clean_num,
-        'message' => $message
-    ], JSON_UNESCAPED_UNICODE);
+    $clean_token = trim(preg_replace('/^bearer\s+/i', '', trim($api_token)));
+
+    // Payload Z-PRO / ZDG (campo "body" conforme docs/ZPRO_API_REFERENCE.md)
+    $body = [
+        'number'         => $clean_num,
+        'body'           => $message,
+        'externalKey'    => 'PRISMA_' . time(),
+        'isClosed'       => false,
+        'validateNumber' => true,
+        'options'        => ['delay' => 1200],
+    ];
+    $whatsapp_id = getSetting('prismabot_whatsapp_id');
+    if (!empty($whatsapp_id)) {
+        $body['whatsappId'] = is_numeric($whatsapp_id) ? intval($whatsapp_id) : $whatsapp_id;
+    }
+    $payload = json_encode($body, JSON_UNESCAPED_UNICODE);
 
     $ch = curl_init($api_url);
     curl_setopt_array($ch, [
@@ -4007,7 +4019,7 @@ function sendWhatsAppMessageViaZPro($api_url, $api_token, $number, $message) {
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_HTTPHEADER     => [
             'Content-Type: application/json',
-            'Authorization: Bearer ' . $api_token
+            'Authorization: Bearer ' . $clean_token
         ],
         CURLOPT_TIMEOUT        => 10,
         CURLOPT_SSL_VERIFYPEER => false,
@@ -4018,8 +4030,16 @@ function sendWhatsAppMessageViaZPro($api_url, $api_token, $number, $message) {
     $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
 
+    $ok = ($http_code >= 200 && $http_code < 300);
+    if ($ok) {
+        $decoded = json_decode((string)$resp, true);
+        if (is_array($decoded) && isset($decoded['success']) && $decoded['success'] === false) {
+            $ok = false;
+        }
+    }
+
     if (function_exists('pabx_log')) {
-        pabx_log('whatsapp', $http_code >= 200 && $http_code < 300 ? 'INFO' : 'ERROR', "Envio AGI Z-PRO para {$clean_num} [HTTP {$http_code}]", [
+        pabx_log('whatsapp', $ok ? 'INFO' : 'ERROR', "Envio AGI Z-PRO para {$clean_num} [HTTP {$http_code}]", [
             'payload' => $payload,
             'response' => $resp
         ]);
@@ -4027,21 +4047,21 @@ function sendWhatsAppMessageViaZPro($api_url, $api_token, $number, $message) {
 
     try {
         global $db;
-        if (!$db && function_exists('getDBConnection')) $db = getDBConnection();
         if ($db) {
-            $stmt_log = $db->prepare("INSERT INTO sent_logs (phone, message, status, call_id, extension, rule_type, created_at) VALUES (:p, :m, :s, :c, :e, :r, CURRENT_TIMESTAMP)");
+            $stmt_log = $db->prepare("INSERT INTO sent_logs (phone, message, status, call_id, extension, rule_type, response_raw, created_at) VALUES (:p, :m, :s, :c, :e, :r, :rr, CURRENT_TIMESTAMP)");
             $stmt_log->execute([
                 ':p' => $clean_num,
                 ':m' => $message,
-                ':s' => ($http_code >= 200 && $http_code < 300) ? 'SUCCESS' : 'ERROR',
-                ':c' => 'AGI_' . time(),
-                ':e' => 'AGI',
-                ':r' => 'AGI_ZPRO'
+                ':s' => $ok ? 'SUCCESS' : 'ERROR',
+                ':c' => $call_id !== '' ? $call_id : ('AGI_' . time()),
+                ':e' => $extension,
+                ':r' => $rule_type,
+                ':rr' => substr((string)$resp, 0, 1000)
             ]);
         }
     } catch (Exception $e_log) {}
 
-    return ($http_code >= 200 && $http_code < 300);
+    return $ok;
 }
 
 /**

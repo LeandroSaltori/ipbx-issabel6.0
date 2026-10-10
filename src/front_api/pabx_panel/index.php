@@ -27,7 +27,7 @@ try {
 // =========================================================================
 // HANDLER DE ENDPOINTS DE API (JSON)
 // =========================================================================
-if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['action'], ['get_logs', 'get_fop_extensions', 'get_trunks_status', 'get_queues_realtime', 'get_parking_lots', 'fop_action', 'originate_call', 'save_contact', 'test_llm_connection', 'analyze_pabx_insights', 'generate_ai_insights', 'get_ai_insights_history', 'delete_ai_insight', 'transcribe_audio', 'get_kpi_calls_detail', 'get_active_calls', 'get_time_groups', 'get_time_group_rules', 'save_time_group_rule', 'delete_time_group_rule', 'get_announcements_list', 'update_announcement_audio', 'sync_assets']))) {
+if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['action'], ['get_logs', 'get_fop_extensions', 'get_trunks_status', 'get_queues_realtime', 'get_parking_lots', 'fop_action', 'originate_call', 'save_contact', 'test_llm_connection', 'analyze_pabx_insights', 'generate_ai_insights', 'get_ai_insights_history', 'delete_ai_insight', 'transcribe_audio', 'get_kpi_calls_detail', 'get_active_calls', 'get_time_groups', 'get_time_group_rules', 'save_time_group_rule', 'delete_time_group_rule', 'get_announcements_list', 'update_announcement_audio', 'sync_assets', 'whatsapp_webhook']))) {
     $action = $_GET['api_action'] ?? $_GET['action'];
     while (ob_get_level()) { @ob_end_clean(); }
     header('Content-Type: application/json; charset=utf-8');
@@ -44,6 +44,69 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
         } catch (Exception $e) {
             echo json_encode(['success' => false, 'error' => 'Falha na sincronização com o PABX: ' . $e->getMessage()]);
         }
+        exit;
+    }
+
+    // Webhook de mensagens recebidas do Z-PRO: registra respostas de NPS (nota 1 a 5)
+    if ($action === 'whatsapp_webhook') {
+        $expected = getSetting('webhook_token');
+        if (empty($expected)) {
+            $expected = bin2hex(random_bytes(16));
+            saveSetting('webhook_token', $expected);
+        }
+        $given = $_GET['token'] ?? ($_SERVER['HTTP_X_WEBHOOK_TOKEN'] ?? '');
+        if (!hash_equals($expected, (string)$given)) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'error' => 'Token inválido']);
+            exit;
+        }
+        $raw = file_get_contents('php://input');
+        $in  = json_decode($raw, true);
+        if (!is_array($in)) { $in = $_POST; }
+        // Aceita variações comuns de payload (Baileys/Z-PRO)
+        $pick = function ($arr, $keys) {
+            foreach ($keys as $k) {
+                $v = $arr;
+                foreach (explode('.', $k) as $part) {
+                    if (is_array($v) && isset($v[$part])) { $v = $v[$part]; } else { $v = null; break; }
+                }
+                if (is_scalar($v) && $v !== '') return (string)$v;
+            }
+            return '';
+        };
+        $fromMe = $pick($in, ['fromMe', 'message.fromMe', 'data.fromMe', 'msg.fromMe']);
+        $phone  = preg_replace('/\D/', '', $pick($in, ['number', 'from', 'phone', 'contact.number', 'ticket.contact.number', 'data.from', 'message.from', 'msg.from']));
+        $text   = trim($pick($in, ['body', 'text', 'message.body', 'message.text', 'data.body', 'msg.body', 'message']));
+        if ($fromMe === '1' || strtolower($fromMe) === 'true' || $phone === '' || $text === '') {
+            echo json_encode(['success' => true, 'ignored' => true]);
+            exit;
+        }
+        if (!preg_match('/^\s*([1-5])(?:\D|$)/u', $text, $mm)) {
+            echo json_encode(['success' => true, 'ignored' => true, 'reason' => 'not_a_score']);
+            exit;
+        }
+        $score = (int)$mm[1];
+        // Casa com o último NPS enviado a esse número nas últimas 48h e ainda sem resposta
+        $tail = substr($phone, -9);
+        $stmt = $db->prepare("SELECT id, extension FROM sent_logs WHERE UPPER(rule_type) = 'NPS' AND status = 'SUCCESS' AND phone LIKE :p AND created_at >= datetime('now', '-48 hours') ORDER BY id DESC LIMIT 1");
+        $stmt->execute([':p' => '%' . $tail]);
+        $sent = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$sent) {
+            echo json_encode(['success' => true, 'ignored' => true, 'reason' => 'no_nps_pending']);
+            exit;
+        }
+        $dup = $db->prepare("SELECT COUNT(*) FROM nps_responses WHERE phone LIKE :p AND created_at >= (SELECT created_at FROM sent_logs WHERE id = :id)");
+        $dup->execute([':p' => '%' . $tail, ':id' => $sent['id']]);
+        if ((int)$dup->fetchColumn() > 0) {
+            echo json_encode(['success' => true, 'ignored' => true, 'reason' => 'already_answered']);
+            exit;
+        }
+        $ext = (string)($sent['extension'] ?? '');
+        $ext_info = $ext !== '' ? getExtensionCustomData($ext) : null;
+        $ins = $db->prepare("INSERT INTO nps_responses (phone, extension, agent_name, score, feedback) VALUES (:p, :e, :a, :s, :f)");
+        $ins->execute([':p' => $phone, ':e' => $ext, ':a' => $ext_info['agent_name'] ?? '', ':s' => $score, ':f' => $text]);
+        if (function_exists('pabx_log')) pabx_log('whatsapp', 'INFO', "NPS recebido de {$phone}: nota {$score}", ['extension' => $ext]);
+        echo json_encode(['success' => true, 'score' => $score]);
         exit;
     }
 
