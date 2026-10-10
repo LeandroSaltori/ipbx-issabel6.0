@@ -20,15 +20,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $m_audio = trim($_POST['ai_model_audio_custom']);
         }
 
+        $k_in = trim($_POST['ai_api_key'] ?? '');
+        $p_in = trim($_POST['ai_provider'] ?? 'openai');
+        // A chave identifica o provedor (gsk_ = Groq, AIza = Gemini)
+        if (strpos($k_in, 'gsk_') === 0)     $p_in = 'groq';
+        elseif (strpos($k_in, 'AIza') === 0) $p_in = 'gemini';
+        $adv = ($_POST['ai_advanced'] ?? '') === '1';   // só grava ajustes se o usuário abriu "Opções avançadas"
         $vals = [
-            ':p'  => trim($_POST['ai_provider']     ?? 'openai'),
-            ':k'  => trim($_POST['ai_api_key']      ?? ''),
-            ':b'  => trim($_POST['ai_base_url']     ?? 'https://api.openai.com/v1'),
-            ':mc' => $m_chat,
-            ':ma' => $m_audio,
+            ':p'  => $p_in,
+            ':k'  => $k_in,
+            ':b'  => $adv ? trim($_POST['ai_base_url'] ?? '') : '',
+            ':mc' => $adv ? $m_chat : '',
+            ':ma' => $adv ? $m_audio : '',
             ':ec' => isset($_POST['enable_copilot']) ? '1' : '0',
-            ':pr' => trim($_POST['ai_custom_prompt']?? ''),
-            ':tl' => trim($_POST['ai_token_limit']  ?? '1024'),
+            ':pr' => $adv ? trim($_POST['ai_custom_prompt'] ?? '') : (string)getSetting('ai_custom_prompt'),
+            ':tl' => $adv ? trim($_POST['ai_token_limit'] ?? '1024') : (string)(getSetting('ai_token_limit') ?: '1024'),
         ];
         $db->prepare("INSERT OR REPLACE INTO settings (key_name, value_val) VALUES
             ('ai_provider',:p),('ai_api_key',:k),('ai_base_url',:b),('ai_model_chat',:mc),('ai_model_audio',:ma),('enable_copilot',:ec),('ai_custom_prompt',:pr),('ai_token_limit',:tl)")
@@ -212,11 +218,16 @@ $ia_tab = isset($_GET['ia_tab']) ? $_GET['ia_tab'] : 'copiloto';
                 </div>
 
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                        <label class="font-bold text-slate-300 block mb-1 flex items-center gap-1"><i class="fa-solid fa-key text-amber-400"></i> API Key Universal *</label>
+                    <div class="sm:col-span-2">
+                        <label class="font-bold text-slate-300 block mb-1 flex items-center gap-1"><i class="fa-solid fa-key text-amber-400"></i> API Key *</label>
+                        <input type="hidden" name="ai_advanced" id="ai_advanced" value="0">
                         <input type="password" name="ai_api_key" value="<?php echo htmlspecialchars($ai_api_key); ?>" placeholder="sk-...  |  gsk_...  |  AIza..."
                                class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono focus:border-brand-500 focus:outline-none">
                     </div>
+                    <p class="sm:col-span-2 text-[11px] text-slate-500">Só cole a chave e salve: o painel reconhece o provedor (<code>gsk_</code> = Groq, <code>AIza</code> = Gemini, <code>sk-</code> = OpenAI) e usa os modelos padrão dele.</p>
+                    <details class="sm:col-span-2 group" ontoggle="document.getElementById('ai_advanced').value = this.open ? '1' : '0';">
+                    <summary class="cursor-pointer text-slate-400 hover:text-white font-bold text-xs py-1"><i class="fa-solid fa-sliders"></i> Opções avançadas (opcional)</summary>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3">
                     <div>
                         <label class="font-bold text-slate-300 block mb-1 flex items-center justify-between">
                             <span>URL Base da API <span class="text-slate-500 font-normal text-[10px]">(opcional)</span></span>
@@ -251,10 +262,10 @@ $ia_tab = isset($_GET['ia_tab']) ? $_GET['ia_tab'] : 'copiloto';
                         <input type="text" id="ai_model_audio_custom" name="ai_model_audio_custom" value="<?php echo htmlspecialchars($ai_model_audio); ?>" placeholder="Ex: whisper-1"
                                class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono mt-2 focus:border-brand-500 focus:outline-none hidden">
                     </div>
-                </div>
+                    </div>
 
                 <!-- Prompt Personalizado -->
-                <div>
+                <div class="pt-3">
                     <label class="font-bold text-slate-300 block mb-1 flex items-center justify-between">
                         <span><i class="fa-solid fa-terminal text-brand-400"></i> Prompt Personalizado do Copiloto</span>
                         <span class="text-[10px] text-slate-500 font-normal">Instrução de tom e regras do PABX</span>
@@ -270,6 +281,8 @@ $ia_tab = isset($_GET['ia_tab']) ? $_GET['ia_tab'] : 'copiloto';
                     </label>
                     <input type="number" name="ai_token_limit" value="<?php echo htmlspecialchars($ai_token_limit); ?>" placeholder="1024"
                            class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono focus:border-brand-500 focus:outline-none">
+                </div>
+                    </details>
                 </div>
 
                 <div class="flex items-center justify-between pt-2 gap-3 flex-wrap">
@@ -504,9 +517,10 @@ async function testLlmConnection() {
 
     const provider  = document.querySelector('input[name="ai_provider"]:checked')?.value || 'openai';
     const apiKey    = document.querySelector('input[name="ai_api_key"]')?.value || '';
-    const baseUrl   = document.getElementById('ai_base_url_input')?.value || '';
-    
-    let selChat = document.getElementById('ai_model_chat_select')?.value;
+    const adv       = document.getElementById('ai_advanced')?.value === '1';
+    const baseUrl   = adv ? (document.getElementById('ai_base_url_input')?.value || '') : '';
+
+    let selChat = adv ? document.getElementById('ai_model_chat_select')?.value : '';
     if (selChat === 'custom') selChat = document.getElementById('ai_model_chat_custom')?.value;
 
     if (!apiKey.trim()) {

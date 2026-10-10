@@ -785,6 +785,9 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
             'deepseek' => ['url' => 'https://api.deepseek.com/v1',                         'model' => 'deepseek-chat']
         ];
 
+        // A chave identifica o provedor; ajustes de outro provedor são descartados
+        $byKey = (strpos($key, 'gsk_') === 0) ? 'groq' : ((strpos($key, 'AIza') === 0) ? 'gemini' : '');
+        if ($byKey !== '' && $byKey !== $provider) { $provider = $byKey; $baseUrl = ''; $model = ''; }
         $pDef = isset($providerDefaults[$provider]) ? $providerDefaults[$provider] : $providerDefaults['openai'];
         if (empty($baseUrl)) $baseUrl = $pDef['url'];
         if (empty($model))   $model   = $pDef['model'];
