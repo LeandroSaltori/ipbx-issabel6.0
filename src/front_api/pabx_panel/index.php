@@ -1148,7 +1148,7 @@ if ($__route_perm !== '' && !hasUserPermission($__route_perm)) {
                     fontFamily: { sans: ['Inter', 'sans-serif'] },
                     colors: {
                         brand: {
-                            50: '#eef2ff', 500: '#6366f1', 600: '#4f46e5', 700: '#4338ca', 900: '#312e81'
+                            50: '#eef2ff', 300: '#a5b4fc', 400: '#818cf8', 500: '#6366f1', 600: '#4f46e5', 700: '#4338ca', 900: '#312e81'
                         }
                     }
                 }
@@ -1262,6 +1262,114 @@ if ($__route_perm !== '' && !hasUserPermission($__route_perm)) {
         body.theme-light .queue-item-card, body.theme-light .fop-card {
             box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.06), 0 8px 10px -6px rgba(15, 23, 42, 0.02) !important;
         }
+
+
+        /* ===== Modo Claro v2: trilhas, chips, textos coloridos, hover e modais (só vale com body.theme-light) ===== */
+        body.theme-light { color-scheme: light; }
+        body.theme-light .custom-scrollbar::-webkit-scrollbar-track { background: #e2e8f0; }
+        body.theme-light .custom-scrollbar::-webkit-scrollbar-thumb { background: #94a3b8; }
+        /* superfícies translúcidas que faltavam */
+        body.theme-light :is(.bg-slate-900\/95, .bg-slate-900\/50, .bg-slate-900\/40):not(.fixed) { background-color: #ffffff !important; border-color: #e2e8f0 !important; }
+        body.theme-light :is(.bg-slate-950\/95, .bg-slate-950\/70, .bg-slate-950\/60, .bg-slate-950\/40):not(.fixed) { background-color: #f8fafc !important; border-color: #e2e8f0 !important; }
+        /* fundos escuros de tela cheia (modais) continuam escurecendo a página, não viram branco */
+        body.theme-light .fixed.inset-0[class*="bg-slate-9"] { background-color: rgba(15, 23, 42, 0.45) !important; }
+        /* trilhas de barras de progresso, chips e linhas em cinza claro */
+        body.theme-light :is(.bg-slate-800, .bg-slate-700, .bg-slate-600):not(button):not(a):not(.fixed) { background-color: #e2e8f0 !important; color: #1e293b !important; }
+        body.theme-light :is(.bg-slate-800\/80, .bg-slate-800\/60, .bg-slate-800\/50, .bg-slate-800\/40, .bg-slate-800\/30):not(button):not(a):not(.fixed) { background-color: rgba(226, 232, 240, 0.7) !important; color: #1e293b !important; }
+        body.theme-light :is(button, a):is(.bg-slate-700, .bg-slate-800\/60, .bg-slate-800\/50, .bg-slate-800\/80) { background-color: #f1f5f9 !important; color: #1e293b !important; border-color: #cbd5e1 !important; }
+        body.theme-light :is(button, a):is(.hover\:bg-slate-700, .hover\:bg-slate-800, .hover\:bg-slate-600):hover { background-color: #e2e8f0 !important; color: #0f172a !important; }
+        body.theme-light .bg-slate-500 { background-color: #94a3b8 !important; }
+        /* bordas e divisores */
+        body.theme-light :is(.border-slate-600, .border-slate-900, .border-slate-950, .border-slate-700\/50, .border-slate-800\/50) { border-color: #e2e8f0 !important; }
+        body.theme-light [class*="divide-slate-"] > * + * { border-color: #e2e8f0 !important; }
+        body.theme-light hr { border-color: #e2e8f0; }
+        /* títulos/ícones em texto claro dentro de superfícies agora claras */
+        body.theme-light :is(.text-slate-600, .text-slate-700) { color: #475569 !important; }
+        body.theme-light .hover\:text-white:hover { color: #0f172a !important; }
+        body.theme-light .placeholder-slate-600::placeholder, body.theme-light ::placeholder { color: #94a3b8 !important; }
+        body.theme-light dialog { background-color: #ffffff !important; color: #0f172a !important; border-color: #cbd5e1 !important; }
+        body.theme-light dialog::backdrop { background: rgba(15, 23, 42, 0.45); }
+        body.theme-light table { color: #1e293b; }
+        body.theme-light audio { filter: none; }
+        /* textos coloridos: tons 200-400 (pensados para fundo escuro) viram 700; 500 vira 600 */
+        body.theme-light :is(.text-emerald-100, .text-emerald-200, .text-emerald-300, .text-emerald-400) { color: #047857 !important; }
+        body.theme-light .text-emerald-500 { color: #047857 !important; }
+        body.theme-light :is(.text-purple-100, .text-purple-200, .text-purple-300, .text-purple-400) { color: #6d28d9 !important; }
+        body.theme-light .text-purple-500 { color: #6d28d9 !important; }
+        body.theme-light :is(.text-cyan-100, .text-cyan-200, .text-cyan-300, .text-cyan-400) { color: #0e7490 !important; }
+        body.theme-light .text-cyan-500 { color: #0e7490 !important; }
+        body.theme-light :is(.text-amber-100, .text-amber-200, .text-amber-300, .text-amber-400) { color: #b45309 !important; }
+        body.theme-light .text-amber-500 { color: #b45309 !important; }
+        body.theme-light :is(.text-rose-100, .text-rose-200, .text-rose-300, .text-rose-400) { color: #be123c !important; }
+        body.theme-light .text-rose-500 { color: #be123c !important; }
+        body.theme-light :is(.text-indigo-100, .text-indigo-200, .text-indigo-300, .text-indigo-400) { color: #4338ca !important; }
+        body.theme-light .text-indigo-500 { color: #4338ca !important; }
+        body.theme-light :is(.text-blue-100, .text-blue-200, .text-blue-300, .text-blue-400) { color: #1d4ed8 !important; }
+        body.theme-light .text-blue-500 { color: #1d4ed8 !important; }
+        body.theme-light :is(.text-brand-100, .text-brand-200, .text-brand-300, .text-brand-400) { color: #4f46e5 !important; }
+        body.theme-light .text-brand-500 { color: #4f46e5 !important; }
+        body.theme-light :is(.text-sky-100, .text-sky-200, .text-sky-300, .text-sky-400) { color: #0369a1 !important; }
+        body.theme-light .text-sky-500 { color: #0369a1 !important; }
+        body.theme-light :is(.text-pink-100, .text-pink-200, .text-pink-300, .text-pink-400) { color: #be185d !important; }
+        body.theme-light .text-pink-500 { color: #be185d !important; }
+        body.theme-light :is(.text-orange-100, .text-orange-200, .text-orange-300, .text-orange-400) { color: #c2410c !important; }
+        body.theme-light .text-orange-500 { color: #c2410c !important; }
+        body.theme-light :is(.text-teal-100, .text-teal-200, .text-teal-300, .text-teal-400) { color: #0f766e !important; }
+        body.theme-light .text-teal-500 { color: #0f766e !important; }
+        body.theme-light :is(.text-red-100, .text-red-200, .text-red-300, .text-red-400) { color: #b91c1c !important; }
+        body.theme-light .text-red-500 { color: #b91c1c !important; }
+        body.theme-light :is(.text-green-100, .text-green-200, .text-green-300, .text-green-400) { color: #15803d !important; }
+        body.theme-light .text-green-500 { color: #15803d !important; }
+        body.theme-light :is(.text-yellow-100, .text-yellow-200, .text-yellow-300, .text-yellow-400) { color: #a16207 !important; }
+        body.theme-light .text-yellow-500 { color: #a16207 !important; }
+        body.theme-light :is(.text-violet-100, .text-violet-200, .text-violet-300, .text-violet-400) { color: #6d28d9 !important; }
+        body.theme-light .text-violet-500 { color: #6d28d9 !important; }
+        body.theme-light :is(.text-fuchsia-100, .text-fuchsia-200, .text-fuchsia-300, .text-fuchsia-400) { color: #a21caf !important; }
+        body.theme-light .text-fuchsia-500 { color: #a21caf !important; }
+        /* textos coloridos com opacidade, hover e estados selecionados (peer-checked) */
+        body.theme-light :is(.text-emerald-200\/60, .text-emerald-200\/70, .text-emerald-200\/80, .text-emerald-200\/90, .text-emerald-300\/60, .text-emerald-300\/70, .text-emerald-300\/80, .text-emerald-300\/90, .text-emerald-400\/60, .text-emerald-400\/70, .text-emerald-400\/80, .text-emerald-400\/90) { color: #047857 !important; }
+        body.theme-light :is(.hover\:text-emerald-100:hover, .hover\:text-emerald-200:hover, .hover\:text-emerald-300:hover, .hover\:text-emerald-400:hover) { color: #047857 !important; }
+        body.theme-light :is(.text-purple-200\/60, .text-purple-200\/70, .text-purple-200\/80, .text-purple-200\/90, .text-purple-300\/60, .text-purple-300\/70, .text-purple-300\/80, .text-purple-300\/90, .text-purple-400\/60, .text-purple-400\/70, .text-purple-400\/80, .text-purple-400\/90) { color: #6d28d9 !important; }
+        body.theme-light :is(.hover\:text-purple-100:hover, .hover\:text-purple-200:hover, .hover\:text-purple-300:hover, .hover\:text-purple-400:hover) { color: #6d28d9 !important; }
+        body.theme-light :is(.text-cyan-200\/60, .text-cyan-200\/70, .text-cyan-200\/80, .text-cyan-200\/90, .text-cyan-300\/60, .text-cyan-300\/70, .text-cyan-300\/80, .text-cyan-300\/90, .text-cyan-400\/60, .text-cyan-400\/70, .text-cyan-400\/80, .text-cyan-400\/90) { color: #0e7490 !important; }
+        body.theme-light :is(.hover\:text-cyan-100:hover, .hover\:text-cyan-200:hover, .hover\:text-cyan-300:hover, .hover\:text-cyan-400:hover) { color: #0e7490 !important; }
+        body.theme-light :is(.text-amber-200\/60, .text-amber-200\/70, .text-amber-200\/80, .text-amber-200\/90, .text-amber-300\/60, .text-amber-300\/70, .text-amber-300\/80, .text-amber-300\/90, .text-amber-400\/60, .text-amber-400\/70, .text-amber-400\/80, .text-amber-400\/90) { color: #b45309 !important; }
+        body.theme-light :is(.hover\:text-amber-100:hover, .hover\:text-amber-200:hover, .hover\:text-amber-300:hover, .hover\:text-amber-400:hover) { color: #b45309 !important; }
+        body.theme-light :is(.text-rose-200\/60, .text-rose-200\/70, .text-rose-200\/80, .text-rose-200\/90, .text-rose-300\/60, .text-rose-300\/70, .text-rose-300\/80, .text-rose-300\/90, .text-rose-400\/60, .text-rose-400\/70, .text-rose-400\/80, .text-rose-400\/90) { color: #be123c !important; }
+        body.theme-light :is(.hover\:text-rose-100:hover, .hover\:text-rose-200:hover, .hover\:text-rose-300:hover, .hover\:text-rose-400:hover) { color: #be123c !important; }
+        body.theme-light :is(.text-indigo-200\/60, .text-indigo-200\/70, .text-indigo-200\/80, .text-indigo-200\/90, .text-indigo-300\/60, .text-indigo-300\/70, .text-indigo-300\/80, .text-indigo-300\/90, .text-indigo-400\/60, .text-indigo-400\/70, .text-indigo-400\/80, .text-indigo-400\/90) { color: #4338ca !important; }
+        body.theme-light :is(.hover\:text-indigo-100:hover, .hover\:text-indigo-200:hover, .hover\:text-indigo-300:hover, .hover\:text-indigo-400:hover) { color: #4338ca !important; }
+        body.theme-light :is(.text-blue-200\/60, .text-blue-200\/70, .text-blue-200\/80, .text-blue-200\/90, .text-blue-300\/60, .text-blue-300\/70, .text-blue-300\/80, .text-blue-300\/90, .text-blue-400\/60, .text-blue-400\/70, .text-blue-400\/80, .text-blue-400\/90) { color: #1d4ed8 !important; }
+        body.theme-light :is(.hover\:text-blue-100:hover, .hover\:text-blue-200:hover, .hover\:text-blue-300:hover, .hover\:text-blue-400:hover) { color: #1d4ed8 !important; }
+        body.theme-light :is(.text-brand-200\/60, .text-brand-200\/70, .text-brand-200\/80, .text-brand-200\/90, .text-brand-300\/60, .text-brand-300\/70, .text-brand-300\/80, .text-brand-300\/90, .text-brand-400\/60, .text-brand-400\/70, .text-brand-400\/80, .text-brand-400\/90) { color: #4f46e5 !important; }
+        body.theme-light :is(.hover\:text-brand-100:hover, .hover\:text-brand-200:hover, .hover\:text-brand-300:hover, .hover\:text-brand-400:hover) { color: #4f46e5 !important; }
+        body.theme-light :is(.text-sky-200\/60, .text-sky-200\/70, .text-sky-200\/80, .text-sky-200\/90, .text-sky-300\/60, .text-sky-300\/70, .text-sky-300\/80, .text-sky-300\/90, .text-sky-400\/60, .text-sky-400\/70, .text-sky-400\/80, .text-sky-400\/90) { color: #0369a1 !important; }
+        body.theme-light :is(.hover\:text-sky-100:hover, .hover\:text-sky-200:hover, .hover\:text-sky-300:hover, .hover\:text-sky-400:hover) { color: #0369a1 !important; }
+        body.theme-light :is(.text-pink-200\/60, .text-pink-200\/70, .text-pink-200\/80, .text-pink-200\/90, .text-pink-300\/60, .text-pink-300\/70, .text-pink-300\/80, .text-pink-300\/90, .text-pink-400\/60, .text-pink-400\/70, .text-pink-400\/80, .text-pink-400\/90) { color: #be185d !important; }
+        body.theme-light :is(.hover\:text-pink-100:hover, .hover\:text-pink-200:hover, .hover\:text-pink-300:hover, .hover\:text-pink-400:hover) { color: #be185d !important; }
+        body.theme-light :is(.text-orange-200\/60, .text-orange-200\/70, .text-orange-200\/80, .text-orange-200\/90, .text-orange-300\/60, .text-orange-300\/70, .text-orange-300\/80, .text-orange-300\/90, .text-orange-400\/60, .text-orange-400\/70, .text-orange-400\/80, .text-orange-400\/90) { color: #c2410c !important; }
+        body.theme-light :is(.hover\:text-orange-100:hover, .hover\:text-orange-200:hover, .hover\:text-orange-300:hover, .hover\:text-orange-400:hover) { color: #c2410c !important; }
+        body.theme-light :is(.text-teal-200\/60, .text-teal-200\/70, .text-teal-200\/80, .text-teal-200\/90, .text-teal-300\/60, .text-teal-300\/70, .text-teal-300\/80, .text-teal-300\/90, .text-teal-400\/60, .text-teal-400\/70, .text-teal-400\/80, .text-teal-400\/90) { color: #0f766e !important; }
+        body.theme-light :is(.hover\:text-teal-100:hover, .hover\:text-teal-200:hover, .hover\:text-teal-300:hover, .hover\:text-teal-400:hover) { color: #0f766e !important; }
+        body.theme-light :is(.text-red-200\/60, .text-red-200\/70, .text-red-200\/80, .text-red-200\/90, .text-red-300\/60, .text-red-300\/70, .text-red-300\/80, .text-red-300\/90, .text-red-400\/60, .text-red-400\/70, .text-red-400\/80, .text-red-400\/90) { color: #b91c1c !important; }
+        body.theme-light :is(.hover\:text-red-100:hover, .hover\:text-red-200:hover, .hover\:text-red-300:hover, .hover\:text-red-400:hover) { color: #b91c1c !important; }
+        body.theme-light :is(.text-green-200\/60, .text-green-200\/70, .text-green-200\/80, .text-green-200\/90, .text-green-300\/60, .text-green-300\/70, .text-green-300\/80, .text-green-300\/90, .text-green-400\/60, .text-green-400\/70, .text-green-400\/80, .text-green-400\/90) { color: #15803d !important; }
+        body.theme-light :is(.hover\:text-green-100:hover, .hover\:text-green-200:hover, .hover\:text-green-300:hover, .hover\:text-green-400:hover) { color: #15803d !important; }
+        body.theme-light :is(.text-yellow-200\/60, .text-yellow-200\/70, .text-yellow-200\/80, .text-yellow-200\/90, .text-yellow-300\/60, .text-yellow-300\/70, .text-yellow-300\/80, .text-yellow-300\/90, .text-yellow-400\/60, .text-yellow-400\/70, .text-yellow-400\/80, .text-yellow-400\/90) { color: #a16207 !important; }
+        body.theme-light :is(.hover\:text-yellow-100:hover, .hover\:text-yellow-200:hover, .hover\:text-yellow-300:hover, .hover\:text-yellow-400:hover) { color: #a16207 !important; }
+        body.theme-light :is(.text-violet-200\/60, .text-violet-200\/70, .text-violet-200\/80, .text-violet-200\/90, .text-violet-300\/60, .text-violet-300\/70, .text-violet-300\/80, .text-violet-300\/90, .text-violet-400\/60, .text-violet-400\/70, .text-violet-400\/80, .text-violet-400\/90) { color: #6d28d9 !important; }
+        body.theme-light :is(.hover\:text-violet-100:hover, .hover\:text-violet-200:hover, .hover\:text-violet-300:hover, .hover\:text-violet-400:hover) { color: #6d28d9 !important; }
+        body.theme-light :is(.text-fuchsia-200\/60, .text-fuchsia-200\/70, .text-fuchsia-200\/80, .text-fuchsia-200\/90, .text-fuchsia-300\/60, .text-fuchsia-300\/70, .text-fuchsia-300\/80, .text-fuchsia-300\/90, .text-fuchsia-400\/60, .text-fuchsia-400\/70, .text-fuchsia-400\/80, .text-fuchsia-400\/90) { color: #a21caf !important; }
+        body.theme-light :is(.hover\:text-fuchsia-100:hover, .hover\:text-fuchsia-200:hover, .hover\:text-fuchsia-300:hover, .hover\:text-fuchsia-400:hover) { color: #a21caf !important; }
+        body.theme-light .peer:checked + div[class*="peer-checked:border-"] { border-color: #6366f1 !important; background-color: #eef2ff !important; box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15) !important; }
+        body.theme-light .peer:checked ~ [class*="peer-checked:bg-brand-"] { background-color: #4f46e5 !important; }
+        body.theme-light .peer:checked ~ [class*="peer-checked:bg-purple-"] { background-color: #7c3aed !important; }
+        body.theme-light .peer:checked ~ [class*="peer-checked:bg-emerald-"] { background-color: #059669 !important; }
+        body.theme-light .peer:not(:checked) ~ div.rounded-full[class*="peer-checked:bg-"] { background-color: #cbd5e1 !important; }
+        /* texto branco volta em botões/etiquetas de cor sólida */
+        body.theme-light :is(.bg-emerald-500, .bg-emerald-600, .bg-emerald-700, .bg-purple-500, .bg-purple-600, .bg-purple-700, .bg-cyan-500, .bg-cyan-600, .bg-cyan-700, .bg-amber-500, .bg-amber-600, .bg-amber-700, .bg-rose-500, .bg-rose-600, .bg-rose-700, .bg-indigo-500, .bg-indigo-600, .bg-indigo-700, .bg-blue-500, .bg-blue-600, .bg-blue-700, .bg-brand-500, .bg-brand-600, .bg-brand-700, .bg-sky-500, .bg-sky-600, .bg-sky-700, .bg-pink-500, .bg-pink-600, .bg-pink-700, .bg-orange-500, .bg-orange-600, .bg-orange-700, .bg-teal-500, .bg-teal-600, .bg-teal-700, .bg-red-500, .bg-red-600, .bg-red-700, .bg-green-500, .bg-green-600, .bg-green-700, .bg-yellow-500, .bg-yellow-600, .bg-yellow-700, .bg-violet-500, .bg-violet-600, .bg-violet-700, .bg-fuchsia-500, .bg-fuchsia-600, .bg-fuchsia-700), body.theme-light :is(.bg-emerald-500, .bg-emerald-600, .bg-emerald-700, .bg-purple-500, .bg-purple-600, .bg-purple-700, .bg-cyan-500, .bg-cyan-600, .bg-cyan-700, .bg-amber-500, .bg-amber-600, .bg-amber-700, .bg-rose-500, .bg-rose-600, .bg-rose-700, .bg-indigo-500, .bg-indigo-600, .bg-indigo-700, .bg-blue-500, .bg-blue-600, .bg-blue-700, .bg-brand-500, .bg-brand-600, .bg-brand-700, .bg-sky-500, .bg-sky-600, .bg-sky-700, .bg-pink-500, .bg-pink-600, .bg-pink-700, .bg-orange-500, .bg-orange-600, .bg-orange-700, .bg-teal-500, .bg-teal-600, .bg-teal-700, .bg-red-500, .bg-red-600, .bg-red-700, .bg-green-500, .bg-green-600, .bg-green-700, .bg-yellow-500, .bg-yellow-600, .bg-yellow-700, .bg-violet-500, .bg-violet-600, .bg-violet-700, .bg-fuchsia-500, .bg-fuchsia-600, .bg-fuchsia-700) * { color: #ffffff !important; }
+        body.theme-light :is(button, a)[class*="from-"][class*="to-"], body.theme-light :is(button, a)[class*="from-"][class*="to-"] * { color: #ffffff !important; }
+        body.theme-light :is([class*="hover:bg-emerald-"], [class*="hover:bg-purple-"], [class*="hover:bg-cyan-"], [class*="hover:bg-amber-"], [class*="hover:bg-rose-"], [class*="hover:bg-indigo-"], [class*="hover:bg-blue-"], [class*="hover:bg-brand-"], [class*="hover:bg-sky-"], [class*="hover:bg-pink-"], [class*="hover:bg-orange-"], [class*="hover:bg-teal-"], [class*="hover:bg-red-"], [class*="hover:bg-green-"], [class*="hover:bg-yellow-"], [class*="hover:bg-violet-"], [class*="hover:bg-fuchsia-"]):hover, body.theme-light :is([class*="hover:bg-emerald-"], [class*="hover:bg-purple-"], [class*="hover:bg-cyan-"], [class*="hover:bg-amber-"], [class*="hover:bg-rose-"], [class*="hover:bg-indigo-"], [class*="hover:bg-blue-"], [class*="hover:bg-brand-"], [class*="hover:bg-sky-"], [class*="hover:bg-pink-"], [class*="hover:bg-orange-"], [class*="hover:bg-teal-"], [class*="hover:bg-red-"], [class*="hover:bg-green-"], [class*="hover:bg-yellow-"], [class*="hover:bg-violet-"], [class*="hover:bg-fuchsia-"]):hover * { color: #ffffff !important; }
 
         /* -----------------------------------------------------------------
          * IMPRESSÃO / EXPORTAÇÃO PDF LIMPA (SEM SIDEBAR, HEADER E MENUS)
