@@ -229,29 +229,29 @@ function isGroupActive($modules_array) {
     </nav>
 
     <!-- Footer System Status, Theme Toggle & User Profile -->
-    <div class="p-3 bg-slate-950/80 border-t border-slate-800 space-y-2">
+    <div class="p-2 bg-slate-950/80 border-t border-slate-800 space-y-1">
         <!-- Botão Modo Claro / Modo Escuro -->
-        <button id="btn-theme-toggle" onclick="toggleThemeMode()" class="w-full px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white text-xs font-bold transition flex items-center justify-between shadow">
+        <button id="btn-theme-toggle" onclick="toggleThemeMode()" class="w-full px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white text-[11px] font-bold transition flex items-center justify-between shadow">
             <span class="flex items-center gap-2">
                 <i id="theme-icon" class="fa-solid fa-sun text-amber-400"></i>
                 <span id="theme-label-text">Modo Claro</span>
             </span>
-            <span class="text-[10px] text-slate-500 font-mono">Theme</span>
+            
         </button>
 
         <?php $logged_user = getLoggedUser(); ?>
         <!-- Perfil do Usuário Logado Clicável -->
-        <div onclick="openUserProfileModal()" class="flex items-center gap-2.5 p-2 rounded-xl bg-slate-900/60 border border-slate-800/60 hover:bg-slate-800/80 hover:border-slate-700 transition cursor-pointer sidebar-text" title="Clique para abrir as configurações do perfil">
-            <div class="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-300 font-bold text-xs">
+        <div onclick="openUserProfileModal()" class="flex items-center gap-2 px-2 py-1 rounded-lg bg-slate-900/60 border border-slate-800/60 hover:bg-slate-800/80 hover:border-slate-700 transition cursor-pointer sidebar-text" title="Clique para abrir as configurações do perfil">
+            <div class="w-6 h-6 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-300 font-bold text-[10px]">
                 <i class="fa-solid fa-user text-brand-400"></i>
             </div>
             <div class="overflow-hidden flex-1">
-                <span class="text-xs font-extrabold text-white block truncate"><?php echo htmlspecialchars($logged_user['name'] ?? 'Usuário'); ?></span>
-                <span class="text-[10px] text-slate-400 block font-mono"><?php echo htmlspecialchars($logged_user['role'] ?? 'Administrador PABX'); ?></span>
+                <span class="text-[11px] font-extrabold text-white block truncate leading-tight"><?php echo htmlspecialchars($logged_user['name'] ?? 'Usuário'); ?></span>
+                <span class="text-[9px] text-slate-400 block font-mono leading-tight truncate"><?php echo htmlspecialchars($logged_user['role'] ?? 'Administrador PABX'); ?></span>
             </div>
-            <i class="fa-solid fa-gear text-xs text-slate-500"></i>
+            <i class="fa-solid fa-gear text-[10px] text-slate-500"></i>
         </div>
-        <a href="index.php?auth=logout" class="mt-2 flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-bold text-rose-300 bg-rose-500/10 border border-rose-500/20 hover:bg-rose-500/20 transition sidebar-text" style="white-space:nowrap"><i class="fa-solid fa-right-from-bracket"></i> Sair</a>
+        <a href="index.php?auth=logout" class="flex items-center justify-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold text-rose-300 bg-rose-500/10 border border-rose-500/20 hover:bg-rose-500/20 transition sidebar-text" style="white-space:nowrap"><i class="fa-solid fa-right-from-bracket"></i> Sair</a>
     </div>
 </aside>
 
