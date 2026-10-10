@@ -48,7 +48,7 @@ try {
 
     try { $db->exec("ALTER TABLE system_users ADD COLUMN password_hash TEXT DEFAULT ''"); } catch (Exception $e) {}
 
-    // Carga de usuários padrão se a tabela estiver vazia
+    // Carga inicial: apenas o administrador; os demais usuários são cadastrados em Configurações > Usuários
     $u_cnt = $db->query("SELECT COUNT(*) as total FROM system_users")->fetchColumn();
     if ($u_cnt == 0) {
         $st_ins = $db->prepare("INSERT INTO system_users (name, email, role, extension, whatsapp, permissions, status) VALUES (:name, :email, :role, :ext, :wa, :perm, 'Ativo')");
@@ -57,24 +57,8 @@ try {
             ':email' => 'leandro@prismatelecom.com.br',
             ':role' => 'Administrador',
             ':ext' => '201',
-            ':wa' => '5511999998888',
+            ':wa' => '',
             ':perm' => json_encode(['mod_dashboard','mod_filas','mod_whatsapp','mod_relatorios','mod_configuracoes','listen_recordings','send_whatsapp','manage_settings','schedule_reports','click_to_call'])
-        ]);
-        $st_ins->execute([
-            ':name' => 'Giovana',
-            ':email' => 'giovana@prismatelecom.com.br',
-            ':role' => 'Supervisor',
-            ':ext' => '204',
-            ':wa' => '5511988887777',
-            ':perm' => json_encode(['mod_dashboard','mod_filas','mod_whatsapp','mod_relatorios','listen_recordings','send_whatsapp','schedule_reports','click_to_call'])
-        ]);
-        $st_ins->execute([
-            ':name' => 'Stefani',
-            ':email' => 'stefani@prismatelecom.com.br',
-            ':role' => 'Usuário',
-            ':ext' => '203',
-            ':wa' => '551197776666',
-            ':perm' => json_encode(['mod_dashboard','mod_filas','click_to_call'])
         ]);
     }
 

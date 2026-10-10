@@ -726,23 +726,12 @@ function getAsteriskTrunksStatus() {
                     'id' => $r['trunkid'],
                     'name' => $t_name,
                     'tech' => $t_tech,
-                    'status' => 'Registrado',
+                    'status' => 'Sem verificação', // só vira Registrado/Desconectado se o Asterisk confirmar
                     'active_calls' => 0,
                     'channels' => []
                 ];
             }
         } catch (Exception $e) {}
-    }
-
-    if (empty($trunks)) {
-        $trunks['Tronco_Principal_PJSIP'] = [
-            'id' => 1,
-            'name' => 'Tronco Principal PJSIP',
-            'tech' => 'PJSIP',
-            'status' => 'Registrado',
-            'active_calls' => 0,
-            'channels' => []
-        ];
     }
 
     if (function_exists('shell_exec')) {
@@ -765,13 +754,15 @@ function getAsteriskTrunksStatus() {
         $pjsip_reg = @shell_exec('asterisk -rx "pjsip show registrations" 2>/dev/null');
         if ($pjsip_reg) {
             foreach (explode("\n", $pjsip_reg) as $line) {
-                if (preg_match('/^\s*([\w\-]+)\/.*?Registered/i', $line, $m)) {
-                    $reg_name = $m[1];
+                if (preg_match('/^\s*([\w\-\.]+)\/\S+.*?\b(Registered|Unregistered|Rejected|Stopped)\b/i', $line, $m)) {
+                    $reg_name = preg_replace('/[-_]reg$/i', '', $m[1]);
+                    $reg_ok = (strcasecmp($m[2], 'Registered') === 0);
                     foreach ($trunks as $tk => &$tdata) {
-                        if (strpos($tk, $reg_name) !== false || strpos($reg_name, $tk) !== false) {
-                            $tdata['status'] = 'Registrado';
+                        if ($reg_name !== '' && (stripos($tk, $reg_name) !== false || stripos($reg_name, $tk) !== false)) {
+                            $tdata['status'] = $reg_ok ? 'Registrado' : 'Desconectado';
                         }
                     }
+                    unset($tdata);
                 }
             }
         }
@@ -4193,3 +4184,120 @@ function processQueueAbandonNotifications($ast) {
     return $out;
 }
 
+
+// =========================================================================
+// INTEGRAÇÃO COM IA (LLM / STT) - configuração única para todos os módulos
+// =========================================================================
+function aiProviderDefaults() {
+    return [
+        'openai'   => ['url' => 'https://api.openai.com/v1',                            'chat' => 'gpt-4o-mini',            'audio' => 'whisper-1'],
+        'groq'     => ['url' => 'https://api.groq.com/openai/v1',                       'chat' => 'llama-3.3-70b-versatile', 'audio' => 'whisper-large-v3'],
+        'gemini'   => ['url' => 'https://generativelanguage.googleapis.com/v1beta/openai', 'chat' => 'gemini-1.5-flash',     'audio' => ''],
+        'deepseek' => ['url' => 'https://api.deepseek.com/v1',                          'chat' => 'deepseek-chat',          'audio' => ''],
+    ];
+}
+
+function aiGetConfig() {
+    $defs     = aiProviderDefaults();
+    $provider = getSetting('ai_provider') ?: 'openai';
+    $d        = $defs[$provider] ?? $defs['openai'];
+    $limit    = (int)(getSetting('ai_token_limit') ?: 1024);
+    return [
+        'provider' => $provider,
+        'key'      => trim((string)getSetting('ai_api_key')),
+        'base_url' => rtrim(trim((string)getSetting('ai_base_url')) ?: $d['url'], '/'),
+        'model'    => getSetting('ai_model_chat') ?: $d['chat'],
+        'audio'    => getSetting('ai_model_audio') ?: $d['audio'],
+        'tokens'   => max(64, min(4000, $limit ?: 1024)),
+        'prompt'   => trim((string)getSetting('ai_custom_prompt')),
+        'enabled'  => getSetting('enable_copilot') !== '0',
+    ];
+}
+
+/** Chat completion compatível com OpenAI. Retorna ['ok','text','error','http']. */
+function aiChatCompletion($system, $user, $timeout = 25, $cfg = null) {
+    $cfg = $cfg ?: aiGetConfig();
+    if ($cfg['key'] === '') return ['ok' => false, 'text' => '', 'error' => 'API Key de IA não configurada', 'http' => 0];
+    if ($cfg['prompt'] !== '') $system = $cfg['prompt'] . "\n\n" . $system;
+    $send = function ($tokenField) use ($cfg, $system, $user, $timeout) {
+        $ch = curl_init($cfg['base_url'] . '/chat/completions');
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST           => true,
+            CURLOPT_POSTFIELDS     => json_encode([
+                'model'      => $cfg['model'],
+                'messages'   => [['role' => 'system', 'content' => $system], ['role' => 'user', 'content' => $user]],
+                $tokenField  => $cfg['tokens'],
+            ]),
+            CURLOPT_HTTPHEADER     => ['Content-Type: application/json', 'Authorization: Bearer ' . $cfg['key']],
+            CURLOPT_TIMEOUT        => $timeout,
+            CURLOPT_SSL_VERIFYPEER => getSetting('ai_ssl_insecure') !== '1',
+            CURLOPT_SSL_VERIFYHOST => getSetting('ai_ssl_insecure') !== '1' ? 2 : 0,
+        ]);
+        $resp = curl_exec($ch);
+        $out  = ['body' => $resp, 'http' => (int)curl_getinfo($ch, CURLINFO_HTTP_CODE), 'err' => curl_error($ch)];
+        curl_close($ch);
+        return $out;
+    };
+    $r = $send('max_tokens');
+    $j = json_decode((string)$r['body'], true);
+    // Modelos novos (o-series/gpt-5) exigem max_completion_tokens
+    if ($r['http'] === 400 && stripos((string)($j['error']['message'] ?? ''), 'max_completion_tokens') !== false) {
+        $r = $send('max_completion_tokens');
+        $j = json_decode((string)$r['body'], true);
+    }
+    if ($r['err'] !== '') {
+        return ['ok' => false, 'text' => '', 'error' => 'Erro de conexão: ' . $r['err'], 'http' => 0];
+    }
+    if ($r['http'] === 200 && isset($j['choices'][0]['message']['content'])) {
+        return ['ok' => true, 'text' => trim($j['choices'][0]['message']['content']), 'error' => '', 'http' => 200];
+    }
+    return ['ok' => false, 'text' => '', 'error' => $j['error']['message'] ?? ('HTTP ' . $r['http']), 'http' => $r['http']];
+}
+
+/** Extrai a lista "insights" de uma resposta do LLM (aceita cercas ```json e texto em volta). */
+function aiParseInsights($txt) {
+    $txt = trim((string)$txt);
+    $txt = preg_replace('/^```(?:json)?\s*/i', '', $txt);
+    $txt = preg_replace('/\s*```$/', '', $txt);
+    $p = json_decode($txt, true);
+    if (!is_array($p) && preg_match('/\{.*\}/s', $txt, $m)) $p = json_decode($m[0], true);
+    if (!is_array($p)) return [];
+    $list = $p['insights'] ?? (array_values($p) === $p ? $p : []);
+    $out = [];
+    foreach ((array)$list as $i) {
+        if (is_scalar($i) && trim((string)$i) !== '') $out[] = trim((string)$i);
+    }
+    return array_slice($out, 0, 5);
+}
+
+/** Métricas reais de hoje no CDR do Asterisk. */
+function aiTodayMetrics() {
+    $m = ['total' => 0, 'atendidas' => 0, 'tma' => 0, 'tme' => 0, 'ok' => false];
+    $pdo = function_exists('getAsteriskPdoConnection') ? getAsteriskPdoConnection('asteriskcdrdb') : null;
+    if (!$pdo) return $m;
+    try {
+        $r = $pdo->query("SELECT COUNT(*) t, SUM(disposition='ANSWERED') a, AVG(CASE WHEN disposition='ANSWERED' THEN billsec END) tma, AVG(GREATEST(duration-billsec,0)) tme FROM cdr WHERE calldate >= CURRENT_DATE()")->fetch(PDO::FETCH_ASSOC);
+        $m = ['total' => (int)$r['t'], 'atendidas' => (int)$r['a'], 'tma' => (int)round((float)$r['tma']), 'tme' => (int)round((float)$r['tme']), 'ok' => true];
+    } catch (Exception $e) {}
+    return $m;
+}
+
+/** Insights factuais (sem IA) calculados somente a partir das métricas. */
+function aiFactInsights($tot, $atend, $tma, $tme) {
+    if ($tot <= 0) return ['Nenhuma chamada registrada no período.'];
+    $pct = round(($atend / $tot) * 100, 1);
+    return [
+        "Volume: $tot chamadas, $atend atendidas ($pct%) e " . ($tot - $atend) . " não atendidas.",
+        'TMA (conversa): ' . ($tma > 0 ? gmdate('i\m s\s', $tma) : '0s') . ' | TME (espera): ' . ($tme > 0 ? gmdate('i\m s\s', $tme) : '0s') . '.',
+    ];
+}
+
+function aiSaveHistory($provider, $model, $insights) {
+    global $db;
+    if (!$db) return;
+    try {
+        $db->prepare("INSERT INTO ai_insights_history (provider, model, insights_json) VALUES (:p, :m, :j)")
+           ->execute([':p' => $provider, ':m' => $model, ':j' => json_encode($insights, JSON_UNESCAPED_UNICODE)]);
+    } catch (Exception $e) {}
+}

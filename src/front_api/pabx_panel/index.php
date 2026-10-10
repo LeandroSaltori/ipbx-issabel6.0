@@ -580,16 +580,13 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
         if (ob_get_level()) ob_end_clean();
         header('Content-Type: application/json');
         try {
-            $stmt = $db->query("SELECT * FROM ai_insights_history ORDER BY id DESC LIMIT 50");
-            $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            $rows = $db->query("SELECT * FROM ai_insights_history ORDER BY id DESC LIMIT 50")->fetchAll(PDO::FETCH_ASSOC);
             foreach ($rows as &$r) {
-                $r['created_at_fmt'] = date('d/m/H:i', strtotime($r['created_at']));
-                if (!empty($r['full_json'])) {
-                    $r['insights'] = is_array(json_decode($r['full_json'], true)) ? json_decode($r['full_json'], true) : [$r['summary']];
-                } else {
-                    $r['insights'] = [$r['summary']];
-                }
+                $dec = json_decode((string)$r['insights_json'], true);
+                $r['insights'] = is_array($dec) ? $dec : [];
+                $r['created_at_fmt'] = date('d/m/Y, H:i:s', strtotime($r['created_at']));
             }
+            unset($r);
             echo json_encode(['success' => true, 'history' => $rows]);
         } catch (Exception $e) {
             echo json_encode(['success' => false, 'error' => $e->getMessage()]);
@@ -662,19 +659,6 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
         }
         exit;
     }
- {
-        if (ob_get_level()) ob_end_clean();
-        header('Content-Type: application/json');
-        try {
-            $stmt = $db->query("SELECT * FROM ai_insights_history ORDER BY id DESC LIMIT 50");
-            $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
-            echo json_encode(['success' => true, 'history' => $rows]);
-        } catch (Exception $e) {
-            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
-        }
-        exit;
-    }
-
     if ($action === 'test_llm_connection') {
         if (ob_get_level()) ob_end_clean();
         header('Content-Type: application/json');
@@ -721,7 +705,7 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
                 'Authorization: Bearer ' . $key
             ],
             CURLOPT_TIMEOUT        => 15,
-            CURLOPT_SSL_VERIFYPEER => false
+            CURLOPT_SSL_VERIFYPEER => (getSetting("ai_ssl_insecure") !== "1")
         ]);
 
         $response = curl_exec($ch);
@@ -747,127 +731,52 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
         exit;
     }
 
-    if (!function_exists('saveAiInsightHistory')) {
-        function saveAiInsightHistory($module, $title, $insights, $meta = []) {
-            global $db;
-            if (!$db) return;
-            try {
-                $provider = getSetting('ai_provider') ?: 'pabx_engine';
-                $model    = getSetting('ai_model')    ?: 'pabx-v1';
-                $stmt = $db->prepare("INSERT INTO ai_insights_history (provider, model, insights_json) VALUES (:p, :m, :j)");
-                $stmt->execute([
-                    ':p' => $provider,
-                    ':m' => $model,
-                    ':j' => json_encode($insights)
-                ]);
-            } catch (Exception $e) {}
-        }
-    }
-
     if ($action === 'analyze_pabx_insights') {
         if (ob_get_level()) ob_end_clean();
         header('Content-Type: application/json; charset=utf-8');
-        $body = json_decode(file_get_contents('php://input'), true);
+        $body = json_decode(file_get_contents('php://input'), true) ?: [];
 
-        $tot    = (int)($body['total'] ?? 0);
-        $atend  = (int)($body['atendidas'] ?? 0);
-        $tma    = (int)($body['tmaSec'] ?? 0);
-        $tme    = (int)($body['tmeSec'] ?? 0);
-        $module = trim($body['module'] ?? 'Geral');
+        $tot   = (int)($body['total'] ?? 0);
+        $atend = (int)($body['atendidas'] ?? 0);
+        $tma   = (int)($body['tmaSec'] ?? 0);
+        $tme   = (int)($body['tmeSec'] ?? 0);
+        $module = preg_replace('/[^\p{L}\p{N} _\-]/u', '', (string)($body['module'] ?? 'Geral'));
 
-        $provider = getSetting('ai_provider') ?: 'openai';
-        $ai_key   = getSetting('ai_api_key');
-        $model    = getSetting('ai_model')    ?: 'gpt-4o-mini';
-        $baseUrl  = getSetting('ai_base_url');
-
-        $ai_configured = !empty($ai_key);
-        $pctAtend = $tot > 0 ? round(($atend / $tot) * 100, 1) : 100;
-        $tmaStr   = $tma > 0 ? gmdate('i\m s\s', $tma) : '0s';
-        $tmeStr   = $tme > 0 ? gmdate('s\s', $tme) : '0s';
-
+        $cfg = aiGetConfig();
+        $ai_configured = ($cfg['key'] !== '' && $cfg['enabled']);
+        $facts = aiFactInsights($tot, $atend, $tma, $tme);
         $insights = [];
+        $aiError = '';
 
-        // Tentar Chamada Real à API LLM se houver Chave de IA configurada
-        if ($ai_configured) {
-            $providerDefaults = [
-                'openai'   => ['url' => 'https://api.openai.com/v1',                       'model' => 'gpt-4o-mini'],
-                'groq'     => ['url' => 'https://api.groq.com/openai/v1',                 'model' => 'llama-3.3-70b-versatile'],
-                'gemini'   => ['url' => 'https://generativelanguage.googleapis.com/v1beta/openai', 'model' => 'gemini-1.5-flash'],
-                'deepseek' => ['url' => 'https://api.deepseek.com/v1',                         'model' => 'deepseek-chat']
-            ];
-            $pDef = isset($providerDefaults[$provider]) ? $providerDefaults[$provider] : $providerDefaults['openai'];
-            if (empty($baseUrl)) $baseUrl = $pDef['url'];
-
-            $endpoint = rtrim($baseUrl, '/') . '/chat/completions';
-            $promptMsg = "Você é um analista especialista de PABX IP Prisma. Analise as métricas reais de hoje: Total de chamadas: $tot, Chamadas atendidas: $atend (Taxa de retenção: $pctAtend%), TMA (Conversa): $tmaStr, TME (Espera): $tmeStr. Responda ESTRITAMENTE um JSON no formato {\"insights\": [\"insight1\", \"insight2\", \"insight3\"]}. Seja profissional, curto e traga conselhos operacionais úteis.";
-
-            $payload = json_encode([
-                'model' => $model,
-                'messages' => [
-                    ['role' => 'system', 'content' => 'Retorne apenas um JSON puro no formato {"insights": ["string1", "string2", "string3"]}'],
-                    ['role' => 'user', 'content' => $promptMsg]
-                ],
-                'max_tokens' => 350
-            ]);
-
-            $ch = curl_init($endpoint);
-            curl_setopt_array($ch, [
-                CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_POST           => true,
-                CURLOPT_POSTFIELDS     => $payload,
-                CURLOPT_HTTPHEADER     => [
-                    'Content-Type: application/json',
-                    'Authorization: Bearer ' . $ai_key
-                ],
-                CURLOPT_TIMEOUT        => 12,
-                CURLOPT_SSL_VERIFYPEER => false
-            ]);
-
-            $response = curl_exec($ch);
-            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            curl_close($ch);
-
-            if ($httpCode === 200 && !empty($response)) {
-                $resData = json_decode($response, true);
-                if (isset($resData['choices'][0]['message']['content'])) {
-                    $txt = trim($resData['choices'][0]['message']['content']);
-                    // Limpar markdown de bloco ```json
-                    $txt = preg_replace('/^```json\s*/i', '', $txt);
-                    $txt = preg_replace('/^```\s*/i', '', $txt);
-                    $txt = preg_replace('/\s*```$/', '', $txt);
-                    
-                    $parsed = json_decode($txt, true);
-                    if (isset($parsed['insights']) && is_array($parsed['insights']) && count($parsed['insights']) >= 1) {
-                        $insights = array_slice($parsed['insights'], 0, 3);
-                    }
-                }
-            }
-        }
-
-        // Fallback Heurístico com dados reais se a IA não estiver configurada ou se a API expirar
-        if (empty($insights)) {
-            if ($tot <= 0) {
-                $insights = [
-                    "Volume Operacional: Nenhuma chamada registrada no período selecionado.",
-                    "Desempenho de Atendimento: Aguardando novas ligações no PABX para cálculo de TMA e TME.",
-                    "Análise Operacional IA: Central de atendimento pronta e sem chamadas pendentes no momento."
-                ];
+        if ($ai_configured && $tot > 0) {
+            $pct = round(($atend / $tot) * 100, 1);
+            $r = aiChatCompletion(
+                'Você é analista de PABX IP. Retorne apenas JSON puro no formato {"insights": ["...","...","..."]}, com no máximo 3 itens curtos, objetivos e em português. Use somente os números informados; não invente dados.',
+                "Módulo: $module. Chamadas: $tot; atendidas: $atend ($pct%); TMA (conversa): {$tma}s; TME (espera): {$tme}s.",
+                20, $cfg
+            );
+            if ($r['ok']) {
+                $insights = aiParseInsights($r['text']);
+                if (empty($insights)) $aiError = 'Resposta da IA fora do formato esperado';
             } else {
-                $insights = [
-                    "Volume Operacional: Total de {$tot} chamadas analisadas ({$atend} atendidas - taxa de retenção de {$pctAtend}%).",
-                    "Desempenho de Atendimento: TMA mantido em {$tmaStr} com Tempo Médio de Espera (TME) em {$tmeStr}.",
-                    "Análise Operacional IA: Operação ativa com acompanhamento de voz em tempo real."
-                ];
+                $aiError = $r['error'];
             }
         }
 
-        saveAiInsightHistory($provider, $model, $insights);
+        $usedAi = !empty($insights);
+        if (!$usedAi) $insights = $facts;
+        aiSaveHistory($usedAi ? $cfg['provider'] : 'metricas', $usedAi ? $cfg['model'] : 'sem-ia', $insights);
+
+        $notice = null;
+        if ($cfg['key'] === '')      $notice = 'IA não configurada (Configurações > Inteligência Artificial): exibindo apenas as métricas reais.';
+        elseif (!$cfg['enabled'])    $notice = 'Copiloto de IA desativado em Configurações: exibindo apenas as métricas reais.';
+        elseif ($aiError !== '')     $notice = 'Falha na IA (' . $aiError . '): exibindo apenas as métricas reais.';
 
         echo json_encode([
             'success' => true,
             'ai_configured' => $ai_configured,
-            'engine_label' => $ai_configured ? "IA Generativa ($provider)" : "Motor Operacional PABX (Sem IA)",
-            'notice' => $ai_configured ? null : "Atenção: A Inteligência Artificial (LLM) não está ativa nas Configurações. A análise abaixo foi gerada automaticamente a partir das métricas reais do PABX.",
+            'engine_label' => $usedAi ? "IA Generativa ({$cfg['provider']})" : 'Métricas reais do PABX (sem IA)',
+            'notice' => $notice,
             'insights' => $insights
         ]);
         exit;
@@ -880,44 +789,59 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
         $body     = json_decode(file_get_contents('php://input'), true);
         $fileRel  = trim($body['file'] ?? '');
 
-        $provider = getSetting('ai_provider')    ?: 'openai';
-        $key      = getSetting('ai_api_key')     ?: '';
-        $model    = getSetting('ai_model_audio')  ?: ($provider === 'groq' ? 'whisper-large-v3' : 'whisper-1');
+        $cfg      = aiGetConfig();
+        $provider = $cfg['provider'];
+        $key      = $cfg['key'];
+        $model    = $cfg['audio'];
 
+        if (!$cfg['enabled']) {
+            echo json_encode(['success' => false, 'error' => 'Copiloto de IA desativado em Configurações.']);
+            exit;
+        }
         if (empty($key)) {
             echo json_encode(['success' => false, 'error' => 'Nenhuma API Key de IA configurada nas Configurações.']);
             exit;
         }
-
+        if (!in_array($provider, ['openai', 'groq'], true) || empty($model)) {
+            echo json_encode(['success' => false, 'error' => "O provedor '$provider' não oferece transcrição de áudio. Use OpenAI ou Groq (Whisper) em Configurações > Inteligência Artificial."]);
+            exit;
+        }
+        if (function_exists('hasUserPermission') && !hasUserPermission('listen_recordings')) {
+            echo json_encode(['success' => false, 'error' => 'Sem permissão para acessar gravações.']);
+            exit;
+        }
         if (empty($fileRel)) {
             echo json_encode(['success' => false, 'error' => 'Arquivo de áudio não especificado.']);
             exit;
         }
 
-        // Tentar localizar o arquivo no servidor de arquivos Asterisk
-        $possiblePaths = [
-            "/var/spool/asterisk/monitor/" . $fileRel,
-            "/var/spool/asterisk/monitor/" . date('Y/m/d/') . $fileRel,
-            $fileRel
-        ];
-
+        // Apenas arquivos dentro das pastas de gravação/sons do Asterisk (bloqueia ../ e caminhos absolutos)
         $audioFilePath = '';
-        foreach ($possiblePaths as $p) {
-            if (file_exists($p) && is_readable($p)) {
-                $audioFilePath = $p;
-                break;
+        $roots = ['/var/spool/asterisk/monitor', '/var/lib/asterisk/sounds'];
+        $cands = [];
+        $relClean = ltrim(str_replace('\\', '/', $fileRel), '/');
+        foreach ($roots as $rt) {
+            $cands[] = $rt . '/' . $relClean;
+            $cands[] = $rt . '/' . date('Y/m/d/') . basename($relClean);
+            foreach (glob($rt . '/*/*/*/' . basename($relClean)) ?: [] as $g) $cands[] = $g;
+        }
+        foreach ($cands as $p) {
+            $rp = realpath($p);
+            if ($rp === false || !is_file($rp) || !is_readable($rp)) continue;
+            foreach ($roots as $rt) {
+                if (strpos($rp, $rt . '/') === 0) { $audioFilePath = $rp; break 2; }
             }
         }
 
         if (empty($audioFilePath)) {
-            echo json_encode(['success' => false, 'error' => "Arquivo de áudio não encontrado na pasta do Asterisk ($fileRel)."]);
+            echo json_encode(['success' => false, 'error' => 'Arquivo de áudio não encontrado na pasta do Asterisk.']);
             exit;
         }
 
         // Endpoint de transcrição Whisper
-        $sttEndpoint = ($provider === 'groq') ? 'https://api.groq.com/openai/v1/audio/transcriptions' : 'https://api.openai.com/v1/audio/transcriptions';
+        $sttEndpoint = $cfg['base_url'] . '/audio/transcriptions';
 
-        $cFile = new CURLFile($audioFilePath, 'audio/wav', basename($audioFilePath));
+        $cFile = new CURLFile($audioFilePath, (strtolower(pathinfo($audioFilePath, PATHINFO_EXTENSION)) === 'mp3') ? 'audio/mpeg' : 'audio/wav', basename($audioFilePath));
         $postData = [
             'file'  => $cFile,
             'model' => $model
@@ -932,7 +856,7 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
                 'Authorization: Bearer ' . $key
             ],
             CURLOPT_TIMEOUT        => 60,
-            CURLOPT_SSL_VERIFYPEER => false
+            CURLOPT_SSL_VERIFYPEER => (getSetting('ai_ssl_insecure') !== '1')
         ]);
 
         $response = curl_exec($ch);
@@ -959,137 +883,46 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
         exit;
     }
 
-    if ($action === 'get_ai_insights_history') {
-        if (ob_get_level()) ob_end_clean();
-        header('Content-Type: application/json');
-        $stmt = $db->query("SELECT * FROM ai_insights_history ORDER BY id DESC LIMIT 50");
-        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        foreach ($rows as &$r) {
-            $r['insights'] = json_decode($r['insights_json'], true);
-            $r['created_at_fmt'] = date('d/m/Y, H:i:s', strtotime($r['created_at']));
-        }
-        echo json_encode(['success' => true, 'history' => $rows]);
-        exit;
-    }
-
-    if ($action === 'delete_ai_insight') {
-        if (ob_get_level()) ob_end_clean();
-        header('Content-Type: application/json');
-        $id = intval($_GET['id'] ?? 0);
-        if ($id > 0) {
-            $db->prepare("DELETE FROM ai_insights_history WHERE id = :id")->execute([':id' => $id]);
-        }
-        echo json_encode(['success' => true]);
-        exit;
-    }
-
     if ($action === 'generate_ai_insights') {
         if (ob_get_level()) ob_end_clean();
         header('Content-Type: application/json');
 
-        $provider = getSetting('ai_provider')  ?: 'openai';
-        $key      = getSetting('ai_api_key')   ?: '';
-        $baseUrl  = getSetting('ai_base_url')  ?: 'https://api.openai.com/v1';
-        $model    = getSetting('ai_model_chat')?: ($provider === 'groq' ? 'llama-3.3-70b-versatile' : 'gpt-4o-mini');
-
-        // Coletar Métricas Reais Atuais para o Prompt de Inteligência
-        $totalCalls = 0;
-        $answeredCalls = 0;
-        if (function_exists('getPABXSystemConfig')) {
-            $sys_conf = getPABXSystemConfig();
-            if (!empty($sys_conf['mysqlrootpwd'])) {
-                try {
-                    $ast_db = new PDO("mysql:host=localhost;dbname=asterisk;charset=utf8", 'root', $sys_conf['mysqlrootpwd'], [
-                        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-                        PDO::ATTR_TIMEOUT => 2
-                    ]);
-                    $totalCalls = (int)$ast_db->query("SELECT COUNT(*) FROM cdr WHERE DATE(calldate) = CURRENT_DATE()")->fetchColumn();
-                    $answeredCalls = (int)$ast_db->query("SELECT COUNT(*) FROM cdr WHERE DATE(calldate) = CURRENT_DATE() AND disposition = 'ANSWERED'")->fetchColumn();
-                } catch (Exception $ex) {}
-            }
-        }
-
-        if (empty($key)) {
-            // Sem chave de IA: apenas fatos calculados do CDR real, sem texto generativo
-            $demoInsights = ($totalCalls > 0)
-                ? [
-                    "Hoje: $totalCalls chamadas no CDR, $answeredCalls atendidas (" . round(($answeredCalls/$totalCalls)*100, 1) . "%) e " . ($totalCalls - $answeredCalls) . " não atendidas.",
-                    "Configure a API Key em Configurações > Inteligência Artificial para gerar análises com LLM."
-                  ]
-                : [
-                    "Nenhuma chamada registrada no CDR hoje até o momento.",
-                    "Configure a API Key em Configurações > Inteligência Artificial para gerar análises com LLM."
-                  ];
-            $stmt = $db->prepare("INSERT INTO ai_insights_history (provider, model, insights_json) VALUES (:p, :m, :j)");
-            $stmt->execute([':p' => $provider, ':m' => $model, ':j' => json_encode($demoInsights)]);
-            
-            echo json_encode([
-                'success' => true,
-                'ai_configured' => false,
-                'notice' => '⚠️ Requisito Não Configurado: A chave de API de Inteligência Artificial não foi informada. Acesse Configurações > Inteligência Artificial e insira sua API Key (OpenAI, Gemini ou Groq) para habilitar resumos generativos.',
-                'provider' => $provider,
-                'model' => $model,
-                'created_at_fmt' => date('H:i'),
-                'insights' => $demoInsights
-            ]);
-            exit;
-        }
-
-        // Fazer Chamada Real à API LLM do Provedor
-        $endpoint = rtrim($baseUrl, '/') . '/chat/completions';
-        $promptMsg = "Você é um analista de PABX IP e telefonia empresarial. Com base nas métricas de hoje: Total de chamadas: $totalCalls, Chamadas atendidas: $answeredCalls. Responda ESTRITAMENTE em formato JSON contendo um array de 3 strings 'insights' curtas e acionáveis sobre a operação.";
-
-        $payload = json_encode([
-            'model' => $model,
-            'messages' => [
-                ['role' => 'system', 'content' => 'Retorne apenas um JSON puro no formato {"insights": ["item1", "item2", "item3"]}'],
-                ['role' => 'user', 'content' => $promptMsg]
-            ],
-            'max_tokens' => 400
-        ]);
-
-        $ch = curl_init($endpoint);
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_POST           => true,
-            CURLOPT_POSTFIELDS     => $payload,
-            CURLOPT_HTTPHEADER     => [
-                'Content-Type: application/json',
-                'Authorization: Bearer ' . $key
-            ],
-            CURLOPT_TIMEOUT        => 20,
-            CURLOPT_SSL_VERIFYPEER => false
-        ]);
-
-        $response = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
-
-        $resData = json_decode($response, true);
+        $cfg = aiGetConfig();
+        $m   = aiTodayMetrics();
+        $facts = aiFactInsights($m['total'], $m['atendidas'], $m['tma'], $m['tme']);
         $insightsList = [];
-        if ($httpCode === 200 && isset($resData['choices'][0]['message']['content'])) {
-            $txt = $resData['choices'][0]['message']['content'];
-            $parsed = json_decode($txt, true);
-            if (isset($parsed['insights']) && is_array($parsed['insights'])) {
-                $insightsList = $parsed['insights'];
+        $aiError = '';
+
+        if ($cfg['key'] !== '' && $cfg['enabled'] && $m['total'] > 0) {
+            $r = aiChatCompletion(
+                'Você é analista de PABX IP e telefonia empresarial. Retorne apenas JSON puro no formato {"insights": ["...","...","..."]}, com 3 itens curtos e acionáveis em português. Use somente os números informados; não invente dados.',
+                "Métricas de hoje: chamadas {$m['total']}; atendidas {$m['atendidas']}; TMA {$m['tma']}s; TME {$m['tme']}s.",
+                25, $cfg
+            );
+            if ($r['ok']) {
+                $insightsList = aiParseInsights($r['text']);
+                if (empty($insightsList)) $aiError = 'Resposta da IA fora do formato esperado';
+            } else {
+                $aiError = $r['error'];
             }
         }
 
-        if (empty($insightsList)) {
-            $insightsList = [
-                "A taxa de atendimento telefônico de hoje é de " . ($totalCalls > 0 ? round(($answeredCalls/$totalCalls)*100, 1) : 100) . "% com $answeredCalls chamadas concluídas.",
-                "Fluxo de ligações estabilizado no período da tarde sem gargalos identificados.",
-                "Recomendado manter a escala de operadores ativa para preservar o baixo Tempo Médio de Espera (TME)."
-            ];
-        }
+        $usedAi = !empty($insightsList);
+        if (!$usedAi) $insightsList = $facts;
+        aiSaveHistory($usedAi ? $cfg['provider'] : 'metricas', $usedAi ? $cfg['model'] : 'sem-ia', $insightsList);
 
-        $stmt = $db->prepare("INSERT INTO ai_insights_history (provider, model, insights_json) VALUES (:p, :m, :j)");
-        $stmt->execute([':p' => $provider, ':m' => $model, ':j' => json_encode($insightsList)]);
+        $notice = null;
+        if ($cfg['key'] === '')   $notice = 'IA não configurada em Configurações > Inteligência Artificial: exibindo apenas as métricas reais.';
+        elseif (!$cfg['enabled']) $notice = 'Copiloto de IA desativado em Configurações: exibindo apenas as métricas reais.';
+        elseif ($aiError !== '')  $notice = 'Falha na IA (' . $aiError . '): exibindo apenas as métricas reais.';
+        elseif (!$m['ok'])        $notice = 'Não foi possível ler o CDR (asteriskcdrdb).';
 
         echo json_encode([
             'success' => true,
-            'provider' => $provider,
-            'model' => $model,
+            'ai_configured' => ($cfg['key'] !== '' && $cfg['enabled']),
+            'notice' => $notice,
+            'provider' => $usedAi ? $cfg['provider'] : 'metricas',
+            'model' => $usedAi ? $cfg['model'] : 'sem-ia',
             'created_at_fmt' => date('H:i'),
             'insights' => $insightsList
         ]);
@@ -1099,13 +932,13 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
     if ($action === 'elevenlabs_tts') {
         if (ob_get_level()) ob_end_clean();
         $el_key      = getSetting('elevenlabs_api_key');
-        $el_voice    = getSetting('elevenlabs_voice_id') ?: 'EXAVITQu4vr4xnSDxMaL';
+        $el_voice    = preg_replace('/[^A-Za-z0-9_-]/', '', (string)(getSetting('elevenlabs_voice_id') ?: 'EXAVITQu4vr4xnSDxMaL'));
         $el_model    = getSetting('elevenlabs_model')    ?: 'eleven_multilingual_v2';
 
         $body = json_decode(file_get_contents('php://input'), true);
         $text = trim($body['text'] ?? '');
 
-        if (empty($el_key) || empty($text)) {
+        if (getSetting('elevenlabs_enabled') === '0' || empty($el_key) || empty($text)) {
             http_response_code(400);
             echo json_encode(['error' => 'API Key ElevenLabs ou texto não configurado.']);
             exit;
@@ -1129,7 +962,7 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
                 'Accept: audio/mpeg'
             ],
             CURLOPT_TIMEOUT        => 30,
-            CURLOPT_SSL_VERIFYPEER => false,
+            CURLOPT_SSL_VERIFYPEER => true,
         ]);
 
         $result   = curl_exec($ch);
@@ -2002,12 +1835,9 @@ if ($__route_perm !== '' && !hasUserPermission($__route_perm)) {
 
             try {
                 if (typeof JsSIP === 'undefined') {
-                    // Fallback de simulação caso biblioteca jssip não tenha carregado via CDN
-                    setTimeout(() => {
-                        if (label) label.innerHTML = `<span class="text-emerald-400 font-bold"><i class="fa-solid fa-circle-check"></i> Registrado (${ext})</span>`;
-                        document.getElementById('webphone-form-view')?.classList.add('hidden');
-                        document.getElementById('webphone-dialpad-view')?.classList.remove('hidden');
-                    }, 800);
+                    // Sem a biblioteca JsSIP não há registro real: nunca simular
+                    if (label) label.innerHTML = `<span class="text-rose-400 font-bold"><i class="fa-solid fa-circle-xmark"></i> Biblioteca JsSIP não carregou</span>`;
+                    showWebphoneError("Softphone indisponível", "A biblioteca JsSIP não foi carregada (CDN bloqueado?). Não é possível registrar o ramal.");
                     return;
                 }
 
@@ -2409,12 +2239,12 @@ if ($__route_perm !== '' && !hasUserPermission($__route_perm)) {
                     <div class="bg-slate-950 rounded-xl p-3.5 border border-slate-800 space-y-2">
                         <div class="flex items-center justify-between">
                             <span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20">${t.tech}</span>
-                            <span class="px-2 py-0.5 rounded text-[9px] font-bold ${t.status === 'Registrado' ? 'text-emerald-400 bg-emerald-500/10' : 'text-rose-400 bg-rose-500/10'}">${t.status}</span>
+                            <span class="px-2 py-0.5 rounded text-[9px] font-bold ${t.status === 'Registrado' ? 'text-emerald-400 bg-emerald-500/10' : (t.status === 'Desconectado' ? 'text-rose-400 bg-rose-500/10' : 'text-amber-400 bg-amber-500/10')}">${t.status}</span>
                         </div>
                         <h4 class="text-xs font-bold text-white truncate">${t.name}</h4>
                         <div class="text-[10px] text-slate-400 border-t border-slate-800 pt-2 flex justify-between">
                             <span>Canais: <strong class="text-white">${t.active_calls}</strong></span>
-                            <span class="text-slate-500">Linha Ativa</span>
+                            <span class="text-slate-500">${t.status === 'Registrado' ? 'Linha Ativa' : (t.status === 'Desconectado' ? 'Sem registro' : 'Sem registro SIP (IP/peer)')}</span>
                         </div>
                     </div>
                 `).join('');
