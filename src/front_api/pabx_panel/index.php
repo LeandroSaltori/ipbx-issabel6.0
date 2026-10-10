@@ -772,8 +772,9 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
             $j = ['resumo' => mb_substr($raw, 0, 1500), 'sentimento' => '', 'satisfacao' => null, 'recomendacao' => ''];
         }
         $sat = isset($j['satisfacao']) && is_numeric($j['satisfacao']) ? max(1, min(5, (float)$j['satisfacao'])) : null;
-        echo json_encode([
+        $result = [
             'success' => true,
+            'uid' => $uid,
             'resumo' => (string)$j['resumo'],
             'sentimento' => (string)($j['sentimento'] ?? ''),
             'satisfacao' => $sat,
@@ -781,7 +782,14 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
             'transcript' => $tr['text'],
             'provider' => $cfg['provider'],
             'model' => $cfg['model'],
-        ]);
+        ];
+        // Regras de palavras-chave configuradas em Relatórios > IA Analytics (tópicos, riscos, checklist)
+        try {
+            $rules = aiAuditApplyRules($tr['text']);
+            aiAuditSaveAnalysis($row, $rules, $result, $cfg);
+            $result['topics'] = $rules['topics']; $result['risks'] = $rules['risks']; $result['qa_score'] = $rules['qa_score'];
+        } catch (Throwable $e) { /* persistência é best-effort */ }
+        echo json_encode($result);
         exit;
     }
 
