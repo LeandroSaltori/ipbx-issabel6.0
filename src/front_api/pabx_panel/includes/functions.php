@@ -242,8 +242,11 @@ function executeAsteriskAMICommand($action, $params = []) {
     }
 
     // Construir mensagem da Ação AMI
+    $action = str_replace(["\r", "\n"], '', (string)$action);
     $cmd_msg = "Action: {$action}\r\n";
     foreach ($params as $pk => $pv) {
+        $pk = str_replace(["\r", "\n", ":"], '', (string)$pk);
+        $pv = str_replace(["\r", "\n"], ' ', (string)$pv);
         $cmd_msg .= "{$pk}: {$pv}\r\n";
     }
     $cmd_msg .= "\r\n";
@@ -266,6 +269,41 @@ function executeAsteriskAMICommand($action, $params = []) {
     fclose($socket);
 
     return ['success' => true, 'response' => $response];
+}
+
+
+/**
+ * Pausa / despausa um membro (agente) de uma fila via AMI (QueuePause).
+ * $paused = 1 pausa, 0 despausa. $pause é mantido apenas por compatibilidade.
+ */
+function pauseAsteriskQueueMember($queue, $iface, $pause = true, $paused = 1, $reason = 'Pausa Operacional') {
+    $queue  = preg_replace('/[^0-9A-Za-z_\-]/', '', (string)$queue);
+    $iface  = preg_replace('/[^0-9A-Za-z_\-\/@.]/', '', (string)$iface);
+    $reason = trim(preg_replace('/[\r\n]+/', ' ', (string)$reason));
+    if ($queue === '' || $iface === '') {
+        return ['success' => false, 'error' => 'Fila ou interface inválida.'];
+    }
+
+    $params = [
+        'Interface' => $iface,
+        'Paused'    => ((int)$paused === 1) ? 'true' : 'false',
+        'Queue'     => $queue,
+    ];
+    if ((int)$paused === 1 && $reason !== '') {
+        $params['Reason'] = $reason;
+    }
+
+    $res = executeAsteriskAMICommand('QueuePause', $params);
+    if (empty($res['success'])) {
+        return ['success' => false, 'error' => $res['error'] ?? 'Falha ao comunicar com o AMI.'];
+    }
+    $raw = $res['response'] ?? '';
+    if (stripos($raw, 'Response: Success') !== false) {
+        return ['success' => true, 'error' => ''];
+    }
+    $msg = 'Asterisk recusou a ação.';
+    if (preg_match('/Message:\s*(.+)/i', $raw, $m)) $msg = trim($m[1]);
+    return ['success' => false, 'error' => $msg];
 }
 
 

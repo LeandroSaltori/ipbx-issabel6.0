@@ -37,12 +37,12 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
             $res = syncPrismaAssets();
             echo json_encode([
                 'success'    => true,
-                'extensions' => $res['ramais_inseridos'] ?? 15,
-                'queues'     => $res['filas_inseridas'] ?? 6,
+                'extensions' => $res['extensions'] ?? 0,
+                'queues'     => $res['queues'] ?? 0,
                 'message'    => 'Sincronização com o PABX Asterisk concluída com sucesso!'
             ]);
         } catch (Exception $e) {
-            echo json_encode(['success' => true, 'extensions' => 15, 'queues' => 6, 'message' => 'Sincronizado com PABX Asterisk!']);
+            echo json_encode(['success' => false, 'error' => 'Falha na sincronização com o PABX: ' . $e->getMessage()]);
         }
         exit;
     }
@@ -371,7 +371,7 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
 
         if ($type === 'hangup' && !empty($channel)) {
             if (function_exists('shell_exec')) {
-                @shell_exec('asterisk -rx "channel request hangup ' . escapeshellarg($channel) . '" 2>/dev/null');
+                @shell_exec('asterisk -rx ' . escapeshellarg('channel request hangup ' . $channel) . ' 2>/dev/null');
                 echo json_encode(['success' => true, 'message' => "Solicitado Hangup no canal $channel"]);
             } else {
                 echo json_encode(['success' => false, 'error' => "shell_exec desabilitado"]);
@@ -413,13 +413,13 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
         if ($type === 'pause_queue_agent') {
             $queue = $_GET['queue'] ?? '';
             $iface = $_GET['interface'] ?? '';
-            $pause = $_GET['pause'] === '1';
             $paused = intval($_GET['paused'] ?? 1);
+            $pause = ($paused === 1);
             $reason = $_GET['reason'] ?? 'Pausa Operacional';
             
             if ($queue && $iface) {
                 $ami_res = pauseAsteriskQueueMember($queue, $iface, $pause, $paused, $reason);
-                echo json_encode(['success' => $ami_res['success'], 'message' => $ami_res['error'] ?: 'Ação enviada']);
+                echo json_encode(['success' => $ami_res['success'], 'message' => $ami_res['success'] ? ($paused === 1 ? 'Agente pausado.' : 'Agente liberado.') : $ami_res['error']]);
             } else {
                 echo json_encode(['success' => false, 'error' => "Parâmetros inválidos"]);
             }
@@ -2049,14 +2049,14 @@ if (!isset($allowed_modules[$module]) || !in_array($action, $allowed_modules[$mo
                 try {
                     data = JSON.parse(rawText);
                 } catch(pe) {
-                    data = { success: true, extensions: 15, queues: 6, message: 'Sincronização concluída com o PABX Asterisk!' };
+                    data = { success: false, error: 'Resposta inválida do servidor durante a sincronização.' };
                 }
 
                 if (icon) icon.classList.remove('fa-spin');
 
                 if (data.success !== false) {
                     showToastNotification('Sincronização PABX', 'Ramais e filas sincronizados com sucesso!', 'success');
-                    openSyncResultModal(data.extensions || 15, data.queues || 6, data.message || 'Sincronização concluída!');
+                    openSyncResultModal(data.extensions || 0, data.queues || 0, data.message || 'Sincronização concluída!');
                 } else {
                     showToastNotification('Erro na Sincronização', data.error || "Falha ao conectar com o PABX.", 'error');
                 }

@@ -52,8 +52,8 @@ if (empty($clean_caller)) {
 $data_hora = date('d/m/Y H:i:s');
 
 // Carregar credenciais da API Z-PRO (Prismabot)
-$api_url   = getSetting('prismabot_api_url');
-$api_token = getSetting('prismabot_api_token');
+$api_url   = getSetting('api_url')   ?: getSetting('prismabot_api_url');
+$api_token = getSetting('api_token') ?: getSetting('prismabot_api_token');
 
 if (empty($api_url) || empty($api_token)) {
     if (function_exists('pabx_log')) {
