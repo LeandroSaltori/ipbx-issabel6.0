@@ -248,11 +248,8 @@ $topic_rules = array_values(array_filter($rules_all, function ($r) { return $r['
                 <button onclick="runGlobalAiAnalysis()" id="btn-run-global-ai" class="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white font-extrabold rounded-xl text-xs transition shadow-lg shadow-purple-600/30 flex items-center gap-2">
                     <i class="fa-solid fa-wand-magic-sparkles"></i> Processar Auditoria Global
                 </button>
-                <button type="button" id="btn-batch-analyze" onclick="analyzePendingCalls()" <?php echo (!$ai_configured || !$pending_uids) ? 'disabled' : ''; ?> class="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-extrabold rounded-xl text-xs transition flex items-center gap-2" style="white-space:nowrap !important;flex-shrink:0 !important;width:auto !important;overflow:visible !important;text-overflow:clip !important;">
-                    <i class="fa-solid fa-microphone-lines"></i> Analisar chamadas do período (<?php echo min(10, count($pending_uids)); ?>)
-                </button>
-                <button type="button" onclick="document.getElementById('dlg-ia-rules').showModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-100 border border-slate-700 font-extrabold rounded-xl text-xs transition flex items-center gap-2" style="white-space:nowrap !important;flex-shrink:0 !important;width:auto !important;overflow:visible !important;text-overflow:clip !important;">
-                    <i class="fa-solid fa-sliders text-purple-400"></i> Configurar palavras
+                <button type="button" onclick="document.getElementById('dlg-ia-rules').showModal()" title="Configurar palavras-chave (riscos, tópicos e checklist)" class="p-2.5 bg-slate-800 hover:bg-slate-700 text-purple-400 border border-slate-700 rounded-xl font-bold transition flex items-center justify-center shadow">
+                    <i class="fa-solid fa-sliders text-base"></i>
                 </button>
                 <button onclick="downloadIaReportPdf()" title="Exportar PDF" class="p-2.5 bg-slate-800 hover:bg-slate-700 text-rose-400 border border-slate-700 rounded-xl font-bold transition flex items-center justify-center shadow">
                     <i class="fa-solid fa-file-pdf text-base"></i>
@@ -321,54 +318,56 @@ function setPresetFilter(preset) {
 
     <!-- CARDS DE METRICAS CHAVE DA OPERAÇÃO DE IA -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <!-- Card 1: Vibe Geral (sentimento das chamadas analisadas) -->
+        <?php
+            $pp = $sent_total ? round($sent_count['Positivo'] * 100 / $sent_total) : 0;
+            $pn = $sent_total ? round($sent_count['Neutro'] * 100 / $sent_total) : 0;
+            $pg = $sent_total ? max(0, 100 - $pp - $pn) : 0;
+            $vibe_lbl = !$sent_total ? 'Sem análises' : ($pp >= 80 ? '🟢 Excelente' : ($pp >= 60 ? '🟡 Regular' : '🔴 Atenção'));
+            $qa_lbl = $qa_avg === null ? 'Sem análises' : ($qa_avg >= 90 ? '⭐ Padronizado' : ($qa_avg >= 70 ? 'Regular' : 'Melhorar'));
+            $fcr_lbl = $fcr_pct === null ? 'Sem dados' : ($fcr_pct >= 85 ? 'Alta Eficiência' : ($fcr_pct >= 65 ? 'Regular' : 'Atenção'));
+        ?>
+        <!-- Card 1: Vibe Geral da Operação -->
         <div class="bg-slate-900/90 border border-emerald-500/30 p-5 rounded-2xl shadow-xl space-y-3">
             <div class="flex items-center justify-between">
                 <span class="text-xs font-black uppercase text-emerald-400 tracking-wider">Vibe Geral dos Clientes</span>
                 <i class="fa-solid fa-face-smile text-emerald-400 text-lg"></i>
             </div>
-            <?php if ($sent_total > 0):
-                $pp = round($sent_count['Positivo'] * 100 / $sent_total); $pn = round($sent_count['Neutro'] * 100 / $sent_total); $pg = max(0, 100 - $pp - $pn); ?>
             <div class="flex items-baseline gap-2">
-                <span class="text-3xl font-black text-white font-mono"><?php echo $pp; ?>%</span>
-                <span class="text-xs text-emerald-300 font-bold">positivas</span>
+                <span class="text-3xl font-black text-white font-mono"><?php echo $sent_total ? $pp . '%' : '—'; ?></span>
+                <span class="text-xs text-emerald-300 font-bold"><?php echo $vibe_lbl; ?></span>
             </div>
             <div class="space-y-1">
                 <div class="flex justify-between text-[10px] text-slate-400">
-                    <span>🟢 <?php echo $pp; ?>% Positivo</span><span>🟡 <?php echo $pn; ?>% Neutro</span><span>🔴 <?php echo $pg; ?>% Negativo</span>
+                    <span>🟢 <?php echo $pp; ?>% Positivo</span>
+                    <span>🟡 <?php echo $pn; ?>% Neutro</span>
+                    <span>🔴 <?php echo $pg; ?>% Risco</span>
                 </div>
                 <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden flex">
                     <div class="bg-emerald-500 h-full" style="width: <?php echo $pp; ?>%"></div>
                     <div class="bg-amber-400 h-full" style="width: <?php echo $pn; ?>%"></div>
                     <div class="bg-rose-500 h-full" style="width: <?php echo $pg; ?>%"></div>
                 </div>
+                <span class="text-[10px] text-slate-500 block"><?php echo $sent_total; ?> chamada(s) analisada(s) pela IA</span>
             </div>
-            <span class="text-[10px] text-slate-400 block">Base: <?php echo $sent_total; ?> chamada(s) analisada(s) pela IA no período</span>
-            <?php else: ?>
-            <div class="text-3xl font-black text-slate-600 font-mono">—</div>
-            <span class="text-[10px] text-slate-400 block">Nenhuma chamada analisada no período. Use "Analisar chamadas do período".</span>
-            <?php endif; ?>
         </div>
 
-        <!-- Card 2: QA Scorecard (checklist configurável) -->
+        <!-- Card 2: QA Scorecard (Qualidade do Atendimento) -->
         <div class="bg-slate-900/90 border border-purple-500/30 p-5 rounded-2xl shadow-xl space-y-3">
             <div class="flex items-center justify-between">
                 <span class="text-xs font-black uppercase text-purple-400 tracking-wider">QA Scorecard Script</span>
                 <i class="fa-solid fa-clipboard-check text-purple-400 text-lg"></i>
             </div>
-            <?php if ($qa_avg !== null): ?>
             <div class="flex items-baseline gap-2">
-                <span class="text-3xl font-black text-white font-mono"><?php echo $qa_avg; ?><span class="text-lg font-normal text-slate-400">/100</span></span>
+                <span class="text-3xl font-black text-white font-mono"><?php echo $qa_avg === null ? '—' : $qa_avg; ?><span class="text-lg font-normal text-slate-400">/100</span></span>
+                <span class="text-xs text-purple-300 font-bold"><?php echo $qa_lbl; ?></span>
             </div>
-            <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden"><div class="bg-purple-500 h-full rounded-full" style="width: <?php echo $qa_avg; ?>%"></div></div>
-            <span class="text-[10px] text-slate-400 block">Média de itens do checklist encontrados nas transcrições (<?php echo $qa_n; ?> chamada(s))</span>
-            <?php else: ?>
-            <div class="text-3xl font-black text-slate-600 font-mono">—</div>
-            <span class="text-[10px] text-slate-400 block">Sem chamadas analisadas ou sem itens de checklist ativos.</span>
-            <?php endif; ?>
+            <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+                <div class="bg-purple-500 h-full rounded-full" style="width: <?php echo (int)$qa_avg; ?>%"></div>
+            </div>
+            <span class="text-[10px] text-slate-400 block">Itens do checklist de script encontrados nas transcrições</span>
         </div>
 
-        <!-- Card 3: Alertas de Risco (palavras-chave configuráveis) -->
+        <!-- Card 3: Alertas de Risco & Red Flags -->
         <div class="bg-slate-900/90 border border-rose-500/30 p-5 rounded-2xl shadow-xl space-y-3">
             <div class="flex items-center justify-between">
                 <span class="text-xs font-black uppercase text-rose-400 tracking-wider">Alertas de Risco / Red Flags</span>
@@ -376,29 +375,31 @@ function setPresetFilter(preset) {
             </div>
             <div class="flex items-baseline gap-2">
                 <span class="text-3xl font-black text-white font-mono"><?php echo $an_total ? $risk_calls : '—'; ?></span>
-                <span class="text-xs text-rose-300 font-bold"><?php echo $an_total ? 'chamada(s) com alerta' : ''; ?></span>
+                <span class="text-xs text-rose-300 font-bold"><?php echo $risk_calls ? 'Atenção Gerencial' : ($an_total ? 'Sem alertas' : 'Sem análises'); ?></span>
             </div>
-            <?php if ($risk_words): foreach (array_slice($risk_words, 0, 3, true) as $w => $n): ?>
-            <div class="bg-rose-500/10 border border-rose-500/20 px-2.5 py-1 rounded-lg text-[10px] text-rose-300 font-bold">⚠️ Palavra-chave "<?php echo htmlspecialchars($w); ?>" em <?php echo $n; ?> chamada(s)</div>
+            <?php if ($risk_words): foreach (array_slice($risk_words, 0, 2, true) as $w => $n): ?>
+            <div class="bg-rose-500/10 border border-rose-500/20 px-2.5 py-1 rounded-lg text-[10px] text-rose-300 font-bold">
+                ⚠️ Palavra-chave "<?php echo htmlspecialchars(mb_strtoupper($w, 'UTF-8')); ?>" detectada (<?php echo $n; ?>)
+            </div>
             <?php endforeach; else: ?>
-            <span class="text-[10px] text-slate-400 block"><?php echo $an_total ? 'Nenhuma palavra de risco encontrada.' : 'Aguardando análises.'; ?> <a href="#" onclick="document.getElementById('dlg-ia-rules').showModal();return false;" class="text-rose-300 underline">Configurar palavras</a></span>
+            <div class="bg-slate-800/60 border border-slate-700 px-2.5 py-1 rounded-lg text-[10px] text-slate-400 font-bold">Nenhuma palavra de risco detectada</div>
             <?php endif; ?>
         </div>
 
-        <!-- Card 4: FCR calculado no CDR -->
+        <!-- Card 4: FCR (Resolução na Primeira Chamada) -->
         <div class="bg-slate-900/90 border border-cyan-500/30 p-5 rounded-2xl shadow-xl space-y-3">
             <div class="flex items-center justify-between">
                 <span class="text-xs font-black uppercase text-cyan-400 tracking-wider">Resolução 1ª Chamada (FCR)</span>
                 <i class="fa-solid fa-bolt text-cyan-400 text-lg"></i>
             </div>
-            <?php if ($fcr_pct !== null): ?>
-            <div class="flex items-baseline gap-2"><span class="text-3xl font-black text-white font-mono"><?php echo $fcr_pct; ?>%</span></div>
-            <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden"><div class="bg-cyan-500 h-full rounded-full" style="width: <?php echo $fcr_pct; ?>%"></div></div>
-            <span class="text-[10px] text-slate-400 block">Chamadas atendidas (externas) sem nova ligação do mesmo número em 24h — <?php echo $fcr_base; ?> no CDR</span>
-            <?php else: ?>
-            <div class="text-3xl font-black text-slate-600 font-mono">—</div>
-            <span class="text-[10px] text-slate-400 block">Sem chamadas externas atendidas com mais de 24h no período.</span>
-            <?php endif; ?>
+            <div class="flex items-baseline gap-2">
+                <span class="text-3xl font-black text-white font-mono"><?php echo $fcr_pct === null ? '—' : $fcr_pct . '%'; ?></span>
+                <span class="text-xs text-cyan-300 font-bold"><?php echo $fcr_lbl; ?></span>
+            </div>
+            <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+                <div class="bg-cyan-500 h-full rounded-full" style="width: <?php echo (float)$fcr_pct; ?>%"></div>
+            </div>
+            <span class="text-[10px] text-slate-400 block">Sem nova ligação do mesmo número em 24h (<?php echo (int)$fcr_base; ?> chamadas no CDR)</span>
         </div>
     </div>
 
@@ -413,17 +414,21 @@ function setPresetFilter(preset) {
             </h3>
 
             <div class="space-y-3 text-xs">
-                <?php if ($topic_count): $tmax = max(array_sum($topic_count), 1); foreach ($topic_count as $tl => $tn): $tp = round($tn * 100 / max($an_total, 1)); ?>
+                <?php
+                $tstyle = [['fa-wrench','cyan','bg-cyan-500','text-cyan-400'],['fa-receipt','amber','bg-amber-400','text-amber-400'],['fa-rocket','purple','bg-purple-500','text-purple-400'],['fa-triangle-exclamation','rose','bg-rose-500','text-rose-400']];
+                $ti = 0;
+                foreach ($topic_rules as $tr_):
+                    if (!$tr_['enabled']) continue;
+                    $st_ = $tstyle[$ti++ % 4]; $tn = $topic_count[$tr_['label']] ?? 0; $tp = $an_total ? round($tn * 100 / $an_total) : 0; ?>
                 <div class="space-y-1">
                     <div class="flex justify-between font-bold">
-                        <span class="text-slate-200 flex items-center gap-2"><i class="fa-solid fa-tag text-cyan-400"></i> <?php echo htmlspecialchars($tl); ?></span>
-                        <span class="text-cyan-400 font-mono"><?php echo $tp; ?>% (<?php echo $tn; ?> chamada<?php echo $tn > 1 ? 's' : ''; ?>)</span>
+                        <span class="text-slate-200 flex items-center gap-2"><i class="fa-solid <?php echo $st_[0]; ?> <?php echo $st_[3]; ?>"></i> <?php echo htmlspecialchars($tr_['label']); ?></span>
+                        <span class="<?php echo $st_[3]; ?> font-mono"><?php echo $tp; ?>% (<?php echo $tn; ?> chamada<?php echo $tn == 1 ? '' : 's'; ?>)</span>
                     </div>
-                    <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden"><div class="bg-cyan-500 h-full rounded-full" style="width: <?php echo $tp; ?>%"></div></div>
+                    <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden"><div class="<?php echo $st_[2]; ?> h-full rounded-full" style="width: <?php echo $tp; ?>%"></div></div>
                 </div>
-                <?php endforeach; else: ?>
-                <p class="text-slate-500 italic py-4 text-center"><?php echo $an_total ? 'Nenhuma chamada analisada casou com as palavras dos tópicos.' : 'Sem chamadas analisadas no período.'; ?>
-                    <a href="#" onclick="document.getElementById('dlg-ia-rules').showModal();return false;" class="text-purple-300 underline">Configurar tópicos</a></p>
+                <?php endforeach; if (!$ti): ?>
+                <p class="text-slate-500 italic py-4 text-center">Nenhum tópico ativo. Use o ícone de configuração no topo.</p>
                 <?php endif; ?>
             </div>
         </div>
@@ -436,16 +441,12 @@ function setPresetFilter(preset) {
             </h3>
 
             <div class="space-y-2.5 text-xs font-semibold">
-                <?php if ($check_n): foreach ($check_n as $cl => $cn): $hits = $check_hit[$cl] ?? 0; $pc = round($hits * 100 / $cn, 1); $good = $pc >= 90; ?>
+                <?php foreach (aiAuditRules('checklist') as $cr): $cl = $cr['label']; $cn = $check_n[$cl] ?? 0; $hits = $check_hit[$cl] ?? 0; $pc = $cn ? round($hits * 100 / $cn, 1) : null; $good = $pc !== null && $pc >= 90; ?>
                 <div class="p-2.5 bg-slate-950 border border-slate-800 rounded-xl flex items-center justify-between">
-                    <span class="text-slate-200 flex items-center gap-2"><i class="fa-solid <?php echo $good ? 'fa-circle-check text-emerald-400' : 'fa-circle-xmark text-amber-400'; ?>"></i> <?php echo htmlspecialchars($cl); ?></span>
-                    <span class="px-2 py-0.5 <?php echo $good ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' : 'bg-amber-500/20 text-amber-300 border-amber-500/30'; ?> border rounded font-mono font-bold"><?php echo $pc; ?>% (<?php echo $hits; ?>/<?php echo $cn; ?>)</span>
+                    <span class="text-slate-200 flex items-center gap-2"><i class="fa-solid <?php echo ($pc === null) ? 'fa-circle text-slate-600' : ($good ? 'fa-circle-check text-emerald-400' : 'fa-circle-xmark text-amber-400'); ?>"></i> <?php echo htmlspecialchars($cl); ?></span>
+                    <span class="px-2 py-0.5 border rounded font-mono font-bold <?php echo $pc === null ? 'bg-slate-800 text-slate-400 border-slate-700' : ($good ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' : 'bg-amber-500/20 text-amber-300 border-amber-500/30'); ?>"><?php echo $pc === null ? 'Sem dados' : ($pc . '% ' . ($good ? 'Cumprido' : '(Melhorar)')); ?></span>
                 </div>
-                <?php endforeach; else: ?>
-                <p class="text-slate-500 italic py-4 text-center">Sem chamadas analisadas no período.
-                    <a href="#" onclick="document.getElementById('dlg-ia-rules').showModal();return false;" class="text-purple-300 underline">Configurar checklist</a></p>
-                <?php endif; ?>
-                <p class="text-[10px] text-slate-500 pt-1">Verificação por palavras-chave na transcrição inteira (a transcrição não separa quem falou).</p>
+                <?php endforeach; ?>
             </div>
         </div>
 
@@ -515,12 +516,7 @@ function setPresetFilter(preset) {
                                 <?php else: ?><span class="text-slate-500 text-[10px]">Sem gravação</span><?php endif; ?>
                             </td>
                             <td class="py-3.5 px-4 text-center">
-                                <?php if ($call['has_recording'] && $ai_configured): ?>
-                                <button type="button" onclick="analyzeOneCall('<?php echo htmlspecialchars($call['id'], ENT_QUOTES); ?>', this)" class="px-3 py-1.5 mb-1 bg-cyan-600/20 hover:bg-cyan-600 text-cyan-300 hover:text-white border border-cyan-500/40 rounded-xl text-xs font-bold transition flex items-center gap-1.5 mx-auto" style="white-space:nowrap !important;flex-shrink:0 !important;width:auto !important;overflow:visible !important;text-overflow:clip !important;">
-                                    <i class="fa-solid fa-wand-magic-sparkles"></i> <?php echo $call['analyzed'] ? 'Reanalisar' : 'Analisar'; ?>
-                                </button>
-                                <?php endif; ?>
-                                <button onclick="openFullIaAuditModal(<?php echo htmlspecialchars(json_encode($call)); ?>)" class="px-3 py-1.5 bg-purple-600/20 hover:bg-purple-600 text-purple-300 hover:text-white border border-purple-500/40 rounded-xl text-xs font-bold transition flex items-center gap-1.5 mx-auto shadow">
+                                <button onclick="openAuditOrAnalyze(<?php echo htmlspecialchars(json_encode($call)); ?>, this)" class="px-3 py-1.5 bg-purple-600/20 hover:bg-purple-600 text-purple-300 hover:text-white border border-purple-500/40 rounded-xl text-xs font-bold transition flex items-center gap-1.5 mx-auto shadow">
                                     <i class="fa-solid fa-magnifying-glass-chart"></i> Ver Auditoria
                                 </button>
                             </td>
@@ -598,31 +594,39 @@ async function iaAnalyzeUid(uid) {
     return res.json();
 }
 
-async function analyzeOneCall(uid, btn) {
+let IA_NEEDS_RELOAD = false;
+
+async function openAuditOrAnalyze(data, btn) {
+    if (data.analyzed || !data.has_recording) { openFullIaAuditModal(data); return; }
     const orig = btn.innerHTML;
     btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Analisando...';
     try {
-        const d = await iaAnalyzeUid(uid);
-        if (d.success) { location.reload(); return; }
-        alert('Não foi possível analisar: ' + (d.error || 'erro desconhecido'));
+        const d = await iaAnalyzeUid(data.id);
+        if (d.success) {
+            data.analyzed = true; IA_NEEDS_RELOAD = true;
+            data.summary_problem = d.resumo; data.summary_action = d.recomendacao || '—';
+            data.summary_result = 'Sentimento: ' + (d.sentimento || '—') + ' | Satisfação: ' + (d.satisfacao == null ? 'não inferida' : d.satisfacao + '/5') + ' | IA: ' + d.model;
+            data.transcript_text = d.transcript;
+            data.qa_score = d.qa_score;
+            data.risk_alert = !!(d.risks && d.risks.length);
+            data.risk_text = (d.risks || []).map(r => r.label + ' (' + (r.words || []).join(', ') + ')').join(' | ');
+            openFullIaAuditModal(data);
+        } else {
+            data.summary_result = 'Não foi possível analisar: ' + (d.error || 'erro desconhecido');
+            openFullIaAuditModal(data);
+        }
     } catch (e) { alert('Falha na requisição: ' + e.message); }
     btn.disabled = false; btn.innerHTML = orig;
 }
 
-async function analyzePendingCalls() {
-    const btn = document.getElementById('btn-batch-analyze');
-    if (!IA_PENDING.length) return;
-    const orig = btn.innerHTML; btn.disabled = true;
-    let ok = 0, fail = 0, lastErr = '';
-    for (let i = 0; i < IA_PENDING.length; i++) {
-        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Analisando ' + (i + 1) + '/' + IA_PENDING.length + '...';
-        try { const d = await iaAnalyzeUid(IA_PENDING[i]); if (d.success) ok++; else { fail++; lastErr = d.error || ''; } }
-        catch (e) { fail++; lastErr = e.message; }
-    }
-    if (fail && !ok) alert('Nenhuma chamada analisada. Último erro: ' + lastErr);
-    else location.reload();
-    btn.innerHTML = orig; btn.disabled = false;
-}
+// Ao fechar o modal após uma análise nova, atualiza os cards
+(function () {
+    const orig = window.closeModal;
+    window.closeModal = function (id) {
+        if (typeof orig === 'function') orig(id);
+        if (id === 'modal-full-ia-audit' && IA_NEEDS_RELOAD) location.reload();
+    };
+})();
 </script>
 
 <!-- MODAL: AUDITORIA DETALHADA DA CHAMADA (DIALOGO DUAL-SPEAKER + SCORECARD) -->
@@ -764,6 +768,12 @@ async function runGlobalAiAnalysis() {
     btn.disabled = true;
 
     try {
+        let analyzedNow = 0;
+        for (const uid of IA_PENDING) {
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Analisando chamadas ' + (analyzedNow + 1) + '/' + IA_PENDING.length + '...';
+            try { const r = await iaAnalyzeUid(uid); if (r.success) analyzedNow++; } catch (e) {}
+        }
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Processando Auditoria...';
         const total = <?php echo $tot_calls; ?>;
         const atend = <?php echo $ans_calls; ?>;
         const tma = <?php echo $avg_tma; ?>;
@@ -776,8 +786,9 @@ async function runGlobalAiAnalysis() {
         });
         const data = await res.json();
         if (data.success && data.insights) {
-            if (typeof showIaToast === 'function') showIaToast('Auditoria Global de IA concluída com 100% dos dados atualizados!');
+            if (typeof showIaToast === 'function') showIaToast('Auditoria Global de IA concluída.');
         }
+        if (typeof analyzedNow !== 'undefined' && analyzedNow > 0) { location.reload(); return; }
     } catch(e) {
         if (typeof showIaToast === 'function') showIaToast('Auditoria de IA atualizada.', true);
     } finally {
