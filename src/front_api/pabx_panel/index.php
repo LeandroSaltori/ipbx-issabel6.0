@@ -659,6 +659,115 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
         }
         exit;
     }
+    // ---------------------------------------------------------------------
+    // Envio manual de WhatsApp (botões de compartilhar / FOP / contatos / resumo IA)
+    // ---------------------------------------------------------------------
+    if ($action === 'send_whatsapp_message') {
+        header('Content-Type: application/json; charset=utf-8');
+        $body  = json_decode(file_get_contents('php://input'), true) ?: [];
+        $phone = preg_replace('/\D/', '', (string)($body['phone'] ?? ''));
+        $msg   = trim((string)($body['message'] ?? ''));
+        $uid   = trim((string)($body['uid'] ?? ''));
+        if (!hasUserPermission('send_whatsapp')) { echo json_encode(['success' => false, 'error' => 'Sem permissão para enviar WhatsApp.']); exit; }
+        if (strlen($phone) < 10 || strlen($phone) > 15) { echo json_encode(['success' => false, 'error' => 'Número inválido. Informe DDD + número.']); exit; }
+        if ($msg === '' || mb_strlen($msg) > 4000) { echo json_encode(['success' => false, 'error' => 'Mensagem vazia ou maior que 4000 caracteres.']); exit; }
+        $warning = '';
+        if ($uid !== '') {
+            if (!hasUserPermission('listen_recordings')) { echo json_encode(['success' => false, 'error' => 'Sem permissão para compartilhar gravações.']); exit; }
+            $link = audioSignedUrl($uid);
+            if ($link !== '') $msg .= "\n\n🎧 Gravação (link válido por 7 dias): " . $link;
+            else $warning = 'Enviado sem o link da gravação: configure a "URL pública do painel" em Configurações > API.';
+        }
+        $lu  = getLoggedUser();
+        $res = sendWhatsAppAPI($phone, $msg, $uid !== '' ? $uid : 'MANUAL', (string)($lu['extension'] ?? 'PAINEL'), 'ENVIO_MANUAL');
+        echo json_encode(['success' => !empty($res['success']), 'error' => $res['error'] ?? '', 'warning' => $warning]);
+        exit;
+    }
+
+    // ---------------------------------------------------------------------
+    // Envio manual de e-mail (SMTP configurado em Configurações > SMTP)
+    // ---------------------------------------------------------------------
+    if ($action === 'send_email_report') {
+        header('Content-Type: application/json; charset=utf-8');
+        $body = json_decode(file_get_contents('php://input'), true) ?: [];
+        $to   = trim((string)($body['to'] ?? ''));
+        $subj = trim(preg_replace('/[\r\n]+/', ' ', (string)($body['subject'] ?? 'Relatório IPbx Prisma')));
+        $msg  = trim((string)($body['message'] ?? ''));
+        $uid  = trim((string)($body['uid'] ?? ''));
+        if (!hasUserPermission('send_whatsapp') && !hasUserPermission('schedule_reports')) { echo json_encode(['success' => false, 'error' => 'Sem permissão para enviar e-mails.']); exit; }
+        if (!filter_var($to, FILTER_VALIDATE_EMAIL)) { echo json_encode(['success' => false, 'error' => 'E-mail de destino inválido.']); exit; }
+        if ($msg === '' || mb_strlen($msg) > 20000) { echo json_encode(['success' => false, 'error' => 'Mensagem vazia ou muito longa.']); exit; }
+        $smtpFile = __DIR__ . '/config/smtp_settings.json';
+        $smtp = is_file($smtpFile) ? json_decode((string)@file_get_contents($smtpFile), true) : null;
+        if (!is_array($smtp) || empty($smtp['host']) || empty($smtp['is_active'])) {
+            echo json_encode(['success' => false, 'error' => 'SMTP não configurado/ativo. Abra Configurações > Servidor SMTP e salve as credenciais.']);
+            exit;
+        }
+        $warning = '';
+        if ($uid !== '') {
+            if (!hasUserPermission('listen_recordings')) { echo json_encode(['success' => false, 'error' => 'Sem permissão para compartilhar gravações.']); exit; }
+            $link = audioSignedUrl($uid);
+            if ($link !== '') $msg .= "\n\nGravação (link válido por 7 dias): " . $link;
+            else $warning = 'Enviado sem o link da gravação: configure a "URL pública do painel" em Configurações > API.';
+        }
+        $res = sendSmtpEmailNative($smtp, $to, $subj, $msg);
+        echo json_encode(['success' => !empty($res['success']), 'error' => $res['error'] ?? '', 'warning' => $warning]);
+        exit;
+    }
+
+    // ---------------------------------------------------------------------
+    // Análise de uma gravação por IA: transcrição (Whisper) + resumo/sentimento (LLM)
+    // ---------------------------------------------------------------------
+    if ($action === 'analyze_call_audio') {
+        header('Content-Type: application/json; charset=utf-8');
+        $body = json_decode(file_get_contents('php://input'), true) ?: [];
+        $uid  = trim((string)($body['uid'] ?? ''));
+        if (!hasUserPermission('listen_recordings')) { echo json_encode(['success' => false, 'error' => 'Sem permissão para acessar gravações.']); exit; }
+        if ($uid === '') { echo json_encode(['success' => false, 'error' => 'Chamada não informada.']); exit; }
+        $cfg = aiGetConfig();
+        if ($cfg['key'] === '')  { echo json_encode(['success' => false, 'error' => 'API Key de IA não configurada em Configurações > Inteligência Artificial.']); exit; }
+        if (!$cfg['enabled'])    { echo json_encode(['success' => false, 'error' => 'Copiloto de IA desativado em Configurações > Inteligência Artificial.']); exit; }
+
+        $cdr = getAsteriskPdoConnection('asteriskcdrdb');
+        $row = false;
+        if ($cdr) {
+            try {
+                $st = $cdr->prepare("SELECT src, dst, calldate, billsec, disposition, recordingfile FROM cdr WHERE uniqueid = :u LIMIT 1");
+                $st->execute([':u' => $uid]);
+                $row = $st->fetch(PDO::FETCH_ASSOC);
+            } catch (Exception $e) {}
+        }
+        if (!$row || empty($row['recordingfile'])) { echo json_encode(['success' => false, 'error' => 'Chamada ou gravação não encontrada no CDR.']); exit; }
+        $path = findRecordingPath($row['recordingfile'], $row['calldate']);
+        if ($path === '') { echo json_encode(['success' => false, 'error' => 'Arquivo de gravação não encontrado em /var/spool/asterisk/monitor.']); exit; }
+
+        $tr = aiTranscribeFile($path, $cfg);
+        if (!$tr['ok']) { echo json_encode(['success' => false, 'error' => 'Transcrição: ' . $tr['error']]); exit; }
+        if ($tr['text'] === '') { echo json_encode(['success' => false, 'error' => 'A transcrição voltou vazia (áudio sem fala?).']); exit; }
+
+        $r = aiChatCompletion(
+            'Você analisa ligações telefônicas de atendimento. Responda APENAS um JSON no formato {"resumo":"até 4 linhas","sentimento":"Positivo|Neutro|Negativo","satisfacao":número de 1 a 5 ou null se a conversa não permitir inferir,"recomendacao":"próximo passo objetivo"}. Use somente o que consta na transcrição; não invente fatos.',
+            mb_substr($tr['text'], 0, 12000), 40, $cfg
+        );
+        if (!$r['ok']) { echo json_encode(['success' => false, 'error' => 'Análise: ' . $r['error'], 'transcript' => $tr['text']]); exit; }
+        $txt = preg_replace('/^```(?:json)?\s*|\s*```$/i', '', trim($r['text']));
+        $j = json_decode($txt, true);
+        if (!is_array($j) && preg_match('/\{.*\}/s', $txt, $mm)) $j = json_decode($mm[0], true);
+        if (!is_array($j) || empty($j['resumo'])) { echo json_encode(['success' => false, 'error' => 'A IA respondeu fora do formato esperado.', 'transcript' => $tr['text']]); exit; }
+        $sat = isset($j['satisfacao']) && is_numeric($j['satisfacao']) ? max(1, min(5, (float)$j['satisfacao'])) : null;
+        echo json_encode([
+            'success' => true,
+            'resumo' => (string)$j['resumo'],
+            'sentimento' => (string)($j['sentimento'] ?? ''),
+            'satisfacao' => $sat,
+            'recomendacao' => (string)($j['recomendacao'] ?? ''),
+            'transcript' => $tr['text'],
+            'provider' => $cfg['provider'],
+            'model' => $cfg['model'],
+        ]);
+        exit;
+    }
+
     if ($action === 'test_llm_connection') {
         if (ob_get_level()) ob_end_clean();
         header('Content-Type: application/json');
@@ -2786,6 +2895,8 @@ if ($__route_perm !== '' && !hasUserPermission($__route_perm)) {
         }
 
 
+    </script>
+
     <!-- MODAL DE COMPARTILHAMENTO VIA E-MAIL -->
     <div id="modal-share-email" class="fixed inset-0 z-[99999] hidden bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4">
         <div class="bg-slate-900 border border-amber-500/30 rounded-3xl max-w-md w-full p-6 space-y-5 shadow-2xl animate-fade-in">
@@ -2885,6 +2996,7 @@ if ($__route_perm !== '' && !hasUserPermission($__route_perm)) {
 
     <script>
         function shareReportViaEmail(itemTitle, defaultEmail = '') {
+            window.__shareUid = window.__pendingUid || ''; window.__pendingUid = '';
             document.getElementById('share-email-subject-val').value = itemTitle;
             document.getElementById('share-email-item-display').innerText = itemTitle;
             const targetInput = document.getElementById('share-email-target');
@@ -2895,6 +3007,7 @@ if ($__route_perm !== '' && !hasUserPermission($__route_perm)) {
         }
 
         function shareReportViaWhatsApp(itemTitle, defaultPhone = '') {
+            window.__shareUid = window.__pendingUid || ''; window.__pendingUid = '';
             document.getElementById('share-wa-item-val').value = itemTitle;
             document.getElementById('share-wa-item-display').innerText = itemTitle;
             const targetInput = document.getElementById('share-wa-target');
@@ -2905,37 +3018,53 @@ if ($__route_perm !== '' && !hasUserPermission($__route_perm)) {
         }
 
         function sendSingleCallEmail(uid, src, dst, calldate, duration) {
+            window.__pendingUid = uid;
             shareReportViaEmail(`Gravação de Chamada #${uid} (${src} ➔ ${dst})`);
         }
 
         function sendSingleCallWa(uid, src, dst, calldate, duration) {
+            window.__pendingUid = uid;
             shareReportViaWhatsApp(`Gravação de Chamada #${uid} (${src} ➔ ${dst})`);
         }
 
-        function executeShareEmail() {
+        async function executeShareEmail() {
             const itemTitle = document.getElementById('share-email-subject-val').value;
             const email = document.getElementById('share-email-target').value.trim();
             const btn = document.getElementById('btn-submit-share-email');
+            const origHtml = btn ? btn.innerHTML : '';
 
             if (!email) {
                 showToastNotification('E-mail Obrigatório', 'Informe o endereço de e-mail de destino.', 'warning');
                 return;
             }
 
-            if (btn) btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Enviando...';
-
-            setTimeout(() => {
-                showToastNotification('E-mail Disparado!', `O item "${itemTitle}" foi enviado com sucesso para ${email}!`, 'success');
-                if (btn) btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Enviar E-mail Agora';
-                closeModal('modal-share-email');
-            }, 800);
+            if (btn) { btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Enviando...'; btn.disabled = true; }
+            try {
+                const res = await fetch('index.php?api_action=send_email_report', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ to: email, subject: itemTitle, message: itemTitle, uid: window.__shareUid || '' })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToastNotification('E-mail enviado', `"${itemTitle}" enviado para ${email}.` + (data.warning ? ' ' + data.warning : ''), data.warning ? 'warning' : 'success');
+                    closeModal('modal-share-email');
+                } else {
+                    showToastNotification('Falha no envio de e-mail', data.error || 'Erro desconhecido', 'error');
+                }
+            } catch (e) {
+                showToastNotification('Falha no envio de e-mail', e.message, 'error');
+            } finally {
+                if (btn) { btn.innerHTML = origHtml || '<i class="fa-solid fa-paper-plane"></i> Enviar E-mail Agora'; btn.disabled = false; }
+            }
         }
 
-        function executeShareWhatsApp() {
+        async function executeShareWhatsApp() {
             const itemTitle = document.getElementById('share-wa-item-val').value;
             let phone = document.getElementById('share-wa-target').value.replace(/\D/g, '');
-            const msg = document.getElementById('share-wa-msg').value;
+            const custom = (document.getElementById('share-wa-msg').value || '').trim();
             const btn = document.getElementById('btn-submit-share-wa');
+            const origHtml = btn ? btn.innerHTML : '';
 
             if (!phone) {
                 showToastNotification('WhatsApp Obrigatório', 'Informe o número do celular com DDD.', 'warning');
@@ -2946,13 +3075,25 @@ if ($__route_perm !== '' && !hasUserPermission($__route_perm)) {
                 phone = '55' + phone;
             }
 
-            if (btn) btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Disparando...';
-
-            setTimeout(() => {
-                showToastNotification('WhatsApp Disparado!', `Item "${itemTitle}" enviado via API para +${phone}!`, 'success');
-                if (btn) btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Enviar API';
-                closeModal('modal-share-whatsapp');
-            }, 800);
+            if (btn) { btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Enviando...'; btn.disabled = true; }
+            try {
+                const res = await fetch('index.php?api_action=send_whatsapp_message', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ phone: phone, message: (custom ? custom + '\n\n' : '') + '📌 ' + itemTitle, uid: window.__shareUid || '' })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToastNotification('WhatsApp enviado', `Mensagem enviada para +${phone}.` + (data.warning ? ' ' + data.warning : ''), data.warning ? 'warning' : 'success');
+                    closeModal('modal-share-whatsapp');
+                } else {
+                    showToastNotification('Falha no envio de WhatsApp', data.error || 'Erro desconhecido', 'error');
+                }
+            } catch (e) {
+                showToastNotification('Falha no envio de WhatsApp', e.message, 'error');
+            } finally {
+                if (btn) { btn.innerHTML = origHtml || '<i class="fa-solid fa-paper-plane"></i> Enviar API'; btn.disabled = false; }
+            }
         }
 
         function openDirectWebWa() {

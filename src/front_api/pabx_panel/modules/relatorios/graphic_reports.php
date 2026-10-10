@@ -525,7 +525,7 @@ if (empty($queue_stats)) {
 
         <div class="space-y-3">
             <label class="text-xs text-slate-300 font-bold block">Número de Telefone / Celular (Com DDD):</label>
-            <input type="text" id="report-target-phone" value="5511999998888" placeholder="Ex: 5511999998888" class="w-full px-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white font-mono focus:border-emerald-500 focus:outline-none">
+            <input type="text" id="report-target-phone" value="" placeholder="Ex: 5511999998888" class="w-full px-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white font-mono focus:border-emerald-500 focus:outline-none">
             <p class="text-[11px] text-slate-400">
                 Será enviado um texto resumido do relatório (Chamadas Recebidas: <?php echo $inc_calls; ?> [<?php echo $inc_pct; ?>%], Saídas: <?php echo $out_calls; ?> [<?php echo $out_pct; ?>%]) para o número informado.
             </p>
@@ -640,9 +640,17 @@ function closeSendWhatsAppModal() {
 async function submitWhatsAppReport() {
     const phone = document.getElementById('report-target-phone').value;
     if (!phone) return alert('Informe o número de telefone.');
-    
-    alert('Relatório enviado com sucesso via WhatsApp para ' + phone);
-    closeSendWhatsAppModal();
+    const msg = <?php echo json_encode("📊 Relatório gráfico PABX - " . date('d/m/Y H:i') . "\nChamadas recebidas: {$inc_calls} ({$inc_pct}%)\nChamadas efetuadas: {$out_calls} ({$out_pct}%)"); ?>;
+    try {
+        const res = await fetch('index.php?api_action=send_whatsapp_message', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ phone: phone, message: msg })
+        });
+        const data = await res.json();
+        if (data.success) { showToastNotification('WhatsApp enviado', 'Resumo enviado para ' + phone, 'success'); closeSendWhatsAppModal(); }
+        else showToastNotification('Falha no envio', data.error || 'Erro desconhecido', 'error');
+    } catch (e) { showToastNotification('Falha no envio', e.message, 'error'); }
 }
 </script>
 

@@ -496,72 +496,108 @@ if (file_exists($jsonSmtpFile)) {
 </div>
 
 <script>
-    function shareSummaryWhatsApp(active) {
-        if (active) {
-            const phone = prompt('Digite o número do WhatsApp com DDD (ex: 5511999998888):');
-            if (phone) alert(`🚀 Resumo IA e link da gravação enviados via WhatsApp para ${phone}!`);
-        } else {
-            alert('⚠️ Integração Inativa!\nPara enviar resumos de chamadas via WhatsApp, acesse "Configurações > APIs & Conexões" e ative a API Prismabot.');
-        }
+    let __aiCall = null;
+
+    function aiEsc(v) {
+        return String(v == null ? '' : v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     }
 
-    function shareSummaryEmail(active) {
-        if (active) {
-            const email = prompt('Digite o e-mail de destino:');
-    function sendSingleCallWa(uid, src, dst, calldate, duration) {
-        const dest = prompt(`🟢 Enviar dados e gravação da chamada ${src} ➔ ${dst} via WhatsApp.\n\nDigite o número de destino com DDD:`, "5511999998888");
-        if (dest) {
-            showToastNotification('WhatsApp Disparado', `Detalhes e áudio da chamada ${uid} enviados com sucesso para ${dest}!`, 'success');
-            if (window.pabx_log) pabx_log('audit', 'INFO', `Envio de gravação de áudio da chamada ${uid} via WhatsApp para ${dest}`);
-        }
+    async function aiPostJson(action, payload) {
+        const res = await fetch('index.php?api_action=' + action, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(payload)
+        });
+        return res.json();
     }
 
-    function sendSingleCallEmail(uid, src, dst, calldate, duration) {
-        const dest = prompt(`📧 Enviar dados e gravação da chamada ${src} ➔ ${dst} por E-mail.\n\nDigite o e-mail de destino:`, "cliente@empresa.com.br");
-        if (dest) {
-            showToastNotification('E-mail Disparado', `Relatório completo da chamada ${uid} com link do áudio enviado para ${dest}!`, 'success');
-            if (window.pabx_log) pabx_log('audit', 'INFO', `Envio de gravação de áudio da chamada ${uid} via E-mail para ${dest}`);
+    async function shareSummaryWhatsApp(active) {
+        if (!active) {
+            showToastNotification('Integração inativa', 'Configure a API do WhatsApp em Configurações > APIs & Conexões.', 'warning');
+            return;
         }
+        if (!__aiCall || !__aiCall.text) {
+            showToastNotification('Sem análise', 'Rode a análise de IA da chamada antes de enviar.', 'warning');
+            return;
+        }
+        const phone = prompt('Digite o número do WhatsApp com DDD (ex: 5511999998888):');
+        if (!phone) return;
+        try {
+            const data = await aiPostJson('send_whatsapp_message', { phone: phone, message: __aiCall.text, uid: __aiCall.uid });
+            if (data.success) showToastNotification('WhatsApp enviado', 'Resumo enviado para ' + phone + '.' + (data.warning ? ' ' + data.warning : ''), data.warning ? 'warning' : 'success');
+            else showToastNotification('Falha no envio de WhatsApp', data.error || 'Erro desconhecido', 'error');
+        } catch (e) { showToastNotification('Falha no envio de WhatsApp', e.message, 'error'); }
     }
 
-    function analyzeAudioAI(uid, src) {
+    async function shareSummaryEmail(active) {
+        if (!active) {
+            showToastNotification('SMTP inativo', 'Configure o servidor em Configurações > Servidor SMTP.', 'warning');
+            return;
+        }
+        if (!__aiCall || !__aiCall.text) {
+            showToastNotification('Sem análise', 'Rode a análise de IA da chamada antes de enviar.', 'warning');
+            return;
+        }
+        const email = prompt('Digite o e-mail de destino:');
+        if (!email) return;
+        try {
+            const data = await aiPostJson('send_email_report', { to: email, subject: 'Resumo IA da chamada ' + __aiCall.uid, message: __aiCall.text, uid: __aiCall.uid });
+            if (data.success) showToastNotification('E-mail enviado', 'Resumo enviado para ' + email + '.' + (data.warning ? ' ' + data.warning : ''), data.warning ? 'warning' : 'success');
+            else showToastNotification('Falha no envio de e-mail', data.error || 'Erro desconhecido', 'error');
+        } catch (e) { showToastNotification('Falha no envio de e-mail', e.message, 'error'); }
+    }
+
+    async function analyzeAudioAI(uid, src) {
         const modal = document.getElementById('modal-ai-call-summary');
         const content = document.getElementById('ai-modal-content');
         const subtitle = document.getElementById('ai-modal-subtitle');
-        
+        __aiCall = null;
+
         if (modal) modal.classList.remove('hidden');
-        if (subtitle) subtitle.innerText = `Analisando chamada do Ramal ${src}`;
-        
-        if (content) {
+        if (subtitle) subtitle.innerText = 'Analisando chamada de ' + src;
+        if (!content) return;
+
+        content.innerHTML = `
+            <div class="animate-pulse py-6 text-center text-purple-400 space-y-2">
+                <i class="fa-solid fa-robot fa-spin text-3xl block"></i>
+                <span class="block font-bold">Transcrevendo o áudio e gerando a análise (pode levar alguns segundos)...</span>
+            </div>`;
+
+        try {
+            const d = await aiPostJson('analyze_call_audio', { uid: uid });
+            if (!d.success) {
+                content.innerHTML = `<div class="p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-rose-300">
+                    <strong><i class="fa-solid fa-circle-xmark"></i> Não foi possível analisar a chamada</strong>
+                    <p class="mt-1">${aiEsc(d.error || 'Erro desconhecido')}</p></div>`;
+                return;
+            }
+            const sat = (d.satisfacao == null) ? 'não inferida' : d.satisfacao + ' / 5';
+            if (subtitle) subtitle.innerText = 'Análise por ' + d.provider + ' / ' + d.model;
+            __aiCall = {
+                uid: uid,
+                text: '🧠 Resumo IA da chamada ' + uid + '\n\n' + d.resumo + '\n\nSentimento: ' + (d.sentimento || '-') + ' | Satisfação: ' + sat + '\nRecomendação: ' + (d.recomendacao || '-')
+            };
             content.innerHTML = `
-                <div class="animate-pulse py-6 text-center text-purple-400 space-y-2">
-                    <i class="fa-solid fa-robot fa-spin text-3xl block"></i>
-                    <span class="block font-bold">O Copiloto de IA está transcrevendo o áudio e gerando os insights...</span>
-                </div>
-            `;
-            
-            setTimeout(() => {
-                content.innerHTML = `
-                    <div class="space-y-3">
-                        <div class="p-3 bg-slate-950 rounded-xl border border-purple-500/30 space-y-1">
-                            <span class="text-[10px] font-bold text-purple-400 uppercase tracking-wider block">RESUMO DO ATENDIMENTO (IA gpt-4o-mini / Groq)</span>
-                            <p class="text-white font-medium">Cliente ligou interessado na aquisição de ramais adicionais para a equipe comercial. O atendente informou os planos e direcionou a proposta para aprovação.</p>
-                        </div>
-                        <div class="grid grid-cols-2 gap-2 text-[11px]">
-                            <div class="p-2.5 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-300">
-                                <strong>Sentimento:</strong> Positivo (Interessado)
-                            </div>
-                            <div class="p-2.5 bg-blue-500/10 border border-blue-500/20 rounded-xl text-blue-300">
-                                <strong>Satisfação:</strong> 4.8 / 5.0
-                            </div>
-                        </div>
-                        <div class="p-3 bg-slate-950 rounded-xl border border-slate-800 space-y-1">
-                            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">RECOMENDAÇÃO DO COPILOTO</span>
-                            <p class="text-slate-300">Agendar follow-up em 24h via WhatsApp com envio da proposta em PDF.</p>
-                        </div>
+                <div class="space-y-3">
+                    <div class="p-3 bg-slate-950 rounded-xl border border-purple-500/30 space-y-1">
+                        <span class="text-[10px] font-bold text-purple-400 uppercase tracking-wider block">Resumo do atendimento</span>
+                        <p class="text-white font-medium">${aiEsc(d.resumo)}</p>
                     </div>
-                `;
-            }, 1200);
+                    <div class="grid grid-cols-2 gap-2 text-[11px]">
+                        <div class="p-2.5 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-300"><strong>Sentimento:</strong> ${aiEsc(d.sentimento || '-')}</div>
+                        <div class="p-2.5 bg-blue-500/10 border border-blue-500/20 rounded-xl text-blue-300"><strong>Satisfação:</strong> ${aiEsc(sat)}</div>
+                    </div>
+                    <div class="p-3 bg-slate-950 rounded-xl border border-slate-800 space-y-1">
+                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Recomendação</span>
+                        <p class="text-slate-300">${aiEsc(d.recomendacao || '-')}</p>
+                    </div>
+                    <details class="p-3 bg-slate-950 rounded-xl border border-slate-800">
+                        <summary class="cursor-pointer text-[11px] font-bold text-slate-400">Transcrição completa</summary>
+                        <p class="mt-2 text-slate-300 whitespace-pre-wrap">${aiEsc(d.transcript)}</p>
+                    </details>
+                </div>`;
+        } catch (e) {
+            content.innerHTML = `<div class="p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-rose-300">Falha na requisição: ${aiEsc(e.message)}</div>`;
         }
     }
 

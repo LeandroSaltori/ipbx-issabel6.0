@@ -755,12 +755,12 @@ async function sendFastWA(e) {
     btn.disabled  = true;
 
     try {
-        const res  = await fetch('index.php?module=whatsapp&action=disparos', {
+                const res = await fetch('index.php?api_action=send_whatsapp_message', {
             method: 'POST',
-            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-            body: `action_send_manual_test=1&phone=${encodeURIComponent(phone)}&message=${encodeURIComponent(msg)}`
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ phone: phone, message: msg })
         });
-        const data = await res.json().catch(() => ({success: true}));
+        const data = await res.json();
         alert(data.success !== false ? `✅ Mensagem enviada para ${phone}!` : `❌ Erro: ${data.error || 'Verifique as configurações da API.'}`);
         closeModal('modal-fast-wa');
     } catch(err) {
