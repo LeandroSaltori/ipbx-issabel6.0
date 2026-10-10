@@ -19,7 +19,7 @@ function isGroupActive($modules_array) {
 }
 ?>
 
-<aside id="sidebar-panel" class="w-64 bg-slate-900/95 border-r border-slate-800 flex flex-col shrink-0 min-h-screen transition-all duration-300 z-30 select-none">
+<aside id="sidebar-panel" class="w-64 bg-slate-900/95 border-r border-slate-800 flex flex-col shrink-0 h-screen sticky top-0 self-start transition-all duration-300 z-30 select-none">
     <!-- Logo Header & Collapse Button -->
     <div class="p-4 border-b border-slate-800 flex items-center justify-between">
         <div class="flex items-center gap-3 sidebar-text">
