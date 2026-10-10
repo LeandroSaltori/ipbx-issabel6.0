@@ -109,6 +109,7 @@ if ($foundPath) {
 
     // 3. Streaming Direto com HTTP headers
     $fsize = filesize($foundPath);
+    $mime_map = ['wav'=>'audio/wav','mp3'=>'audio/mpeg','gsm'=>'audio/x-gsm','ogg'=>'audio/ogg'];
     $foundMime = isset($mime_map[$pExt]) ? $mime_map[$pExt] : 'audio/wav';
     header("Content-Type: $foundMime");
     header("Content-Length: $fsize");
@@ -119,57 +120,8 @@ if ($foundPath) {
     exit;
 }
 
-// -------------------------------------------------------------------------
-// Fallback Avançado: Gerar Áudio WAV PCM 16-bit (16000Hz mono) em memória
-// Compatível 100% com navegadores modernos (Chrome, Edge, Firefox, Safari)
-// -------------------------------------------------------------------------
-$sampleRate = 16000;
-$duration   = 2.5; // 2.5 segundos
-$numSamples = (int)($sampleRate * $duration);
-
-// Sequência de notas de anúncio PABX (Chime: Dó5 523Hz -> Mi5 659Hz -> Sol5 784Hz)
-$pcm = '';
-for ($i = 0; $i < $numSamples; $i++) {
-    $t = $i / $sampleRate;
-    $freq = 523.25; // Dó (0 a 0.8s)
-    if ($t > 0.8 && $t <= 1.6) $freq = 659.25; // Mi (0.8s a 1.6s)
-    if ($t > 1.6) $freq = 783.99; // Sol (1.6s a 2.5s)
-
-    // Envelope de suavização (fade in / fade out por nota)
-    $noteT = fmod($t, 0.8);
-    $env   = min(1, min($noteT / 0.05, (0.8 - $noteT) / 0.05));
-
-    $val = (int)(16000 * $env * sin(2 * M_PI * $freq * $t));
-    $val = max(-32768, min(32767, $val));
-    $pcm .= pack('v', $val); // 16-bit signed PCM little endian
-}
-
-// Cabeçalho WAV RIFF PCM 16-bit
-$dataSize   = strlen($pcm);
-$byteRate   = $sampleRate * 1 * 2; // sampleRate * channels * bytesPerSample
-$blockAlign = 2; // 1 canal * 2 bytes
-
-$header  = 'RIFF';
-$header .= pack('V', 36 + $dataSize);   // ChunkSize
-$header .= 'WAVE';
-$header .= 'fmt ';
-$header .= pack('V', 16);              // Subchunk1Size (PCM = 16)
-$header .= pack('v', 1);              // AudioFormat (PCM = 1)
-$header .= pack('v', 1);              // NumChannels (1 = mono)
-$header .= pack('V', $sampleRate);    // SampleRate (16000 Hz)
-$header .= pack('V', $byteRate);      // ByteRate (32000 B/s)
-$header .= pack('v', $blockAlign);    // BlockAlign (2 bytes)
-$header .= pack('v', 16);             // BitsPerSample (16 bits - CRÍTICO PARA HTML5)
-$header .= 'data';
-$header .= pack('V', $dataSize);
-
-$wav = $header . $pcm;
-
-header("Content-Type: audio/wav");
-header("Content-Length: " . strlen($wav));
-header("Accept-Ranges: bytes");
-header("Cache-Control: no-cache");
-header("X-Audio-Source: generated-16bit-pcm");
-
-echo $wav;
+// Arquivo não encontrado: nunca gerar áudio sintético
+http_response_code(404);
+header('Content-Type: text/plain; charset=utf-8');
+echo 'Áudio não encontrado';
 exit;

@@ -246,7 +246,7 @@ function isGroupActive($modules_array) {
                 <i class="fa-solid fa-user text-brand-400"></i>
             </div>
             <div class="overflow-hidden flex-1">
-                <span class="text-xs font-extrabold text-white block truncate"><?php echo htmlspecialchars($logged_user['name'] ?? 'Leandro Administrador'); ?></span>
+                <span class="text-xs font-extrabold text-white block truncate"><?php echo htmlspecialchars($logged_user['name'] ?? 'Usuário'); ?></span>
                 <span class="text-[10px] text-slate-400 block font-mono"><?php echo htmlspecialchars($logged_user['role'] ?? 'Administrador PABX'); ?></span>
             </div>
             <i class="fa-solid fa-gear text-xs text-slate-500"></i>

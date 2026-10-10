@@ -397,11 +397,16 @@ function exportToCSV() {
         btn.disabled = true;
 
         try {
+<?php
+            $__ans = array_filter($cdr_list, function($r){ return $r['disposition'] === 'ANSWERED'; });
+            $cdr_tma = count($__ans) ? array_sum(array_column($__ans, 'billsec')) / count($__ans) : 0;
+            $cdr_tme = count($cdr_list) ? array_sum(array_map(function($r){ return max(0, $r['duration'] - $r['billsec']); }, $cdr_list)) / count($cdr_list) : 0;
+?>
             const count = <?php echo count($cdr_list); ?>;
             const res = await fetch('index.php?api_action=analyze_pabx_insights', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ total: count, atendidas: count, tmaSec: 140, tmeSec: 10, is_demo: isDemo, module: 'CDR' })
+                body: JSON.stringify({ total: count, atendidas: <?php echo count($__ans); ?>, tmaSec: <?php echo (int)$cdr_tma; ?>, tmeSec: <?php echo (int)$cdr_tme; ?>, module: 'CDR' })
             });
             const data = await res.json();
 
@@ -415,15 +420,10 @@ function exportToCSV() {
                         <p class="text-slate-300 text-xs">
                             Nenhuma API Key de IA (GroqCloud ou OpenAI) foi configurada em <strong>Configurações > Inteligência Artificial</strong>.
                         </p>
-                        <div class="pt-1">
-                            <button type="button" onclick="runCdrAiAnalysis(true)" class="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white rounded-lg font-bold text-xs transition flex items-center gap-1">
-                                <i class="fa-solid fa-eye"></i> Ver Exemplo Demonstrativo
-                            </button>
-                        </div>
                     </div>
                 `;
             } else if (data.success && data.insights) {
-                const demoBadge = data.is_demo ? '<span class="px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 text-[10px] font-bold border border-purple-500/30 ml-2">MODO DEMONSTRATIVO</span>' : '';
+                const demoBadge = '';
                 txt.innerHTML = `
                     <div class="space-y-2">
                         <div class="font-extrabold text-purple-300 flex items-center gap-1.5">

@@ -11,7 +11,6 @@
 
 $ai_key = getSetting('ai_api_key');
 $ai_configured = !empty($ai_key);
-$is_demo = isset($_GET['is_demo']) && $_GET['is_demo'] === '1';
 
 $contacts_map = function_exists('getContactsMap') ? getContactsMap() : [];
 
@@ -83,88 +82,8 @@ if ($ast_db) {
     } catch (Exception $e) {}
 }
 
-// Lista rica de chamadas auditadas com inteligência artificial completa
-$audited_calls = [
-    [
-        'id' => '1',
-        'calldate' => date('d/m/Y H:i', strtotime('-15 mins')),
-        'client_name' => 'Marcos Oliveira',
-        'phone' => '011988877766',
-        'operator' => 'Ramal 205 (Lucas)',
-        'duration' => '02m 45s',
-        'sentiment' => 'POSITIVO',
-        'sentiment_badge' => 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
-        'sentiment_label' => '🟢 Satisfeito',
-        'topic' => 'Suporte Técnico',
-        'topic_icon' => 'fa-wrench text-cyan-400',
-        'qa_score' => 98,
-        'risk_alert' => false,
-        'risk_text' => '',
-        'summary_problem' => 'Cliente solicitou suporte para configuração de rota de chamadas.',
-        'summary_action' => 'Atendente orientou passo a passo no painel e realizou teste prático.',
-        'summary_result' => 'Problema resolvido na primeira chamada com nota máxima do cliente.',
-        'transcript' => [
-            ['speaker' => 'client', 'name' => 'Marcos', 'time' => '00:05', 'text' => 'Boa tarde! Preciso de ajuda para ajustar o transbordo das chamadas no meu ramal.'],
-            ['speaker' => 'agent', 'name' => 'Lucas (Operador)', 'time' => '00:12', 'text' => 'Boa tarde, Sr. Marcos! Claro, vou te guiar agora mesmo pelo painel do IPbx Prisma. Pode acessar a aba Ramais?'],
-            ['speaker' => 'client', 'name' => 'Marcos', 'time' => '00:30', 'text' => 'Pronto, já estou na tela. E agora?'],
-            ['speaker' => 'agent', 'name' => 'Lucas (Operador)', 'time' => '00:45', 'text' => 'Basta marcar a opção "Transbordo em 15s" e colocar o número desejado. Vamos fazer um teste juntos?'],
-            ['speaker' => 'client', 'name' => 'Marcos', 'time' => '02:10', 'text' => 'Perfeito! Tocou no meu celular direitinho. Muito obrigado pelo atendimento excelente!'],
-            ['speaker' => 'agent', 'name' => 'Lucas (Operador)', 'time' => '02:25', 'text' => 'Por nada, Sr. Marcos! A equipe IPbx Prisma está sempre à disposição. Tenha um ótimo dia!']
-        ]
-    ],
-    [
-        'id' => '2',
-        'calldate' => date('d/m/Y H:i', strtotime('-45 mins')),
-        'client_name' => 'Camila Rodrigues',
-        'phone' => '011977766655',
-        'operator' => 'Ramal 201 (Leandro)',
-        'duration' => '04m 12s',
-        'sentiment' => 'RISCO',
-        'sentiment_badge' => 'bg-rose-500/20 text-rose-300 border-rose-500/30 animate-pulse',
-        'sentiment_label' => '⚠️ Risco de Churn / Procon',
-        'topic' => 'Cancelamento / Reclamação',
-        'topic_icon' => 'fa-triangle-exclamation text-rose-400',
-        'qa_score' => 72,
-        'risk_alert' => true,
-        'risk_text' => 'Detecção da palavra "PROCON" e "CANCELAMENTO"',
-        'summary_problem' => 'Cliente descontente com o tempo de espera na fila e valor da mensalidade.',
-        'summary_action' => 'Atendente ofereceu desconto especial e prioridade na fila de suporte.',
-        'summary_result' => 'Retenção temporária efetuada. Requer acompanhamento da gerência.',
-        'transcript' => [
-            ['speaker' => 'client', 'name' => 'Camila', 'time' => '00:03', 'text' => 'Fiquei 10 minutos esperando na fila! Quero cancelar o meu plano imediatamente ou vou acionar o Procon!'],
-            ['speaker' => 'agent', 'name' => 'Leandro (Operador)', 'time' => '00:15', 'text' => 'Compreendo perfeitamente sua insatisfação, Sra. Camila. Peço sinceras desculpas pelo tempo de espera.'],
-            ['speaker' => 'client', 'name' => 'Camila', 'time' => '01:05', 'text' => 'Sempre que preciso de suporte demoram demais para me atender!'],
-            ['speaker' => 'agent', 'name' => 'Leandro (Operador)', 'time' => '01:40', 'text' => 'Estou aplicando agora um desconto de 20% na sua mensalidade e cadastrando seu número na Fila VIP sem espera.'],
-            ['speaker' => 'client', 'name' => 'Camila', 'time' => '03:50', 'text' => 'Está certo então, vou aguardar esse mês para ver se melhora.']
-        ]
-    ],
-    [
-        'id' => '3',
-        'calldate' => date('d/m/Y H:i', strtotime('-2 hours')),
-        'client_name' => 'Roberto Mendes',
-        'phone' => '011966655544',
-        'operator' => 'Ramal 200 (Lays)',
-        'duration' => '01m 30s',
-        'sentiment' => 'NEUTRO',
-        'sentiment_badge' => 'bg-amber-500/20 text-amber-300 border-amber-500/30',
-        'sentiment_label' => '🟡 Informativo / Neutro',
-        'topic' => 'Financeiro / Faturas',
-        'topic_icon' => 'fa-receipt text-amber-400',
-        'qa_score' => 95,
-        'risk_alert' => false,
-        'risk_text' => '',
-        'summary_problem' => 'Solicitação da 2ª via da fatura mensal enviada por e-mail.',
-        'summary_action' => 'Atendente reenviou o boleto em PDF pelo WhatsApp da empresa.',
-        'summary_result' => 'Chamada concluída rapidamente sem intercorrências.',
-        'transcript' => [
-            ['speaker' => 'client', 'name' => 'Roberto', 'time' => '00:04', 'text' => 'Bom dia! Gostaria de receber a segunda via da minha fatura deste mês.'],
-            ['speaker' => 'agent', 'name' => 'Lays (Operadora)', 'time' => '00:10', 'text' => 'Bom dia, Sr. Roberto! Qual o seu CNPJ por gentileza?'],
-            ['speaker' => 'client', 'name' => 'Roberto', 'time' => '00:20', 'text' => 'É o 12.345.678/0001-90.'],
-            ['speaker' => 'agent', 'name' => 'Lays (Operadora)', 'time' => '00:45', 'text' => 'Perfeito! Acabei de enviar o boleto diretamente para o seu WhatsApp cadastrado. Mais alguma dúvida?'],
-            ['speaker' => 'client', 'name' => 'Roberto', 'time' => '01:20', 'text' => 'Somente isso, obrigado!']
-        ]
-    ]
-];
+// Somente chamadas reais do CDR (sem dados fictícios)
+$audited_calls = [];
 
 // Se existirem chamadas reais do banco Asterisk CDR, mesclar no topo
 if (!empty($cdr_list)) {
@@ -172,29 +91,28 @@ if (!empty($cdr_list)) {
         $phone_num = $c_real['src'];
         $src_cdata = function_exists('lookupContactData') ? lookupContactData($phone_num, $contacts_map) : false;
         
+        $isAns = ($c_real['disposition'] === 'ANSWERED');
         $audited_calls[] = [
-            'id' => 'real_' . $c_real['uniqueid'],
+            'id' => $c_real['uniqueid'],
+            'has_recording' => !empty($c_real['recordingfile']),
             'calldate' => date('d/m/Y H:i', strtotime($c_real['calldate'])),
             'client_name' => $src_cdata ? $src_cdata['name'] : "Cliente $phone_num",
             'cdata' => $src_cdata,
             'phone' => $phone_num,
             'operator' => 'Ramal ' . $c_real['dst'],
             'duration' => gmdate('i\m s\s', (int)$c_real['billsec']),
-            'sentiment' => ($c_real['disposition'] === 'ANSWERED') ? 'POSITIVO' : 'RISCO',
-            'sentiment_badge' => ($c_real['disposition'] === 'ANSWERED') ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' : 'bg-rose-500/20 text-rose-300 border-rose-500/30',
-            'sentiment_label' => ($c_real['disposition'] === 'ANSWERED') ? '🟢 Atendimento Concluído' : '🔴 Chamada Perdida / Sem Resposta',
-            'topic' => 'Atendimento Geral',
+            'sentiment' => $isAns ? 'ATENDIDA' : 'NAO_ATENDIDA',
+            'sentiment_badge' => $isAns ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' : 'bg-rose-500/20 text-rose-300 border-rose-500/30',
+            'sentiment_label' => $isAns ? 'Atendida' : htmlspecialchars((string)$c_real['disposition']),
+            'topic' => 'Chamada CDR',
             'topic_icon' => 'fa-headset text-indigo-400',
-            'qa_score' => ($c_real['disposition'] === 'ANSWERED') ? 96 : 60,
-            'risk_alert' => ($c_real['disposition'] !== 'ANSWERED'),
-            'risk_text' => ($c_real['disposition'] !== 'ANSWERED') ? 'Chamada não atendida no PABX' : '',
-            'summary_problem' => 'Atendimento registrado no CDR do Asterisk.',
-            'summary_action' => 'Áudio gravado e processado pelo servidor de Inteligência Artificial.',
-            'summary_result' => 'Gravação de voz disponível para análise.',
-            'transcript' => [
-                ['speaker' => 'client', 'name' => 'Cliente (' . $phone_num . ')', 'time' => '00:02', 'text' => 'Início do diálogo gravado no servidor IPbx Prisma.'],
-                ['speaker' => 'agent', 'name' => 'Operador (' . $c_real['dst'] . ')', 'time' => '00:10', 'text' => 'Atendimento e gravação de áudio digitalizada com sucesso.']
-            ]
+            'qa_score' => null,
+            'risk_alert' => !$isAns,
+            'risk_text' => !$isAns ? 'Chamada não atendida (' . $c_real['disposition'] . ')' : '',
+            'summary_problem' => 'Origem ' . $phone_num . ' para ' . $c_real['dst'] . '.',
+            'summary_action' => 'Resultado no CDR: ' . $c_real['disposition'] . ', ' . (int)$c_real['billsec'] . 's falados.',
+            'summary_result' => $ai_configured ? 'Transcrição e análise por IA ainda não geradas para esta chamada.' : 'IA não configurada: sem transcrição/sentimento.',
+            'transcript' => []
         ];
     }
 }
@@ -512,14 +430,16 @@ function setPresetFilter(preset) {
                                 </span>
                             </td>
                             <td class="py-3.5 px-4 text-center">
-                                <span class="font-mono font-black text-sm <?php echo $call['qa_score'] >= 90 ? 'text-emerald-400' : 'text-amber-400'; ?>">
-                                    <?php echo $call['qa_score']; ?>/100
+                                <span class="font-mono font-black text-sm text-slate-500">
+                                    <?php echo $call['qa_score'] === null ? '—' : ((int)$call['qa_score']) . '/100'; ?>
                                 </span>
                             </td>
                             <td class="py-3.5 px-4 text-center">
-                                <audio controls class="h-7 w-44 inline-block opacity-90">
-                                    <source src="relatorio_filas.php?action=stream_audio&uid=<?php echo urlencode($call['id']); ?>" type="audio/wav">
+                                <?php if (!empty($call['has_recording'])): ?>
+                                <audio controls preload="none" class="h-7 w-44 inline-block opacity-90">
+                                    <source src="get_audio.php?uid=<?php echo urlencode($call['id']); ?>" type="audio/wav">
                                 </audio>
+                                <?php else: ?><span class="text-slate-500 text-[10px]">Sem gravação</span><?php endif; ?>
                             </td>
                             <td class="py-3.5 px-4 text-center">
                                 <button onclick="openFullIaAuditModal(<?php echo htmlspecialchars(json_encode($call)); ?>)" class="px-3 py-1.5 bg-purple-600/20 hover:bg-purple-600 text-purple-300 hover:text-white border border-purple-500/40 rounded-xl text-xs font-bold transition flex items-center gap-1.5 mx-auto shadow">
@@ -610,7 +530,7 @@ function setPresetFilter(preset) {
 <script>
 function openFullIaAuditModal(data) {
     document.getElementById('audit-modal-title').innerText = 'Auditoria: ' + (data.client_name || 'Atendimento');
-    document.getElementById('audit-modal-subtitle').innerText = (data.operator || '') + ' | Duração: ' + (data.duration || '') + ' | Score QA: ' + (data.qa_score || 95) + '/100';
+    document.getElementById('audit-modal-subtitle').innerText = (data.operator || '') + ' | Duração: ' + (data.duration || '') + ' | Score QA: ' + (data.qa_score == null ? '—' : data.qa_score + '/100');
 
     document.getElementById('audit-modal-problem').innerText = '"' + (data.summary_problem || 'Solicitação efetuada pelo cliente.') + '"';
     document.getElementById('audit-modal-action').innerText = '"' + (data.summary_action || 'Atendimento prestado no ramal.') + '"';
@@ -653,7 +573,7 @@ function openFullIaAuditModal(data) {
     // Player URL
     const player = document.getElementById('audit-modal-player');
     if (player) {
-        player.src = 'relatorio_filas.php?action=stream_audio&uid=' + encodeURIComponent(data.id);
+        player.src = 'get_audio.php?uid=' + encodeURIComponent(data.id);
         player.load();
     }
 

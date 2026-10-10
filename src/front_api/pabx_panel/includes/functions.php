@@ -3112,11 +3112,11 @@ function getLoggedUser() {
     if (!$u) {
         $u = [
             'id' => 1,
-            'name' => 'Leandro',
-            'email' => 'leandro@prismatelecom.com.br',
+            'name' => 'Administrador (CLI)',
+            'email' => '',
             'role' => 'Administrador',
-            'extension' => '201',
-            'whatsapp' => '5511999998888',
+            'extension' => '',
+            'whatsapp' => '',
             'permissions_list' => ['mod_dashboard','mod_filas','mod_whatsapp','mod_relatorios','mod_configuracoes','listen_recordings','send_whatsapp','manage_settings','schedule_reports','click_to_call']
         ];
     }

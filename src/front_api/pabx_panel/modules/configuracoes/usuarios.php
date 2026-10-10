@@ -57,15 +57,6 @@ try {
     }
 } catch (Exception $e) {}
 
-if (empty($available_extensions)) {
-    $available_extensions = [
-        '200' => 'Recepção (200 - PJSIP)',
-        '201' => 'Leandro (201 - PJSIP)',
-        '203' => 'Stefani (203 - WebRTC)',
-        '204' => 'Giovana (204 - SIP)',
-        '205' => 'Lucas (205 - PJSIP)'
-    ];
-}
 ?>
 
 <div class="space-y-6">
@@ -426,7 +417,7 @@ function openAddUserModal() {
     document.getElementById('form-user-email').value = '';
     document.getElementById('form-user-role').value = 'Administrador';
     document.getElementById('form-user-extension').value = '201';
-    document.getElementById('form-user-whatsapp').value = '5511999998888';
+    document.getElementById('form-user-whatsapp').value = '';
     
     updatePermissionsByRole('Administrador');
     document.getElementById('modal-user-form').classList.remove('hidden');

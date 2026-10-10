@@ -89,9 +89,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             } elseif (isset($_POST['action_test_prismabot_api'])) {
                 $cleanToken = trim(preg_replace('/^bearer\s+/i', '', trim($bot_token)));
+                $__lu = function_exists('getLoggedUser') ? getLoggedUser() : null;
+                $__testNumber = preg_replace('/\D+/', '', (string)($__lu['whatsapp'] ?? ''));
+                if ($__testNumber === '') {
+                    $msg_error = "⚠️ Cadastre seu WhatsApp em Configurações > Usuários: o teste envia o ping para o número do usuário logado.";
+                } else {
                 $testPayload = [
-                    'number'         => '5511999998888',
-                    'body'           => 'Ping Test',
+                    'number'         => $__testNumber,
+                    'body'           => 'Teste de conexão IPBX Prisma',
                     'externalKey'    => 'PRISMA_TEST_' . time(),
                     'isClosed'       => false,
                     'validateNumber' => false
@@ -134,6 +139,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 } else {
                     $msg_status = "⚡ API Prismabot/Z-PRO alcançada com código HTTP $httpCode.";
                     logUserAction("Teste Prismabot API", "Status HTTP $httpCode", "CONFIG");
+                }
                 }
             } else {
                 $msg_status = "Credenciais e Custom Destinations salvas e sincronizadas com sucesso no PABX!";

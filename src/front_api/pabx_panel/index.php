@@ -1010,11 +1010,16 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
         }
 
         if (empty($key)) {
-            $demoInsights = [
-                "A taxa de atendimento atual de voz está em " . ($totalCalls > 0 ? round(($answeredCalls/$totalCalls)*100, 1) : 100) . "%, indicando boa absorção de chamadas.",
-                "Fluxo de ligações estabilizado no período sem gargalos críticos de espera.",
-                "Recomendado configurar sua API Key em Configurações > Inteligência Artificial para habilitar diagnósticos preditivos com LLM."
-            ];
+            // Sem chave de IA: apenas fatos calculados do CDR real, sem texto generativo
+            $demoInsights = ($totalCalls > 0)
+                ? [
+                    "Hoje: $totalCalls chamadas no CDR, $answeredCalls atendidas (" . round(($answeredCalls/$totalCalls)*100, 1) . "%) e " . ($totalCalls - $answeredCalls) . " não atendidas.",
+                    "Configure a API Key em Configurações > Inteligência Artificial para gerar análises com LLM."
+                  ]
+                : [
+                    "Nenhuma chamada registrada no CDR hoje até o momento.",
+                    "Configure a API Key em Configurações > Inteligência Artificial para gerar análises com LLM."
+                  ];
             $stmt = $db->prepare("INSERT INTO ai_insights_history (provider, model, insights_json) VALUES (:p, :m, :j)");
             $stmt->execute([':p' => $provider, ':m' => $model, ':j' => json_encode($demoInsights)]);
             
@@ -2814,17 +2819,18 @@ if ($__route_perm !== '' && !hasUserPermission($__route_perm)) {
         </div>
     </div>
 
-    <!-- MODAL DO PERFIL DE USUÁRIO (Leandro Administrador) -->
+    <!-- MODAL DO PERFIL DO USUÁRIO LOGADO (dados reais de system_users) -->
+    <?php $__pu = function_exists('getLoggedUser') ? (getLoggedUser() ?: []) : []; $__puName = (string)($__pu['name'] ?? ''); $__puIni = strtoupper(function_exists('mb_substr') ? mb_substr($__puName ?: '?', 0, 2) : substr($__puName ?: '?', 0, 2)); ?>
     <div id="modal-user-profile" class="fixed inset-0 z-[9999] hidden bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
         <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-lg w-full p-6 space-y-5 shadow-2xl">
             <div class="flex items-center justify-between border-b border-slate-800 pb-3">
                 <div class="flex items-center gap-3">
                     <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-brand-600 to-indigo-600 text-white flex items-center justify-center font-black text-base shadow-md">
-                        LA
+                        <?php echo htmlspecialchars($__puIni); ?>
                     </div>
                     <div>
-                        <h4 class="text-sm font-black text-white">Leandro Administrador</h4>
-                        <span class="text-[10px] text-brand-300 font-mono">Administrador Geral PABX Prisma</span>
+                        <h4 class="text-sm font-black text-white"><?php echo htmlspecialchars($__puName); ?></h4>
+                        <span class="text-[10px] text-brand-300 font-mono"><?php echo htmlspecialchars((string)($__pu['role'] ?? '')); ?></span>
                     </div>
                 </div>
                 <button onclick="closeModal('modal-user-profile')" class="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition">
@@ -2835,17 +2841,17 @@ if ($__route_perm !== '' && !hasUserPermission($__route_perm)) {
             <div class="space-y-3 text-xs">
                 <div class="space-y-1">
                     <label class="font-bold text-slate-300">E-mail para Recebimento de Relatórios & Notificações:</label>
-                    <input type="email" id="user-profile-email" value="leandro@pabxprisma.com.br" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-brand-500">
+                    <input type="email" id="user-profile-email" readonly value="<?php echo htmlspecialchars((string)($__pu['email'] ?? '')); ?>" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-brand-500">
                 </div>
 
                 <div class="grid grid-cols-2 gap-3">
                     <div class="space-y-1">
                         <label class="font-bold text-slate-300">Ramal Operador Associado:</label>
-                        <input type="text" id="user-profile-ext" value="200" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-white font-mono focus:outline-none focus:border-brand-500">
+                        <input type="text" id="user-profile-ext" readonly value="<?php echo htmlspecialchars((string)($__pu['extension'] ?? '')); ?>" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-white font-mono focus:outline-none focus:border-brand-500">
                     </div>
                     <div class="space-y-1">
                         <label class="font-bold text-slate-300">Nível de Acesso:</label>
-                        <input type="text" disabled value="Super Administrador" class="w-full bg-slate-950/60 border border-slate-800 text-slate-400 rounded-xl px-3 py-2.5 font-bold cursor-not-allowed">
+                        <input type="text" disabled value="<?php echo htmlspecialchars((string)($__pu['role'] ?? '')); ?>" class="w-full bg-slate-950/60 border border-slate-800 text-slate-400 rounded-xl px-3 py-2.5 font-bold cursor-not-allowed">
                     </div>
                 </div>
 
@@ -2856,9 +2862,9 @@ if ($__route_perm !== '' && !hasUserPermission($__route_perm)) {
 
             <div class="flex justify-end gap-2 pt-2">
                 <button onclick="closeModal('modal-user-profile')" class="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-xs transition">Cancelar</button>
-                <button onclick="saveUserProfileLocal()" class="px-5 py-2.5 bg-brand-600 hover:bg-brand-500 text-white font-extrabold rounded-xl text-xs shadow-lg shadow-brand-600/30 transition flex items-center gap-1.5">
-                    <i class="fa-solid fa-floppy-disk"></i> Salvar Perfil
-                </button>
+                <a href="index.php?module=configuracoes&action=usuarios" style="white-space:nowrap !important;flex-shrink:0 !important;width:auto !important;overflow:visible !important;text-overflow:clip !important" class="px-5 py-2.5 bg-brand-600 hover:bg-brand-500 text-white font-extrabold rounded-xl text-xs shadow-lg shadow-brand-600/30 transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-user-gear"></i> Gerenciar Usuários
+                </a>
             </div>
         </div>
     </div>
@@ -2981,14 +2987,6 @@ if ($__route_perm !== '' && !hasUserPermission($__route_perm)) {
             if (modal) modal.classList.remove('hidden');
         }
 
-        function saveUserProfileLocal() {
-            const email = document.getElementById('user-profile-email')?.value;
-            const ext = document.getElementById('user-profile-ext')?.value;
-            if (email) localStorage.setItem('prisma_user_email', email);
-            if (ext) localStorage.setItem('prisma_user_extension', ext);
-            showToastNotification('Perfil Atualizado', 'As preferências do seu usuário foram salvas!', 'success');
-            closeModal('modal-user-profile');
-        }
 
     <!-- MODAL DE COMPARTILHAMENTO VIA E-MAIL -->
     <div id="modal-share-email" class="fixed inset-0 z-[99999] hidden bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4">

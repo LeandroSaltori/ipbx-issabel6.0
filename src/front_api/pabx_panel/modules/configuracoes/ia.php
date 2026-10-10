@@ -163,7 +163,7 @@ $ia_tab = isset($_GET['ia_tab']) ? $_GET['ia_tab'] : 'copiloto';
         <?php if (empty($ai_api_key)): ?>
         <div class="p-4 rounded-xl bg-amber-500/10 text-amber-300 border border-amber-500/20 text-xs font-bold flex items-center gap-2">
             <i class="fa-solid fa-triangle-exclamation text-amber-400"></i>
-            Nenhuma API Key configurada. O Copiloto usará dados demonstrativos até que uma chave seja inserida abaixo.
+            Nenhuma API Key configurada. Sem chave, o Copiloto exibe apenas os números reais do CDR, sem análise generativa.
         </div>
         <?php endif; ?>
 
