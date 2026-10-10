@@ -4237,14 +4237,25 @@ function aiProviderDefaults() {
 function aiGetConfig() {
     $defs     = aiProviderDefaults();
     $provider = getSetting('ai_provider') ?: 'openai';
+    $key      = trim((string)getSetting('ai_api_key'));
+    $mChat    = getSetting('ai_model_chat');
+    $mAudio   = getSetting('ai_model_audio');
+    // A chave identifica o provedor: evita enviar chave Groq/Gemini ao endpoint da OpenAI
+    $byKey = null;
+    if (strpos($key, 'gsk_') === 0)      $byKey = 'groq';
+    elseif (strpos($key, 'AIza') === 0)  $byKey = 'gemini';
+    if ($byKey && $byKey !== $provider) {
+        $provider = $byKey;
+        $mChat = $mAudio = '';   // modelos salvos eram de outro provedor
+    }
     $d        = $defs[$provider] ?? $defs['openai'];
     $limit    = (int)(getSetting('ai_token_limit') ?: 1024);
     return [
         'provider' => $provider,
-        'key'      => trim((string)getSetting('ai_api_key')),
-        'base_url' => rtrim(trim((string)getSetting('ai_base_url')) ?: $d['url'], '/'),
-        'model'    => getSetting('ai_model_chat') ?: $d['chat'],
-        'audio'    => getSetting('ai_model_audio') ?: $d['audio'],
+        'key'      => $key,
+        'base_url' => rtrim(($byKey ? '' : trim((string)getSetting('ai_base_url'))) ?: $d['url'], '/'),
+        'model'    => $mChat ?: $d['chat'],
+        'audio'    => $mAudio ?: $d['audio'],
         'tokens'   => max(64, min(4000, $limit ?: 1024)),
         'prompt'   => trim((string)getSetting('ai_custom_prompt')),
         'enabled'  => getSetting('enable_copilot') !== '0',
