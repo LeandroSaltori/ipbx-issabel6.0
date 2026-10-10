@@ -1487,6 +1487,32 @@ update_sounds_ptbr() {
 }
 
 # --- INSTALAR TUDO ---
+update_front_api() {
+    log_info "Instalando/Atualizando front_api (Painel Integrado PABX)..."
+    FRONT_DEST="/var/www/html/front_api"
+    BACKUP_OLD="/var/www/html/front_api_OLD"
+    if [ -d "$REPO_DIR/src/front_api" ]; then
+        if [ -d "$FRONT_DEST" ]; then
+            if [ ! -d "$BACKUP_OLD" ]; then
+                log_info "Criando backup seguro da pasta original: $FRONT_DEST -> $BACKUP_OLD..."
+                /bin/cp -rf "$FRONT_DEST" "$BACKUP_OLD"
+                log_success "Pasta original preservada com sucesso em $BACKUP_OLD."
+            else
+                log_info "Backup original $BACKUP_OLD ja preservado. Atualizando pasta ativa..."
+            fi
+        fi
+        mkdir -p "$FRONT_DEST"
+        /bin/cp -rf "$REPO_DIR/src/front_api/"* "$FRONT_DEST/"
+        chown -R asterisk:asterisk "$FRONT_DEST"
+        chmod -R 755 "$FRONT_DEST"
+        [ -f "$FRONT_DEST/.ht_whatsapp_config.sqlite" ] && chmod 666 "$FRONT_DEST/.ht_whatsapp_config.sqlite" 2>/dev/null || true
+        [ -f "$FRONT_DEST/pabx_panel/.ht_whatsapp_config.sqlite" ] && chmod 666 "$FRONT_DEST/pabx_panel/.ht_whatsapp_config.sqlite" 2>/dev/null || true
+        log_success "front_api instalado com sucesso em $FRONT_DEST."
+    else
+        log_error "Pasta src/front_api não encontrada no repositório."
+    fi
+}
+
 install_all() {
     echo ""
     log_info "Executando instalação COMPLETA de todos os módulos..."
@@ -1519,6 +1545,7 @@ install_all() {
     update_autoupdate
     update_limpalogs
     update_openvpn
+    update_front_api
     if [ -f "$REPO_DIR/scripts/ipbx-sounds-ptbr.sh" ]; then
         bash "$REPO_DIR/scripts/ipbx-sounds-ptbr.sh" --cirurgico || true
     fi
@@ -1566,7 +1593,7 @@ show_menu() {
     echo -e "${BLUE}║${NC}   ${WHITE}[25]${NC} Web Developer               ${WHITE}[26]${NC} Configurar Domínio e SSL  ${BLUE}║${NC}"
     echo -e "${BLUE}║${NC}   ${WHITE}[27]${NC} Limpeza de Logs e Disco     ${WHITE}[28]${NC} Servidor OpenVPN (EasyVPN)${BLUE}║${NC}"
     echo -e "${BLUE}║${NC}   ${WHITE}[29]${NC} Rollback (Restauro/Instalar)${WHITE}[30]${NC} Data/Hora e NTP (São Paulo)${BLUE}║${NC}"
-    echo -e "${BLUE}║${NC}   ${WHITE}[31]${NC} Áudios e Sons PT-BR (Asterisk)                              ${BLUE}║${NC}"
+    echo -e "${BLUE}║${NC}   ${WHITE}[31]${NC} Áudios e Sons PT-BR (Asterisk)${WHITE}[32]${NC} front_api (Painel PABX)      ${BLUE}║${NC}"
     echo -e "${BLUE}║${NC}                                                                    ${BLUE}║${NC}"
     echo -e "${BLUE}╠══════════════════════════════════════════════════════════════════════╣${NC}"
     echo -e "${BLUE}║${NC}   ${YELLOW}[A]${NC}  ${YELLOW}INSTALAR TUDO${NC} (igual ao install.sh completo)                ${BLUE}║${NC}"
@@ -1618,6 +1645,7 @@ while true; do
         29) update_rollback ;;
         30) create_snapshot "Data/Hora e NTP Brasil"; update_timezone; reload_services ;;
         31) create_snapshot "Áudios e Sons PT-BR"; update_sounds_ptbr; reload_services ;;
+        32) create_snapshot "Painel front_api"; update_front_api; reload_services ;;
         [aA]) create_snapshot "Instalação Completa"; install_all ;;
         0)
             echo ""

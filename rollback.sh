@@ -147,7 +147,7 @@ if [ ${#DIRS[@]} -eq 0 ]; then
     
     # Fallback para backups _old legados
     HAS_OLD=false
-    for legacy in /var/www/html/admin_old /var/www/html/lang_old /var/www/html/modules_old; do
+    for legacy in /var/www/html/admin_old /var/www/html/lang_old /var/www/html/modules_old /var/www/html/front_api_OLD /var/www/html/front_api_old; do
         if [ -e "$legacy" ]; then HAS_OLD=true; break; fi
     done
 
@@ -155,15 +155,22 @@ if [ ${#DIRS[@]} -eq 0 ]; then
         log_info "Backups _old legados encontrados. Restaurando backups _old (sem apagar pastas)..."
         # Restauração não-destrutiva: sobrepõe o conteúdo de <pasta>_old em <pasta>
         # (cp -rpf), sem rm -rf e sem remover a pasta _old original.
-        for legacy_name in admin lang modules; do
-            legacy_dir="/var/www/html/${legacy_name}_old"
-            if [ -e "$legacy_dir" ]; then
+        for legacy_name in admin lang modules front_api; do
+            legacy_dir=""
+            if [ -e "/var/www/html/${legacy_name}_OLD" ]; then
+                legacy_dir="/var/www/html/${legacy_name}_OLD"
+            elif [ -e "/var/www/html/${legacy_name}_old" ]; then
+                legacy_dir="/var/www/html/${legacy_name}_old"
+            fi
+            if [ -n "$legacy_dir" ]; then
                 if $DRY_RUN; then
-                    log_dry "Restauraria ${legacy_name} a partir de ${legacy_name}_old"
+                    log_dry "Restauraria ${legacy_name} a partir de $(basename "$legacy_dir")"
                 else
                     mkdir -p "/var/www/html/${legacy_name}"
                     cp -rpf "$legacy_dir/." "/var/www/html/${legacy_name}/"
-                    log_success "${legacy_name} restaurado de ${legacy_name}_old"
+                    chown -R asterisk:asterisk "/var/www/html/${legacy_name}"
+                    chmod -R 755 "/var/www/html/${legacy_name}"
+                    log_success "${legacy_name} restaurado de $(basename "$legacy_dir")"
                 fi
             fi
         done

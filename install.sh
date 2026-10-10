@@ -1181,6 +1181,32 @@ if [ -d "$REPO_DIR/src/ramais" ]; then
 fi
 
 # ==============================================================================
+# PAINEL INTEGRADO FRONT_API (COM BACKUP AUTOMATICO front_api_OLD)
+# ==============================================================================
+if [ -d "$REPO_DIR/src/front_api" ]; then
+    log_info "Instalando front_api (Painel Integrado PABX)..."
+    FRONT_DEST="/var/www/html/front_api"
+    BACKUP_OLD="/var/www/html/front_api_OLD"
+    if [ -d "$FRONT_DEST" ]; then
+        if [ ! -d "$BACKUP_OLD" ]; then
+            log_info "Criando backup seguro da pasta original: $FRONT_DEST -> $BACKUP_OLD..."
+            /bin/cp -rf "$FRONT_DEST" "$BACKUP_OLD"
+            log_success "Pasta original preservada com sucesso em $BACKUP_OLD."
+        else
+            log_info "Backup original $BACKUP_OLD ja preservado. Atualizando pasta ativa..."
+        fi
+    fi
+    mkdir -p "$FRONT_DEST"
+    /bin/cp -rf "$REPO_DIR/src/front_api/"* "$FRONT_DEST/"
+    chown -R asterisk:asterisk "$FRONT_DEST"
+    chmod -R 755 "$FRONT_DEST"
+    [ -f "$FRONT_DEST/.ht_whatsapp_config.sqlite" ] && chmod 666 "$FRONT_DEST/.ht_whatsapp_config.sqlite" 2>/dev/null || true
+    [ -f "$FRONT_DEST/pabx_panel/.ht_whatsapp_config.sqlite" ] && chmod 666 "$FRONT_DEST/pabx_panel/.ht_whatsapp_config.sqlite" 2>/dev/null || true
+    log_success "front_api instalado com sucesso em $FRONT_DEST."
+fi
+
+
+# ==============================================================================
 # 17. MÓDULOS WEB DEVELOPER
 # ==============================================================================
 log_info "17/20 - Instalando Módulos Web Developer..."
