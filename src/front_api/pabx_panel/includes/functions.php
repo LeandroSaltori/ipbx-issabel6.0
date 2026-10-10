@@ -4429,8 +4429,26 @@ function aiTranscribeFile($path, $cfg = null) {
     if ($needConv || $path !== strtolower($path) && $ext !== pathinfo($path, PATHINFO_EXTENSION)) {
         $tmp = sys_get_temp_dir() . '/ai_rec_' . bin2hex(random_bytes(6)) . '.wav';
         $in = escapeshellarg($path); $o = escapeshellarg($tmp);
-        $cmds = ["sox $in -r 16000 -c 1 -b 16 $o 2>&1", "ffmpeg -nostdin -y -loglevel error -i $in -ar 16000 -ac 1 $o 2>&1"];
-        if (in_array($ext, ['gsm','wav49'], true)) array_unshift($cmds, "sox -t gsm $in -r 16000 -c 1 -b 16 $o 2>&1");
+        // Formatos de gravação do Asterisk/Issabel. Os "raw" (sem cabeçalho) exigem parâmetros explícitos.
+        $raw = [
+            'ulaw' => '-f mulaw -ar 8000 -ac 1', 'pcm' => '-f mulaw -ar 8000 -ac 1', 'ul' => '-f mulaw -ar 8000 -ac 1',
+            'mu' => '-f mulaw -ar 8000 -ac 1', 'alaw' => '-f alaw -ar 8000 -ac 1', 'al' => '-f alaw -ar 8000 -ac 1',
+            'sln' => '-f s16le -ar 8000 -ac 1', 'raw' => '-f s16le -ar 8000 -ac 1',
+            'sln12' => '-f s16le -ar 12000 -ac 1', 'sln16' => '-f s16le -ar 16000 -ac 1', 'sln24' => '-f s16le -ar 24000 -ac 1',
+            'sln32' => '-f s16le -ar 32000 -ac 1', 'sln44' => '-f s16le -ar 44100 -ac 1', 'sln48' => '-f s16le -ar 48000 -ac 1',
+            'sln96' => '-f s16le -ar 96000 -ac 1', 'sln192' => '-f s16le -ar 192000 -ac 1',
+            'g722' => '-f g722', 'gsm' => '-f gsm -ar 8000 -ac 1',
+            'vox' => '-f oki_adpcm -ar 8000 -ac 1', 'ilbc' => '-f ilbc', 'g726' => '-f g726 -ar 8000 -ac 1',
+            'g729' => '-f g729', 'au' => '', 'snd' => '', 'wav49' => '-f gsm -ar 8000 -ac 1',
+        ];
+        $sx = ['ulaw' => '-t ul -r 8000 -c 1', 'pcm' => '-t ul -r 8000 -c 1', 'alaw' => '-t al -r 8000 -c 1',
+               'sln' => '-t raw -r 8000 -e signed -b 16 -c 1', 'sln16' => '-t raw -r 16000 -e signed -b 16 -c 1',
+               'gsm' => '-t gsm -r 8000 -c 1', 'wav49' => '-t gsm -r 8000 -c 1'];
+        $cmds = [];
+        $fi = $raw[$ext] ?? '';
+        $cmds[] = "ffmpeg -nostdin -y -loglevel error $fi -i $in -ar 16000 -ac 1 -c:a pcm_s16le $o 2>&1";
+        if (isset($sx[$ext])) $cmds[] = "sox {$sx[$ext]} $in -r 16000 -c 1 -b 16 $o 2>&1";
+        $cmds[] = "sox $in -r 16000 -c 1 -b 16 $o 2>&1";
         foreach ($cmds as $c) {
             @shell_exec($c);
             if (is_file($tmp) && filesize($tmp) > 1000) break;
