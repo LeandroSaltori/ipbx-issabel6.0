@@ -41,6 +41,7 @@ if (($_GET['api_action'] ?? '') === 'whatsapp_webhook') {
 // =========================================================================
 if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['action'], ['get_logs', 'get_fop_extensions', 'get_trunks_status', 'get_queues_realtime', 'get_parking_lots', 'fop_action', 'originate_call', 'save_contact', 'test_llm_connection', 'analyze_pabx_insights', 'generate_ai_insights', 'get_ai_insights_history', 'delete_ai_insight', 'transcribe_audio', 'get_kpi_calls_detail', 'get_active_calls', 'get_time_groups', 'get_time_group_rules', 'save_time_group_rule', 'delete_time_group_rule', 'get_announcements_list', 'update_announcement_audio', 'sync_assets', 'whatsapp_webhook']))) {
     $action = $_GET['api_action'] ?? $_GET['action'];
+    if (function_exists('auditRequest')) auditRequest('', '', true, (string)$action);
     while (ob_get_level()) { @ob_end_clean(); }
     header('Content-Type: application/json; charset=utf-8');
 
@@ -1115,6 +1116,9 @@ if (!isset($allowed_modules[$module]) || !in_array($action, $allowed_modules[$mo
     $module = 'dashboard';
     $action = 'view_v1';
 }
+
+// Trilha de auditoria: tela/relatório acessado ou formulário enviado
+if (function_exists('auditRequest')) auditRequest($module, $action, false);
 
 // Permissão por módulo (mesmas regras de exibição do menu)
 $__route_denied = false;

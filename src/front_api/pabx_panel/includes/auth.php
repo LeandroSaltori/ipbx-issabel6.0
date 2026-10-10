@@ -131,7 +131,7 @@ function authLogin($email, $password) {
     if (!$u || $hash === '' || !$ok || ($u['status'] ?? 'Ativo') !== 'Ativo') {
         authRecordAttempt($email, false);
         authLogFail2ban($email);
-        if (function_exists('pabx_log')) pabx_log('security', 'WARNING', 'Falha de login no painel', ['email' => $email, 'ip' => authClientIp()]);
+        if (function_exists('pabx_log')) pabx_log('security', 'WARNING', 'Falha de login no painel', ['email' => $email, 'ip' => authClientIp()]); if (function_exists('pabx_log')) pabx_log('user_actions', 'WARNING', '[AUTH] Tentativa de login falhou', ['usuario' => $email]);
         $hint = authFail2banActive()
             ? ' Após várias falhas seu IP é bloqueado pelo Fail2ban do Issabel.'
             : '';
@@ -144,11 +144,12 @@ function authLogin($email, $password) {
     if (password_needs_rehash($hash, PASSWORD_DEFAULT)) {
         $db->prepare("UPDATE system_users SET password_hash = :h WHERE id = :id")->execute([':h' => password_hash($password, PASSWORD_DEFAULT), ':id' => $u['id']]);
     }
-    if (function_exists('pabx_log')) pabx_log('security', 'INFO', 'Login no painel', ['email' => $u['email'], 'ip' => authClientIp()]);
+    if (function_exists('pabx_log')) pabx_log('security', 'INFO', 'Login no painel', ['email' => $u['email'], 'ip' => authClientIp()]); if (function_exists('pabx_log')) pabx_log('user_actions', 'INFO', '[AUTH] Entrou no painel (login)', ['usuario' => $u['email']]);
     return ['success' => true, 'error' => ''];
 }
 
 function authLogout() {
+    if (function_exists('pabx_log')) { $__u = $_SESSION['logged_user_id'] ?? 0; pabx_log('user_actions', 'INFO', '[AUTH] Saiu do painel (logout)', ['user_id' => $__u]); }
     $_SESSION = [];
     if (ini_get('session.use_cookies')) {
         $p = session_get_cookie_params();

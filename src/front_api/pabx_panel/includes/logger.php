@@ -62,7 +62,11 @@ function pabx_log($category, $level, $message, array $context = []) {
 
         // ─── Identificar Origem do Cliente / Usuário ─────────────────────────
         $clientIp = $_SERVER['REMOTE_ADDR'] ?? 'CLI/Cron';
-        $userName = $_SESSION['user_username'] ?? $_SESSION['username'] ?? 'System';
+        $userName = $_SESSION['user_username'] ?? $_SESSION['username'] ?? '';
+        if ($userName === '') {
+            $userName = function_exists('auditCurrentUser') ? auditCurrentUser() : 'System';
+        }
+        $userName = str_replace(["\r", "\n", ']'], ' ', (string)$userName);
 
         // ─── Formatação de Data com Milissegundos ───────────────────────────
         $microtime = microtime(true);
@@ -253,3 +257,5 @@ set_exception_handler(function($exception) {
         'trace' => substr($exception->getTraceAsString(), 0, 500)
     ]);
 });
+
+require_once __DIR__ . '/audit_hook.php';
