@@ -41,6 +41,7 @@ try {
     try { $db->exec("ALTER TABLE extensions_config ADD COLUMN send_ai_summary INTEGER DEFAULT 0"); } catch (Exception $e) {}
     try { $db->exec("ALTER TABLE extensions_config ADD COLUMN notify_agent_internal INTEGER DEFAULT 1"); } catch (Exception $e) {}
     try { $db->exec("ALTER TABLE extensions_config ADD COLUMN ringtime_limit INTEGER DEFAULT 0"); } catch (Exception $e) {}
+    try { $db->exec("ALTER TABLE extensions_config ADD COLUMN send_call_recording INTEGER DEFAULT 0"); } catch (Exception $e) {}
     try { $db->exec("ALTER TABLE sent_logs ADD COLUMN call_id TEXT"); } catch (Exception $e) {}
     try { $db->exec("ALTER TABLE sent_logs ADD COLUMN extension TEXT"); } catch (Exception $e) {}
     try { $db->exec("ALTER TABLE sent_logs ADD COLUMN rule_type TEXT"); } catch (Exception $e) {}

@@ -11,12 +11,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $notify_agent_int = isset($_POST['notify_agent_internal']) ? 1 : 0;
         $notify_client = isset($_POST['notify_client_busy']) ? 1 : 0;
         $send_ai = isset($_POST['send_ai_summary']) ? 1 : 0;
+        $send_rec = isset($_POST['send_call_recording']) ? 1 : 0;
+        $ring_limit = max(0, min(300, (int)($_POST['ringtime_limit'] ?? 0)));
 
         $stmt_up = $db->prepare("UPDATE extensions_config SET 
             notify_agent_missed = :nam, 
             notify_agent_internal = :nai, 
             notify_client_busy = :ncb, 
             send_ai_summary = :sai, 
+            send_call_recording = :scr,
+            ringtime_limit = :rtl,
             updated_at = CURRENT_TIMESTAMP 
             WHERE id = :id");
         
@@ -25,10 +29,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ':nai' => $notify_agent_int,
             ':ncb' => $notify_client,
             ':sai' => $send_ai,
+            ':scr' => $send_rec,
+            ':rtl' => $ring_limit,
             ':id' => $ext_id
         ]);
 
         $msg = "Permissões do ramal atualizadas com sucesso!";
+        $q_extnum = $db->prepare("SELECT extension FROM extensions_config WHERE id = :id");
+        $q_extnum->execute([':id' => $ext_id]);
+        $ext_num = $q_extnum->fetchColumn();
+        if ($ext_num !== false) {
+            $ring_res = applyExtensionRingtime($ext_num, $ring_limit);
+            if ($ring_res['success']) {
+                $msg .= $ring_limit > 0 ? " Tempo de toque do ramal $ext_num aplicado no Asterisk: {$ring_limit}s." : " Tempo de toque do ramal $ext_num volta ao padrão do PABX.";
+            } else {
+                $msg .= " Atenção: salvo no painel, mas não aplicado no Asterisk (" . $ring_res['error'] . ").";
+            }
+        }
     } elseif (isset($_POST['action_bulk_permissions'])) {
         $bulk_type = $_POST['bulk_type'] ?? '';
         if ($bulk_type === 'enable_all_missed') {
@@ -38,7 +55,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $db->exec("UPDATE extensions_config SET send_ai_summary = 1, updated_at = CURRENT_TIMESTAMP");
             $msg = "Resumos de Inteligência Artificial ativados em LOTE para TODOS os ramais!";
         } elseif ($bulk_type === 'disable_all') {
-            $db->exec("UPDATE extensions_config SET notify_agent_missed = 0, notify_agent_internal = 0, notify_client_busy = 0, send_ai_summary = 0, updated_at = CURRENT_TIMESTAMP");
+            $db->exec("UPDATE extensions_config SET notify_agent_missed = 0, notify_agent_internal = 0, notify_client_busy = 0, send_ai_summary = 0, send_call_recording = 0, updated_at = CURRENT_TIMESTAMP");
             $msg = "Todas as permissões foram desativadas para TODOS os ramais.";
         }
     }
@@ -140,6 +157,16 @@ $exts_list = $db->query("SELECT * FROM extensions_config ORDER BY CAST(extension
                                 <span>Enviar Resumo IA do Áudio</span>
                             </label>
 
+                            <label class="flex items-center gap-2 text-slate-300 cursor-pointer">
+                                <input type="checkbox" name="send_call_recording" value="1" <?php echo !empty($e['send_call_recording']) ? 'checked' : ''; ?> class="accent-brand-500 rounded">
+                                <span>Enviar Link da Gravação</span>
+                            </label>
+
+                            <label class="flex items-center justify-between gap-2 text-slate-300">
+                                <span>Tempo de toque (s) <span class="text-slate-500">0 = padrão</span></span>
+                                <input type="number" min="0" max="300" name="ringtime_limit" value="<?php echo (int)($e['ringtime_limit'] ?? 0); ?>" class="w-16 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white font-mono text-center">
+                            </label>
+
                             <div class="pt-2">
                                 <button type="submit" class="w-full py-1.5 bg-slate-800 hover:bg-brand-600 text-slate-300 hover:text-white font-bold rounded transition">
                                     Salvar Permissões
@@ -161,6 +188,8 @@ $exts_list = $db->query("SELECT * FROM extensions_config ORDER BY CAST(extension
                             <th class="p-3">Ext. Interna</th>
                             <th class="p-3">Notif. Ocupado</th>
                             <th class="p-3">Resumo IA</th>
+                            <th class="p-3">Gravação</th>
+                            <th class="p-3">Toque (s)</th>
                             <th class="p-3 text-right">Ação</th>
                         </tr>
                     </thead>
@@ -184,6 +213,12 @@ $exts_list = $db->query("SELECT * FROM extensions_config ORDER BY CAST(extension
                                     </td>
                                     <td class="p-3">
                                         <input type="checkbox" name="send_ai_summary" value="1" <?php echo $e['send_ai_summary'] ? 'checked' : ''; ?> class="accent-brand-500 rounded">
+                                    </td>
+                                    <td class="p-3">
+                                        <input type="checkbox" name="send_call_recording" value="1" <?php echo !empty($e['send_call_recording']) ? 'checked' : ''; ?> class="accent-brand-500 rounded">
+                                    </td>
+                                    <td class="p-3">
+                                        <input type="number" min="0" max="300" name="ringtime_limit" value="<?php echo (int)($e['ringtime_limit'] ?? 0); ?>" class="w-16 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white font-mono text-center">
                                     </td>
                                     <td class="p-3 text-right">
                                         <button type="submit" class="px-3 py-1 bg-brand-600 hover:bg-brand-500 text-white rounded text-[11px] font-bold transition">

@@ -726,6 +726,7 @@ function getAsteriskTrunksStatus() {
                     'id' => $r['trunkid'],
                     'name' => $t_name,
                     'tech' => $t_tech,
+                    'channelid' => (string)$r['channelid'],
                     'status' => 'Sem verificação', // só vira Registrado/Desconectado se o Asterisk confirmar
                     'active_calls' => 0,
                     'channels' => []
@@ -763,6 +764,34 @@ function getAsteriskTrunksStatus() {
                         }
                     }
                     unset($tdata);
+                }
+            }
+        }
+
+        // Troncos sem registro (autenticação por IP/peer): estado pelo qualify do endpoint/peer
+        $pending = array_filter($trunks, function ($t) { return $t['status'] === 'Sem verificação'; });
+        if ($pending) {
+            $mark = function ($name, $up) use (&$trunks, $pending) {
+                foreach ($pending as $tk => $td) {
+                    $ids = array_filter([$tk, $td['channelid'] ?? '']);
+                    foreach ($ids as $id) {
+                        if (strcasecmp($id, $name) === 0 || strcasecmp(preg_replace('/^(sip|pjsip)\//i', '', $id), $name) === 0) {
+                            $trunks[$tk]['status'] = $up ? 'Registrado' : 'Desconectado';
+                            return;
+                        }
+                    }
+                }
+            };
+            $ep = @shell_exec('asterisk -rx "pjsip show endpoints" 2>/dev/null');
+            if ($ep && preg_match_all('/^\s*Endpoint:\s+([^\s\/]+)(?:\/\S*)?\s+(Unavailable|Not in use|In use|Busy|Ringing|Invalid|Unreachable)/mi', $ep, $mm, PREG_SET_ORDER)) {
+                foreach ($mm as $m) $mark($m[1], !preg_match('/^(Unavailable|Invalid|Unreachable)$/i', $m[2]));
+            }
+            $peers = @shell_exec('asterisk -rx "sip show peers" 2>/dev/null');
+            if ($peers) {
+                foreach (explode("\n", $peers) as $line) {
+                    if (preg_match('/^([^\s\/]+)(?:\/\S*)?\s+\S+\s+.*?\b(OK|UNREACHABLE|LAGGED|UNKNOWN)\b/', $line, $m)) {
+                        $mark($m[1], strtoupper($m[2]) === 'OK' || strtoupper($m[2]) === 'LAGGED');
+                    }
                 }
             }
         }
@@ -4300,4 +4329,167 @@ function aiSaveHistory($provider, $model, $insights) {
         $db->prepare("INSERT INTO ai_insights_history (provider, model, insights_json) VALUES (:p, :m, :j)")
            ->execute([':p' => $provider, ':m' => $model, ':j' => json_encode($insights, JSON_UNESCAPED_UNICODE)]);
     } catch (Exception $e) {}
+}
+
+// =========================================================================
+// LIMITE DE TOQUE POR RAMAL (FreePBX: AMPUSER/<ramal>/ringtimer no AstDB)
+// =========================================================================
+function applyExtensionRingtime($ext, $secs) {
+    $ext  = preg_replace('/\D/', '', (string)$ext);
+    $secs = max(0, min(300, (int)$secs));
+    if ($ext === '') return ['success' => false, 'error' => 'Ramal inválido'];
+    $r = executeAsteriskAMICommand('DBPut', ['Family' => 'AMPUSER', 'Key' => "$ext/ringtimer", 'Val' => (string)$secs]);
+    if (!empty($r['success']) && stripos($r['response'] ?? '', 'Response: Success') !== false) {
+        return ['success' => true];
+    }
+    return ['success' => false, 'error' => $r['error'] ?? trim(preg_replace('/\s+/', ' ', (string)($r['response'] ?? 'Falha no AMI')))];
+}
+
+// =========================================================================
+// LINK ASSINADO TEMPORÁRIO PARA GRAVAÇÕES (HMAC; não exige sessão do painel)
+// =========================================================================
+function audioLinkSecret() {
+    $s = getSetting('audio_link_secret');
+    if (empty($s)) { $s = bin2hex(random_bytes(32)); saveSetting('audio_link_secret', $s); }
+    return $s;
+}
+
+function audioSigValid($uid, $exp, $sig) {
+    $exp = (int)$exp;
+    if ($exp < time() || $uid === '' || $sig === '') return false;
+    return hash_equals(hash_hmac('sha256', $uid . '|' . $exp, audioLinkSecret()), (string)$sig);
+}
+
+/** Retorna '' se "URL pública do painel" não estiver configurada. */
+function audioSignedUrl($uid, $ttl = 604800) {
+    $base = rtrim((string)getSetting('public_base_url'), '/');
+    if ($base === '') return '';
+    $exp = time() + max(60, (int)$ttl);
+    $sig = hash_hmac('sha256', $uid . '|' . $exp, audioLinkSecret());
+    return $base . '/pabx_panel/get_audio.php?uid=' . rawurlencode($uid) . '&exp=' . $exp . '&sig=' . $sig;
+}
+
+/** Localiza o arquivo de gravação (somente dentro de /var/spool/asterisk/monitor). */
+function findRecordingPath($recordingfile, $calldate) {
+    $rec = basename((string)$recordingfile);
+    if ($rec === '' || $rec === '.' || $rec === '..') return '';
+    $t = strtotime($calldate) ?: time();
+    $root = '/var/spool/asterisk/monitor';
+    $cands = ["$root/$rec", $root . '/' . date('Y/m/d', $t) . "/$rec", $root . '/' . date('Y/m', $t) . "/$rec"];
+    foreach (glob("$root/*/*/*/$rec") ?: [] as $g) $cands[] = $g;
+    foreach ($cands as $c) {
+        $rp = realpath($c);
+        if ($rp !== false && is_file($rp) && filesize($rp) > 0 && strpos($rp, $root . '/') === 0) return $rp;
+    }
+    return '';
+}
+
+// =========================================================================
+// TRANSCRIÇÃO (Whisper OpenAI/Groq) E RESUMO DE CHAMADA
+// =========================================================================
+function aiTranscribeFile($path, $cfg = null) {
+    $cfg = $cfg ?: aiGetConfig();
+    if (!$cfg['enabled'])  return ['ok' => false, 'text' => '', 'error' => 'Copiloto de IA desativado'];
+    if ($cfg['key'] === '') return ['ok' => false, 'text' => '', 'error' => 'API Key de IA não configurada'];
+    if (!in_array($cfg['provider'], ['openai', 'groq'], true) || empty($cfg['audio'])) {
+        return ['ok' => false, 'text' => '', 'error' => "O provedor '{$cfg['provider']}' não oferece transcrição (use OpenAI ou Groq)"];
+    }
+    if (!is_file($path) || filesize($path) > 24 * 1024 * 1024) {
+        return ['ok' => false, 'text' => '', 'error' => 'Arquivo ausente ou maior que 24MB'];
+    }
+    $mime = (strtolower(pathinfo($path, PATHINFO_EXTENSION)) === 'mp3') ? 'audio/mpeg' : 'audio/wav';
+    $ch = curl_init($cfg['base_url'] . '/audio/transcriptions');
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_POST           => true,
+        CURLOPT_POSTFIELDS     => ['file' => new CURLFile($path, $mime, basename($path)), 'model' => $cfg['audio']],
+        CURLOPT_HTTPHEADER     => ['Authorization: Bearer ' . $cfg['key']],
+        CURLOPT_TIMEOUT        => 90,
+        CURLOPT_SSL_VERIFYPEER => (getSetting('ai_ssl_insecure') !== '1'),
+    ]);
+    $resp = curl_exec($ch);
+    $http = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $err  = curl_error($ch);
+    curl_close($ch);
+    if ($err !== '') return ['ok' => false, 'text' => '', 'error' => 'Erro cURL: ' . $err];
+    $j = json_decode((string)$resp, true);
+    if ($http === 200 && isset($j['text'])) return ['ok' => true, 'text' => trim($j['text']), 'error' => ''];
+    return ['ok' => false, 'text' => '', 'error' => $j['error']['message'] ?? "HTTP $http"];
+}
+
+/**
+ * Cron: ao fim de chamadas atendidas e gravadas dos ramais com "Resumo IA" e/ou "Gravação",
+ * envia WhatsApp ao atendente (whatsapp_number do ramal) com o resumo e/ou link assinado.
+ */
+function processCallSummaryNotifications($cdr) {
+    global $db;
+    $out = ['processed' => 0, 'sent' => 0, 'skipped' => 0, 'error' => ''];
+    $api_url = getSetting('api_url'); $api_token = getSetting('api_token');
+    if (empty($api_url) || empty($api_token)) { $out['error'] = 'API WhatsApp não configurada.'; return $out; }
+
+    // Primeira execução: só passa a valer para chamadas dali em diante
+    $since = getSetting('summary_since');
+    if (empty($since)) { saveSetting('summary_since', date('Y-m-d H:i:s')); return $out; }
+
+    $cfgs = [];
+    foreach ($db->query("SELECT extension, agent_name, whatsapp_number, send_ai_summary, send_call_recording FROM extensions_config WHERE (send_ai_summary = 1 OR send_call_recording = 1) AND whatsapp_number <> ''")->fetchAll(PDO::FETCH_ASSOC) as $r) {
+        $cfgs[$r['extension']] = $r;
+    }
+    if (!$cfgs) return $out;
+
+    try {
+        $st = $cdr->prepare("SELECT uniqueid, calldate, src, dst, billsec, duration, recordingfile FROM cdr
+            WHERE calldate >= :since AND calldate >= (NOW() - INTERVAL 3 HOUR) AND disposition = 'ANSWERED' AND billsec >= 15
+              AND recordingfile <> '' AND (calldate + INTERVAL duration SECOND) <= (NOW() - INTERVAL 30 SECOND)
+            ORDER BY calldate ASC LIMIT 100");
+        $st->execute([':since' => $since]);
+        $calls = $st->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Exception $e) { $out['error'] = $e->getMessage(); return $out; }
+
+    $dup = $db->prepare("SELECT COUNT(*) FROM sent_logs WHERE call_id = :c AND extension = :e AND rule_type = 'RESUMO_CHAMADA'");
+    $ins = $db->prepare("INSERT INTO sent_logs (phone, call_id, extension, rule_type, message, status) VALUES (:p, :c, :e, 'RESUMO_CHAMADA', :m, :s)");
+    $cfg = aiGetConfig();
+
+    foreach ($calls as $c) {
+        foreach (array_unique([$c['dst'], $c['src']]) as $ext) {
+            if (!isset($cfgs[$ext])) continue;
+            $dup->execute([':c' => $c['uniqueid'], ':e' => $ext]);
+            if ((int)$dup->fetchColumn() > 0) continue;
+            $out['processed']++;
+            $e = $cfgs[$ext];
+            $parts = []; $why = [];
+
+            $other = ($ext === $c['dst']) ? $c['src'] : $c['dst'];
+            $head = "📞 Chamada " . date('d/m H:i', strtotime($c['calldate'])) . " com $other (" . gmdate('i\m s\s', (int)$c['billsec']) . ")";
+
+            if (!empty($e['send_call_recording'])) {
+                $url = audioSignedUrl($c['uniqueid']);
+                if ($url !== '') $parts[] = "🎧 Gravação (link válido por 7 dias): $url";
+                else $why[] = 'URL pública do painel não configurada (Configurações > API)';
+            }
+            if (!empty($e['send_ai_summary'])) {
+                $path = findRecordingPath($c['recordingfile'], $c['calldate']);
+                if ($path === '') { $why[] = 'arquivo de gravação não encontrado'; }
+                else {
+                    $tr = aiTranscribeFile($path, $cfg);
+                    if (!$tr['ok'] || $tr['text'] === '') { $why[] = 'transcrição: ' . ($tr['error'] ?: 'vazia'); }
+                    else {
+                        $sm = aiChatCompletion('Resuma a ligação telefônica em português, em no máximo 5 linhas: motivo, o que foi combinado e próximos passos. Use somente o que consta na transcrição; se algo não estiver claro, diga que não ficou claro.', mb_substr($tr['text'], 0, 12000), 40, $cfg);
+                        if ($sm['ok'] && $sm['text'] !== '') $parts[] = "🧠 Resumo IA:\n" . $sm['text'];
+                        else $why[] = 'resumo: ' . $sm['error'];
+                    }
+                }
+            }
+
+            if (!$parts) {
+                $ins->execute([':p' => $e['whatsapp_number'], ':c' => $c['uniqueid'], ':e' => $ext, ':m' => 'Ignorado: ' . implode('; ', $why), ':s' => 'IGNORADO']);
+                $out['skipped']++;
+                continue;
+            }
+            $msg = $head . "\n\n" . implode("\n\n", $parts);
+            $ok = sendWhatsAppMessageViaZPro($api_url, $api_token, $e['whatsapp_number'], $msg, $c['uniqueid'], $ext, 'RESUMO_CHAMADA');
+            $ok ? $out['sent']++ : $out['skipped']++;
+        }
+    }
+    return $out;
 }

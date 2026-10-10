@@ -130,9 +130,11 @@ if [ -d /etc/cron.d ]; then
   cat > /etc/cron.d/ipbx-front-api <<CRON
 # IPbx Prisma - notificacao WhatsApp de abandono de fila (gerado por instalar-front-api.sh)
 * * * * * asterisk $PHP_BIN $DEST_DIR/pabx_panel/cron/send_queue_abandon.php >/dev/null 2>&1
+# IPbx Prisma - resumo por IA e link da gravacao ao atendente (WhatsApp)
+* * * * * asterisk $PHP_BIN $DEST_DIR/pabx_panel/cron/send_call_summaries.php >/dev/null 2>&1
 CRON
   chmod 644 /etc/cron.d/ipbx-front-api
-  echo "[✓] Cron de abandono de fila instalado em /etc/cron.d/ipbx-front-api"
+  echo "[✓] Crons (abandono de fila, resumo de chamadas) instalados em /etc/cron.d/ipbx-front-api"
 fi
 
 # Fail2ban do Issabel: jail "ipbx-front-api" (bloqueio de IP por falhas de login do painel)

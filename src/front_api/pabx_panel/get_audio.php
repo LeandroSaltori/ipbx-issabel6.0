@@ -12,9 +12,15 @@ while (ob_get_level()) {
 
 require_once __DIR__ . '/config/database.php';
 require_once __DIR__ . '/includes/functions.php';
-authGate('plain');
+// Link assinado temporário (enviado por WhatsApp): vale só para a gravação (uid) e dispensa a sessão
+$__signed = false;
+if (!empty($_GET['uid']) && !empty($_GET['exp']) && !empty($_GET['sig'])) {
+    $__signed = audioSigValid((string)$_GET['uid'], $_GET['exp'], (string)$_GET['sig']);
+    if (!$__signed) { http_response_code(403); header('Content-Type: text/plain; charset=utf-8'); echo 'Link inválido ou expirado'; exit; }
+}
+if (!$__signed) authGate('plain');
 
-$file = isset($_GET['file']) ? trim($_GET['file']) : '';
+$file = (!$__signed && isset($_GET['file'])) ? trim($_GET['file']) : '';
 $uid  = isset($_GET['uid']) ? trim($_GET['uid']) : '';
 
 $foundPath = null;

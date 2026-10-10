@@ -59,6 +59,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } catch (Exception $e) {}
     }
 
+    // URL pública do painel (usada nos links assinados de gravação enviados por WhatsApp)
+    if (isset($_POST['action_save_public_url'])) {
+        $active_tab = 'prismabot';
+        $pub = rtrim(trim($_POST['public_base_url'] ?? ''), '/');
+        if ($pub !== '' && !preg_match('#^https?://[A-Za-z0-9.\-:\[\]]+(/[A-Za-z0-9._~/\-]*)?$#', $pub)) {
+            $msg_error = "⚠️ URL pública inválida. Use o formato https://pbx.seudominio.com.br/front_api";
+        } else {
+            saveSetting('public_base_url', $pub);
+            $msg_status = $pub === '' ? "URL pública removida: links de gravação não serão enviados." : "URL pública do painel salva.";
+            logUserAction("Salvar URL pública", $pub, "CONFIG");
+        }
+    }
+
     // 2. API Prismabot & Sincronização de Custom Destinations
     if (isset($_POST['action_save_prismabot_api']) || isset($_POST['action_test_prismabot_api']) || isset($_POST['action_sync_custom_destinations'])) {
         $active_tab = 'prismabot';
@@ -544,6 +557,20 @@ if (empty($currentPbxToken) && !empty($currentPbxPass) && $_SERVER['REQUEST_METH
                     <p class="text-[11px] text-slate-400">Cadastre esta URL como webhook de mensagens recebidas no Z-PRO. Respostas de 1 a 5 a uma pesquisa NPS enviada nas últimas 48h são gravadas no painel.</p>
                     <input type="text" readonly value="<?php echo htmlspecialchars($wh_url); ?>" onclick="this.select()" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-[11px] font-mono text-amber-200">
                 </div>
+            </div>
+
+            <!-- URL PÚBLICA DO PAINEL (links assinados de gravação) -->
+            <div class="pt-4 border-t border-slate-800/80">
+                <form method="POST" action="" class="bg-slate-950/80 p-4 rounded-2xl border border-cyan-500/30 space-y-2">
+                    <div class="flex items-center gap-2 border-b border-slate-800 pb-2">
+                        <i class="fa-solid fa-link text-cyan-400 text-base"></i>
+                        <strong class="text-white text-xs">URL pública do painel (links de gravação)</strong>
+                    </div>
+                    <p class="text-[11px] text-slate-400">Endereço pelo qual o atendente alcança o painel fora da rede interna. Usado para montar o link temporário (7 dias, assinado) da gravação enviado por WhatsApp aos ramais com "Enviar Link da Gravação". Sem este campo o link não é enviado.</p>
+                    <input type="hidden" name="action_save_public_url" value="1">
+                    <input type="text" name="public_base_url" value="<?php echo htmlspecialchars((string)getSetting('public_base_url')); ?>" placeholder="https://pbx.seudominio.com.br/front_api" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-[11px] text-cyan-200 font-mono focus:border-cyan-500 focus:outline-none">
+                    <button type="submit" style="white-space:nowrap !important;flex-shrink:0 !important;width:auto !important;overflow:visible !important;text-overflow:clip !important" class="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-xl text-xs transition"><i class="fa-solid fa-floppy-disk"></i> Salvar URL</button>
+                </form>
             </div>
 
             <!-- CAIXA DE TESTE DE DISPARO DIRETO NA PRÓPRIA TELA -->

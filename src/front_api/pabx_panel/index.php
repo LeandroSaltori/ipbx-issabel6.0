@@ -838,47 +838,15 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
             exit;
         }
 
-        // Endpoint de transcrição Whisper
-        $sttEndpoint = $cfg['base_url'] . '/audio/transcriptions';
-
-        $cFile = new CURLFile($audioFilePath, (strtolower(pathinfo($audioFilePath, PATHINFO_EXTENSION)) === 'mp3') ? 'audio/mpeg' : 'audio/wav', basename($audioFilePath));
-        $postData = [
-            'file'  => $cFile,
-            'model' => $model
-        ];
-
-        $ch = curl_init($sttEndpoint);
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_POST           => true,
-            CURLOPT_POSTFIELDS     => $postData,
-            CURLOPT_HTTPHEADER     => [
-                'Authorization: Bearer ' . $key
-            ],
-            CURLOPT_TIMEOUT        => 60,
-            CURLOPT_SSL_VERIFYPEER => (getSetting('ai_ssl_insecure') !== '1')
-        ]);
-
-        $response = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $curlErr  = curl_error($ch);
-        curl_close($ch);
-
-        if ($curlErr) {
-            echo json_encode(['success' => false, 'error' => 'Erro cURL: ' . $curlErr]);
-            exit;
-        }
-
-        $resData = json_decode($response, true);
-        if ($httpCode === 200 && isset($resData['text'])) {
+        $tr = aiTranscribeFile($audioFilePath, $cfg);
+        if ($tr['ok']) {
             echo json_encode([
                 'success' => true,
-                'text'    => $resData['text'],
+                'text'    => $tr['text'],
                 'message' => "Transcrição gerada com sucesso via $provider ($model)!"
             ]);
         } else {
-            $errDetail = isset($resData['error']['message']) ? $resData['error']['message'] : "HTTP $httpCode";
-            echo json_encode(['success' => false, 'error' => "Falha na transcrição: " . $errDetail]);
+            echo json_encode(['success' => false, 'error' => 'Falha na transcrição: ' . $tr['error']]);
         }
         exit;
     }
