@@ -18,8 +18,12 @@ $called_ext = trim($argv[3] ?? '');
 $queue_name = trim($argv[4] ?? '');
 if ($queue_name === '0') $queue_name = '';
 
+// Bloco de ambiente AGI (agi_*): lido uma única vez, para liberar o canal de comandos AGI
+$agi_env_consumed = false;
+
 // Se caller_id ou ramal não vier nos argumentos CLI, ler do fluxo AGI STDIN
 if (empty($caller_id) || strpos($caller_id, '$') !== false) {
+    $agi_env_consumed = true;
     while ($line = fgets(STDIN)) {
         $line = trim($line);
         if ($line === '') break;
@@ -30,6 +34,29 @@ if (empty($caller_id) || strpos($caller_id, '$') !== false) {
             $called_ext = trim(substr($line, strlen('agi_extension:')));
         }
     }
+}
+
+/**
+ * Lê uma variável de canal via protocolo AGI (GET VARIABLE). Retorna null se indisponível.
+ * Funciona com dialplans já instalados, sem precisar de argumento extra.
+ */
+function agiGetVariable($name) {
+    global $agi_env_consumed;
+    if (!$agi_env_consumed) {
+        $agi_env_consumed = true;
+        stream_set_timeout(STDIN, 2);
+        while (($l = fgets(STDIN)) !== false) {
+            if (trim($l) === '') break;
+        }
+    }
+    fwrite(STDOUT, "GET VARIABLE " . preg_replace('/[^A-Za-z0-9_]/', '', $name) . "\n");
+    fflush(STDOUT);
+    stream_set_timeout(STDIN, 2);
+    $reply = fgets(STDIN);
+    if ($reply !== false && preg_match('/^200 result=1 \((.*)\)/', trim($reply), $m)) {
+        return $m[1];
+    }
+    return null;
 }
 
 // Log inicial de rastreamento AGI
@@ -133,6 +160,17 @@ if ($event_type === 'missed_extension') {
     $template = (function_exists('getRule') && getRule('queue_exit_whatsapp_msg')) ? getRule('queue_exit_whatsapp_msg') : (getSetting('prismabot_msg_transbordo') ?: $DEFAULT_TEMPLATES['transbordo']);
 } elseif ($event_type === 'audio') {
     $template = (function_exists('getRule') && getRule('missed_client_msg')) ? getRule('missed_client_msg') : (getSetting('prismabot_msg_audio') ?: $DEFAULT_TEMPLATES['audio']);
+}
+
+// Ramal ocupado: só notifica o cliente se "Notif. Ocupado" estiver ativo no ramal
+if ($event_type === 'missed_extension' && !empty($called_ext)) {
+    $dial_status = strtoupper((string)agiGetVariable('DIALSTATUS'));
+    if ($dial_status === 'BUSY' && (empty($ext_info) || empty($ext_info['notify_client_busy']))) {
+        if (function_exists('pabx_log')) {
+            pabx_log('whatsapp', 'INFO', "Ramal {$called_ext} ocupado: notificação ao cliente desativada para este ramal", ['caller' => $clean_caller]);
+        }
+        $template = '';
+    }
 }
 
 if (!empty($template) && !empty($target_number)) {

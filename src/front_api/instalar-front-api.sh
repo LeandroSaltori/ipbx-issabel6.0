@@ -124,6 +124,17 @@ if command -v php &>/dev/null && [ -f "$DEST_DIR/pabx_panel/set_password.php" ];
   [ -f "$DEST_DIR/pabx_panel/.ht_whatsapp_config.sqlite" ] && chmod 666 "$DEST_DIR/pabx_panel/.ht_whatsapp_config.sqlite" 2>/dev/null || true
 fi
 
+# Cron de abandono de fila (WhatsApp para cliente/supervisor) - idempotente
+if [ -d /etc/cron.d ]; then
+  PHP_BIN="$(command -v php || echo /usr/bin/php)"
+  cat > /etc/cron.d/ipbx-front-api <<CRON
+# IPbx Prisma - notificacao WhatsApp de abandono de fila (gerado por instalar-front-api.sh)
+* * * * * asterisk $PHP_BIN $DEST_DIR/pabx_panel/cron/send_queue_abandon.php >/dev/null 2>&1
+CRON
+  chmod 644 /etc/cron.d/ipbx-front-api
+  echo "[✓] Cron de abandono de fila instalado em /etc/cron.d/ipbx-front-api"
+fi
+
 # Limpeza de arquivos temporários se houve clone
 if [ -n "$TMP_REPO" ] && [ -d "$TMP_REPO" ]; then
   rm -rf "$TMP_REPO"

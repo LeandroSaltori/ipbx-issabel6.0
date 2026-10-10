@@ -4122,3 +4122,74 @@ function syncExtensionDestinationsWithAsterisk($extension, $enable_custom_dest) 
         return false;
     }
 }
+
+/**
+ * Avisa por WhatsApp o cliente (e o supervisor) quando uma chamada é ABANDONADA em fila.
+ * Lê asterisk(cdrdb).queue_log a partir do último id processado; na primeira execução só
+ * marca o ponto de partida (não envia histórico). Requer queues_config.abandon_enabled = 1.
+ * $ast = PDO do banco que contém queue_log. Retorna ['processed'=>n,'sent'=>n,'skipped'=>n,'error'=>string].
+ */
+function processQueueAbandonNotifications($ast) {
+    global $db;
+    $out = ['processed' => 0, 'sent' => 0, 'skipped' => 0, 'error' => ''];
+    $api_url   = getSetting('api_url');
+    $api_token = getSetting('api_token');
+    if (empty($api_url) || empty($api_token)) {
+        $out['error'] = 'API WhatsApp não configurada.';
+        return $out;
+    }
+    try {
+        $last = getSetting('abandon_last_queue_log_id');
+        if ($last === '' || $last === null || $last === false) {
+            $max = (int)$ast->query("SELECT COALESCE(MAX(id), 0) FROM queue_log")->fetchColumn();
+            saveSetting('abandon_last_queue_log_id', (string)$max);
+            return $out; // primeira execução: não dispara histórico
+        }
+        $last = (int)$last;
+
+        $st = $ast->prepare("SELECT id, callid, queuename FROM queue_log WHERE id > :last AND event = 'ABANDON' ORDER BY id ASC LIMIT 200");
+        $st->execute([':last' => $last]);
+        $events = $st->fetchAll(PDO::FETCH_ASSOC);
+
+        $max_id = $last;
+        $q_enter = $ast->prepare("SELECT data2 FROM queue_log WHERE callid = :c AND event = 'ENTERQUEUE' ORDER BY id ASC LIMIT 1");
+        $dup = $db->prepare("SELECT COUNT(*) FROM sent_logs WHERE call_id = :c AND UPPER(rule_type) = 'FILA_ABANDONO' AND extension = :q");
+        $q_cfg = $db->prepare("SELECT queue_name, abandon_enabled, abandon_msg, supervisor_whatsapp FROM queues_config WHERE queue_number = :q LIMIT 1");
+        $now = date('d/m/Y H:i:s');
+
+        foreach ($events as $ev) {
+            $max_id = max($max_id, (int)$ev['id']);
+            $out['processed']++;
+            $q = (string)$ev['queuename'];
+            $q_cfg->execute([':q' => $q]);
+            $cfg = $q_cfg->fetch(PDO::FETCH_ASSOC);
+            if (!$cfg || empty($cfg['abandon_enabled'])) { $out['skipped']++; continue; }
+
+            $dup->execute([':c' => $ev['callid'], ':q' => $q]);
+            if ((int)$dup->fetchColumn() > 0) { $out['skipped']++; continue; }
+
+            $q_enter->execute([':c' => $ev['callid']]);
+            $caller = preg_replace('/\D/', '', (string)$q_enter->fetchColumn());
+            if ($caller === '' || strlen($caller) < 8) { $out['skipped']++; continue; } // sem número externo identificável
+
+            $q_name = !empty($cfg['queue_name']) ? $cfg['queue_name'] : $q;
+            $tpl = !empty($cfg['abandon_msg']) ? $cfg['abandon_msg'] : getRule('queue_abandon_msg_default');
+            if (empty($tpl)) { $tpl = 'Olá! Vimos que você ligou para o setor {NOME_FILA} às {DATA_HORA} e a chamada não pôde ser atendida. Em breve entraremos em contato!'; }
+            $msg = str_replace(['{NOME_FILA}', '{CLIENTE}', '{DATA_HORA}'], [$q_name, $caller, $now], $tpl);
+
+            $ok = sendWhatsAppMessageViaZPro($api_url, $api_token, $caller, $msg, (string)$ev['callid'], $q, 'FILA_ABANDONO');
+            if ($ok) { $out['sent']++; } else { $out['skipped']++; }
+
+            $sup = preg_replace('/\D/', '', (string)($cfg['supervisor_whatsapp'] ?? ''));
+            if ($sup !== '') {
+                $sup_msg = "⚠️ *Abandono na fila {$q_name}*\n\nCliente *{$caller}* desistiu de aguardar às *{$now}*.";
+                sendWhatsAppMessageViaZPro($api_url, $api_token, $sup, $sup_msg, (string)$ev['callid'] . '_SUP', $q, 'FILA_ABANDONO_SUP');
+            }
+        }
+        saveSetting('abandon_last_queue_log_id', (string)$max_id);
+    } catch (Exception $e) {
+        $out['error'] = $e->getMessage();
+    }
+    return $out;
+}
+

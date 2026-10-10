@@ -55,6 +55,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (function_exists('pabx_log')) {
             pabx_log('whatsapp', 'INFO', "Restaurados modelos de mensagens de fábrica do WhatsApp");
         }
+    } elseif (isset($_POST['action_save_queue_abandon'])) {
+        $q_en  = $_POST['q_abandon'] ?? [];
+        $q_sup = $_POST['q_supervisor'] ?? [];
+        $q_msg = $_POST['q_msg'] ?? [];
+        $upd = $db->prepare("UPDATE queues_config SET abandon_enabled = :en, supervisor_whatsapp = :sup, abandon_msg = :m, updated_at = CURRENT_TIMESTAMP WHERE queue_number = :q");
+        $n = 0;
+        foreach ($db->query("SELECT queue_number FROM queues_config")->fetchAll(PDO::FETCH_COLUMN) as $qn) {
+            $upd->execute([
+                ':en'  => isset($q_en[$qn]) ? 1 : 0,
+                ':sup' => preg_replace('/\D/', '', (string)($q_sup[$qn] ?? '')),
+                ':m'   => trim((string)($q_msg[$qn] ?? '')),
+                ':q'   => $qn
+            ]);
+            $n++;
+        }
+        $msg = "Abandono de fila salvo para {$n} fila(s).";
+        if (function_exists('pabx_log')) pabx_log('whatsapp', 'INFO', "Configuração de abandono por fila atualizada ({$n} filas)");
     } elseif (isset($_POST['action_test_rule_wa'])) {
         $test_phone = trim($_POST['test_phone'] ?? '');
         $test_rule  = trim($_POST['test_rule_type'] ?? 'queue_abandon_msg_default');
@@ -244,6 +261,35 @@ $nps_msg      = getRule('nps_msg')                   ?: $DEFAULT_TEMPLATES['nps_
                 <span>Salvar Regras de Integração</span>
             </button>
         </div>
+    </form>
+
+    <!-- ABANDONO DE FILA POR FILA (cliente + supervisor) -->
+    <?php $__queues_cfg = $db->query("SELECT queue_number, queue_name, abandon_enabled, abandon_msg, supervisor_whatsapp FROM queues_config ORDER BY CAST(queue_number AS UNSIGNED) ASC")->fetchAll(PDO::FETCH_ASSOC); ?>
+    <form method="POST" action="" class="bg-slate-900/90 border border-purple-500/30 rounded-xl p-5 shadow-xl space-y-4">
+        <div class="border-b border-slate-800/80 pb-3">
+            <h3 class="text-sm font-bold text-white flex items-center gap-2"><i class="fa-solid fa-phone-slash text-purple-400"></i> Abandono de Fila</h3>
+            <span class="text-xs text-slate-400">Quando o cliente desiste de aguardar na fila, ele recebe a mensagem abaixo e o supervisor é avisado. Em branco, usa o modelo "Abandono de fila" acima.</span>
+        </div>
+        <?php if (empty($__queues_cfg)): ?>
+            <div class="text-xs text-slate-500 py-4 text-center">Nenhuma fila sincronizada. Use "Sincronizar" no topo do painel.</div>
+        <?php else: ?>
+        <div class="overflow-x-auto">
+            <table class="w-full text-xs">
+                <thead><tr class="text-slate-400 text-left border-b border-slate-800"><th class="py-2 pr-3">Fila</th><th class="py-2 pr-3">Ativo</th><th class="py-2 pr-3">WhatsApp do supervisor</th><th class="py-2">Mensagem própria (opcional)</th></tr></thead>
+                <tbody>
+                <?php foreach ($__queues_cfg as $__q): $__qn = htmlspecialchars($__q['queue_number'], ENT_QUOTES); ?>
+                    <tr class="border-b border-slate-800/60">
+                        <td class="py-2 pr-3 text-white font-bold whitespace-nowrap"><?php echo $__qn; ?> - <?php echo htmlspecialchars($__q['queue_name']); ?></td>
+                        <td class="py-2 pr-3"><input type="checkbox" name="q_abandon[<?php echo $__qn; ?>]" value="1" <?php echo !empty($__q['abandon_enabled']) ? 'checked' : ''; ?> class="rounded accent-purple-500"></td>
+                        <td class="py-2 pr-3"><input type="text" name="q_supervisor[<?php echo $__qn; ?>]" value="<?php echo htmlspecialchars($__q['supervisor_whatsapp'] ?? '', ENT_QUOTES); ?>" placeholder="5511999998888" class="w-44 px-2 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-cyan-300 font-mono"></td>
+                        <td class="py-2"><input type="text" name="q_msg[<?php echo $__qn; ?>]" value="<?php echo htmlspecialchars($__q['abandon_msg'] ?? '', ENT_QUOTES); ?>" placeholder="Ex.: Olá! Vimos que você ligou para {NOME_FILA}..." class="w-full px-2 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-slate-200"></td>
+                    </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+        <button type="submit" name="action_save_queue_abandon" style="white-space:nowrap;flex-shrink:0;width:auto" class="px-5 py-2.5 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-xl text-xs transition"><i class="fa-solid fa-floppy-disk"></i> Salvar abandono de fila</button>
+        <?php endif; ?>
     </form>
 
     <!-- CARD DE TESTE MANUAL DE ENVIOS DE WHATSAPP -->
