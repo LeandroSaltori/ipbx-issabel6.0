@@ -4249,6 +4249,14 @@ function aiGetConfig() {
         $mChat = $mAudio = '';   // modelos salvos eram de outro provedor
     }
     $d        = $defs[$provider] ?? $defs['openai'];
+    // Modelo salvo de outro provedor (ex.: whisper-1/gpt-* com chave Groq) é ignorado
+    if ($provider === 'groq') {
+        if ($mAudio !== '' && !preg_match('/whisper/i', $mAudio) || $mAudio === 'whisper-1') $mAudio = '';
+        if ($mChat !== '' && preg_match('/^(gpt-|o1|o3|gemini|deepseek|claude)/i', $mChat)) $mChat = '';
+    } elseif ($provider === 'openai') {
+        if ($mChat !== '' && preg_match('/^(llama|mixtral|gemma|gemini|deepseek|qwen)/i', $mChat)) $mChat = '';
+        if ($mAudio !== '' && preg_match('/large-v3/i', $mAudio)) $mAudio = '';
+    }
     $limit    = (int)(getSetting('ai_token_limit') ?: 1024);
     return [
         'provider' => $provider,
