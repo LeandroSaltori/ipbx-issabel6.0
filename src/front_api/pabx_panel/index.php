@@ -750,10 +750,22 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
             mb_substr($tr['text'], 0, 12000), 40, $cfg
         );
         if (!$r['ok']) { echo json_encode(['success' => false, 'error' => 'Análise: ' . $r['error'], 'transcript' => $tr['text']]); exit; }
-        $txt = preg_replace('/^```(?:json)?\s*|\s*```$/i', '', trim($r['text']));
+        $raw = trim(preg_replace('#<think>.*?</think>#is', '', (string)$r['text']));   // modelos de raciocínio
+        $txt = preg_replace('/^```(?:json)?\s*|\s*```$/i', '', $raw);
         $j = json_decode($txt, true);
         if (!is_array($j) && preg_match('/\{.*\}/s', $txt, $mm)) $j = json_decode($mm[0], true);
-        if (!is_array($j) || empty($j['resumo'])) { echo json_encode(['success' => false, 'error' => 'A IA respondeu fora do formato esperado.', 'transcript' => $tr['text']]); exit; }
+        if (is_array($j)) {   // chaves alternativas / valores em lista
+            foreach (['resumo' => ['resumo', 'summary', 'resumo_chamada'], 'sentimento' => ['sentimento', 'sentiment'], 'recomendacao' => ['recomendacao', 'recomendação', 'recommendation', 'proximo_passo']] as $dst => $alts) {
+                foreach ($alts as $a) if (isset($j[$a])) { $j[$dst] = $j[$a]; break; }
+            }
+            foreach (['resumo', 'sentimento', 'recomendacao'] as $f) if (isset($j[$f]) && is_array($j[$f])) $j[$f] = implode(' ', array_map('strval', $j[$f]));
+            if (!isset($j['satisfacao']) && isset($j['satisfação'])) $j['satisfacao'] = $j['satisfação'];
+        }
+        if (!is_array($j) || empty($j['resumo'])) {
+            if ($raw === '') { echo json_encode(['success' => false, 'error' => 'A IA devolveu resposta vazia (modelo ' . $cfg['model'] . ').', 'transcript' => $tr['text']]); exit; }
+            // Resposta em texto livre: mostra como resumo, sem inventar métricas
+            $j = ['resumo' => mb_substr($raw, 0, 1500), 'sentimento' => '', 'satisfacao' => null, 'recomendacao' => ''];
+        }
         $sat = isset($j['satisfacao']) && is_numeric($j['satisfacao']) ? max(1, min(5, (float)$j['satisfacao'])) : null;
         echo json_encode([
             'success' => true,
