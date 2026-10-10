@@ -79,9 +79,33 @@ if [ -d "$DEST_DIR" ]; then
 fi
 
 # 3. Cópia e implantação dos arquivos novos
+# Preserva a base SQLite de produção (configurações, token da API, usuários, histórico):
+# o repositório traz um .ht_whatsapp_config.sqlite de exemplo que NÃO pode sobrescrever a base viva.
+KEEP_DIR="$(mktemp -d /tmp/front_api_keep.XXXXXX)"
+for rel in ".ht_whatsapp_config.sqlite" "pabx_panel/.ht_whatsapp_config.sqlite"; do
+  if [ -f "$DEST_DIR/$rel" ]; then
+    mkdir -p "$KEEP_DIR/$(dirname "$rel")"
+    /bin/cp -p "$DEST_DIR/$rel" "$KEEP_DIR/$rel"
+  fi
+done
+if [ -d "$DEST_DIR/pabx_panel/logs" ]; then
+  mkdir -p "$KEEP_DIR/pabx_panel"
+  /bin/cp -rp "$DEST_DIR/pabx_panel/logs" "$KEEP_DIR/pabx_panel/logs"
+fi
+
 echo "[+] Copiando arquivos atualizados para $DEST_DIR..."
 mkdir -p "$DEST_DIR"
 /bin/cp -rf "$SOURCE_DIR/"* "$DEST_DIR/"
+
+# Restaura a base e os logs de produção por cima dos arquivos de exemplo
+for rel in ".ht_whatsapp_config.sqlite" "pabx_panel/.ht_whatsapp_config.sqlite"; do
+  if [ -f "$KEEP_DIR/$rel" ]; then
+    /bin/cp -pf "$KEEP_DIR/$rel" "$DEST_DIR/$rel"
+    echo "[✓] Base preservada: $rel"
+  fi
+done
+[ -d "$KEEP_DIR/pabx_panel/logs" ] && /bin/cp -rpf "$KEEP_DIR/pabx_panel/logs/." "$DEST_DIR/pabx_panel/logs/"
+rm -rf "$KEEP_DIR"
 
 # 4. Ajuste estrito de permissões e proprietário do PABX
 echo "[+] Ajustando permissões de sistema..."
@@ -91,6 +115,14 @@ chmod -R 755 "$DEST_DIR"
 # Permissão nos bancos SQLite se presentes
 [ -f "$DEST_DIR/.ht_whatsapp_config.sqlite" ] && chmod 666 "$DEST_DIR/.ht_whatsapp_config.sqlite" 2>/dev/null || true
 [ -f "$DEST_DIR/pabx_panel/.ht_whatsapp_config.sqlite" ] && chmod 666 "$DEST_DIR/pabx_panel/.ht_whatsapp_config.sqlite" 2>/dev/null || true
+
+# Senha inicial do painel: só gera se ninguém tiver senha definida ainda
+if command -v php &>/dev/null && [ -f "$DEST_DIR/pabx_panel/set_password.php" ]; then
+  echo "[+] Verificando senha de acesso do painel..."
+  php "$DEST_DIR/pabx_panel/set_password.php" || true
+  chown -R asterisk:asterisk "$DEST_DIR"
+  [ -f "$DEST_DIR/pabx_panel/.ht_whatsapp_config.sqlite" ] && chmod 666 "$DEST_DIR/pabx_panel/.ht_whatsapp_config.sqlite" 2>/dev/null || true
+fi
 
 # Limpeza de arquivos temporários se houve clone
 if [ -n "$TMP_REPO" ] && [ -d "$TMP_REPO" ]; then
@@ -112,6 +144,9 @@ echo ""
 echo " Como acessar no navegador:"
 echo "    http://$IP_LOCAL/front_api/"
 echo "    ou https://$IP_LOCAL/front_api/"
+echo ""
+echo " Redefinir senha de um usuário:"
+echo "    php $DEST_DIR/pabx_panel/set_password.php email@dominio.com"
 echo ""
 echo " Para reverter a qualquer momento, execute:"
 echo "    bash $DEST_DIR/instalar-front-api.sh --rollback"

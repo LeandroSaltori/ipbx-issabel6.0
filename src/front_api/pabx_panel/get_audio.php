@@ -12,6 +12,7 @@ while (ob_get_level()) {
 
 require_once __DIR__ . '/config/database.php';
 require_once __DIR__ . '/includes/functions.php';
+authGate('plain');
 
 $file = isset($_GET['file']) ? trim($_GET['file']) : '';
 $uid  = isset($_GET['uid']) ? trim($_GET['uid']) : '';

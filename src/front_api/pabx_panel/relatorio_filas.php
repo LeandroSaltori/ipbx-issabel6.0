@@ -7,6 +7,11 @@
 
 date_default_timezone_set('America/Sao_Paulo');
 
+// Exige sessão do painel (este arquivo serve gravações e relatórios)
+require_once __DIR__ . '/config/database.php';
+require_once __DIR__ . '/includes/functions.php';
+authGate('plain');
+
 // Garantir UTF-8 nos cabe&#231;alhos HTTP e ambiente PHP
 ini_set('default_charset', 'UTF-8');
 if (function_exists('mb_internal_encoding')) {

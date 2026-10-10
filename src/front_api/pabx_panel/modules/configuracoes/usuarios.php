@@ -15,6 +15,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_save_user'])) 
         'role'        => trim($_POST['user_role'] ?? 'Usuário'),
         'extension'   => trim($_POST['user_extension'] ?? ''),
         'whatsapp'    => trim($_POST['user_whatsapp'] ?? ''),
+        'password'    => (string)($_POST['user_password'] ?? ''),
         'permissions' => isset($_POST['permissions']) && is_array($_POST['permissions']) ? $_POST['permissions'] : []
     ];
 
@@ -29,7 +30,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_save_user'])) 
 // Processar exclusão de usuário
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_delete_user'])) {
     $del_id = intval($_POST['delete_user_id'] ?? 0);
-    if ($del_id > 0) {
+    if ($del_id > 0 && $del_id === (int)($_SESSION['logged_user_id'] ?? 0)) {
+        $msg_error = "Você não pode excluir o próprio usuário enquanto estiver logado.";
+    } elseif ($del_id > 0) {
         if (deleteSystemUser($del_id)) {
             $msg_success = "Usuário removido com sucesso.";
         } else {
@@ -296,6 +299,12 @@ if (empty($available_extensions)) {
                 <span class="text-[10px] text-slate-400 block">Número de WhatsApp do usuário com DDD para onde o sistema enviará relatórios em PDF, relatórios periódicos e notificações.</span>
             </div>
 
+            <!-- Senha de acesso ao painel -->
+            <div class="space-y-1">
+                <label class="text-xs font-bold text-amber-400 block">Senha de acesso ao painel:</label>
+                <input type="password" id="form-user-password" name="user_password" minlength="8" autocomplete="new-password" placeholder="Mínimo 8 caracteres (em branco mantém a atual)" class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-amber-200 focus:border-amber-500 focus:outline-none font-mono">
+            </div>
+
             <!-- SEÇÃO 1: PERMISSÕES DE ACESSO AOS MÓDULOS -->
             <div class="space-y-2 pt-3 border-t border-slate-800">
                 <div class="flex items-center justify-between">
@@ -412,6 +421,7 @@ function updatePermissionsByRole(roleName) {
 function openAddUserModal() {
     document.getElementById('user-modal-title').innerText = 'Criar Novo Usuário';
     document.getElementById('form-user-id').value = '0';
+    document.getElementById('form-user-password').value = '';
     document.getElementById('form-user-name').value = '';
     document.getElementById('form-user-email').value = '';
     document.getElementById('form-user-role').value = 'Administrador';
@@ -425,6 +435,7 @@ function openAddUserModal() {
 function openEditUserModal(u) {
     document.getElementById('user-modal-title').innerText = `Editar Usuário: ${u.name}`;
     document.getElementById('form-user-id').value = u.id;
+    document.getElementById('form-user-password').value = '';
     document.getElementById('form-user-name').value = u.name || '';
     document.getElementById('form-user-email').value = u.email || '';
     document.getElementById('form-user-role').value = u.role || 'Administrador';

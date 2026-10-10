@@ -251,6 +251,7 @@ function isGroupActive($modules_array) {
             </div>
             <i class="fa-solid fa-gear text-xs text-slate-500"></i>
         </div>
+        <a href="index.php?auth=logout" class="mt-2 flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-bold text-rose-300 bg-rose-500/10 border border-rose-500/20 hover:bg-rose-500/20 transition sidebar-text" style="white-space:nowrap"><i class="fa-solid fa-right-from-bracket"></i> Sair</a>
     </div>
 </aside>
 

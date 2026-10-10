@@ -5,6 +5,7 @@
 
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/logger.php';
+require_once __DIR__ . '/auth.php';
 
 function getSetting($key) {
     global $db;
@@ -3060,6 +3061,10 @@ function saveSystemUser($data) {
         if ($id > 0) {
             $stmt = $db->prepare("UPDATE system_users SET name = :name, email = :email, role = :role, extension = :ext, whatsapp = :wa, permissions = :perm, updated_at = CURRENT_TIMESTAMP WHERE id = :id");
             $stmt->execute([':name' => $name, ':email' => $email, ':role' => $role, ':ext' => $extension, ':wa' => $whatsapp, ':perm' => $permissions, ':id' => $id]);
+            if (!empty($data['password'])) {
+                $pw = authSetPassword($id, $data['password']);
+                if (!$pw['success']) return ['success' => false, 'error' => $pw['error']];
+            }
             return ['success' => true, 'message' => "Usuário '$name' atualizado com sucesso!"];
         } else {
             // Verificar duplicidade de e-mail
@@ -3070,7 +3075,15 @@ function saveSystemUser($data) {
             }
 
             $stmt = $db->prepare("INSERT INTO system_users (name, email, role, extension, whatsapp, permissions, status) VALUES (:name, :email, :role, :ext, :wa, :perm, 'Ativo')");
+            if (empty($data['password'])) {
+                return ['success' => false, 'error' => 'Defina uma senha (mínimo 8 caracteres) para o novo usuário.'];
+            }
             $stmt->execute([':name' => $name, ':email' => $email, ':role' => $role, ':ext' => $extension, ':wa' => $whatsapp, ':perm' => $permissions]);
+            $pw = authSetPassword((int)$db->lastInsertId(), $data['password']);
+            if (!$pw['success']) {
+                $db->prepare("DELETE FROM system_users WHERE email = :e")->execute([':e' => $email]);
+                return ['success' => false, 'error' => $pw['error']];
+            }
             return ['success' => true, 'message' => "Usuário '$name' cadastrado com sucesso!"];
         }
     } catch (Exception $e) {
@@ -3090,8 +3103,12 @@ function deleteSystemUser($id) {
 }
 
 function getLoggedUser() {
-    $user_id = $_SESSION['logged_user_id'] ?? 1;
+    // Na web só vale o usuário da sessão; o padrão administrador é apenas para CLI (AGI/cron)
+    $user_id = $_SESSION['logged_user_id'] ?? (PHP_SAPI === 'cli' ? 1 : 0);
     $u = getSystemUserById($user_id);
+    if (!$u && PHP_SAPI !== 'cli') {
+        return null;
+    }
     if (!$u) {
         $u = [
             'id' => 1,

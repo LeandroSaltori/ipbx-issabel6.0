@@ -25,6 +25,18 @@ try {
 } catch (Exception $ex_sync) {}
 
 // =========================================================================
+// AUTENTICAÇÃO (portão único do painel)
+// =========================================================================
+$__api_action_names = ['get_logs', 'get_fop_extensions', 'get_trunks_status', 'get_queues_realtime', 'get_parking_lots', 'fop_action', 'originate_call', 'save_contact', 'test_llm_connection', 'analyze_pabx_insights', 'generate_ai_insights', 'get_ai_insights_history', 'delete_ai_insight', 'transcribe_audio', 'get_kpi_calls_detail', 'get_active_calls', 'get_time_groups', 'get_time_group_rules', 'save_time_group_rule', 'delete_time_group_rule', 'get_announcements_list', 'update_announcement_audio', 'sync_assets'];
+if (($_GET['api_action'] ?? '') === 'whatsapp_webhook') {
+    // Webhook do Z-PRO: autenticado por token próprio, sem sessão
+} elseif (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['action'], $__api_action_names, true))) {
+    authGate('json');
+} else {
+    authGate('page');
+}
+
+// =========================================================================
 // HANDLER DE ENDPOINTS DE API (JSON)
 // =========================================================================
 if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['action'], ['get_logs', 'get_fop_extensions', 'get_trunks_status', 'get_queues_realtime', 'get_parking_lots', 'fop_action', 'originate_call', 'save_contact', 'test_llm_connection', 'analyze_pabx_insights', 'generate_ai_insights', 'get_ai_insights_history', 'delete_ai_insight', 'transcribe_audio', 'get_kpi_calls_detail', 'get_active_calls', 'get_time_groups', 'get_time_group_rules', 'save_time_group_rule', 'delete_time_group_rule', 'get_announcements_list', 'update_announcement_audio', 'sync_assets', 'whatsapp_webhook']))) {
@@ -494,6 +506,10 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
     }
 
     if ($action === 'originate_call') {
+        if (!hasUserPermission('click_to_call')) {
+            echo json_encode(['success' => false, 'error' => 'Sem permissão para originar chamadas.']);
+            exit;
+        }
         $from = isset($_GET['from']) ? preg_replace('/[^0-9]/', '', $_GET['from']) : '';
         $to   = isset($_GET['to']) ? preg_replace('/[^0-9]/', '', $_GET['to']) : '';
         if (empty($from) || empty($to)) {
@@ -1154,6 +1170,13 @@ if (!isset($allowed_modules[$module]) || !in_array($action, $allowed_modules[$mo
     $module = 'dashboard';
     $action = 'view_v1';
 }
+
+// Permissão por módulo (mesmas regras de exibição do menu)
+$__route_denied = false;
+$__route_perm = authRoutePermission($module, $action);
+if ($__route_perm !== '' && !hasUserPermission($__route_perm)) {
+    $__route_denied = true;
+}
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR" class="dark">
@@ -1343,7 +1366,9 @@ if (!isset($allowed_modules[$module]) || !in_array($action, $allowed_modules[$mo
                     $target_file = __DIR__ . "/modules/{$module}/{$action}.php";
                 }
 
-                if (file_exists($target_file)) {
+                if ($__route_denied) {
+                    echo '<div class="p-10 text-center text-slate-400"><i class="fa-solid fa-lock text-3xl text-rose-400 mb-3"></i><div class="font-bold text-white">Acesso negado</div><div class="text-xs mt-1">Seu perfil não tem permissão para este módulo.</div></div>';
+                } elseif (file_exists($target_file)) {
                     include_once $target_file;
                 } else {
                     echo '<div class="p-10 text-center text-slate-500">Módulo não encontrado.</div>';
