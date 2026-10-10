@@ -4234,6 +4234,49 @@ function aiProviderDefaults() {
     ];
 }
 
+/** Lista os modelos que a chave realmente enxerga (GET /models), com cache de 6h. */
+function aiAvailableModels($provider, $key, $baseUrl, $force = false) {
+    if ($key === '' || $baseUrl === '') return [];
+    $tag = md5($provider . '|' . $baseUrl . '|' . $key);
+    $cache = json_decode((string)getSetting('ai_models_cache'), true);
+    if (!$force && is_array($cache) && ($cache['tag'] ?? '') === $tag && time() - (int)($cache['t'] ?? 0) < 6 * 3600 && !empty($cache['ids'])) {
+        return $cache['ids'];
+    }
+    $ch = curl_init(rtrim($baseUrl, '/') . '/models');
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 8,
+        CURLOPT_HTTPHEADER     => ['Authorization: Bearer ' . $key],
+        CURLOPT_SSL_VERIFYPEER => getSetting('ai_ssl_insecure') !== '1',
+        CURLOPT_SSL_VERIFYHOST => getSetting('ai_ssl_insecure') !== '1' ? 2 : 0,
+    ]);
+    $resp = curl_exec($ch); $http = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE); curl_close($ch);
+    $j = json_decode((string)$resp, true);
+    $ids = [];
+    if ($http === 200 && !empty($j['data']) && is_array($j['data'])) {
+        foreach ($j['data'] as $m) if (!empty($m['id'])) $ids[] = preg_replace('#^models/#', '', $m['id']);
+    }
+    if ($ids) saveSetting('ai_models_cache', json_encode(['tag' => $tag, 't' => time(), 'ids' => $ids]));
+    return $ids;
+}
+
+/** Escolhe o melhor modelo disponível ('chat' ou 'audio'); '' se nada servir. */
+function aiPickModel($ids, $kind, $preferred = '') {
+    if ($preferred !== '' && in_array($preferred, $ids, true)) return $preferred;
+    if ($kind === 'audio') {
+        foreach (['whisper-large-v3-turbo', 'whisper-large-v3', 'whisper-1'] as $m) if (in_array($m, $ids, true)) return $m;
+        foreach ($ids as $id) if (stripos($id, 'whisper') !== false) return $id;
+        return '';
+    }
+    foreach (['llama-3.3-70b-versatile', 'llama-3.1-8b-instant', 'openai/gpt-oss-120b', 'openai/gpt-oss-20b', 'gpt-4o-mini', 'gpt-4.1-mini', 'gpt-4o', 'gemini-2.0-flash', 'gemini-1.5-flash', 'deepseek-chat'] as $m) {
+        if (in_array($m, $ids, true)) return $m;
+    }
+    foreach ($ids as $id) {
+        if (preg_match('/whisper|guard|tts|orpheus|playai|embed|moderation|dall|image|audio|realtime|transcribe|vision-preview|davinci|babbage/i', $id)) continue;
+        return $id;
+    }
+    return '';
+}
+
 function aiGetConfig() {
     $defs     = aiProviderDefaults();
     $provider = getSetting('ai_provider') ?: 'openai';
@@ -4258,12 +4301,24 @@ function aiGetConfig() {
         if ($mAudio !== '' && preg_match('/large-v3/i', $mAudio)) $mAudio = '';
     }
     $limit    = (int)(getSetting('ai_token_limit') ?: 1024);
+    $baseUrl  = rtrim(($byKey ? '' : trim((string)getSetting('ai_base_url'))) ?: $d['url'], '/');
+    $mChat    = $mChat ?: $d['chat'];
+    $mAudio   = $mAudio ?: $d['audio'];
+    // Se o modelo escolhido não existe para esta chave, usa o melhor disponível (a API informa a lista)
+    if ($key !== '') {
+        $ids = aiAvailableModels($provider, $key, $baseUrl);
+        if ($ids) {
+            if (!in_array($mChat, $ids, true))  $mChat  = aiPickModel($ids, 'chat', '') ?: $mChat;
+            if ($mAudio !== '' && !in_array($mAudio, $ids, true)) $mAudio = aiPickModel($ids, 'audio', '') ?: $mAudio;
+            if ($mAudio === '' && in_array($provider, ['openai', 'groq'], true)) $mAudio = aiPickModel($ids, 'audio', '');
+        }
+    }
     return [
         'provider' => $provider,
         'key'      => $key,
-        'base_url' => rtrim(($byKey ? '' : trim((string)getSetting('ai_base_url'))) ?: $d['url'], '/'),
-        'model'    => $mChat ?: $d['chat'],
-        'audio'    => $mAudio ?: $d['audio'],
+        'base_url' => $baseUrl,
+        'model'    => $mChat,
+        'audio'    => $mAudio,
         'tokens'   => max(64, min(4000, $limit ?: 1024)),
         'prompt'   => trim((string)getSetting('ai_custom_prompt')),
         'enabled'  => getSetting('enable_copilot') !== '0',

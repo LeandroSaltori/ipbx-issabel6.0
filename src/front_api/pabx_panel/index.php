@@ -791,6 +791,8 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
         $pDef = isset($providerDefaults[$provider]) ? $providerDefaults[$provider] : $providerDefaults['openai'];
         if (empty($baseUrl)) $baseUrl = $pDef['url'];
         if (empty($model))   $model   = $pDef['model'];
+        $ids = aiAvailableModels($provider, $key, $baseUrl, true);
+        if ($ids && !in_array($model, $ids, true)) $model = aiPickModel($ids, 'chat', '') ?: $model;
 
         if (empty($key)) {
             echo json_encode(['success' => false, 'error' => 'API Key não informada. Cole a chave antes de testar.']);
