@@ -4416,12 +4416,44 @@ function aiTranscribeFile($path, $cfg = null) {
     if (!is_file($path) || filesize($path) > 24 * 1024 * 1024) {
         return ['ok' => false, 'text' => '', 'error' => 'Arquivo ausente ou maior que 24MB'];
     }
-    $mime = (strtolower(pathinfo($path, PATHINFO_EXTENSION)) === 'mp3') ? 'audio/mpeg' : 'audio/wav';
+    // Whisper só aceita estas extensões; gravações do Asterisk podem ser .gsm/.wav49/.sln/.WAV etc.
+    $ext = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+    $okExt = ['flac','mp3','mp4','mpeg','mpga','m4a','ogg','opus','wav','webm'];
+    $sendPath = $path; $tmp = '';
+    $needConv = !in_array($ext, $okExt, true);
+    if (!$needConv && $ext === 'wav') {
+        // WAV em GSM/formato exótico: valida o cabeçalho (PCM=1); senão reconverte
+        $h = (string)@file_get_contents($path, false, null, 0, 24);
+        if (strlen($h) < 24 || substr($h, 0, 4) !== 'RIFF' || unpack('v', substr($h, 20, 2))[1] !== 1) $needConv = true;
+    }
+    if ($needConv || $path !== strtolower($path) && $ext !== pathinfo($path, PATHINFO_EXTENSION)) {
+        $tmp = sys_get_temp_dir() . '/ai_rec_' . bin2hex(random_bytes(6)) . '.wav';
+        $in = escapeshellarg($path); $o = escapeshellarg($tmp);
+        $cmds = ["sox $in -r 16000 -c 1 -b 16 $o 2>&1", "ffmpeg -nostdin -y -loglevel error -i $in -ar 16000 -ac 1 $o 2>&1"];
+        if (in_array($ext, ['gsm','wav49'], true)) array_unshift($cmds, "sox -t gsm $in -r 16000 -c 1 -b 16 $o 2>&1");
+        foreach ($cmds as $c) {
+            @shell_exec($c);
+            if (is_file($tmp) && filesize($tmp) > 1000) break;
+        }
+        if (!is_file($tmp) || filesize($tmp) <= 1000) {
+            if (is_file($tmp)) @unlink($tmp);
+            if ($needConv) return ['ok' => false, 'text' => '', 'error' => "Formato .$ext não suportado e sem sox/ffmpeg para converter no servidor"];
+            $tmp = '';   // só extensão em maiúsculas: envia com nome normalizado
+        } else { $sendPath = $tmp; }
+    }
+    if ($filesizeTmp = (is_file($sendPath) ? filesize($sendPath) : 0) and $filesizeTmp > 24 * 1024 * 1024) {
+        if ($tmp) @unlink($tmp);
+        return ['ok' => false, 'text' => '', 'error' => 'Áudio maior que 24MB após conversão'];
+    }
+    $sendExt  = pathinfo($sendPath, PATHINFO_EXTENSION);
+    $sendName = preg_replace('/[^A-Za-z0-9_-]/', '_', pathinfo($path, PATHINFO_FILENAME)) . '.' . strtolower($sendExt);
+    $mime = (strtolower($sendExt) === 'mp3') ? 'audio/mpeg' : 'audio/wav';
+    $path = $sendPath;
     $ch = curl_init($cfg['base_url'] . '/audio/transcriptions');
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_POST           => true,
-        CURLOPT_POSTFIELDS     => ['file' => new CURLFile($path, $mime, basename($path)), 'model' => $cfg['audio']],
+        CURLOPT_POSTFIELDS     => ['file' => new CURLFile($path, $mime, $sendName), 'model' => $cfg['audio']],
         CURLOPT_HTTPHEADER     => ['Authorization: Bearer ' . $cfg['key']],
         CURLOPT_TIMEOUT        => 90,
         CURLOPT_SSL_VERIFYPEER => (getSetting('ai_ssl_insecure') !== '1'),
@@ -4430,6 +4462,7 @@ function aiTranscribeFile($path, $cfg = null) {
     $http = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
     $err  = curl_error($ch);
     curl_close($ch);
+    if ($tmp !== '' && is_file($tmp)) @unlink($tmp);
     if ($err !== '') return ['ok' => false, 'text' => '', 'error' => 'Erro cURL: ' . $err];
     $j = json_decode((string)$resp, true);
     if ($http === 200 && isset($j['text'])) return ['ok' => true, 'text' => trim($j['text']), 'error' => ''];
