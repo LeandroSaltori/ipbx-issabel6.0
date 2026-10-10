@@ -19,6 +19,38 @@ function authClientIp() {
     return $_SERVER['REMOTE_ADDR'] ?? 'cli';
 }
 
+/** Caminho do log que o fail2ban (jail ipbx-front-api) monitora. */
+function authFail2banLogPath() {
+    return '/var/log/ipbx-front-api/auth.log';
+}
+
+/**
+ * O jail ipbx-front-api está instalado no fail2ban do Issabel?
+ * Quando sim, o bloqueio de IP é gerido pelo fail2ban (telas nativas Security > Fail2ban),
+ * e o limitador interno fica desativado para não haver duas gestões diferentes.
+ */
+function authFail2banActive() {
+    static $active = null;
+    if ($active !== null) return $active;
+    $active = false;
+    if (is_file('/etc/fail2ban/jail.d/ipbx-front-api.conf')) {
+        $active = true;
+    } else {
+        $c = @file_get_contents('/etc/fail2ban/jail.d/issabel.conf');
+        if ($c !== false && strpos($c, '[ipbx-front-api]') !== false) $active = true;
+    }
+    return $active;
+}
+
+/** Registra falha de login em formato lido pelo filtro do fail2ban (usuário em urlencode: sem injeção de IP/linhas). */
+function authLogFail2ban($email) {
+    $line = date('Y-m-d H:i:s') . ' ipbx-front-api LOGIN_FAIL ip=' . authClientIp() . ' user=' . rawurlencode(substr((string)$email, 0, 80)) . "\n";
+    $path = authFail2banLogPath();
+    if (!@file_put_contents($path, $line, FILE_APPEND | LOCK_EX)) {
+        @file_put_contents(__DIR__ . '/../logs/auth.log', $line, FILE_APPEND | LOCK_EX);
+    }
+}
+
 function authEnsureSchema() {
     global $db;
     static $done = false;
@@ -57,7 +89,6 @@ function authIsLocked($email) {
     global $db;
     authEnsureSchema();
     try {
-        $since = date('Y-m-d H:i:s', time() - AUTH_LOCK_MINUTES * 60);
         $st = $db->prepare("SELECT COUNT(*) FROM login_attempts WHERE success = 0 AND created_at >= :since AND (ip = :ip OR email = :em)");
         // created_at é gravado em UTC pelo SQLite; compara no mesmo fuso
         $st->execute([':since' => gmdate('Y-m-d H:i:s', time() - AUTH_LOCK_MINUTES * 60), ':ip' => authClientIp(), ':em' => strtolower($email)]);
@@ -87,7 +118,7 @@ function authLogin($email, $password) {
     if ($email === '' || (string)$password === '') {
         return ['success' => false, 'error' => 'Informe e-mail e senha.'];
     }
-    if (authIsLocked($email)) {
+    if (!authFail2banActive() && authIsLocked($email)) {
         return ['success' => false, 'error' => 'Muitas tentativas. Aguarde ' . AUTH_LOCK_MINUTES . ' minutos e tente novamente.'];
     }
     $st = $db->prepare("SELECT * FROM system_users WHERE lower(email) = lower(:e) LIMIT 1");
@@ -99,8 +130,12 @@ function authLogin($email, $password) {
     $ok = password_verify((string)$password, $hash !== '' ? $hash : '$2y$10$usesomesillystringforsaltuQ5VhFmH0nQd0pB0m3x8cYb1fK1y2');
     if (!$u || $hash === '' || !$ok || ($u['status'] ?? 'Ativo') !== 'Ativo') {
         authRecordAttempt($email, false);
+        authLogFail2ban($email);
         if (function_exists('pabx_log')) pabx_log('security', 'WARNING', 'Falha de login no painel', ['email' => $email, 'ip' => authClientIp()]);
-        return ['success' => false, 'error' => 'E-mail ou senha inválidos.'];
+        $hint = authFail2banActive()
+            ? ' Após várias falhas seu IP é bloqueado pelo Fail2ban do Issabel.'
+            : '';
+        return ['success' => false, 'error' => 'E-mail ou senha inválidos.' . $hint];
     }
     authRecordAttempt($email, true);
     session_regenerate_id(true);

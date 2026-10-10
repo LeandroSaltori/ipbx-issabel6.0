@@ -135,6 +135,69 @@ CRON
   echo "[✓] Cron de abandono de fila instalado em /etc/cron.d/ipbx-front-api"
 fi
 
+# Fail2ban do Issabel: jail "ipbx-front-api" (bloqueio de IP por falhas de login do painel)
+# Gerido nas telas nativas do Issabel: Security > Fail2ban (jails) e Security > Fail2ban Banned IPs.
+if [ -d /etc/fail2ban ]; then
+  F2B_LOG_DIR="/var/log/ipbx-front-api"
+  mkdir -p "$F2B_LOG_DIR"
+  touch "$F2B_LOG_DIR/auth.log"
+  chown -R asterisk:asterisk "$F2B_LOG_DIR"
+  chmod 755 "$F2B_LOG_DIR"; chmod 644 "$F2B_LOG_DIR/auth.log"
+
+  cat > /etc/fail2ban/filter.d/ipbx-front-api.conf <<'F2BFILTER'
+# IPbx Prisma - falhas de login no painel front_api
+[Definition]
+failregex = ^.*ipbx-front-api LOGIN_FAIL ip=<HOST> user=\S*\s*$
+ignoreregex =
+F2BFILTER
+
+  JAIL_BLOCK='[ipbx-front-api]
+enabled = true
+filter = ipbx-front-api
+logpath = /var/log/ipbx-front-api/auth.log
+port = http,https
+maxretry = 5
+findtime = 600
+bantime = 3600'
+
+  ISSABEL_JAILS="/etc/fail2ban/jail.d/issabel.conf"
+  if [ -f "$ISSABEL_JAILS" ]; then
+    # Dentro do arquivo do Issabel, para aparecer/ser editável em Security > Fail2ban
+    if ! grep -q '^\[ipbx-front-api\]' "$ISSABEL_JAILS"; then
+      [ -f "$ISSABEL_JAILS.bak-ipbx" ] || /bin/cp -p "$ISSABEL_JAILS" "$ISSABEL_JAILS.bak-ipbx"
+      printf '\n%s\n' "$JAIL_BLOCK" >> "$ISSABEL_JAILS"
+    fi
+    rm -f /etc/fail2ban/jail.d/ipbx-front-api.conf
+  else
+    printf '%s\n' "$JAIL_BLOCK" > /etc/fail2ban/jail.d/ipbx-front-api.conf
+  fi
+
+  cat > /etc/logrotate.d/ipbx-front-api <<'LOGROT'
+/var/log/ipbx-front-api/auth.log {
+    weekly
+    rotate 8
+    compress
+    missingok
+    notifempty
+    copytruncate
+}
+LOGROT
+
+  if [ -x /usr/bin/issabel-helper ]; then
+    /usr/bin/issabel-helper fb_client reload >/dev/null 2>&1 || fail2ban-client reload >/dev/null 2>&1 || true
+  elif command -v fail2ban-client &>/dev/null; then
+    fail2ban-client reload >/dev/null 2>&1 || true
+  fi
+  echo "[✓] Jail fail2ban 'ipbx-front-api' instalado (5 falhas/10 min = banimento de 1h)."
+fi
+
+# Telas nativas do Issabel (lista de IPs banidos e jails) com o jail do painel
+if [ -d "$SOURCE_DIR/../modules/sec_fb_banned" ] && [ -d /var/www/html/modules/sec_fb_banned ]; then
+  /bin/cp -f "$SOURCE_DIR/../modules/sec_fb_banned/index.php" /var/www/html/modules/sec_fb_banned/index.php
+  /bin/cp -f "$SOURCE_DIR/../modules/sec_fb_admin/libs/IssabelF2Bservice.class.php" /var/www/html/modules/sec_fb_admin/libs/IssabelF2Bservice.class.php
+  echo "[✓] Telas nativas do Fail2ban atualizadas para exibir o jail do painel."
+fi
+
 # Limpeza de arquivos temporários se houve clone
 if [ -n "$TMP_REPO" ] && [ -d "$TMP_REPO" ]; then
   rm -rf "$TMP_REPO"

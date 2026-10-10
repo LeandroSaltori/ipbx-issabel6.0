@@ -65,6 +65,9 @@ class IssabelF2BService {
                 $result = $this->_DB->genQuery($query,array());
             }
         }
+        // Jail do painel IPbx Prisma (login do front_api): garante a linha também em instalações já existentes
+        $query = "INSERT INTO jails (name,maxretry,bantime,ignoreip,enabled) SELECT 'ipbx-front-api','5','1','127.0.0.1',1 WHERE NOT EXISTS (SELECT 1 FROM jails WHERE name='ipbx-front-api')";
+        $this->_DB->genQuery($query,array());
     }
 
     /**
