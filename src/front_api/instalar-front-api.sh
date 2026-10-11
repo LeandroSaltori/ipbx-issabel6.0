@@ -142,9 +142,11 @@ if [ -d /etc/cron.d ]; then
 * * * * * asterisk $PHP_BIN $DEST_DIR/pabx_panel/cron/send_call_summaries.php >/dev/null 2>&1
 # IPbx Prisma - aviso de chamada perdida ao atendente (WhatsApp), lido do CDR do Issabel
 * * * * * asterisk $PHP_BIN $DEST_DIR/pabx_panel/cron/send_missed_calls.php >/dev/null 2>&1
+# IPbx Prisma - alerta de tronco fora do ar (WhatsApp ao supervisor)
+* * * * * asterisk $PHP_BIN $DEST_DIR/pabx_panel/cron/check_trunks.php >/dev/null 2>&1
 CRON
   chmod 644 /etc/cron.d/ipbx-front-api
-  echo "[✓] Crons (abandono de fila, resumo de chamadas, chamadas perdidas) instalados em /etc/cron.d/ipbx-front-api"
+  echo "[✓] Crons (abandono de fila, resumo de chamadas, chamadas perdidas, alerta de tronco) instalados em /etc/cron.d/ipbx-front-api"
 fi
 
 # Fail2ban do Issabel: jail "ipbx-front-api" (bloqueio de IP por falhas de login do painel)

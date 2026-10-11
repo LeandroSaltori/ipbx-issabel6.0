@@ -72,6 +72,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
+    // Alerta de tronco fora do ar (WhatsApp ao supervisor)
+    if (isset($_POST['action_save_trunk_alert']) || isset($_POST['action_test_trunk_alert'])) {
+        $active_tab = 'prismabot';
+        saveSetting('trunk_alert_enabled', isset($_POST['trunk_alert_enabled']) ? '1' : '0');
+        saveSetting('trunk_alert_numbers', trim($_POST['trunk_alert_numbers'] ?? ''));
+        $msg_status = "Alerta de tronco salvo.";
+        if (isset($_POST['action_test_trunk_alert'])) {
+            $nums = trunkAlertNumbers();
+            if (!$nums) { $msg_error = "⚠️ Informe ao menos um número (DDD + telefone)."; $msg_status = ''; }
+            else {
+                $okc = 0; foreach ($nums as $n) { $r = sendWhatsAppAPI($n, "✅ Teste do alerta de tronco do PABX Prisma. Você será avisado aqui se uma linha cair.", 'TESTE_TRONCO_' . date('YmdHis'), 'TRONCO', 'ALERTA_TRONCO'); if (!empty($r['success'])) $okc++; }
+                $msg_status = $okc ? "Teste enviado para $okc número(s)." : ''; if (!$okc) $msg_error = "⚠️ Não foi possível enviar o teste. Confira o servidor de envio WhatsApp.";
+            }
+        }
+        logUserAction("Alerta de tronco", getSetting('trunk_alert_enabled') === '1' ? 'ativado' : 'desativado', "CONFIG");
+    }
+
     // 1b. Servidor de envio WhatsApp (Prismabot/Z-PRO ou UAZAPI)
     $uaz_qr = '';
     if (isset($_POST['action_save_wa_provider']) || isset($_POST['action_test_uazapi']) || isset($_POST['action_connect_uazapi'])) {
@@ -669,6 +686,23 @@ if (empty($currentPbxToken) && !empty($currentPbxPass) && $_SERVER['REQUEST_METH
                     <input type="hidden" name="action_save_public_url" value="1">
                     <input type="text" name="public_base_url" value="<?php echo htmlspecialchars((string)getSetting('public_base_url')); ?>" placeholder="https://pbx.seudominio.com.br/front_api" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-[11px] text-cyan-200 font-mono focus:border-cyan-500 focus:outline-none">
                     <button type="submit" style="white-space:nowrap !important;flex-shrink:0 !important;width:auto !important;overflow:visible !important;text-overflow:clip !important" class="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-xl text-xs transition"><i class="fa-solid fa-floppy-disk"></i> Salvar URL</button>
+                </form>
+            </div>
+
+            <!-- ALERTA DE TRONCO FORA DO AR -->
+            <div class="pt-4 border-t border-slate-800/80">
+                <form method="POST" action="" class="bg-slate-950/80 p-4 rounded-2xl border border-rose-500/30 space-y-2">
+                    <div class="flex items-center gap-2 border-b border-slate-800 pb-2">
+                        <i class="fa-solid fa-triangle-exclamation text-rose-400 text-base"></i>
+                        <strong class="text-white text-xs">Alerta de tronco fora do ar (WhatsApp)</strong>
+                    </div>
+                    <p class="text-[11px] text-slate-400">Avisa uma única vez quando uma linha ficar desconectada por mais de 1 minuto e avisa de novo quando ela voltar. Use o servidor de envio WhatsApp configurado acima.</p>
+                    <label class="flex items-center gap-2 text-xs text-slate-300"><input type="checkbox" name="trunk_alert_enabled" value="1" <?php echo getSetting('trunk_alert_enabled') === '1' ? 'checked' : ''; ?>> Ativar alerta de tronco</label>
+                    <input type="text" name="trunk_alert_numbers" value="<?php echo htmlspecialchars((string)getSetting('trunk_alert_numbers')); ?>" placeholder="Números que recebem o alerta (DDD + telefone), separados por vírgula" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white font-mono">
+                    <div class="flex items-center gap-2 justify-end">
+                        <button type="submit" name="action_test_trunk_alert" value="1" style="white-space:nowrap !important;flex-shrink:0 !important;width:auto !important;overflow:visible !important;text-overflow:clip !important" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl border border-slate-700 text-xs">Salvar e Testar</button>
+                        <button type="submit" name="action_save_trunk_alert" value="1" style="white-space:nowrap !important;flex-shrink:0 !important;width:auto !important;overflow:visible !important;text-overflow:clip !important" class="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl text-xs"><i class="fa-solid fa-floppy-disk mr-1"></i> Salvar</button>
+                    </div>
                 </form>
             </div>
 

@@ -6,6 +6,7 @@
  */
 return [
     'done' => [
+        ['data' => '2026-10-11', 'mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-triangle-exclamation', 'titulo' => 'Alerta de tronco fora do ar', 'desc' => 'O supervisor recebe um WhatsApp assim que uma linha cai e outro quando ela volta, uma única vez cada. Configure em Configurações > API.'],
         ['data' => '2026-10-11', 'mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-rocket', 'titulo' => 'Novidades do sistema', 'desc' => 'Este histórico: todas as funções novas e correções passam a aparecer aqui automaticamente, no rodapé do menu.'],
         ['mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-robot', 'titulo' => 'Chat com IA no painel', 'desc' => 'Assistente flutuante que responde sobre ligações, ramais, filas e gravações usando os dados reais do seu PABX. Liberado por usuário.'],
         ['mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-diagram-project', 'titulo' => 'IA por função', 'desc' => 'Escolha qual IA faz a transcrição de áudio, os resumos/insights e o chat, com chave própria por provedor.'],
@@ -17,7 +18,6 @@ return [
         ['mes' => 'Outubro/2026', 'novo' => false, 'icon' => 'fa-bell', 'titulo' => 'Chamada perdida avisada uma única vez', 'desc' => 'O WhatsApp de chamada perdida é enviado uma vez e só repete se o envio falhar.'],
     ],
     'plan' => [
-        ['icon' => 'fa-triangle-exclamation', 'titulo' => 'Alerta de tronco fora do ar', 'desc' => 'Aviso por WhatsApp ao supervisor quando uma linha cair.'],
         ['icon' => 'fa-shield-halved', 'titulo' => 'Painel de segurança', 'desc' => 'Bloqueios do firewall e tentativas de invasão.'],
         ['icon' => 'fa-phone-volume', 'titulo' => 'Provisionamento de telefones IP', 'desc' => 'Configurar o aparelho automaticamente pelo MAC.'],
         ['icon' => 'fa-clipboard-list', 'titulo' => 'Formulários de atendimento', 'desc' => 'Registro do motivo e resultado da chamada pelo atendente.'],

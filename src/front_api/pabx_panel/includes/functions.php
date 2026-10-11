@@ -5703,3 +5703,55 @@ function setExtensionFeature($ext, $field, $value) {
     if (!empty($r['success']) && (stripos($resp, 'Response: Success') !== false || ($value === '' && stripos($resp, 'Response:') !== false))) return ['success' => true];
     return ['success' => false, 'error' => $r['error'] ?? (preg_match('/Message:\s*(.+)/i', $resp, $m) ? trim($m[1]) : 'Falha no AMI')];
 }
+
+// =========================================================================
+// ALERTA DE TRONCO FORA DO AR (WhatsApp ao supervisor) - roda no cron a cada minuto
+// =========================================================================
+function trunkAlertNumbers() {
+    $out = [];
+    foreach (preg_split('/[,;\r\n]+/', (string)getSetting('trunk_alert_numbers')) as $n) {
+        $n = preg_replace('/\D/', '', $n);
+        if (strlen($n) >= 10) $out[] = $n;
+    }
+    return array_values(array_unique($out));
+}
+
+/** Verifica os troncos e avisa UMA vez quando cair (após 2 verificações seguidas) e UMA vez quando voltar. */
+function checkTrunkAlerts() {
+    global $db;
+    $res = ['checked' => 0, 'down' => 0, 'alerts' => 0, 'error' => ''];
+    if (getSetting('trunk_alert_enabled') !== '1') { $res['error'] = 'desativado'; return $res; }
+    $nums = trunkAlertNumbers();
+    if (!$nums) { $res['error'] = 'sem números cadastrados'; return $res; }
+    $db->exec("CREATE TABLE IF NOT EXISTS trunk_alert_state (trunk TEXT PRIMARY KEY, status TEXT, bad_count INTEGER DEFAULT 0, down_notified INTEGER DEFAULT 0, since DATETIME)");
+    $trunks = getAsteriskTrunksStatus();
+    $send = function ($msg, $tag) use ($nums) {
+        $ok = false;
+        foreach ($nums as $n) { $r = sendWhatsAppAPI($n, $msg, 'TRUNK_' . $tag . '_' . date('YmdHis'), 'TRONCO', 'ALERTA_TRONCO'); if (!empty($r['success'])) $ok = true; }
+        return $ok;
+    };
+    foreach ($trunks as $t) {
+        $name = (string)$t['name']; $st = (string)$t['status'];
+        if ($st !== 'Registrado' && $st !== 'Desconectado') continue;   // "Sem verificação": não alerta
+        $res['checked']++;
+        $q = $db->prepare("SELECT * FROM trunk_alert_state WHERE trunk = :t"); $q->execute([':t' => $name]); $row = $q->fetch(PDO::FETCH_ASSOC);
+        if (!$row) { $db->prepare("INSERT INTO trunk_alert_state (trunk, status, bad_count, down_notified, since) VALUES (:t,:s,0,0,CURRENT_TIMESTAMP)")->execute([':t' => $name, ':s' => $st]); $row = ['bad_count' => 0, 'down_notified' => 0, 'since' => date('Y-m-d H:i:s')]; }
+        if ($st === 'Desconectado') {
+            $res['down']++;
+            $bad = (int)$row['bad_count'] + 1;
+            $notified = (int)$row['down_notified'];
+            if ($bad >= 2 && !$notified) {
+                if ($send("🚨 *Tronco fora do ar*\nLinha: {$name} ({$t['tech']})\nDesde: " . date('d/m H:i') . "\nVerifique o provedor ou a rede.", 'DOWN')) { $notified = 1; $res['alerts']++; }
+                // se o envio falhar, tenta de novo na próxima verificação
+            }
+            $db->prepare("UPDATE trunk_alert_state SET status='Desconectado', bad_count=:b, down_notified=:n WHERE trunk=:t")->execute([':b' => $bad, ':n' => $notified, ':t' => $name]);
+        } else {
+            if ((int)$row['down_notified'] === 1) {
+                if ($send("✅ *Tronco restabelecido*\nLinha: {$name} ({$t['tech']})\nVoltou às " . date('d/m H:i') . '.', 'UP')) $res['alerts']++;
+                else continue;   // reenvia o aviso de volta na próxima verificação
+            }
+            $db->prepare("UPDATE trunk_alert_state SET status='Registrado', bad_count=0, down_notified=0, since=CURRENT_TIMESTAMP WHERE trunk=:t")->execute([':t' => $name]);
+        }
+    }
+    return $res;
+}
