@@ -39,6 +39,10 @@ $type_filter    = $_GET['type_filter'] ?? 'ALL';
 // Conexão Nativa com o banco de dados Asterisk CDR
 $ast_db = function_exists('getAsteriskPdoConnection') ? getAsteriskPdoConnection('asteriskcdrdb') : null;
 $cdr_list = [];
+$per_page = (int)($_GET['per_page'] ?? 20);
+if (!in_array($per_page, [20, 50, 100], true)) $per_page = 20;
+$page = max(1, (int)($_GET['page'] ?? 1));
+$cdr_total = 0; $cdr_ans = 0; $cdr_tma = 0; $cdr_tme = 0; $total_pages = 1;
 
 if ($ast_db) {
     try {
@@ -64,7 +68,20 @@ if ($ast_db) {
             $where_clauses[] = "(LENGTH(src) > 4 OR LENGTH(dst) > 4)";
         }
 
-        $sql = "SELECT calldate, src, dst, disposition, duration, billsec, uniqueid, recordingfile, lastapp, dcontext FROM cdr WHERE " . implode(' AND ', $where_clauses) . " ORDER BY calldate DESC LIMIT 100";
+        $__where = implode(' AND ', $where_clauses);
+        // Totais/estatísticas do período INTEIRO (independem da página exibida)
+        $q_agg = $ast_db->prepare("SELECT COUNT(*) AS total, SUM(CASE WHEN disposition = 'ANSWERED' THEN 1 ELSE 0 END) AS ans, AVG(CASE WHEN disposition = 'ANSWERED' THEN billsec END) AS tma, AVG(CASE WHEN duration > billsec THEN duration - billsec ELSE 0 END) AS tme FROM cdr WHERE " . $__where);
+        $q_agg->execute($params);
+        $__agg = $q_agg->fetch(PDO::FETCH_ASSOC) ?: [];
+        $cdr_total = (int)($__agg['total'] ?? 0);
+        $cdr_ans   = (int)($__agg['ans'] ?? 0);
+        $cdr_tma   = (float)($__agg['tma'] ?? 0);
+        $cdr_tme   = (float)($__agg['tme'] ?? 0);
+        $total_pages = max(1, (int)ceil($cdr_total / $per_page));
+        if ($page > $total_pages) $page = $total_pages;
+        $__offset = ($page - 1) * $per_page;
+
+        $sql = "SELECT calldate, src, dst, disposition, duration, billsec, uniqueid, recordingfile, lastapp, dcontext FROM cdr WHERE " . $__where . " ORDER BY calldate DESC LIMIT " . (int)$per_page . " OFFSET " . (int)$__offset;
         $q_cdr = $ast_db->prepare($sql);
         $q_cdr->execute($params);
         $cdr_list = $q_cdr->fetchAll(PDO::FETCH_ASSOC);
@@ -85,7 +102,7 @@ if ($ast_db) {
             
             <!-- Botões Rápidos de Exportação e Impressão (Somente Ícones) -->
             <div class="flex items-center gap-2 flex-wrap print:hidden">
-                <button type="button" onclick="exportToCSV()" title="Exportar CSV" class="p-2.5 bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-slate-700 rounded-xl font-bold transition flex items-center justify-center shadow">
+                <button type="button" onclick="exportToCSV()" title="Exportar CSV (linhas da página exibida)" class="p-2.5 bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-slate-700 rounded-xl font-bold transition flex items-center justify-center shadow">
                     <i class="fa-solid fa-file-csv text-base"></i>
                 </button>
                 <button type="button" onclick="window.print()" title="Imprimir / Gerar PDF" class="p-2.5 bg-slate-800 hover:bg-slate-700 text-rose-400 border border-slate-700 rounded-xl font-bold transition flex items-center justify-center shadow">
@@ -97,6 +114,7 @@ if ($ast_db) {
         <form method="GET" action="index.php" class="flex flex-col gap-3">
             <input type="hidden" name="module" value="relatorios">
             <input type="hidden" name="action" value="cdr_gravacoes">
+            <input type="hidden" name="per_page" value="<?php echo (int)$per_page; ?>">
 
             <!-- Filtro Unificado -->
             <div class="flex flex-wrap items-center gap-2 w-full">
@@ -164,6 +182,21 @@ function exportToCSV() {
     link.click();
 }
 </script>
+
+    <!-- BANNER DE ANÁLISE COM IA DESTE RELATÓRIO DE GRAVAÇÕES -->
+    <div class="bg-slate-900/90 border border-purple-500/20 rounded-2xl p-5 shadow-xl space-y-3">
+        <div class="flex items-center justify-between">
+            <h3 class="text-sm font-extrabold text-white flex items-center gap-2">
+                <i class="fa-solid fa-wand-magic-sparkles text-purple-400 animate-pulse"></i> Copiloto de IA: Analisar Gravações & CDR
+            </h3>
+            <button onclick="runCdrAiAnalysis()" id="btn-run-cdr-ai" class="px-4 py-1.5 bg-purple-600 hover:bg-purple-500 text-white font-extrabold rounded-xl text-xs transition shadow-lg shadow-purple-600/30 flex items-center gap-2">
+                <i class="fa-solid fa-sparkles"></i> Analisar com IA
+            </button>
+        </div>
+        <div id="cdr-ai-container" class="bg-slate-950/80 p-4 rounded-xl border border-slate-800 hidden">
+            <p id="cdr-ai-text" class="text-slate-300 text-xs leading-relaxed italic">--</p>
+        </div>
+    </div>
 
     <!-- Tabela de Gravações & CDR -->
     <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-5 shadow-xl">
@@ -367,21 +400,45 @@ function exportToCSV() {
                     </tbody>
                 </table>
             </div>
-        </div>
-    </div>
 
-    <!-- BANNER DE ANÁLISE COM IA DESTE RELATÓRIO DE GRAVAÇÕES -->
-    <div class="bg-slate-900/90 border border-purple-500/20 rounded-2xl p-5 shadow-xl space-y-3">
-        <div class="flex items-center justify-between">
-            <h3 class="text-sm font-extrabold text-white flex items-center gap-2">
-                <i class="fa-solid fa-wand-magic-sparkles text-purple-400 animate-pulse"></i> Copiloto de IA: Analisar Gravações & CDR
-            </h3>
-            <button onclick="runCdrAiAnalysis()" id="btn-run-cdr-ai" class="px-4 py-1.5 bg-purple-600 hover:bg-purple-500 text-white font-extrabold rounded-xl text-xs transition shadow-lg shadow-purple-600/30 flex items-center gap-2">
-                <i class="fa-solid fa-sparkles"></i> Analisar com IA
-            </button>
-        </div>
-        <div id="cdr-ai-container" class="bg-slate-950/80 p-4 rounded-xl border border-slate-800 hidden">
-            <p id="cdr-ai-text" class="text-slate-300 text-xs leading-relaxed italic">--</p>
+            <!-- Paginação -->
+            <?php
+            $__q = $_GET; unset($__q['page']);
+            $__link = function ($pg, $pp = null) use ($__q, $per_page) {
+                $q = $__q; $q['module'] = 'relatorios'; $q['action'] = 'cdr_gravacoes'; $q['per_page'] = $pp ?: $per_page; $q['page'] = $pg;
+                return 'index.php?' . htmlspecialchars(http_build_query($q));
+            };
+            $__from = $cdr_total ? (($page - 1) * $per_page + 1) : 0;
+            $__to   = min($cdr_total, $page * $per_page);
+            $__btn  = 'min-w-[2rem] px-2.5 py-1.5 rounded-lg text-xs font-bold border transition text-center';
+            ?>
+            <div class="mt-4 pt-4 border-t border-slate-800 flex flex-col md:flex-row items-center justify-between gap-3 text-xs">
+                <div class="text-slate-400">
+                    Mostrando <b class="text-white"><?php echo $__from; ?>–<?php echo $__to; ?></b> de <b class="text-white"><?php echo number_format($cdr_total, 0, ',', '.'); ?></b> chamadas
+                </div>
+                <div class="flex items-center gap-1 flex-wrap justify-center">
+                    <?php if ($page > 1): ?>
+                        <a href="<?php echo $__link(1); ?>" class="<?php echo $__btn; ?> bg-slate-950 border-slate-800 text-slate-300 hover:bg-slate-800" title="Primeira">«</a>
+                        <a href="<?php echo $__link($page - 1); ?>" class="<?php echo $__btn; ?> bg-slate-950 border-slate-800 text-slate-300 hover:bg-slate-800">‹ Anterior</a>
+                    <?php endif; ?>
+                    <?php for ($__p = max(1, $page - 2); $__p <= min($total_pages, $page + 2); $__p++): ?>
+                        <a href="<?php echo $__link($__p); ?>" class="<?php echo $__btn; ?> <?php echo $__p === $page ? 'bg-brand-600 border-brand-500 text-white' : 'bg-slate-950 border-slate-800 text-slate-300 hover:bg-slate-800'; ?>"><?php echo $__p; ?></a>
+                    <?php endfor; ?>
+                    <?php if ($page < $total_pages): ?>
+                        <a href="<?php echo $__link($page + 1); ?>" class="<?php echo $__btn; ?> bg-slate-950 border-slate-800 text-slate-300 hover:bg-slate-800">Próxima ›</a>
+                        <a href="<?php echo $__link($total_pages); ?>" class="<?php echo $__btn; ?> bg-slate-950 border-slate-800 text-slate-300 hover:bg-slate-800" title="Última">»</a>
+                    <?php endif; ?>
+                    <span class="text-slate-500 ml-2">Página <?php echo $page; ?> de <?php echo $total_pages; ?></span>
+                </div>
+                <label class="flex items-center gap-2 text-slate-400">
+                    Linhas por página
+                    <select onchange="location.href=this.value" class="px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-white text-xs focus:border-brand-500 focus:outline-none">
+                        <?php foreach ([20, 50, 100] as $__pp): ?>
+                            <option value="<?php echo $__link(1, $__pp); ?>" <?php echo $per_page === $__pp ? 'selected' : ''; ?>><?php echo $__pp; ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </label>
+            </div>
         </div>
     </div>
 
@@ -397,16 +454,10 @@ function exportToCSV() {
         btn.disabled = true;
 
         try {
-<?php
-            $__ans = array_filter($cdr_list, function($r){ return $r['disposition'] === 'ANSWERED'; });
-            $cdr_tma = count($__ans) ? array_sum(array_column($__ans, 'billsec')) / count($__ans) : 0;
-            $cdr_tme = count($cdr_list) ? array_sum(array_map(function($r){ return max(0, $r['duration'] - $r['billsec']); }, $cdr_list)) / count($cdr_list) : 0;
-?>
-            const count = <?php echo count($cdr_list); ?>;
             const res = await fetch('index.php?api_action=analyze_pabx_insights', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ total: count, atendidas: <?php echo count($__ans); ?>, tmaSec: <?php echo (int)$cdr_tma; ?>, tmeSec: <?php echo (int)$cdr_tme; ?>, module: 'CDR' })
+                body: JSON.stringify({ total: <?php echo (int)$cdr_total; ?>, atendidas: <?php echo (int)$cdr_ans; ?>, tmaSec: <?php echo (int)$cdr_tma; ?>, tmeSec: <?php echo (int)$cdr_tme; ?>, module: 'CDR' })
             });
             const data = await res.json();
 
