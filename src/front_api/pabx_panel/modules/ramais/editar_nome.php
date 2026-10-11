@@ -418,11 +418,12 @@ $exts_list = $db->query("SELECT * FROM extensions_config ORDER BY CAST(extension
                 </div>
                 <div>
                     <label class="block text-slate-300 font-bold mb-1">Tecnologia</label>
-                    <select id="modal_tech" name="tech" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white">
+                    <select id="modal_tech" name="tech" tabindex="-1" onmousedown="return false" onkeydown="return false" title="Definida no Issabel ao criar o ramal" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-400 opacity-70 cursor-not-allowed">
                         <option value="PJSIP">PJSIP</option>
                         <option value="SIP">SIP (Chan_SIP)</option>
                         <option value="IAX2">IAX2</option>
                     </select>
+                    <p class="text-[10px] text-slate-500 mt-1">Definida no Issabel ao criar o ramal (somente leitura).</p>
                 </div>
             </div>
 

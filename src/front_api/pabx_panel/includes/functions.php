@@ -5578,6 +5578,11 @@ function aiChatToolDefs() {
         $fn('recording_link', 'Gera link temporário (7 dias) da gravação de uma chamada pelo uniqueid retornado em search_calls.', [
             'uniqueid' => ['type' => 'string'],
         ], ['uniqueid']),
+        $fn('send_report', 'Envia por WhatsApp o resumo do período (chamadas, atendidas, TMA, TME) para um número. SÓ chame depois de o usuário confirmar explicitamente o número de destino.', [
+            'phone' => ['type' => 'string', 'description' => 'Número com DDD (ex.: 11999998888)'],
+            'days'  => ['type' => 'integer', 'description' => 'Últimos N dias (1 = hoje). Padrão 1'],
+            'note'  => ['type' => 'string', 'description' => 'Texto opcional a acrescentar ao relatório'],
+        ], ['phone']),
     ];
 }
 
@@ -5643,6 +5648,27 @@ function aiChatExecTool($name, $a) {
             }
             return ['filas' => $out];
         }
+        if ($name === 'send_report') {
+            if (!hasUserPermission('send_whatsapp')) return ['error' => 'Este usuário não tem permissão para enviar WhatsApp.'];
+            $ph = preg_replace('/\D/', '', (string)($a['phone'] ?? ''));
+            if (strlen($ph) < 10 || strlen($ph) > 13) return ['error' => 'Número inválido. Informe DDD + número.'];
+            if (strlen($ph) <= 11) $ph = '55' . $ph;
+            $hk = 'ai_report_hour_' . date('YmdH');
+            $cnt = (int)getSetting($hk);
+            if ($cnt >= 10) return ['error' => 'Limite de 10 envios por hora atingido.'];
+            $sm = aiChatExecTool('period_summary', ['days' => $a['days'] ?? 1]);
+            if (isset($sm['error'])) return $sm;
+            $fmt = function ($s) { return sprintf('%d:%02d', intdiv((int)$s, 60), (int)$s % 60); };
+            $msg = "📊 *Relatório PABX* (" . ($sm['periodo_dias'] == 1 ? 'hoje' : 'últimos ' . $sm['periodo_dias'] . ' dias') . ")\n"
+                 . "Chamadas: {$sm['total']}\nAtendidas: {$sm['atendidas']}\nNão atendidas: {$sm['nao_atendidas']}\n"
+                 . "TMA: " . $fmt($sm['tma_seg']) . " | TME: " . $fmt($sm['tme_seg']);
+            $note = trim((string)($a['note'] ?? ''));
+            if ($note !== '') $msg .= "\n\n" . mb_substr($note, 0, 500);
+            $ok = sendWhatsAppAPI($ph, $msg, 'AI_CHAT', 'GERAL', 'RELATORIO_CHAT');
+            if (!$ok) return ['error' => 'Falha ao enviar pelo WhatsApp. Verifique a integração em Status da Integração.'];
+            saveSetting($hk, (string)($cnt + 1));
+            return ['enviado' => true, 'para' => $ph];
+        }
         if ($name === 'recording_link') {
             if (!hasUserPermission('listen_recordings')) return ['error' => 'Este usuário não tem permissão para gravações.'];
             $uid = trim((string)($a['uniqueid'] ?? ''));
@@ -5696,7 +5722,7 @@ function aiChatRun($history) {
     if ($cfg['key'] === '' || !$cfg['enabled']) return ['ok' => false, 'error' => 'IA não configurada. Configure em Configurações > Inteligência Artificial.'];
     $sys = "Você é o assistente do painel PABX Prisma (Issabel/Asterisk). Hoje é " . date('d/m/Y H:i') . ". "
          . "Responda em português, curto e objetivo. Use SOMENTE dados retornados pelas ferramentas; nunca invente números, ramais ou ligações. "
-         . "Se faltar informação (ex.: qual ramal), pergunte. Você só consulta (não altera nada). Para tabelas use markdown. Para gravações use recording_link e entregue o link em markdown [Ouvir gravação](url). "
+         . "Se faltar informação (ex.: qual ramal), pergunte. Você só consulta; a única ação permitida é send_report (envio do resumo por WhatsApp), e somente após o usuário confirmar o número. Para tabelas use markdown. Para gravações use recording_link e entregue o link em markdown [Ouvir gravação](url). "
          . "Se o usuário pedir algo fora do escopo do PABX, explique educadamente o que você pode fazer.";
     if ($cfg['prompt'] !== '') $sys = $cfg['prompt'] . "\n\n" . $sys;
     $msgs = [['role' => 'system', 'content' => $sys]];

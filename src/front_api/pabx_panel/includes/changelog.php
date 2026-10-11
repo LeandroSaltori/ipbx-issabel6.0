@@ -6,6 +6,7 @@
  */
 return [
     'done' => [
+        ['data' => '2026-10-11', 'mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-paper-plane', 'titulo' => 'Relatório por WhatsApp pelo Chat IA', 'desc' => 'Peça no chat "envie o resumo de hoje para o número tal" e o relatório de chamadas chega por WhatsApp, só para quem tem permissão de envio.'],
         ['data' => '2026-10-11', 'mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-phone-volume', 'titulo' => 'Provisionamento de telefones IP', 'desc' => 'Cadastre o MAC do aparelho (Yealink ou Grandstream) e o ramal: o telefone se configura sozinho, sem digitar nada nele.'],
         ['data' => '2026-10-11', 'mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-clipboard-list', 'titulo' => 'Formulários de atendimento', 'desc' => 'O atendente registra o motivo e o resultado de cada chamada, com listas que você mesmo personaliza e consulta por período.'],
         ['data' => '2026-10-11', 'mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-shield-halved', 'titulo' => 'Painel de segurança', 'desc' => 'Veja em uma tela as tentativas de acesso indevido ao seu PABX e os endereços que foram bloqueados automaticamente.'],
