@@ -62,28 +62,34 @@ if (!empty($uid)) {
     }
 }
 
-// 2. Se for por nome de arquivo (anúncios, uras, sons do sistema)
+// 2. Se for por nome de arquivo (anúncios, URAs, sons do sistema): resolve só dentro de /var/lib/asterisk/sounds
+$soundParts = [];
 if (!$foundPath && !empty($file)) {
-    $filenameNoExt = pathinfo($file, PATHINFO_FILENAME);
-    $paths = [
-        "/var/lib/asterisk/sounds/custom/$file",
-        "/var/lib/asterisk/sounds/custom/{$filenameNoExt}.wav",
-        "/var/lib/asterisk/sounds/custom/{$filenameNoExt}.mp3",
-        "/var/lib/asterisk/sounds/custom/{$filenameNoExt}.gsm",
-        "/var/lib/asterisk/sounds/pt_BR/$file",
-        "/var/lib/asterisk/sounds/pt_BR/{$filenameNoExt}.wav",
-        "/var/lib/asterisk/sounds/$file",
-        "/var/lib/asterisk/sounds/{$filenameNoExt}.wav",
-        __DIR__ . "/sounds/$file",
-        __DIR__ . "/sounds/{$filenameNoExt}.wav",
-    ];
-
-    foreach ($paths as $p) {
-        if (file_exists($p) && is_file($p) && is_readable($p) && filesize($p) > 0) {
-            $foundPath = $p;
-            break;
-        }
+    $soundParts = asteriskSoundResolve($file);
+    if (count($soundParts) === 1) {
+        $foundPath = $soundParts[0];
     }
+}
+
+// Formatos "crus" do Asterisk (sem cabeçalho) e gravações compostas ("a&b") exigem FFmpeg
+$rawFmt = ['sln' => ['s16le', 8000], 'sln16' => ['s16le', 16000], 'g722' => ['g722', 16000], 'ulaw' => ['mulaw', 8000], 'alaw' => ['alaw', 8000]];
+$ffm = trim((string)@shell_exec('which ffmpeg 2>/dev/null'));
+if ($ffm === '' && file_exists('/usr/bin/ffmpeg')) $ffm = '/usr/bin/ffmpeg';
+$ffInput = function ($path) use ($rawFmt) {
+    $e = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+    if (isset($rawFmt[$e])) return '-f ' . $rawFmt[$e][0] . ' -ar ' . $rawFmt[$e][1] . ' -ac 1 -i ' . escapeshellarg($path);
+    return '-i ' . escapeshellarg($path);
+};
+if ($ffm !== '' && is_executable($ffm) && (count($soundParts) > 1 || ($foundPath && isset($rawFmt[strtolower(pathinfo($foundPath, PATHINFO_EXTENSION))]) && empty($uid)))) {
+    $list = count($soundParts) > 1 ? $soundParts : [$foundPath];
+    $inputs = ''; $labels = '';
+    foreach ($list as $i => $pp) { $inputs .= ' ' . $ffInput($pp); $labels .= "[$i:a]"; }
+    $filter = count($list) > 1 ? ' -filter_complex ' . escapeshellarg($labels . 'concat=n=' . count($list) . ':v=0:a=1') : '';
+    header('Content-Type: audio/wav');
+    header('Cache-Control: no-cache, must-revalidate');
+    header('X-Audio-Source: ffmpeg-asterisk');
+    passthru(escapeshellcmd($ffm) . $inputs . $filter . ' -f wav -acodec pcm_s16le -ar 16000 -ac 1 - 2>/dev/null');
+    exit;
 }
 
 if ($foundPath) {

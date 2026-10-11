@@ -4752,3 +4752,38 @@ function aiAuditSaveAnalysis($row, $a, $res, $cfg) {
         ':p' => $cfg['provider'], ':m' => $cfg['model'], ':at' => date('Y-m-d H:i:s'),
     ]);
 }
+
+
+/**
+ * Localiza no disco os arquivos de som do Asterisk de uma gravação cadastrada (ex.: "custom/boas-vindas",
+ * sem extensão, ou várias partes separadas por "&"). Só devolve arquivos dentro de /var/lib/asterisk/sounds.
+ * @return string[] um caminho por parte; [] se alguma parte não existir.
+ */
+function asteriskSoundResolve($name) {
+    $root = @realpath('/var/lib/asterisk/sounds');
+    if (!$root || !is_string($name) || $name === '') return [];
+    $exts = ['wav', 'WAV', 'sln16', 'g722', 'sln', 'ulaw', 'alaw', 'gsm', 'mp3', 'ogg'];
+    $dirs = [$root];
+    foreach ((array)@glob($root . '/*', GLOB_ONLYDIR) as $d) $dirs[] = $d;
+    $out = [];
+    foreach (explode('&', $name) as $part) {
+        $part = trim($part);
+        if ($part === '' || strpos($part, "\0") !== false || strpos($part, '..') !== false) return [];
+        $part = ltrim($part, '/');
+        if (strpos($part, 'sounds/') === 0) $part = substr($part, 7);
+        $noext = preg_replace('/\.(wav|sln16|sln|g722|ulaw|alaw|gsm|mp3|ogg)$/i', '', $part);
+        $found = null;
+        foreach ($dirs as $d) {
+            foreach ($exts as $e) {
+                $c = "$d/$noext.$e";
+                if (is_file($c) && is_readable($c) && filesize($c) > 0) {
+                    $rp = realpath($c);
+                    if ($rp && strpos($rp, $root . '/') === 0) { $found = $rp; break 2; }
+                }
+            }
+        }
+        if (!$found) return [];
+        $out[] = $found;
+    }
+    return $out;
+}

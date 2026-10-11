@@ -321,7 +321,7 @@ if (!function_exists('renderDynamicFlowNode')) {
                                     </div>
                                     
                                     <audio controls controlsList="nodownload" class="h-8 max-w-full sm:w-64 text-xs opacity-95">
-                                        <source src="get_audio.php?file=<?php echo urlencode($node['audio_file']); ?>" type="audio/wav">
+                                        <source src="get_audio.php?file=<?php echo urlencode($node['audio_file']); ?>" type="audio/wav" onerror="var a=this.closest('audio');if(a&&!a.dataset.err){a.dataset.err=1;a.insertAdjacentHTML('afterend','<span class=&quot;text-[10px] text-rose-300 font-bold&quot;>Arquivo de áudio não encontrado no servidor (/var/lib/asterisk/sounds)</span>');}">
                                         Seu navegador não suporta o elemento de áudio.
                                     </audio>
                                 </div>
@@ -389,7 +389,7 @@ if (!function_exists('renderDynamicFlowNode')) {
                                 </div>
                                 <div class="flex flex-col sm:flex-row items-center justify-between gap-3 pt-1">
                                     <audio controls controlsList="nodownload" class="h-8 max-w-full sm:w-72 text-xs opacity-95">
-                                        <source src="get_audio.php?file=<?php echo urlencode($node['audio_file']); ?>" type="audio/wav">
+                                        <source src="get_audio.php?file=<?php echo urlencode($node['audio_file']); ?>" type="audio/wav" onerror="var a=this.closest('audio');if(a&&!a.dataset.err){a.dataset.err=1;a.insertAdjacentHTML('afterend','<span class=&quot;text-[10px] text-rose-300 font-bold&quot;>Arquivo de áudio não encontrado no servidor (/var/lib/asterisk/sounds)</span>');}">
                                         Navegador sem suporte a áudio.
                                     </audio>
                                     <span class="text-[10px] text-slate-400 font-mono">Tocada ao entrar no menu</span>
