@@ -280,7 +280,7 @@ $exts_list = $db->query("SELECT * FROM extensions_config ORDER BY CAST(extension
                     <tr>
                         <th class="py-3 px-3">Ramal</th>
                         <th class="py-3 px-3">Nome do Atendente</th>
-                        <th class="py-3 px-3">Tecnologia</th>
+                        <th class="py-3 px-3" style="display:none">Tecnologia</th>
                         
                         <!-- Coluna 1: Perdidas Ext. com Checkbox (Todos) -->
                         <th class="py-3 px-3 text-center">
@@ -335,7 +335,7 @@ $exts_list = $db->query("SELECT * FROM extensions_config ORDER BY CAST(extension
                         <tr class="ext-row-item hover:bg-slate-800/30 transition-colors" data-ext="<?php echo htmlspecialchars($ext['extension']); ?>" data-name="<?php echo htmlspecialchars(strtolower($ext['agent_name'])); ?>">
                             <td class="py-3 px-3 font-mono text-cyan-400 font-bold"><?php echo htmlspecialchars($ext['extension']); ?></td>
                             <td class="py-3 px-3 font-bold text-white"><?php echo htmlspecialchars($ext['agent_name']); ?></td>
-                            <td class="py-3 px-3"><span class="px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-mono text-[10px]"><?php echo htmlspecialchars($ext['tech'] ?: 'PJSIP'); ?></span></td>
+                            <td class="py-3 px-3" style="display:none"><span class="px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-mono text-[10px]"><?php echo htmlspecialchars($ext['tech'] ?: 'PJSIP'); ?></span></td>
                             
                             <!-- Checkbox Interativo: Perdidas Ext. -->
                             <td class="py-3 px-3 text-center">
@@ -416,7 +416,7 @@ $exts_list = $db->query("SELECT * FROM extensions_config ORDER BY CAST(extension
                     <label class="block text-slate-300 font-bold mb-1">Ramal</label>
                     <input type="text" id="modal_extension" name="extension" readonly class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-cyan-400 font-mono font-bold">
                 </div>
-                <div>
+                <div style="display:none">
                     <label class="block text-slate-300 font-bold mb-1">Tecnologia</label>
                     <select id="modal_tech" name="tech" tabindex="-1" onmousedown="return false" onkeydown="return false" title="Definida no Issabel ao criar o ramal" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-400 opacity-70 cursor-not-allowed">
                         <option value="PJSIP">PJSIP</option>
