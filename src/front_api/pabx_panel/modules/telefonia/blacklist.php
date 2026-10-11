@@ -1,10 +1,8 @@
 ﻿<?php
 /**
- * IPbx Prisma - Módulo de Bloqueio de Chamadas (Blacklist via REST API)
+ * IPbx Prisma - Módulo de Bloqueio de Chamadas (Blacklist nativa do Issabel, via AMI / AstDB)
  */
 
-require_once __DIR__ . '/../../includes/pbxapi_client.php';
-$apiClient = new PbxApiClient($db);
 
 $msg_status = '';
 $msg_error  = '';
@@ -14,11 +12,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $num  = trim($_POST['block_number'] ?? '');
         $desc = trim($_POST['block_desc'] ?? '');
         if (!empty($num)) {
-            $res = $apiClient->addToBlacklist($num, $desc);
+            $res = asteriskBlacklistAdd($num, $desc);
             if ($res['success']) {
                 $msg_status = "Número '$num' adicionado à Blacklist do PABX com sucesso!";
             } else {
-                $msg_error = "Erro ao adicionar à Blacklist: " . ($res['message'] ?? 'Falha na requisição API');
+                $msg_error = "Erro ao adicionar à Blacklist: " . ($res['error'] ?? 'Falha ao falar com o Asterisk');
             }
         }
     }
@@ -26,21 +24,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['action_delete_blacklist'])) {
         $num = trim($_POST['delete_number'] ?? '');
         if (!empty($num)) {
-            $res = $apiClient->deleteFromBlacklist($num);
+            $res = asteriskBlacklistDelete($num);
             if ($res['success']) {
                 $msg_status = "Número '$num' removido da Blacklist do PABX.";
             } else {
-                $msg_error = "Erro ao remover da Blacklist: " . ($res['message'] ?? 'Falha na requisição API');
+                $msg_error = "Erro ao remover da Blacklist: " . ($res['error'] ?? 'Falha ao falar com o Asterisk');
             }
         }
     }
 }
 
-// Obter lista atual via API
-$apiRes = $apiClient->getBlacklist();
-$blacklistItems = [];
-if ($apiRes['success'] && is_array($apiRes['data'])) {
-    $blacklistItems = $apiRes['data']['results'] ?? $apiRes['data'];
+// Lista atual: a mesma do Issabel (Aplicações > Blacklist)
+$blRes = asteriskBlacklistList();
+$blacklistItems = $blRes['items'];
+if (!$blRes['success'] && $msg_error === '') {
+    $msg_error = 'Não foi possível ler a blacklist do Issabel: ' . $blRes['error'];
 }
 ?>
 

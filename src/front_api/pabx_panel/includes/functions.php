@@ -4823,3 +4823,51 @@ function asteriskSoundStatus($name) {
     }
     return ['ok' => false, 'path' => "$root/$noext.*", 'msg' => "O PABX cadastra a gravação \"$first\", mas o arquivo não foi encontrado em $root/$noext.*." . $hint];
 }
+
+
+/**
+ * Blacklist NATIVA do Issabel/FreePBX: família "blacklist" do banco interno do Asterisk (AstDB).
+ * É a mesma lista da tela Aplicações > Blacklist do Issabel e a consultada pelo dialplan.
+ */
+function asteriskBlacklistNormalize($num) {
+    $num = trim((string)$num);
+    if (strtolower($num) === 'blocked') return 'blocked'; // chamadas sem identificação
+    $num = preg_replace('/[^0-9+*#]/', '', $num);
+    return (strlen($num) >= 1 && strlen($num) <= 25) ? $num : '';
+}
+
+function asteriskBlacklistList() {
+    $res = executeAsteriskAMICommand('Command', ['Command' => 'database show blacklist']);
+    if (empty($res['success'])) return ['success' => false, 'items' => [], 'error' => $res['error'] ?? 'Falha ao consultar o AMI.'];
+    $items = [];
+    foreach (preg_split('/\r?\n/', (string)($res['response'] ?? '')) as $line) {
+        if (preg_match('#^/blacklist/(\S+)\s*:\s*(.*)$#', trim($line), $m)) {
+            $val = trim($m[2]);
+            $items[] = ['number' => $m[1], 'description' => ($val === '' || $val === '1') ? 'Bloqueado' : $val];
+        }
+    }
+    return ['success' => true, 'items' => $items, 'error' => ''];
+}
+
+function asteriskBlacklistAdd($num, $desc = '') {
+    $n = asteriskBlacklistNormalize($num);
+    if ($n === '') return ['success' => false, 'error' => 'Número inválido (use apenas dígitos, +, * ou #).'];
+    $desc = trim(preg_replace('/[\r\n"]+/', ' ', (string)$desc));
+    $res = executeAsteriskAMICommand('DBPut', ['Family' => 'blacklist', 'Key' => $n, 'Val' => ($desc !== '' ? mb_substr($desc, 0, 60) : '1')]);
+    if (empty($res['success']) || stripos((string)($res['response'] ?? ''), 'Response: Success') === false) {
+        return ['success' => false, 'error' => $res['error'] ?? 'O Asterisk não confirmou a gravação.'];
+    }
+    if (function_exists('pabx_log')) pabx_log('user_actions', 'INFO', '[TELEFONIA] Número adicionado à blacklist do Issabel', ['numero' => $n]);
+    return ['success' => true, 'error' => ''];
+}
+
+function asteriskBlacklistDelete($num) {
+    $n = asteriskBlacklistNormalize($num);
+    if ($n === '') return ['success' => false, 'error' => 'Número inválido.'];
+    $res = executeAsteriskAMICommand('DBDel', ['Family' => 'blacklist', 'Key' => $n]);
+    if (empty($res['success']) || stripos((string)($res['response'] ?? ''), 'Response: Success') === false) {
+        return ['success' => false, 'error' => $res['error'] ?? 'O Asterisk não confirmou a remoção.'];
+    }
+    if (function_exists('pabx_log')) pabx_log('user_actions', 'INFO', '[TELEFONIA] Número removido da blacklist do Issabel', ['numero' => $n]);
+    return ['success' => true, 'error' => ''];
+}
