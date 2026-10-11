@@ -1059,3 +1059,34 @@ document.addEventListener("DOMContentLoaded", function() {
     }
 });
 </script>
+
+<?php
+// Conteúdo real enviado pelo modal "Enviar por WhatsApp/E-mail" (resumo em texto + CSV anexo)
+$__sh_tot = count($chamadas); $__sh_ans = 0; $__sh_esp = 0; $__sh_fala = 0; $__sh_q = [];
+foreach ($chamadas as $__c) {
+    $__a = ($__c['status'] === 'ATENDIDA');
+    if ($__a) { $__sh_ans++; $__sh_fala += intval($__c['tempo_falando']); }
+    $__sh_esp += intval($__c['tempo_espera']);
+    $__k = trim($__c['fila_num'] . ' ' . $__c['fila_descr']);
+    if (!isset($__sh_q[$__k])) $__sh_q[$__k] = ['t' => 0, 'a' => 0];
+    $__sh_q[$__k]['t']++; if ($__a) $__sh_q[$__k]['a']++;
+}
+$__sh_aband = $__sh_tot - $__sh_ans;
+$__sh_txt  = "Período: " . date('d/m/Y', strtotime($dataInicio)) . " a " . date('d/m/Y', strtotime($dataFim)) . "\n";
+$__sh_txt .= "Total de chamadas: {$__sh_tot}\nAtendidas: {$__sh_ans}" . ($__sh_tot ? " (" . round($__sh_ans / $__sh_tot * 100, 1) . "%)" : "") . "\nAbandonadas: {$__sh_aband}\n";
+$__sh_txt .= "Espera média: " . ($__sh_tot ? round($__sh_esp / $__sh_tot) : 0) . "s | Duração média das atendidas: " . ($__sh_ans ? round($__sh_fala / $__sh_ans) : 0) . "s\n";
+if ($__sh_q) { $__sh_txt .= "\nPor fila:\n"; foreach ($__sh_q as $__k => $__v) $__sh_txt .= "• {$__k}: {$__v['t']} chamadas, {$__v['a']} atendidas\n"; }
+if (!$__sh_tot) $__sh_txt .= "\n(Nenhuma chamada de fila no período/filtros selecionados)";
+$__sh_csv = "UniqueID;Data/Hora;Fila;Nome da Fila;Numero (BINA);Agente;Ramal;Status;Tempo Espera (s);Tempo Fala (s);Quem Desligou\n";
+foreach ($chamadas as $__c) {
+    $__sh_csv .= implode(';', array_map(function ($v) { return '"' . str_replace('"', '""', (string)$v) . '"'; }, [
+        $__c['uniqueid'], $__c['datetime'], $__c['fila_num'], $__c['fila_descr'], $__c['numero'], $__c['agente'], $__c['ramal'],
+        $__c['status'], intval($__c['tempo_espera']), intval($__c['tempo_falando']), $__c['quem_desligou'] ?: '-'
+    ])) . "\n";
+}
+?>
+<script>
+window.__reportShare = function () {
+    return { summary: <?php echo json_encode(rtrim($__sh_txt), JSON_UNESCAPED_UNICODE); ?>, csv: <?php echo json_encode($__sh_csv, JSON_UNESCAPED_UNICODE); ?>, filename: <?php echo json_encode('relatorio_filas_' . $dataInicio . '_' . $dataFim . '.csv'); ?> };
+};
+</script>

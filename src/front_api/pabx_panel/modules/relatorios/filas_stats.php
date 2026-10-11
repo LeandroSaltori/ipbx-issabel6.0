@@ -452,3 +452,19 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 </script>
+
+<?php
+$__sh_txt  = "Período: " . date('d/m/Y', strtotime($start_date)) . " a " . date('d/m/Y', strtotime($end_date)) . "\n";
+$__sh_txt .= "Total: {$grand_total} | Atendidas: {$grand_answered} | Abandonadas: {$grand_abandoned} | SLA geral: {$grand_sla}%\n";
+$__sh_csv = "Fila,Número,Total,Atendidas,Abandonadas,SLA(%),Tempo Médio,Maior Espera\n";
+foreach ($queue_stats as $__qn => $__q) {
+    $__sh_txt .= "\n• " . $__q['name'] . " (" . $__qn . "): " . $__q['total'] . " chamadas, " . $__q['answered'] . " atendidas, " . $__q['abandoned'] . " abandonadas, SLA " . $__q['sla'] . "%, tempo médio " . fmtSec(intval($__q['avg_sec'] ?? 0));
+    $__sh_csv .= '"' . str_replace('"', '""', $__q['name']) . '","' . $__qn . '",' . intval($__q['total']) . ',' . intval($__q['answered']) . ',' . intval($__q['abandoned']) . ',"' . $__q['sla'] . '%","' . fmtSec(intval($__q['avg_sec'] ?? 0)) . '","' . fmtSec(intval($__q['max_wait'])) . '"' . "\n";
+}
+if (!$queue_stats) $__sh_txt .= "\n(Nenhuma fila com movimento no período)";
+?>
+<script>
+window.__reportShare = function () {
+    return { summary: <?php echo json_encode(rtrim($__sh_txt), JSON_UNESCAPED_UNICODE); ?>, csv: <?php echo json_encode($__sh_csv, JSON_UNESCAPED_UNICODE); ?>, filename: <?php echo json_encode('estatisticas_filas_' . $start_date . '_' . $end_date . '.csv'); ?> };
+};
+</script>

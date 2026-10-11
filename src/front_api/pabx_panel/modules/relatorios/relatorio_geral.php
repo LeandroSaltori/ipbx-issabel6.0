@@ -716,3 +716,20 @@ function closeKpiDetailModal() {
 }
 </script>
 
+<?php
+$__sh_txt  = "Período: " . date('d/m/Y', strtotime($start_date)) . " a " . date('d/m/Y', strtotime($end_date)) . "\n";
+$__sh_txt .= "Total de chamadas: {$total_calls}\nRecebidas: {$inc_calls} ({$inc_pct}%)\nEfetuadas: {$out_calls} ({$out_pct}%)\nInternas: {$int_calls} ({$int_pct}%)\nNúmeros únicos: {$unique_callers}\n";
+$__sh_csv = "Indicador,Valor,Porcentagem\n\"Total de Chamadas\",{$total_calls},100.0%\n\"Chamadas Recebidas\",{$inc_calls},{$inc_pct}%\n\"Chamadas Efetuadas\",{$out_calls},{$out_pct}%\n\"Chamadas Internas\",{$int_calls},{$int_pct}%\n\n";
+$__sh_csv .= "Ramal,Atendente,Recebidas,Efetuadas,Tempo Recebidas,Tempo Efetuadas\n";
+$__sh_top = $ext_summary; usort($__sh_top, function ($a, $b) { return ($b['inc_cnt'] + $b['out_cnt']) <=> ($a['inc_cnt'] + $a['out_cnt']); });
+$__sh_txt .= "\nMais ativos:\n";
+foreach (array_slice($__sh_top, 0, 5) as $__e) { if ($__e['inc_cnt'] + $__e['out_cnt'] > 0) $__sh_txt .= "• {$__e['ext']} {$__e['user']}: {$__e['inc_cnt']} receb. / {$__e['out_cnt']} efet.\n"; }
+foreach ($ext_summary as $__e) {
+    $__sh_csv .= '"' . $__e['ext'] . '","' . str_replace('"', '""', $__e['user']) . '",' . $__e['inc_cnt'] . ',' . $__e['out_cnt'] . ',"' . $__e['inc_time'] . '","' . $__e['out_time'] . '"' . "\n";
+}
+?>
+<script>
+window.__reportShare = function () {
+    return { summary: <?php echo json_encode(rtrim($__sh_txt), JSON_UNESCAPED_UNICODE); ?>, csv: <?php echo json_encode($__sh_csv, JSON_UNESCAPED_UNICODE); ?>, filename: <?php echo json_encode('relatorio_geral_' . $start_date . '_' . $end_date . '.csv'); ?> };
+};
+</script>

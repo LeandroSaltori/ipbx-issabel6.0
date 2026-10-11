@@ -698,7 +698,17 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
         }
         $lu  = getLoggedUser();
         $res = sendWhatsAppAPI($phone, $msg, $uid !== '' ? $uid : 'MANUAL', (string)($lu['extension'] ?? 'PAINEL'), 'ENVIO_MANUAL');
-        echo json_encode(['success' => !empty($res['success']), 'error' => $res['error'] ?? '', 'warning' => $warning]);
+        $files_sent = 0; $file_warns = [];
+        if (!empty($res['success'])) {
+            list($atts, $file_warns) = buildShareAttachments($body);
+            foreach ($atts as $a) {
+                $fr = sendWhatsAppFile($phone, $a['name'], $a['content'], $a['type'], '', $uid !== '' ? $uid : 'MANUAL', (string)($lu['extension'] ?? 'PAINEL'));
+                if (!empty($fr['success'])) $files_sent++;
+                else $file_warns[] = 'Texto enviado, mas o arquivo ' . $a['name'] . ' falhou: ' . ($fr['error'] ?: 'erro desconhecido');
+            }
+        }
+        if ($file_warns) $warning = trim($warning . ' ' . implode(' ', $file_warns));
+        echo json_encode(['success' => !empty($res['success']), 'error' => $res['error'] ?? '', 'warning' => $warning, 'files_sent' => $files_sent]);
         exit;
     }
 
@@ -728,8 +738,10 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
             if ($link !== '') $msg .= "\n\nGravação (link válido por 7 dias): " . $link;
             else $warning = 'Enviado sem o link da gravação: configure a "URL pública do painel" em Configurações > API.';
         }
-        $res = sendSmtpEmailNative($smtp, $to, $subj, $msg);
-        echo json_encode(['success' => !empty($res['success']), 'error' => $res['error'] ?? '', 'warning' => $warning]);
+        list($atts, $file_warns) = buildShareAttachments($body);
+        if ($file_warns) $warning = trim($warning . ' ' . implode(' ', $file_warns));
+        $res = sendSmtpEmailNative($smtp, $to, $subj, $msg, $atts);
+        echo json_encode(['success' => !empty($res['success']), 'error' => $res['error'] ?? '', 'warning' => $warning, 'files_sent' => count($atts)]);
         exit;
     }
 
@@ -3155,7 +3167,7 @@ if ($__route_perm !== '' && !hasUserPermission($__route_perm)) {
 
     <script>
         function shareReportViaEmail(itemTitle, defaultEmail = '') {
-            window.__shareUid = window.__pendingUid || ''; window.__pendingUid = '';
+            window.__shareDetail = window.__pendingDetail || ''; window.__pendingDetail = ''; window.__shareUid = window.__pendingUid || ''; window.__pendingUid = '';
             document.getElementById('share-email-subject-val').value = itemTitle;
             document.getElementById('share-email-item-display').innerText = itemTitle;
             const targetInput = document.getElementById('share-email-target');
@@ -3166,7 +3178,7 @@ if ($__route_perm !== '' && !hasUserPermission($__route_perm)) {
         }
 
         function shareReportViaWhatsApp(itemTitle, defaultPhone = '') {
-            window.__shareUid = window.__pendingUid || ''; window.__pendingUid = '';
+            window.__shareDetail = window.__pendingDetail || ''; window.__pendingDetail = ''; window.__shareUid = window.__pendingUid || ''; window.__pendingUid = '';
             document.getElementById('share-wa-item-val').value = itemTitle;
             document.getElementById('share-wa-item-display').innerText = itemTitle;
             const targetInput = document.getElementById('share-wa-target');
@@ -3178,11 +3190,13 @@ if ($__route_perm !== '' && !hasUserPermission($__route_perm)) {
 
         function sendSingleCallEmail(uid, src, dst, calldate, duration) {
             window.__pendingUid = uid;
+            window.__pendingDetail = `Origem: ${src}\nDestino: ${dst}\nData: ${calldate}\nDuração: ${duration}s`;
             shareReportViaEmail(`Gravação de Chamada #${uid} (${src} ➔ ${dst})`);
         }
 
         function sendSingleCallWa(uid, src, dst, calldate, duration) {
             window.__pendingUid = uid;
+            window.__pendingDetail = `Origem: ${src}\nDestino: ${dst}\nData: ${calldate}\nDuração: ${duration}s`;
             shareReportViaWhatsApp(`Gravação de Chamada #${uid} (${src} ➔ ${dst})`);
         }
 
@@ -3191,6 +3205,7 @@ if ($__route_perm !== '' && !hasUserPermission($__route_perm)) {
             const email = document.getElementById('share-email-target').value.trim();
             const btn = document.getElementById('btn-submit-share-email');
             const origHtml = btn ? btn.innerHTML : '';
+            let __rs = null; try { __rs = (!window.__shareUid && typeof window.__reportShare === 'function') ? window.__reportShare() : null; } catch (e) { __rs = null; }
 
             if (!email) {
                 showToastNotification('E-mail Obrigatório', 'Informe o endereço de e-mail de destino.', 'warning');
@@ -3202,7 +3217,7 @@ if ($__route_perm !== '' && !hasUserPermission($__route_perm)) {
                 const res = await fetch('index.php?api_action=send_email_report', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ to: email, subject: itemTitle, message: itemTitle, uid: window.__shareUid || '' })
+                    body: JSON.stringify(Object.assign({ to: email, subject: itemTitle, message: itemTitle + (__rs && __rs.summary ? '\n\n' + __rs.summary : '') + (window.__shareUid && window.__shareDetail ? '\n\n' + window.__shareDetail : ''), uid: window.__shareUid || '' }, (__rs && !window.__shareUid) ? { csv: __rs.csv || '', filename: __rs.filename || 'relatorio.csv' } : {}))
                 });
                 const data = await res.json();
                 if (data.success) {
@@ -3224,6 +3239,7 @@ if ($__route_perm !== '' && !hasUserPermission($__route_perm)) {
             const custom = (document.getElementById('share-wa-msg').value || '').trim();
             const btn = document.getElementById('btn-submit-share-wa');
             const origHtml = btn ? btn.innerHTML : '';
+            let __rs = null; try { __rs = (!window.__shareUid && typeof window.__reportShare === 'function') ? window.__reportShare() : null; } catch (e) { __rs = null; }
 
             if (!phone) {
                 showToastNotification('WhatsApp Obrigatório', 'Informe o número do celular com DDD.', 'warning');
@@ -3239,11 +3255,11 @@ if ($__route_perm !== '' && !hasUserPermission($__route_perm)) {
                 const res = await fetch('index.php?api_action=send_whatsapp_message', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ phone: phone, message: (custom ? custom + '\n\n' : '') + '📌 ' + itemTitle, uid: window.__shareUid || '' })
+                    body: JSON.stringify(Object.assign({ phone: phone, message: (custom ? custom + '\n\n' : '') + '📌 ' + itemTitle + (__rs && __rs.summary ? '\n\n' + __rs.summary : '') + (window.__shareUid && window.__shareDetail ? '\n\n' + window.__shareDetail : ''), uid: window.__shareUid || '' }, (__rs && !window.__shareUid) ? { csv: __rs.csv || '', filename: __rs.filename || 'relatorio.csv' } : {}))
                 });
                 const data = await res.json();
                 if (data.success) {
-                    showToastNotification('WhatsApp enviado', `Mensagem enviada para +${phone}.` + (data.warning ? ' ' + data.warning : ''), data.warning ? 'warning' : 'success');
+                    showToastNotification('WhatsApp enviado', `Mensagem enviada para +${phone}` + (data.files_sent ? ` com ${data.files_sent} anexo(s).` : '.') + (data.warning ? ' ' + data.warning : ''), data.warning ? 'warning' : 'success');
                     closeModal('modal-share-whatsapp');
                 } else {
                     showToastNotification('Falha no envio de WhatsApp', data.error || 'Erro desconhecido', 'error');

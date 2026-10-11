@@ -1539,6 +1539,95 @@ function getAsteriskConferences() {
     return array_values($conf_map);
 }
 
+/**
+ * Envia um ARQUIVO (documento/áudio) por WhatsApp pelo provedor ativo.
+ * Z-PRO: POST {api_url}/base64 (base64Data, mimeType, fileName). UAZAPI: POST /send/media (type=document).
+ */
+function sendWhatsAppFile($phone, $fileName, $content, $mime = 'application/octet-stream', $caption = '', $call_id = 'MANUAL', $extension = 'PAINEL', $rule_type = 'ENVIO_MANUAL_ARQUIVO') {
+    global $db;
+    $num = preg_replace('/\D/', '', (string)$phone);
+    if (strlen($num) === 10 || strlen($num) === 11) $num = '55' . $num;
+    $fileName = preg_replace('/[^A-Za-z0-9._\- ]/', '_', basename((string)$fileName)) ?: 'arquivo';
+    $http = 0; $resp = ''; $err = ''; $ok = false;
+
+    if ($num === '' || $content === '' || $content === null) {
+        $err = 'Número ou arquivo vazio';
+    } elseif (waProvider() === 'uazapi') {
+        $r = uazapiRequest('POST', '/send/media', ['number' => $num, 'type' => 'document', 'file' => base64_encode($content), 'docName' => $fileName, 'text' => (string)$caption], 60);
+        $http = $r['http']; $resp = $r['resp']; $err = $r['error'];
+        $ok = ($err === '' && $http >= 200 && $http < 300);
+        if (!$ok && $err === '') $err = 'HTTP ' . $http . ($http === 401 ? ' (token da instância inválido)' : '');
+    } else {
+        $api_url = trim((string)getSetting('api_url'));
+        $tok = trim(preg_replace('/^bearer\s+/i', '', trim((string)getSetting('api_token'))));
+        if ($api_url === '' || $tok === '') {
+            $err = 'API Prismabot não configurada (URL ou Token ausente).';
+        } else {
+            $body = ['body' => (string)$caption, 'number' => $num, 'base64Data' => base64_encode($content), 'mimeType' => $mime, 'fileName' => $fileName, 'isClosed' => false, 'validateNumber' => true];
+            $wid = getSetting('prismabot_whatsapp_id');
+            if (!empty($wid)) $body['whatsappId'] = is_numeric($wid) ? intval($wid) : $wid;
+            $ch = curl_init(rtrim($api_url, '/') . '/base64');
+            curl_setopt_array($ch, [
+                CURLOPT_POST => true, CURLOPT_POSTFIELDS => json_encode($body, JSON_UNESCAPED_UNICODE), CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_HTTPHEADER => ['Content-Type: application/json', 'Authorization: Bearer ' . $tok],
+                CURLOPT_TIMEOUT => 60, CURLOPT_SSL_VERIFYPEER => false, CURLOPT_SSL_VERIFYHOST => false
+            ]);
+            $resp = (string)curl_exec($ch); $http = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE); $ce = curl_error($ch); curl_close($ch);
+            if ($ce) { $err = 'cURL Error: ' . $ce; }
+            else {
+                $ok = ($http >= 200 && $http < 300);
+                $d = json_decode($resp, true);
+                if ($ok && is_array($d) && isset($d['success']) && $d['success'] === false) { $ok = false; $err = $d['error'] ?? 'API retornou success=false'; }
+                if (!$ok && $err === '') $err = 'HTTP ' . $http . (is_array($d) && !empty($d['error']) ? ': ' . $d['error'] : '');
+            }
+        }
+    }
+    try {
+        if ($db) {
+            $db->prepare("INSERT INTO sent_logs (phone, call_id, extension, rule_type, message, status, response_raw) VALUES (:p, :c, :e, :r, :m, :s, :rr)")->execute([
+                ':p' => $num, ':c' => $call_id, ':e' => $extension, ':r' => $rule_type,
+                ':m' => '📎 Arquivo: ' . $fileName . ' (' . round(strlen((string)$content) / 1024) . ' KB)',
+                ':s' => $ok ? 'SUCCESS' : 'ERROR', ':rr' => substr($resp !== '' ? $resp : $err, 0, 1000)
+            ]);
+        }
+    } catch (Exception $e) {}
+    if (function_exists('pabx_log')) pabx_log('whatsapp', $ok ? 'INFO' : 'ERROR', "Envio de arquivo {$fileName} para {$num} [HTTP {$http}]", ['error' => $err]);
+    return ['success' => $ok, 'error' => $err];
+}
+
+/**
+ * Monta os anexos pedidos pelo modal de compartilhamento: CSV do relatório e/ou a gravação (uid).
+ * Retorna [anexos[], avisos[]] onde anexo = ['name','type','content'].
+ */
+function buildShareAttachments($body) {
+    $atts = []; $warns = [];
+    $csv = (string)($body['csv'] ?? '');
+    if ($csv !== '') {
+        if (strlen($csv) > 3 * 1024 * 1024) { $warns[] = 'CSV maior que 3MB não foi anexado.'; }
+        else {
+            $fn = preg_replace('/[^A-Za-z0-9._\-]/', '_', basename((string)($body['filename'] ?? 'relatorio.csv')));
+            if (!preg_match('/\.csv$/i', $fn)) $fn .= '.csv';
+            $atts[] = ['name' => $fn, 'type' => 'text/csv', 'content' => (strpos($csv, "\xEF\xBB\xBF") === 0 ? '' : "\xEF\xBB\xBF") . $csv];
+        }
+    }
+    $uid = trim((string)($body['uid'] ?? ''));
+    if ($uid !== '' && hasUserPermission('listen_recordings')) {
+        $cdr = getAsteriskPdoConnection('asteriskcdrdb'); $row = false;
+        if ($cdr) {
+            try { $st = $cdr->prepare("SELECT calldate, recordingfile FROM cdr WHERE uniqueid = :u AND recordingfile <> '' LIMIT 1"); $st->execute([':u' => $uid]); $row = $st->fetch(PDO::FETCH_ASSOC); } catch (Exception $e) {}
+        }
+        $path = $row ? findRecordingPath($row['recordingfile'], $row['calldate']) : '';
+        if ($path === '') { $warns[] = 'Arquivo da gravação não encontrado no servidor; enviado apenas o link.'; }
+        elseif (filesize($path) > 15 * 1024 * 1024) { $warns[] = 'Gravação maior que 15MB: enviado apenas o link.'; }
+        else {
+            $ext = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+            $types = ['wav' => 'audio/wav', 'mp3' => 'audio/mpeg', 'ogg' => 'audio/ogg', 'gsm' => 'audio/x-gsm'];
+            $atts[] = ['name' => 'gravacao_' . preg_replace('/[^0-9.]/', '', $uid) . '.' . $ext, 'type' => $types[$ext] ?? 'application/octet-stream', 'content' => file_get_contents($path)];
+        }
+    }
+    return [$atts, $warns];
+}
+
 /** Provedor de envio WhatsApp ativo: 'zpro' (Prismabot/Z-PRO, padrão) ou 'uazapi'. */
 function waProvider() {
     return getSetting('wa_provider') === 'uazapi' ? 'uazapi' : 'zpro';

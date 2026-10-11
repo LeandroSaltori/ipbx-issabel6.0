@@ -769,3 +769,14 @@ function closeKpiCallsModal() {
     document.getElementById('modal-kpi-calls-detail')?.classList.add('hidden');
 }
 </script>
+
+<?php
+$__sh_txt  = "Tipo: " . $report_type . " | Período: " . date('d/m/Y', strtotime($start_date)) . " a " . date('d/m/Y', strtotime($end_date)) . "\n";
+$__sh_txt .= "Chamadas recebidas: {$inc_calls} ({$inc_pct}%) - " . gmdate('H:i:s', intval($inc_time)) . "\nChamadas efetuadas: {$out_calls} ({$out_pct}%) - " . gmdate('H:i:s', intval($out_time)) . "\n";
+$__sh_csv = "Tipo,Qtd,Porcentagem,Tempo\nChamadas Recebidas,{$inc_calls},{$inc_pct}%," . gmdate('H:i:s', intval($inc_time)) . "\nChamadas Efetuadas,{$out_calls},{$out_pct}%," . gmdate('H:i:s', intval($out_time)) . "\n";
+?>
+<script>
+window.__reportShare = function () {
+    return { summary: <?php echo json_encode(rtrim($__sh_txt), JSON_UNESCAPED_UNICODE); ?>, csv: <?php echo json_encode($__sh_csv, JSON_UNESCAPED_UNICODE); ?>, filename: <?php echo json_encode('relatorio_grafico_' . $start_date . '_' . $end_date . '.csv'); ?> };
+};
+</script>
