@@ -203,27 +203,36 @@ function executeAsteriskAMICommand($action, $params = []) {
     $port = (int)(getSetting('ami_port') ?: 5038);
 
     $credentials_to_try = getAsteriskAMICredentials();
+    // Remove credenciais repetidas (mesmo usuário+senha)
+    $seen = []; $uniq = [];
+    foreach ($credentials_to_try as $c) {
+        $k = ($c['user'] ?? '') . "\0" . ($c['secret'] ?? '');
+        if (!isset($seen[$k])) { $seen[$k] = 1; $uniq[] = $c; }
+    }
+    $credentials_to_try = $uniq;
     $socket = null;
     $authenticated = false;
     $last_error = '';
+    $connected_once = false;
 
-    $s = @fsockopen($host, $port, $errno, $errstr, 4);
-    if (!$s) {
-        return ['success' => false, 'error' => "Falha ao conectar no AMI $host:$port - $errstr"];
-    }
-    stream_set_timeout($s, 5);
-
-    // Ler banner inicial
-    $banner = fgets($s, 1024);
-
+    // O Asterisk FECHA a conexão após um login recusado: cada tentativa usa um socket novo
     foreach ($credentials_to_try as $cred) {
         if (empty($cred['user']) || empty($cred['secret'])) continue;
-        $login_msg = "Action: Login\r\nUsername: {$cred['user']}\r\nSecret: {$cred['secret']}\r\nEvents: off\r\n\r\n";
-        fwrite($s, $login_msg);
+        $s = @fsockopen($host, $port, $errno, $errstr, 4);
+        if (!$s) {
+            if (!$connected_once) return ['success' => false, 'error' => "Falha ao conectar no AMI $host:$port - $errstr"];
+            $last_error = "Conexão AMI interrompida ($errstr)";
+            break;
+        }
+        $connected_once = true;
+        stream_set_timeout($s, 5);
+        fgets($s, 1024); // banner
 
+        fwrite($s, "Action: Login\r\nUsername: {$cred['user']}\r\nSecret: {$cred['secret']}\r\nEvents: off\r\n\r\n");
         $login_response = '';
         while (!feof($s)) {
             $line = fgets($s, 1024);
+            if ($line === false) break;
             $login_response .= $line;
             if (trim($line) == '') break;
         }
@@ -232,13 +241,15 @@ function executeAsteriskAMICommand($action, $params = []) {
             $authenticated = true;
             $socket = $s;
             break;
-        } else {
-            $last_error = "Credencial AMI recusada para usuário " . $cred['user'];
         }
+        $last_error = "Credencial AMI recusada para usuário " . $cred['user'];
+        @fclose($s);
     }
 
+    if (!$connected_once) {
+        return ['success' => false, 'error' => "Falha ao conectar no AMI $host:$port - sem credenciais para testar. " . amiCredentialDiagnosis($credentials_to_try)];
+    }
     if (!$authenticated || !$socket) {
-        if ($s) fclose($s);
         return ['success' => false, 'error' => "Falha de Autenticação AMI no Host $host. $last_error " . amiCredentialDiagnosis($credentials_to_try)];
     }
 
