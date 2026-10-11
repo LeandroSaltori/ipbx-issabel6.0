@@ -608,8 +608,7 @@ async function updateIntegratedQueues() {
                 }
 
                 const displayName = m.name ? m.name : `Ramal ${m.extension}`;
-                const pauseBtn = (m.status === 'Indisponível' || !m.interface) ? '' :
-                    `<button type="button" onclick="fopPauseMember('${q.queue_number}','${m.interface}',${m.paused ? 1 : 0})" title="${m.paused ? 'Retomar na fila' : 'Pausar na fila'}" class="ml-1.5 text-[10px] px-1.5 py-0.5 rounded border border-slate-700 text-slate-300 hover:bg-slate-800" style="white-space:nowrap;flex-shrink:0;width:auto;overflow:visible">${m.paused ? '▶ Retomar' : '⏸ Pausar'}</button>`;
+                const pauseBtn = ''; // pausa de fila não é utilizada (botão removido)
 
                 return `<div class="flex items-center justify-between p-1.5 bg-slate-950/80 rounded-xl border border-slate-800 text-xs">
                     <div class="flex items-center gap-2 overflow-hidden mr-2">

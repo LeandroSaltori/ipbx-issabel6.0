@@ -171,10 +171,6 @@ function isGroupActive($modules_array) {
                     <i class="fa-solid fa-headset w-4 text-center"></i>
                     <span>CDR & Gravações</span>
                 </a>
-                <a href="index.php?module=relatorios&action=pausas_agentes" class="flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all <?php echo isNavActive('relatorios', 'pausas_agentes') ? 'bg-brand-500/20 text-brand-400 border border-brand-500/30 font-bold' : 'text-slate-400 hover:text-white hover:bg-slate-800/60'; ?>">
-                    <i class="fa-solid fa-pause-circle w-4 text-center text-violet-400"></i>
-                    <span>Pausas & Tempo Logado</span>
-                </a>
                 <a href="index.php?module=relatorios&action=formularios" class="flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all <?php echo isNavActive('relatorios', 'formularios') ? 'bg-brand-500/20 text-brand-400 border border-brand-500/30 font-bold' : 'text-slate-400 hover:text-white hover:bg-slate-800/60'; ?>">
                     <i class="fa-solid fa-clipboard-list w-4 text-center text-violet-400"></i>
                     <span>Formulários de Atendimento</span>
