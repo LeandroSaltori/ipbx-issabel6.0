@@ -6026,3 +6026,79 @@ function provRenderConfig($vendor, $ext, $name, $secret, $host) {
         . "account.1.auth_name = $ext\naccount.1.user_name = $ext\naccount.1.password = $secret\n"
         . "account.1.sip_server.1.address = $host\naccount.1.sip_server.1.port = 5060\n";
 }
+
+/** Fail2ban HÍBRIDO: usa os jails/whitelist nativos do Issabel (Security > Fail2ban, /var/www/db/iptables.db). */
+function f2bNativeDbPath() { return defined('IPBX_F2B_DB') ? IPBX_F2B_DB : '/var/www/db/iptables.db'; }
+function f2bNativeJails() {
+    $path = f2bNativeDbPath();
+    if (!@is_readable($path)) return [];
+    try {
+        $p = new PDO('sqlite:' . $path);
+        $p->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        return $p->query("SELECT id, name, maxretry, bantime, ignoreip, enabled FROM jails ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Exception $e) { return []; }
+}
+function f2bIpValid($ip) {
+    $ip = trim($ip);
+    if (!preg_match('/^[0-9a-fA-F\.:]+(\/\d{1,3})?$/', $ip)) return false;
+    $base = explode('/', $ip)[0];
+    return filter_var($base, FILTER_VALIDATE_IP) !== false;
+}
+/** IPs da whitelist (ignoreip) em comum nos jails nativos, sem o localhost. */
+function f2bWhitelistGet() {
+    $all = [];
+    foreach (f2bNativeJails() as $j) {
+        foreach (preg_split('/[\s,]+/', (string)$j['ignoreip'], -1, PREG_SPLIT_NO_EMPTY) as $ip) {
+            if ($ip !== '127.0.0.1' && $ip !== '::1' && f2bIpValid($ip)) $all[$ip] = true;
+        }
+    }
+    return array_keys($all);
+}
+/** Grava a whitelist em TODOS os jails nativos e aplica pelo mecanismo do Issabel. Retorna ['ok'=>bool,'msg'=>string]. */
+function f2bWhitelistSave(array $ips) {
+    $clean = [];
+    foreach ($ips as $ip) { $ip = trim($ip); if ($ip !== '' && f2bIpValid($ip)) $clean[$ip] = true; }
+    $value = trim('127.0.0.1 ' . implode(' ', array_keys($clean)));
+    $path = f2bNativeDbPath();
+    if (!@is_writable($path)) return ['ok' => false, 'msg' => 'Banco de jails do Issabel sem permissão de escrita.'];
+    try {
+        $p = new PDO('sqlite:' . $path);
+        $p->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        $p->prepare("UPDATE jails SET ignoreip = ?")->execute([$value]);
+    } catch (Exception $e) { return ['ok' => false, 'msg' => 'Falha ao gravar: ' . $e->getMessage()]; }
+    $applied = false;
+    $lib = '/var/www/html/libs/paloSantoDB.class.php';
+    $cls = '/var/www/html/modules/sec_fb_admin/libs/IssabelF2Bservice.class.php';
+    if (is_readable($lib) && is_readable($cls)) {
+        try {
+            include_once $lib; include_once $cls;
+            $dsn = 'sqlite3:///' . $path;
+            $svc = new IssabelF2BService($dsn);
+            $svc->F2BUpdateJails($dsn);
+            $applied = true;
+        } catch (Throwable $e) { $applied = false; }
+    }
+    if (!$applied && is_executable('/usr/bin/issabel-helper')) {
+        @exec('/usr/bin/issabel-helper fb_client reload 2>&1', $o, $rc);
+        $applied = ($rc === 0);
+    }
+    return ['ok' => $applied, 'msg' => $applied ? 'Whitelist salva e aplicada no Fail2ban do Issabel.' : 'Whitelist salva no Issabel, mas não foi possível recarregar o Fail2ban agora (será aplicada ao recarregar em Security > Fail2ban).'];
+}
+/** IPs banidos agora, pelo mesmo comando da tela nativa (Security > Fail2ban Banned IPs). */
+function f2bBannedNative() {
+    if (!is_executable('/usr/bin/issabel-helper')) return null;
+    $out = [];
+    foreach (['sshd', 'asterisk', 'apache-auth', 'issabel-gui', 'ipbx-front-api'] as $jail) {
+        $r = [];
+        @exec('/usr/bin/issabel-helper fb_client status ' . escapeshellarg($jail) . ' 2>/dev/null', $r, $rc);
+        foreach (preg_split('/\s+/', trim(implode(' ', $r)), -1, PREG_SPLIT_NO_EMPTY) as $ip) {
+            if (f2bIpValid($ip)) $out[] = ['jail' => $jail, 'ip' => $ip];
+        }
+    }
+    return $out;
+}
+function f2bUnban($jail, $ip) {
+    if (!in_array($jail, ['sshd', 'asterisk', 'apache-auth', 'issabel-gui', 'ipbx-front-api'], true) || !f2bIpValid($ip) || !is_executable('/usr/bin/issabel-helper')) return false;
+    @exec('/usr/bin/issabel-helper fb_client unban ' . escapeshellarg($jail) . ' ' . escapeshellarg($ip) . ' 2>&1', $o, $rc);
+    return $rc === 0;
+}
