@@ -6,7 +6,7 @@
  */
 return [
     'done' => [
-        ['data' => '2026-10-11', 'mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-triangle-exclamation', 'titulo' => 'Alerta de tronco fora do ar', 'desc' => 'O supervisor recebe um WhatsApp assim que uma linha cai e outro quando ela volta, uma única vez cada. Configure em Configurações > API.'],
+        ['data' => '2026-10-11', 'mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-triangle-exclamation', 'titulo' => 'Alerta de tronco fora do ar', 'desc' => 'O supervisor recebe um WhatsApp assim que uma linha cai e outro quando ela volta, uma única vez cada, com intervalo mínimo de 15 min por linha. Fica desligado até você ativar em Configurações > API.'],
         ['data' => '2026-10-11', 'mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-rocket', 'titulo' => 'Novidades do sistema', 'desc' => 'Este histórico: todas as funções novas e correções passam a aparecer aqui automaticamente, no rodapé do menu.'],
         ['mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-robot', 'titulo' => 'Chat com IA no painel', 'desc' => 'Assistente flutuante que responde sobre ligações, ramais, filas e gravações usando os dados reais do seu PABX. Liberado por usuário.'],
         ['mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-diagram-project', 'titulo' => 'IA por função', 'desc' => 'Escolha qual IA faz a transcrição de áudio, os resumos/insights e o chat, com chave própria por provedor.'],

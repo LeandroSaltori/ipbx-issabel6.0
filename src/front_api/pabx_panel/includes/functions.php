@@ -5724,6 +5724,8 @@ function checkTrunkAlerts() {
     $nums = trunkAlertNumbers();
     if (!$nums) { $res['error'] = 'sem números cadastrados'; return $res; }
     $db->exec("CREATE TABLE IF NOT EXISTS trunk_alert_state (trunk TEXT PRIMARY KEY, status TEXT, bad_count INTEGER DEFAULT 0, down_notified INTEGER DEFAULT 0, since DATETIME)");
+    try { $db->exec("ALTER TABLE trunk_alert_state ADD COLUMN last_alert INTEGER DEFAULT 0"); } catch (Exception $e) {}
+    $cooldown = 900;   // mesmo tronco: no máximo 1 aviso de queda a cada 15 min (linha instável não gera enxurrada)
     $trunks = getAsteriskTrunksStatus();
     $send = function ($msg, $tag) use ($nums) {
         $ok = false;
@@ -5740,8 +5742,8 @@ function checkTrunkAlerts() {
             $res['down']++;
             $bad = (int)$row['bad_count'] + 1;
             $notified = (int)$row['down_notified'];
-            if ($bad >= 2 && !$notified) {
-                if ($send("🚨 *Tronco fora do ar*\nLinha: {$name} ({$t['tech']})\nDesde: " . date('d/m H:i') . "\nVerifique o provedor ou a rede.", 'DOWN')) { $notified = 1; $res['alerts']++; }
+            if ($bad >= 2 && !$notified && (time() - (int)($row['last_alert'] ?? 0)) >= $cooldown) {
+                if ($send("🚨 *Tronco fora do ar*\nLinha: {$name} ({$t['tech']})\nDesde: " . date('d/m H:i') . "\nVerifique o provedor ou a rede.", 'DOWN')) { $notified = 1; $res['alerts']++; $db->prepare("UPDATE trunk_alert_state SET last_alert=:l WHERE trunk=:t")->execute([':l' => time(), ':t' => $name]); }
                 // se o envio falhar, tenta de novo na próxima verificação
             }
             $db->prepare("UPDATE trunk_alert_state SET status='Desconectado', bad_count=:b, down_notified=:n WHERE trunk=:t")->execute([':b' => $bad, ':n' => $notified, ':t' => $name]);
