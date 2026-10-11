@@ -860,8 +860,8 @@ function getAsteriskTrunksStatus() {
         } catch (Exception $e) {}
     }
 
-    if (function_exists('shell_exec')) {
-        $sip_reg = @shell_exec('asterisk -rx "sip show registry" 2>/dev/null');
+    if (true) {
+        $sip_reg = asteriskCliOutput('sip show registry');
         if ($sip_reg) {
             foreach (explode("\n", $sip_reg) as $line) {
                 if (preg_match('/^([\w\.\-]+:\d+|[\w\.\-]+)\s+.*?\s+(Registered|Request Sent|Auth\. Sent|Rejected|Unregistered)/i', $line, $m)) {
@@ -877,7 +877,7 @@ function getAsteriskTrunksStatus() {
             }
         }
 
-        $pjsip_reg = @shell_exec('asterisk -rx "pjsip show registrations" 2>/dev/null');
+        $pjsip_reg = asteriskCliOutput('pjsip show registrations');
         if ($pjsip_reg) {
             foreach (explode("\n", $pjsip_reg) as $line) {
                 if (preg_match('/^\s*([\w\-\.]+)\/\S+.*?\b(Registered|Unregistered|Rejected|Stopped)\b/i', $line, $m)) {
@@ -907,11 +907,11 @@ function getAsteriskTrunksStatus() {
                     }
                 }
             };
-            $ep = @shell_exec('asterisk -rx "pjsip show endpoints" 2>/dev/null');
+            $ep = asteriskCliOutput('pjsip show endpoints');
             if ($ep && preg_match_all('/^\s*Endpoint:\s+([^\s\/]+)(?:\/\S*)?\s+(Unavailable|Not in use|In use|Busy|Ringing|Invalid|Unreachable)/mi', $ep, $mm, PREG_SET_ORDER)) {
                 foreach ($mm as $m) $mark($m[1], !preg_match('/^(Unavailable|Invalid|Unreachable)$/i', $m[2]));
             }
-            $peers = @shell_exec('asterisk -rx "sip show peers" 2>/dev/null');
+            $peers = asteriskCliOutput('sip show peers');
             if ($peers) {
                 foreach (explode("\n", $peers) as $line) {
                     if (preg_match('/^([^\s\/]+)(?:\/\S*)?\s+\S+\s+.*?\b(OK|UNREACHABLE|LAGGED|UNKNOWN)\b/', $line, $m)) {
@@ -921,7 +921,7 @@ function getAsteriskTrunksStatus() {
             }
         }
 
-        $chans = @shell_exec('asterisk -rx "core show channels concise" 2>/dev/null');
+        $chans = asteriskCliOutput('core show channels concise');
         if ($chans) {
             foreach (explode("\n", $chans) as $line) {
                 $parts = explode('!', $line);
@@ -1423,7 +1423,7 @@ function getAsteriskParkingLots() {
     // Mapeamento de contatos para rotular nomes de chamadores
     $contacts_map = function_exists('getContactsMap') ? getContactsMap() : [];
 
-    if (!function_exists('shell_exec')) {
+    if (false) {
         return [
             'config' => $parking_config,
             'lots'   => $parking_lots
@@ -1431,13 +1431,13 @@ function getAsteriskParkingLots() {
     }
 
     // Estratégia 1: 'parking show default' ou 'parking show' (Asterisk 12+ res_parking)
-    $out1 = @shell_exec('asterisk -rx "parking show default" 2>/dev/null');
+    $out1 = asteriskCliOutput('parking show default');
     if (empty($out1) || strpos(strtolower($out1), 'no such command') !== false) {
-        $out1 = @shell_exec('asterisk -rx "parking show" 2>/dev/null');
+        $out1 = asteriskCliOutput('parking show');
     }
 
     // Estratégia 2: 'parkedcalls show' (Asterisk 11 e anteriores res_features)
-    $out2 = @shell_exec('asterisk -rx "parkedcalls show" 2>/dev/null');
+    $out2 = asteriskCliOutput('parkedcalls show');
 
     // Processar saídas dos comandos CLI nativos de parking
     $raw_outputs = array_filter([$out1, $out2]);
@@ -1492,7 +1492,7 @@ function getAsteriskParkingLots() {
     }
 
     // Estratégia 3: Fallback via 'core show channels concise'
-    $out_chans = @shell_exec('asterisk -rx "core show channels concise" 2>/dev/null');
+    $out_chans = asteriskCliOutput('core show channels concise');
     if (!empty($out_chans)) {
         $lines = explode("\n", str_replace("\r", "", $out_chans));
         foreach ($lines as $line) {
@@ -1549,7 +1549,7 @@ function getAsteriskParkingLots() {
     }
 
     // Estratégia 4: Fallback via 'core show hints'
-    $out_hints = @shell_exec('asterisk -rx "core show hints" 2>/dev/null');
+    $out_hints = asteriskCliOutput('core show hints');
     if (!empty($out_hints)) {
         $lines = explode("\n", str_replace("\r", "", $out_hints));
         foreach ($lines as $line) {
@@ -1633,9 +1633,9 @@ function getAsteriskConferences() {
     }
 
     // 3. Checar participantes ativos via CLI (ConfBridge ou MeetMe)
-    if (function_exists('shell_exec') && !empty($conf_map)) {
+    if (true && !empty($conf_map)) {
         // Testar ConfBridge
-        $out_cb = @shell_exec('asterisk -rx "confbridge show rooms" 2>/dev/null');
+        $out_cb = asteriskCliOutput('confbridge show rooms');
         if (!empty($out_cb)) {
             $lines = explode("\n", $out_cb);
             foreach ($lines as $line) {
@@ -1650,7 +1650,7 @@ function getAsteriskConferences() {
         }
 
         // Testar MeetMe
-        $out_mm = @shell_exec('asterisk -rx "meetme list" 2>/dev/null');
+        $out_mm = asteriskCliOutput('meetme list');
         if (!empty($out_mm)) {
             $lines = explode("\n", $out_mm);
             foreach ($lines as $line) {
