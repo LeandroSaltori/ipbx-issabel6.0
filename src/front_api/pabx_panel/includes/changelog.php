@@ -6,6 +6,7 @@
  */
 return [
     'done' => [
+        ['data' => '2026-10-11', 'mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-shield-halved', 'titulo' => 'Painel de segurança', 'desc' => 'Veja em uma tela as tentativas de acesso indevido ao seu PABX e os endereços que foram bloqueados automaticamente.'],
         ['data' => '2026-10-11', 'mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-broom', 'titulo' => 'Painel mais enxuto e rápido', 'desc' => 'Renomear ramal agora grava direto no Issabel, sem depender da REST API (que virou opcional); botões que não funcionavam foram retirados e o painel deixou de aguardar uma API que não responde.'],
         ['data' => '2026-10-11', 'mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-heart-pulse', 'titulo' => 'Status da Integração', 'desc' => 'Uma tela mostra se o Asterisk, os bancos, o WhatsApp, a IA, o e-mail e as tarefas automáticas estão funcionando, com o motivo quando algo falha. Fica em Configurações.'],
         ['data' => '2026-10-11', 'mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-envelope-circle-check', 'titulo' => 'Avisos de abandono e resumo sem repetição', 'desc' => 'Aviso de abandono de fila e resumo da chamada passam a ser enviados uma única vez; só tentam de novo (até 3 vezes) se o envio falhar.'],
@@ -21,7 +22,6 @@ return [
         ['mes' => 'Outubro/2026', 'novo' => false, 'icon' => 'fa-bell', 'titulo' => 'Chamada perdida avisada uma única vez', 'desc' => 'O WhatsApp de chamada perdida é enviado uma vez e só repete se o envio falhar.'],
     ],
     'plan' => [
-        ['icon' => 'fa-shield-halved', 'titulo' => 'Painel de segurança', 'desc' => 'Bloqueios do firewall e tentativas de invasão.'],
         ['icon' => 'fa-phone-volume', 'titulo' => 'Provisionamento de telefones IP', 'desc' => 'Configurar o aparelho automaticamente pelo MAC.'],
         ['icon' => 'fa-clipboard-list', 'titulo' => 'Formulários de atendimento', 'desc' => 'Registro do motivo e resultado da chamada pelo atendente.'],
     ],

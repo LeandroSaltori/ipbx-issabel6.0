@@ -5901,3 +5901,65 @@ function integrationStatusChecks() {
     }
     return $r;
 }
+
+/**
+ * Painel de segurança (somente leitura): tentativas de invasão registradas pelo Asterisk e bloqueios do fail2ban.
+ * Lê só o final dos logs; se um arquivo não for legível pelo usuário do Apache, informa em 'avisos'.
+ */
+function securityTailFile($path, $bytes = 400000) {
+    if (!@is_file($path) || !@is_readable($path)) return null;
+    $size = @filesize($path);
+    $fh = @fopen($path, 'r');
+    if (!$fh) return null;
+    if ($size > $bytes) fseek($fh, -$bytes, SEEK_END);
+    $data = (string)stream_get_contents($fh);
+    fclose($fh);
+    return $data;
+}
+
+function securityOverview() {
+    $res = ['tentativas' => [], 'por_ip' => [], 'bans' => [], 'banidos_ativos' => [], 'avisos' => []];
+
+    // 1) Eventos de segurança do Asterisk (security log; fallback: full)
+    $txt = null; $origem = '';
+    foreach (['/var/log/asterisk/security_log', '/var/log/asterisk/security', '/var/log/asterisk/full'] as $f) {
+        $t = securityTailFile($f);
+        if ($t !== null && stripos($t, 'SecurityEvent=') !== false) { $txt = $t; $origem = $f; break; }
+    }
+    if ($txt === null) {
+        $res['avisos'][] = 'Log de segurança do Asterisk não encontrado ou sem permissão de leitura (/var/log/asterisk/security_log). Habilite "security" em logger.conf.';
+    } else {
+        $bad = ['InvalidAccountID', 'InvalidPassword', 'ChallengeResponseFailed', 'FailedACL', 'InvalidTransport', 'AuthMethodNotAllowed', 'ChallengeSentFailed'];
+        $lines = array_slice(preg_split('/\r?\n/', $txt), -6000);
+        foreach ($lines as $ln) {
+            if (!preg_match('/SecurityEvent="?([A-Za-z]+)"?/', $ln, $m) || !in_array($m[1], $bad, true)) continue;
+            $ip = '';
+            if (preg_match('/RemoteAddress="[^\/]*\/[^\/]*\/([0-9a-fA-F\.:]+)\//', $ln, $a)) $ip = $a[1];
+            $when = preg_match('/EventTV="?(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2}:\d{2})/', $ln, $w) ? ($w[1] . ' ' . $w[2]) : (preg_match('/^\[([^\]]+)\]/', $ln, $w2) ? $w2[1] : '');
+            $acct = preg_match('/AccountID="?([^",]+)/', $ln, $ac) ? $ac[1] : '';
+            $res['tentativas'][] = ['quando' => $when, 'evento' => $m[1], 'ip' => $ip, 'conta' => $acct];
+            if ($ip !== '') $res['por_ip'][$ip] = ($res['por_ip'][$ip] ?? 0) + 1;
+        }
+        arsort($res['por_ip']);
+        $res['por_ip'] = array_slice($res['por_ip'], 0, 15, true);
+        $res['tentativas'] = array_slice(array_reverse($res['tentativas']), 0, 50);
+        $res['origem'] = $origem;
+    }
+
+    // 2) Bloqueios do fail2ban (log)
+    $f2b = securityTailFile('/var/log/fail2ban.log');
+    if ($f2b === null) {
+        $res['avisos'][] = 'Log do fail2ban (/var/log/fail2ban.log) não encontrado ou sem permissão de leitura.';
+    } else {
+        $state = [];
+        foreach (preg_split('/\r?\n/', $f2b) as $ln) {
+            if (preg_match('/^(\S+ \S+).*\[([^\]]+)\]\s+(Ban|Unban)\s+([0-9a-fA-F\.:]+)/', $ln, $m)) {
+                $state[$m[4]] = $m[3] === 'Ban' ? ['quando' => $m[1], 'jail' => $m[2]] : null;
+                if ($m[3] === 'Ban') $res['bans'][] = ['quando' => $m[1], 'jail' => $m[2], 'ip' => $m[4]];
+            }
+        }
+        foreach ($state as $ip => $v) if ($v) $res['banidos_ativos'][] = ['ip' => $ip] + $v;
+        $res['bans'] = array_slice(array_reverse($res['bans']), 0, 30);
+    }
+    return $res;
+}
