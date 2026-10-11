@@ -10,6 +10,7 @@ $DEFAULT_TEMPLATES = [
     'queue_exit_whatsapp_msg'  => "📲 *Atendimento Prisma WhatsApp*\n\nOlá! Recebemos sua solicitação via PABX às *{DATA_HORA}*. Em instantes um de nossos atendentes dará sequência ao seu atendimento por este canal.",
     'missed_agent_msg'          => "⚠️ *Notificação de Chamada Perdida*\n\nOlá *{ATENDENTE}*! O cliente número *{CLIENTE}* tentou ligar no seu ramal *{RAMAL}* às *{DATA_HORA}* e a chamada não foi atendida.",
     'missed_client_msg'         => "🎙️ *Notificação de Chamada - IPbx Prisma*\n\nInformações da ligação:\n• Cliente: *{CLIENTE}*\n• Atendente: *{ATENDENTE}* (Ramal *{RAMAL}*)\n• Data/Hora: *{DATA_HORA}*\n\nO registro de áudio/gravação da chamada está disponível no sistema.",
+    'audio_msg'                 => "🎙️ *Gravação da sua chamada - IPbx Prisma*\n\nOlá! Segue o registro da sua ligação com *{ATENDENTE}* (Ramal *{RAMAL}*) em *{DATA_HORA}*:\n{LINK_GRAVACAO}",
     'nps_msg'                   => "⭐ *Pesquisa de Satisfação - IPbx Prisma*\n\nOlá! Como você avalia o atendimento recebido pelo atendente *{ATENDENTE}* (Ramal *{RAMAL}*) às *{DATA_HORA}*?\n\nResponda com uma nota de 1 (Péssimo) a 5 (Excelente)."
 ];
 
@@ -23,6 +24,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'queue_exit_whatsapp_msg'  => trim($_POST['queue_exit_whatsapp_msg'] ?? ''),
             'missed_agent_msg'          => trim($_POST['missed_agent_msg'] ?? ''),
             'missed_client_msg'         => trim($_POST['missed_client_msg'] ?? ''),
+            'audio_msg'                 => trim($_POST['audio_msg'] ?? ''),
             'nps_enabled'               => isset($_POST['nps_enabled']) ? '1' : '0',
             'nps_msg'                   => trim($_POST['nps_msg'] ?? '')
         ];
@@ -93,6 +95,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 [$clean_test_phone, 'Suporte Técnico', 'Atendente Prisma', '201', $data_hora],
                 $tpl
             );
+            $msg_processed = str_replace('{LINK_GRAVACAO}', '(link da gravação — gerado na chamada real)', $msg_processed);
 
             $res = sendWhatsAppAPI($clean_test_phone, $msg_processed, 'TESTE_MANUAL_' . time(), '201', 'TESTE_REGRAS');
 
@@ -122,7 +125,8 @@ $rule_abandon = getRule('queue_abandon_msg_default') ?: $DEFAULT_TEMPLATES['queu
 $rule_exit_wa = getRule('queue_exit_whatsapp_msg')  ?: $DEFAULT_TEMPLATES['queue_exit_whatsapp_msg'];
 $rule_agent   = getRule('missed_agent_msg')          ?: $DEFAULT_TEMPLATES['missed_agent_msg'];
 $rule_client  = getRule('missed_client_msg')         ?: $DEFAULT_TEMPLATES['missed_client_msg'];
-$nps_enabled  = getRule('nps_enabled')               ?: '1';
+$rule_audio   = getRule('audio_msg')                 ?: $DEFAULT_TEMPLATES['audio_msg'];
+$nps_enabled  = getRule('nps_enabled') === '0' ? '0' : '1';
 $nps_msg      = getRule('nps_msg')                   ?: $DEFAULT_TEMPLATES['nps_msg'];
 ?>
 
@@ -222,15 +226,26 @@ $nps_msg      = getRule('nps_msg')                   ?: $DEFAULT_TEMPLATES['nps_
                     <textarea id="txt_missed_agent_msg" name="missed_agent_msg" rows="4" class="w-full px-3 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white focus:border-brand-500 focus:outline-none font-sans leading-relaxed"><?php echo htmlspecialchars($rule_agent); ?></textarea>
                 </div>
 
+                <!-- Aviso ao Cliente (Ramal Não Atendeu) -->
+                <div class="space-y-2">
+                    <div class="flex items-center justify-between">
+                        <label class="font-bold text-slate-300 flex items-center gap-1.5">
+                            <i class="fa-solid fa-file-audio text-purple-400"></i> Mensagem ao Cliente (Chamada Perdida no Ramal)
+                        </label>
+                        <span class="text-[10px] text-slate-500 font-mono">Cliente / Ramal</span>
+                    </div>
+                    <textarea id="txt_missed_client_msg" name="missed_client_msg" rows="4" class="w-full px-3 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white focus:border-brand-500 focus:outline-none font-sans leading-relaxed"><?php echo htmlspecialchars($rule_client); ?></textarea>
+                </div>
+
                 <!-- Envio de Áudio de Gravação ao Cliente -->
                 <div class="space-y-2">
                     <div class="flex items-center justify-between">
                         <label class="font-bold text-slate-300 flex items-center gap-1.5">
-                            <i class="fa-solid fa-file-audio text-purple-400"></i> Envio de Informações & Gravação de Áudio
+                            <i class="fa-solid fa-file-audio text-purple-400"></i> Envio de Gravação da Chamada (use {LINK_GRAVACAO})
                         </label>
                         <span class="text-[10px] text-slate-500 font-mono">ext-prisma-audio</span>
                     </div>
-                    <textarea id="txt_missed_client_msg" name="missed_client_msg" rows="4" class="w-full px-3 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white focus:border-brand-500 focus:outline-none font-sans leading-relaxed"><?php echo htmlspecialchars($rule_client); ?></textarea>
+                    <textarea id="txt_audio_msg" name="audio_msg" rows="4" class="w-full px-3 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white focus:border-brand-500 focus:outline-none font-sans leading-relaxed"><?php echo htmlspecialchars($rule_audio); ?></textarea>
                 </div>
             </div>
         </div>
@@ -327,7 +342,8 @@ $nps_msg      = getRule('nps_msg')                   ?: $DEFAULT_TEMPLATES['nps_
                     <option value="queue_abandon_msg_default">⚠️ Abandono de Fila (ext-prisma-no-answer)</option>
                     <option value="queue_exit_whatsapp_msg">📲 Transbordo URA / WhatsApp (ext-prisma-transbordo)</option>
                     <option value="missed_agent_msg">⚠️ Notificação ao Atendente do Ramal</option>
-                    <option value="missed_client_msg">🎙️ Envio de Gravação de Áudio (ext-prisma-audio)</option>
+                    <option value="missed_client_msg">📵 Aviso ao Cliente - Ramal Não Atendeu</option>
+                    <option value="audio_msg">🎙️ Envio de Gravação (ext-prisma-audio)</option>
                     <option value="nps_msg">⭐ Pesquisa de Satisfação NPS (ext-prisma-nps)</option>
                 </select>
             </div>

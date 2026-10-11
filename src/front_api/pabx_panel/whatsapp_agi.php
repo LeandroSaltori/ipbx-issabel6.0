@@ -159,7 +159,13 @@ if ($event_type === 'missed_extension') {
 } elseif ($event_type === 'transbordo') {
     $template = (function_exists('getRule') && getRule('queue_exit_whatsapp_msg')) ? getRule('queue_exit_whatsapp_msg') : (getSetting('prismabot_msg_transbordo') ?: $DEFAULT_TEMPLATES['transbordo']);
 } elseif ($event_type === 'audio') {
-    $template = (function_exists('getRule') && getRule('missed_client_msg')) ? getRule('missed_client_msg') : (getSetting('prismabot_msg_audio') ?: $DEFAULT_TEMPLATES['audio']);
+    $template = (function_exists('getRule') && getRule('audio_msg')) ? getRule('audio_msg') : (getSetting('prismabot_msg_audio') ?: $DEFAULT_TEMPLATES['audio']);
+}
+
+// NPS desativado no painel: não envia
+if ($event_type === 'nps' && function_exists('getRule') && getRule('nps_enabled') === '0') {
+    if (function_exists('pabx_log')) pabx_log('whatsapp', 'INFO', "NPS desativado nas Regras de Mensagens: envio ignorado", []);
+    $template = '';
 }
 
 // Ramal ocupado: só notifica o cliente se "Notif. Ocupado" estiver ativo no ramal
@@ -182,6 +188,11 @@ if (!empty($template) && !empty($target_number)) {
         [$clean_caller, $nome_fila, $nome_atendente, $called_ext, $data_hora],
         $template
     );
+    if (strpos($msg_cliente, '{LINK_GRAVACAO}') !== false) {
+        $uid_call = trim((string)agiGetVariable('UNIQUEID'));
+        $lnk = ($uid_call !== '' && function_exists('audioSignedUrl')) ? audioSignedUrl($uid_call) : '';
+        $msg_cliente = str_replace('{LINK_GRAVACAO}', $lnk, $msg_cliente);
+    }
 
     $rule_map = ['no_answer' => 'FILA_ABANDONO', 'missed_extension' => 'ATENDENTE_NAO_ATENDEU', 'nps' => 'NPS', 'transbordo' => 'TRANSBORDO', 'audio' => 'AUDIO'];
     $sent = sendWhatsAppMessageViaZPro($api_url, $api_token, $target_number, $msg_cliente, 'AGI_' . time(), ($called_ext ?: 'AGI'), ($rule_map[$event_type] ?? 'AGI_ZPRO'));

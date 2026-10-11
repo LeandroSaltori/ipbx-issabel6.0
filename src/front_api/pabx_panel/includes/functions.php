@@ -3983,7 +3983,7 @@ function syncCustomDestinationsWithAsterisk() {
     $msg_no_answer  = (function_exists('getRule') && getRule('queue_abandon_msg_default')) ? getRule('queue_abandon_msg_default') : (getSetting('prismabot_msg_no_answer') ?: 'Olá! Vimos que você tentou ligar para nosso setor {NOME_FILA} no número {CLIENTE} às {DATA_HORA} e não conseguiu aguardar. Como podemos te ajudar por aqui?');
     $msg_nps        = (function_exists('getRule') && getRule('nps_msg')) ? getRule('nps_msg') : (getSetting('prismabot_msg_nps') ?: 'Olá! Obrigado por seu contato com o atendente {ATENDENTE} no número {CLIENTE} às {DATA_HORA}. De 1 a 5, qual nota você dá para o atendimento recebido?');
     $msg_transbordo = (function_exists('getRule') && getRule('queue_exit_whatsapp_msg')) ? getRule('queue_exit_whatsapp_msg') : (getSetting('prismabot_msg_transbordo') ?: 'Olá! Vimos que você optou por não aguardar na linha da fila {NOME_FILA} no número {CLIENTE} às {DATA_HORA}. Já iniciamos seu atendimento VIP por aqui!');
-    $msg_audio      = (function_exists('getRule') && getRule('missed_client_msg')) ? getRule('missed_client_msg') : (getSetting('prismabot_msg_audio') ?: 'Olá! O atendente {ATENDENTE} (Ramal {RAMAL}) está temporariamente indisponível. Recebemos sua chamada do número {CLIENTE} às {DATA_HORA}. Deixe sua mensagem por aqui!');
+    $msg_audio      = (function_exists('getRule') && getRule('audio_msg')) ? getRule('audio_msg') : (getSetting('prismabot_msg_audio') ?: 'Olá! O atendente {ATENDENTE} (Ramal {RAMAL}) está temporariamente indisponível. Recebemos sua chamada do número {CLIENTE} às {DATA_HORA}. Deixe sua mensagem por aqui!');
 
     $destinations = [
         [
