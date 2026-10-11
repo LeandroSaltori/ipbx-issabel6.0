@@ -239,7 +239,7 @@ function executeAsteriskAMICommand($action, $params = []) {
 
     if (!$authenticated || !$socket) {
         if ($s) fclose($s);
-        return ['success' => false, 'error' => "Falha de Autenticação AMI no Host $host. $last_error"];
+        return ['success' => false, 'error' => "Falha de Autenticação AMI no Host $host. $last_error " . amiCredentialDiagnosis($credentials_to_try)];
     }
 
     // Construir mensagem da Ação AMI
@@ -4870,4 +4870,17 @@ function asteriskBlacklistDelete($num) {
     }
     if (function_exists('pabx_log')) pabx_log('user_actions', 'INFO', '[TELEFONIA] Número removido da blacklist do Issabel', ['numero' => $n]);
     return ['success' => true, 'error' => ''];
+}
+
+
+/** Diagnóstico (sem senhas) de por que o AMI recusou: usuários testados e leitura dos arquivos de credencial. */
+function amiCredentialDiagnosis($creds) {
+    $users = [];
+    foreach ((array)$creds as $c) { if (!empty($c['user'])) $users[$c['user']] = true; }
+    $files = [];
+    foreach (['/etc/amportal.conf', '/etc/asterisk/manager_custom.conf', '/etc/asterisk/manager.conf', '/etc/asterisk/manager_additional.conf'] as $f) {
+        $files[] = basename($f) . '=' . (!file_exists($f) ? 'não existe' : (is_readable($f) ? 'legível' : 'SEM permissão de leitura'));
+    }
+    $web = function_exists('posix_getpwuid') ? (posix_getpwuid(posix_geteuid())['name'] ?? '?') : '?';
+    return '[Diagnóstico: usuários testados: ' . implode(', ', array_keys($users)) . '. Arquivos: ' . implode('; ', $files) . ". Usuário do painel: $web. Confira em Configurações > AMI.]";
 }
