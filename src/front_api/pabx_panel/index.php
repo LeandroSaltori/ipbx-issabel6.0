@@ -27,7 +27,7 @@ try {
 // =========================================================================
 // AUTENTICAÇÃO (portão único do painel)
 // =========================================================================
-$__api_action_names = ['get_logs', 'get_fop_extensions', 'get_trunks_status', 'get_queues_realtime', 'get_parking_lots', 'fop_action', 'originate_call', 'save_contact', 'test_llm_connection', 'analyze_pabx_insights', 'generate_ai_insights', 'get_ai_insights_history', 'delete_ai_insight', 'transcribe_audio', 'get_kpi_calls_detail', 'get_active_calls', 'get_time_groups', 'get_time_group_rules', 'save_time_group_rule', 'delete_time_group_rule', 'get_announcements_list', 'update_announcement_audio', 'sync_assets'];
+$__api_action_names = ['get_logs', 'get_fop_extensions', 'get_trunks_status', 'get_queues_realtime', 'get_parking_lots', 'fop_action', 'originate_call', 'save_contact', 'test_llm_connection', 'analyze_pabx_insights', 'generate_ai_insights', 'get_ai_insights_history', 'delete_ai_insight', 'transcribe_audio', 'get_kpi_calls_detail', 'get_active_calls', 'get_time_groups', 'get_time_group_rules', 'save_time_group_rule', 'delete_time_group_rule', 'get_announcements_list', 'update_announcement_audio', 'sync_assets', 'ai_chat', 'ai_chat_info'];
 if (($_GET['api_action'] ?? '') === 'whatsapp_webhook') {
     // Webhook do Z-PRO: autenticado por token próprio, sem sessão
 } elseif (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['action'], $__api_action_names, true))) {
@@ -39,7 +39,7 @@ if (($_GET['api_action'] ?? '') === 'whatsapp_webhook') {
 // =========================================================================
 // HANDLER DE ENDPOINTS DE API (JSON)
 // =========================================================================
-if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['action'], ['get_logs', 'get_fop_extensions', 'get_trunks_status', 'get_queues_realtime', 'get_parking_lots', 'fop_action', 'originate_call', 'save_contact', 'test_llm_connection', 'analyze_pabx_insights', 'generate_ai_insights', 'get_ai_insights_history', 'delete_ai_insight', 'transcribe_audio', 'get_kpi_calls_detail', 'get_active_calls', 'get_time_groups', 'get_time_group_rules', 'save_time_group_rule', 'delete_time_group_rule', 'get_announcements_list', 'update_announcement_audio', 'sync_assets', 'whatsapp_webhook']))) {
+if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['action'], ['get_logs', 'get_fop_extensions', 'get_trunks_status', 'get_queues_realtime', 'get_parking_lots', 'fop_action', 'originate_call', 'save_contact', 'test_llm_connection', 'analyze_pabx_insights', 'generate_ai_insights', 'get_ai_insights_history', 'delete_ai_insight', 'transcribe_audio', 'get_kpi_calls_detail', 'get_active_calls', 'get_time_groups', 'get_time_group_rules', 'save_time_group_rule', 'delete_time_group_rule', 'get_announcements_list', 'update_announcement_audio', 'sync_assets', 'ai_chat', 'ai_chat_info', 'whatsapp_webhook']))) {
     $action = $_GET['api_action'] ?? $_GET['action'];
     if (function_exists('auditRequest')) auditRequest('', '', true, (string)$action);
     while (ob_get_level()) { @ob_end_clean(); }
@@ -57,6 +57,25 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
         } catch (Exception $e) {
             echo json_encode(['success' => false, 'error' => 'Falha na sincronização com o PABX: ' . $e->getMessage()]);
         }
+        exit;
+    }
+
+    // Chat assistente com IA (por usuário; consultas somente leitura)
+    if ($action === 'ai_chat_info') {
+        echo json_encode(['success' => true, 'enabled' => (hasUserPermission('ai_chat') && aiChatAvailable())]);
+        exit;
+    }
+    if ($action === 'ai_chat') {
+        if (!hasUserPermission('ai_chat')) { echo json_encode(['success' => false, 'error' => 'Seu usuário não tem acesso ao Chat IA.']); exit; }
+        $body = json_decode(file_get_contents('php://input'), true) ?: [];
+        $hist = is_array($body['messages'] ?? null) ? $body['messages'] : [];
+        $last = '';
+        foreach (array_reverse($hist) as $h) { if (($h['role'] ?? '') === 'user') { $last = (string)($h['content'] ?? ''); break; } }
+        if ($last === '') { echo json_encode(['success' => false, 'error' => 'Pergunta vazia.']); exit; }
+        @set_time_limit(120);
+        $r = aiChatRun($hist);
+        aiChatLog($last, $r['tools'] ?? [], !empty($r['ok']));
+        echo json_encode(!empty($r['ok']) ? ['success' => true, 'text' => $r['text'], 'tools' => $r['tools']] : ['success' => false, 'error' => $r['error']], JSON_UNESCAPED_UNICODE);
         exit;
     }
 
@@ -710,7 +729,8 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
         $uid  = trim((string)($body['uid'] ?? ''));
         if (!hasUserPermission('listen_recordings')) { echo json_encode(['success' => false, 'error' => 'Sem permissão para acessar gravações.']); exit; }
         if ($uid === '') { echo json_encode(['success' => false, 'error' => 'Chamada não informada.']); exit; }
-        $cfg = aiGetConfig();
+        $cfg = aiGetConfig('insights');
+        $cfgA = aiGetConfig('audio');
         if ($cfg['key'] === '')  { echo json_encode(['success' => false, 'error' => 'API Key de IA não configurada em Configurações > Inteligência Artificial.']); exit; }
         if (!$cfg['enabled'])    { echo json_encode(['success' => false, 'error' => 'Copiloto de IA desativado em Configurações > Inteligência Artificial.']); exit; }
 
@@ -727,7 +747,7 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
         $path = findRecordingPath($row['recordingfile'], $row['calldate']);
         if ($path === '') { echo json_encode(['success' => false, 'error' => 'Arquivo de gravação não encontrado em /var/spool/asterisk/monitor.']); exit; }
 
-        $tr = aiTranscribeFile($path, $cfg);
+        $tr = aiTranscribeFile($path, $cfgA);
         if (!$tr['ok']) { echo json_encode(['success' => false, 'error' => 'Transcrição: ' . $tr['error']]); exit; }
         if ($tr['text'] === '') { echo json_encode(['success' => false, 'error' => 'A transcrição voltou vazia (áudio sem fala?).']); exit; }
 
@@ -867,7 +887,7 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
         $tme   = (int)($body['tmeSec'] ?? 0);
         $module = preg_replace('/[^\p{L}\p{N} _\-]/u', '', (string)($body['module'] ?? 'Geral'));
 
-        $cfg = aiGetConfig();
+        $cfg = aiGetConfig('insights');
         $ai_configured = ($cfg['key'] !== '' && $cfg['enabled']);
         $facts = aiFactInsights($tot, $atend, $tma, $tme);
         $insights = [];
@@ -914,7 +934,7 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
         $body     = json_decode(file_get_contents('php://input'), true);
         $fileRel  = trim($body['file'] ?? '');
 
-        $cfg      = aiGetConfig();
+        $cfg      = aiGetConfig('audio');
         $provider = $cfg['provider'];
         $key      = $cfg['key'];
         $model    = $cfg['audio'];
@@ -980,7 +1000,7 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
         if (ob_get_level()) ob_end_clean();
         header('Content-Type: application/json');
 
-        $cfg = aiGetConfig();
+        $cfg = aiGetConfig('insights');
         $m   = aiTodayMetrics();
         $facts = aiFactInsights($m['total'], $m['atendidas'], $m['tma'], $m['tme']);
         $insightsList = [];
@@ -3345,6 +3365,82 @@ if ($__route_perm !== '' && !hasUserPermission($__route_perm)) {
         }
     </script>
 
+<?php if (function_exists('hasUserPermission') && hasUserPermission('ai_chat') && function_exists('aiChatAvailable') && aiChatAvailable()): ?>
+<style>
+#ai-chat-fab{position:fixed;right:20px;bottom:20px;z-index:60;width:54px;height:54px;border-radius:50%;border:0;cursor:pointer;color:#fff;font-size:22px;background:linear-gradient(135deg,#7c3aed,#6366f1);box-shadow:0 8px 24px rgba(99,102,241,.45)}
+#ai-chat-fab:hover{transform:scale(1.06)}
+dialog#ai-chat-dialog{border:1px solid #334155;border-radius:18px;padding:0;background:#1c1b2f;color:#e2e8f0;width:min(420px,calc(100vw - 24px));height:min(620px,calc(100vh - 24px));margin:0 20px 20px auto;overflow:hidden;font-family:'Segoe UI',system-ui,sans-serif}
+dialog#ai-chat-dialog[open]{display:flex;flex-direction:column}
+dialog#ai-chat-dialog::backdrop{background:rgba(0,0,0,.65);backdrop-filter:blur(4px)}
+#ai-chat-head{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:linear-gradient(135deg,#7c3aed,#6366f1);color:#fff;font-weight:700;font-size:14px}
+#ai-chat-head button{background:transparent;border:0;color:#fff;cursor:pointer;font-size:16px;white-space:nowrap;flex-shrink:0;width:auto;overflow:visible}
+#ai-chat-body{flex:1;overflow:auto;padding:12px;display:flex;flex-direction:column;gap:8px;background:#0f172a}
+.ai-msg{max-width:92%;padding:9px 12px;border-radius:14px;font-size:13px;line-height:1.45;word-wrap:break-word}
+.ai-msg.bot{background:#252440;border:1px solid #334155;align-self:flex-start}
+.ai-msg.me{background:#6366f1;color:#fff;align-self:flex-end}
+.ai-msg a{color:#a5b4fc;text-decoration:underline}
+.ai-msg table{border-collapse:collapse;font-size:11px;margin:6px 0;display:block;overflow:auto}
+.ai-msg th,.ai-msg td{border:1px solid #475569;padding:3px 6px;white-space:nowrap}
+.ai-chip{display:inline-block;margin:3px 4px 0 0;padding:5px 10px;border-radius:999px;border:1px solid #6366f1;background:transparent;color:#c7d2fe;font-size:11px;cursor:pointer;white-space:nowrap;flex-shrink:0;width:auto;overflow:visible}
+.ai-chip:hover{background:#6366f1;color:#fff}
+#ai-chat-form{display:flex;gap:8px;padding:10px;background:#1c1b2f;border-top:1px solid #334155}
+#ai-chat-input{flex:1;background:#0f172a;border:1px solid #334155;border-radius:12px;color:#fff;padding:9px 12px;font-size:13px;outline:none}
+#ai-chat-send{background:linear-gradient(135deg,#7c3aed,#6366f1);border:0;color:#fff;border-radius:12px;padding:0 14px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0;width:auto;overflow:visible}
+</style>
+<button id="ai-chat-fab" type="button" title="Assistente IA" onclick="aiChatOpen()"><i class="fa-solid fa-robot"></i></button>
+<script>
+(function(){
+  var hist = [], dlg = null, body = null, started = false, busy = false;
+  var SUG = ['Ligações de hoje do ramal 201', 'Quantas vezes o número 11999998888 ligou nos últimos 7 dias?', 'Resumo das chamadas de hoje', 'Como estão as filas agora?', 'Quais ramais estão em chamada?'];
+  function esc(t){return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+  function md(t){
+    t = esc(t);
+    var lines = t.split('\n'), out = [], tbl = [];
+    function flush(){ if(!tbl.length) return; var h = tbl[0], rows = tbl.slice(2);
+      var cells = function(l,tag){ return '<tr>'+l.replace(/^\||\|$/g,'').split('|').map(function(c){return '<'+tag+'>'+c.trim()+'</'+tag+'>';}).join('')+'</tr>'; };
+      out.push('<table>'+cells(h,'th')+rows.map(function(r){return cells(r,'td');}).join('')+'</table>'); tbl = []; }
+    lines.forEach(function(l){ if (/^\s*\|.*\|\s*$/.test(l)) tbl.push(l); else { flush(); out.push(l); } });
+    flush();
+    t = out.join('\n').replace(/\n(?=<table)|(<\/table>)\n/g,'$1');
+    t = t.replace(/\*\*(.+?)\*\*/g,'<b>$1</b>')
+         .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,'<a href="$2" target="_blank" rel="noopener">$1</a>')
+         .replace(/\n/g,'<br>');
+    return t;
+  }
+  function add(cls, html){ var d = document.createElement('div'); d.className = 'ai-msg '+cls; d.innerHTML = html; body.appendChild(d); body.scrollTop = body.scrollHeight; return d; }
+  function build(){
+    dlg = document.createElement('dialog'); dlg.id = 'ai-chat-dialog';
+    dlg.innerHTML = '<div id="ai-chat-head"><span><i class="fa-solid fa-robot"></i> Assistente PABX Prisma</span><button type="button" id="ai-chat-x" title="Fechar">✕</button></div>'
+      + '<div id="ai-chat-body"></div>'
+      + '<form id="ai-chat-form"><input id="ai-chat-input" autocomplete="off" placeholder="Pergunte sobre ramais, ligações, filas..."><button id="ai-chat-send" type="submit">Enviar</button></form>';
+    document.body.appendChild(dlg);
+    body = dlg.querySelector('#ai-chat-body');
+    dlg.querySelector('#ai-chat-x').onclick = function(){ dlg.close(); };
+    dlg.addEventListener('click', function(e){ if (e.target === dlg) dlg.close(); });
+    dlg.querySelector('#ai-chat-form').onsubmit = function(e){ e.preventDefault(); var i = dlg.querySelector('#ai-chat-input'); var v = i.value.trim(); if (v) { i.value = ''; send(v); } };
+  }
+  function greet(){
+    started = true;
+    add('bot', '<b>Olá! Sou o assistente do seu PABX.</b><br>Consulto dados reais (somente leitura) e posso:<br>• listar ligações de um ramal ou número<br>• contar quantas vezes um número ligou<br>• resumir o período (atendidas, TMA, TME)<br>• mostrar status de ramais e filas<br>• gerar o link de uma gravação<br><span style="color:#94a3b8">Experimente:</span><br>'
+      + SUG.map(function(s){ return '<button type="button" class="ai-chip" data-q="'+esc(s)+'">'+esc(s)+'</button>'; }).join(''));
+    body.querySelectorAll('.ai-chip').forEach(function(b){ b.onclick = function(){ send(b.getAttribute('data-q')); }; });
+  }
+  async function send(text){
+    if (busy) return; busy = true;
+    add('me', esc(text)); hist.push({role:'user', content:text});
+    var w = add('bot', '<i>consultando o PABX…</i>');
+    try {
+      var r = await fetch('index.php?api_action=ai_chat', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({messages: hist})});
+      var d = await r.json();
+      if (d.success) { w.innerHTML = md(d.text || '(sem resposta)'); hist.push({role:'assistant', content:d.text || ''}); }
+      else { w.innerHTML = '⚠️ ' + esc(d.error || 'Falha ao consultar a IA.'); hist.pop(); }
+    } catch(e){ w.innerHTML = '⚠️ ' + esc(e.message); hist.pop(); }
+    busy = false; body.scrollTop = body.scrollHeight;
+  }
+  window.aiChatOpen = function(){ if (!dlg) build(); if (!started) greet(); dlg.showModal(); setTimeout(function(){ var i = dlg.querySelector('#ai-chat-input'); if (i) i.focus(); }, 50); };
+})();
+</script>
+<?php endif; ?>
 <audio id="webphone-remote-audio" autoplay></audio>
 <audio id="webphone-local-audio" autoplay muted></audio>
 </body>

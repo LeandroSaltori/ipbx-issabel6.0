@@ -4748,12 +4748,53 @@ function aiPickModel($ids, $kind, $preferred = '') {
     return '';
 }
 
-function aiGetConfig() {
+/** Funções (papéis) da IA que podem ter provedor/modelo próprios. */
+function aiRoles() {
+    return [
+        'audio'    => 'Transcrição de áudio (gravações)',
+        'insights' => 'Copiloto, resumos de chamada e auditoria',
+        'chat'     => 'Chat assistente do painel',
+    ];
+}
+
+/** Chave de API guardada para um provedor (cofre por provedor; cai na chave legada se for do mesmo provedor). */
+function aiKeyFor($provider) {
+    $k = trim((string)getSetting('ai_key_' . $provider));
+    if ($k !== '') return $k;
+    $legacy = trim((string)getSetting('ai_api_key'));
+    if ($legacy === '') return '';
+    $lp = getSetting('ai_provider') ?: 'openai';
+    if (strpos($legacy, 'gsk_') === 0) $lp = 'groq';
+    elseif (strpos($legacy, 'AIza') === 0) $lp = 'gemini';
+    return $lp === $provider ? $legacy : '';
+}
+
+/** Provedor/modelo escolhidos para uma função, ou null se a função usa a configuração geral. */
+function aiRoleChoice($role) {
+    if ($role === '' || !isset(aiRoles()[$role])) return null;
+    $p = trim((string)getSetting("ai_role_{$role}_provider"));
+    if ($p === '' || !isset(aiProviderDefaults()[$p])) return null;
+    $k = aiKeyFor($p);
+    if ($k === '') return null;
+    return ['provider' => $p, 'key' => $k, 'model' => trim((string)getSetting("ai_role_{$role}_model"))];
+}
+
+function aiGetConfig($role = '') {
     $defs     = aiProviderDefaults();
     $provider = getSetting('ai_provider') ?: 'openai';
     $key      = trim((string)getSetting('ai_api_key'));
     $mChat    = getSetting('ai_model_chat');
     $mAudio   = getSetting('ai_model_audio');
+    $roleSel  = aiRoleChoice($role);
+    if ($roleSel) {
+        // Função com provedor próprio: usa a chave desse provedor e o modelo escolhido para a função
+        $legacyProv = $provider;
+        $provider = $roleSel['provider'];
+        $key      = $roleSel['key'];
+        $mChat    = ($role === 'audio') ? '' : $roleSel['model'];
+        $mAudio   = ($role === 'audio') ? $roleSel['model'] : '';
+        $legacyBase = ($legacyProv === $provider) ? trim((string)getSetting('ai_base_url')) : '';
+    }
     // A chave identifica o provedor: evita enviar chave Groq/Gemini ao endpoint da OpenAI
     $byKey = null;
     if (strpos($key, 'gsk_') === 0)      $byKey = 'groq';
@@ -4772,7 +4813,7 @@ function aiGetConfig() {
         if ($mAudio !== '' && preg_match('/large-v3/i', $mAudio)) $mAudio = '';
     }
     $limit    = (int)(getSetting('ai_token_limit') ?: 1024);
-    $baseUrl  = rtrim(($byKey ? '' : trim((string)getSetting('ai_base_url'))) ?: $d['url'], '/');
+    $baseUrl  = rtrim(($byKey ? '' : ($roleSel ? $legacyBase : trim((string)getSetting('ai_base_url')))) ?: $d['url'], '/');
     $mChat    = $mChat ?: $d['chat'];
     $mAudio   = $mAudio ?: $d['audio'];
     // Se o modelo escolhido não existe para esta chave, usa o melhor disponível (a API informa a lista)
@@ -4798,7 +4839,7 @@ function aiGetConfig() {
 
 /** Chat completion compatível com OpenAI. Retorna ['ok','text','error','http']. */
 function aiChatCompletion($system, $user, $timeout = 25, $cfg = null) {
-    $cfg = $cfg ?: aiGetConfig();
+    $cfg = $cfg ?: aiGetConfig('insights');
     if ($cfg['key'] === '') return ['ok' => false, 'text' => '', 'error' => 'API Key de IA não configurada', 'http' => 0];
     if ($cfg['prompt'] !== '') $system = $cfg['prompt'] . "\n\n" . $system;
     $send = function ($tokenField) use ($cfg, $system, $user, $timeout) {
@@ -4941,7 +4982,7 @@ function findRecordingPath($recordingfile, $calldate) {
 // TRANSCRIÇÃO (Whisper OpenAI/Groq) E RESUMO DE CHAMADA
 // =========================================================================
 function aiTranscribeFile($path, $cfg = null) {
-    $cfg = $cfg ?: aiGetConfig();
+    $cfg = $cfg ?: aiGetConfig('audio');
     if (!$cfg['enabled'])  return ['ok' => false, 'text' => '', 'error' => 'Copiloto de IA desativado'];
     if ($cfg['key'] === '') return ['ok' => false, 'text' => '', 'error' => 'API Key de IA não configurada'];
     if (!in_array($cfg['provider'], ['openai', 'groq'], true) || empty($cfg['audio'])) {
@@ -5052,7 +5093,8 @@ function processCallSummaryNotifications($cdr) {
 
     $dup = $db->prepare("SELECT COUNT(*) FROM sent_logs WHERE call_id = :c AND extension = :e AND rule_type = 'RESUMO_CHAMADA'");
     $ins = $db->prepare("INSERT INTO sent_logs (phone, call_id, extension, rule_type, message, status) VALUES (:p, :c, :e, 'RESUMO_CHAMADA', :m, :s)");
-    $cfg = aiGetConfig();
+    $cfg = aiGetConfig('insights');
+    $cfgAudio = aiGetConfig('audio');
 
     foreach ($calls as $c) {
         foreach (array_unique([$c['dst'], $c['src']]) as $ext) {
@@ -5075,7 +5117,7 @@ function processCallSummaryNotifications($cdr) {
                 $path = findRecordingPath($c['recordingfile'], $c['calldate']);
                 if ($path === '') { $why[] = 'arquivo de gravação não encontrado'; }
                 else {
-                    $tr = aiTranscribeFile($path, $cfg);
+                    $tr = aiTranscribeFile($path, $cfgAudio);
                     if (!$tr['ok'] || $tr['text'] === '') { $why[] = 'transcrição: ' . ($tr['error'] ?: 'vazia'); }
                     else {
                         $sm = aiChatCompletion('Resuma a ligação telefônica em português, em no máximo 5 linhas: motivo, o que foi combinado e próximos passos. Use somente o que consta na transcrição; se algo não estiver claro, diga que não ficou claro.', mb_substr($tr['text'], 0, 12000), 40, $cfg);
@@ -5451,4 +5493,179 @@ function processMissedCallNotifications($cdr) {
         }
     }
     return $out;
+}
+
+// =========================================================================
+// CHAT ASSISTENTE COM IA (ferramentas SOMENTE LEITURA sobre dados reais do PABX)
+// =========================================================================
+function aiChatAvailable() {
+    $c = aiGetConfig('chat');
+    return $c['key'] !== '' && $c['enabled'];
+}
+
+function aiChatToolDefs() {
+    $fn = function ($name, $desc, $props, $req = []) {
+        return ['type' => 'function', 'function' => ['name' => $name, 'description' => $desc,
+            'parameters' => ['type' => 'object', 'properties' => (object)$props, 'required' => $req]]];
+    };
+    return [
+        $fn('search_calls', 'Lista ligações reais do CDR. Filtre por ramal (extension), número externo (number), status e período.', [
+            'extension'   => ['type' => 'string', 'description' => 'Ramal (ex.: 201) que originou ou recebeu'],
+            'number'      => ['type' => 'string', 'description' => 'Número de telefone (qualquer parte final) em origem ou destino'],
+            'days'        => ['type' => 'integer', 'description' => 'Últimos N dias (1 = hoje). Padrão 1, máx. 90'],
+            'disposition' => ['type' => 'string', 'enum' => ['ANSWERED', 'NO ANSWER', 'BUSY', 'FAILED'], 'description' => 'Filtro de status'],
+            'limit'       => ['type' => 'integer', 'description' => 'Máx. de linhas (padrão 15, máx. 30)'],
+        ]),
+        $fn('count_calls_by_number', 'Conta quantas vezes um número ligou/foi chamado nos últimos dias, com total por dia.', [
+            'number' => ['type' => 'string', 'description' => 'Número de telefone'],
+            'days'   => ['type' => 'integer', 'description' => 'Últimos N dias (padrão 7, máx. 90)'],
+        ], ['number']),
+        $fn('period_summary', 'Totais do período: chamadas, atendidas, não atendidas, TMA (conversa) e TME (espera).', [
+            'days' => ['type' => 'integer', 'description' => 'Últimos N dias (1 = hoje). Padrão 1'],
+        ]),
+        $fn('extensions_status', 'Status em tempo real dos ramais (Livre, Em Chamada, Tocando, Indisponível) com nomes.', []),
+        $fn('queues_status', 'Status em tempo real das filas: espera, atendidas, abandonadas e agentes (inclui pausados).', []),
+        $fn('recording_link', 'Gera link temporário (7 dias) da gravação de uma chamada pelo uniqueid retornado em search_calls.', [
+            'uniqueid' => ['type' => 'string'],
+        ], ['uniqueid']),
+    ];
+}
+
+function aiChatDays($v, $def) { return max(1, min(90, (int)($v ?: $def))); }
+
+function aiChatExecTool($name, $a) {
+    global $db;
+    $cdr = getAsteriskPdoConnection('asteriskcdrdb');
+    $need = ['search_calls', 'count_calls_by_number', 'period_summary', 'recording_link'];
+    if (in_array($name, $need, true) && !$cdr) return ['error' => 'Banco de chamadas (CDR) indisponível.'];
+    $since = function ($days) { return date('Y-m-d 00:00:00', strtotime('-' . ($days - 1) . ' days')); };
+    $ext2name = [];
+    try { foreach ($db->query("SELECT extension, agent_name FROM extensions_config") as $r) $ext2name[$r['extension']] = $r['agent_name']; } catch (Exception $e) {}
+
+    try {
+        if ($name === 'search_calls') {
+            $days = aiChatDays($a['days'] ?? 1, 1);
+            $lim  = max(1, min(30, (int)($a['limit'] ?? 15)));
+            $w = ['calldate >= :since']; $p = [':since' => $since($days)];
+            if (!empty($a['extension'])) { $w[] = '(src = :e OR dst = :e)'; $p[':e'] = preg_replace('/\D/', '', (string)$a['extension']); }
+            if (!empty($a['number']))    { $w[] = '(src LIKE :n OR dst LIKE :n)'; $p[':n'] = '%' . substr(preg_replace('/\D/', '', (string)$a['number']), -9); }
+            if (!empty($a['disposition']) && in_array($a['disposition'], ['ANSWERED', 'NO ANSWER', 'BUSY', 'FAILED'], true)) { $w[] = 'disposition = :d'; $p[':d'] = $a['disposition']; }
+            $where = implode(' AND ', $w);
+            $st = $cdr->prepare("SELECT COUNT(*) t, SUM(disposition='ANSWERED') a FROM cdr WHERE $where"); $st->execute($p); $tot = $st->fetch(PDO::FETCH_ASSOC);
+            $st = $cdr->prepare("SELECT calldate, src, dst, disposition, billsec, uniqueid, (recordingfile <> '') AS rec FROM cdr WHERE $where ORDER BY calldate DESC LIMIT $lim");
+            $st->execute($p);
+            $rows = [];
+            foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
+                $rows[] = ['data' => $r['calldate'], 'origem' => $r['src'] . (isset($ext2name[$r['src']]) ? ' (' . $ext2name[$r['src']] . ')' : ''),
+                    'destino' => $r['dst'] . (isset($ext2name[$r['dst']]) ? ' (' . $ext2name[$r['dst']] . ')' : ''),
+                    'status' => $r['disposition'], 'duracao_seg' => (int)$r['billsec'], 'uniqueid' => $r['uniqueid'], 'tem_gravacao' => (bool)$r['rec']];
+            }
+            return ['periodo_dias' => $days, 'total_encontrado' => (int)$tot['t'], 'atendidas' => (int)$tot['a'], 'mostrando' => count($rows), 'ligacoes' => $rows];
+        }
+        if ($name === 'count_calls_by_number') {
+            $days = aiChatDays($a['days'] ?? 7, 7);
+            $n = '%' . substr(preg_replace('/\D/', '', (string)($a['number'] ?? '')), -9);
+            if (strlen($n) < 5) return ['error' => 'Número inválido.'];
+            $st = $cdr->prepare("SELECT DATE(calldate) d, COUNT(*) t, SUM(disposition='ANSWERED') a FROM cdr WHERE calldate >= :s AND (src LIKE :n OR dst LIKE :n) GROUP BY DATE(calldate) ORDER BY d DESC");
+            $st->execute([':s' => $since($days), ':n' => $n]);
+            $per = []; $tot = 0; $ans = 0;
+            foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) { $per[] = ['dia' => $r['d'], 'chamadas' => (int)$r['t'], 'atendidas' => (int)$r['a']]; $tot += (int)$r['t']; $ans += (int)$r['a']; }
+            return ['periodo_dias' => $days, 'total' => $tot, 'atendidas' => $ans, 'por_dia' => $per];
+        }
+        if ($name === 'period_summary') {
+            $days = aiChatDays($a['days'] ?? 1, 1);
+            $st = $cdr->prepare("SELECT COUNT(*) t, SUM(disposition='ANSWERED') a, AVG(CASE WHEN disposition='ANSWERED' THEN billsec END) tma, AVG(GREATEST(duration-billsec,0)) tme FROM cdr WHERE calldate >= :s");
+            $st->execute([':s' => $since($days)]); $r = $st->fetch(PDO::FETCH_ASSOC);
+            return ['periodo_dias' => $days, 'total' => (int)$r['t'], 'atendidas' => (int)$r['a'], 'nao_atendidas' => (int)$r['t'] - (int)$r['a'],
+                    'tma_seg' => (int)round((float)$r['tma']), 'tme_seg' => (int)round((float)$r['tme'])];
+        }
+        if ($name === 'extensions_status') {
+            $out = []; $live = getAsteriskRealtimeStatuses();
+            foreach ($live as $ext => $stt) $out[] = ['ramal' => (string)$ext, 'nome' => $ext2name[$ext] ?? '', 'status' => $stt];
+            return ['ramais' => array_slice($out, 0, 80)];
+        }
+        if ($name === 'queues_status') {
+            $out = [];
+            foreach (getAsteriskQueuesRealtimeStatus('today') as $q) {
+                $mem = [];
+                foreach ($q['members'] as $m) $mem[] = ['ramal' => $m['extension'], 'nome' => $m['name'], 'status' => $m['status']];
+                $out[] = ['fila' => $q['queue_name'], 'em_espera' => $q['callers_count'], 'atendidas_hoje' => $q['answered_count'], 'abandonadas_hoje' => $q['abandoned_count'], 'agentes' => $mem];
+            }
+            return ['filas' => $out];
+        }
+        if ($name === 'recording_link') {
+            if (!hasUserPermission('listen_recordings')) return ['error' => 'Este usuário não tem permissão para gravações.'];
+            $uid = trim((string)($a['uniqueid'] ?? ''));
+            $st = $cdr->prepare("SELECT recordingfile, calldate FROM cdr WHERE uniqueid = :u LIMIT 1"); $st->execute([':u' => $uid]); $r = $st->fetch(PDO::FETCH_ASSOC);
+            if (!$r || $r['recordingfile'] === '') return ['error' => 'Chamada sem gravação.'];
+            $url = audioSignedUrl($uid);
+            return $url === '' ? ['error' => 'URL pública do painel não configurada (Configurações > API).'] : ['link' => $url, 'validade' => '7 dias'];
+        }
+    } catch (Exception $e) {
+        return ['error' => 'Falha na consulta: ' . $e->getMessage()];
+    }
+    return ['error' => 'Ferramenta desconhecida.'];
+}
+
+/** Uma rodada de chat com ferramentas (API compatível com OpenAI). Retorna a mensagem do assistente ou erro. */
+function aiChatRaw($messages, $cfg) {
+    $send = function ($tokField) use ($messages, $cfg) {
+        $ch = curl_init($cfg['base_url'] . '/chat/completions');
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true, CURLOPT_POST => true, CURLOPT_TIMEOUT => 45,
+            CURLOPT_POSTFIELDS => json_encode(['model' => $cfg['model'], 'messages' => $messages, 'tools' => aiChatToolDefs(), 'tool_choice' => 'auto', $tokField => max(600, $cfg['tokens'])]),
+            CURLOPT_HTTPHEADER => ['Content-Type: application/json', 'Authorization: Bearer ' . $cfg['key']],
+            CURLOPT_SSL_VERIFYPEER => getSetting('ai_ssl_insecure') !== '1',
+            CURLOPT_SSL_VERIFYHOST => getSetting('ai_ssl_insecure') !== '1' ? 2 : 0,
+        ]);
+        $resp = curl_exec($ch); $o = ['body' => $resp, 'http' => (int)curl_getinfo($ch, CURLINFO_HTTP_CODE), 'err' => curl_error($ch)];
+        curl_close($ch);
+        return $o;
+    };
+    $r = $send('max_tokens'); $j = json_decode((string)$r['body'], true);
+    if ($r['http'] === 400 && stripos((string)($j['error']['message'] ?? ''), 'max_completion_tokens') !== false) { $r = $send('max_completion_tokens'); $j = json_decode((string)$r['body'], true); }
+    if ($r['err'] !== '') return ['ok' => false, 'error' => 'Erro de conexão: ' . $r['err']];
+    if ($r['http'] === 200 && isset($j['choices'][0]['message'])) return ['ok' => true, 'message' => $j['choices'][0]['message']];
+    return ['ok' => false, 'error' => $j['error']['message'] ?? ('HTTP ' . $r['http'])];
+}
+
+function aiChatLog($question, $tools, $ok) {
+    global $db;
+    if (!$db) return;
+    try {
+        $db->exec("CREATE TABLE IF NOT EXISTS ai_chat_log (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT, question TEXT, tools TEXT, ok INTEGER, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)");
+        $u = function_exists('getLoggedUser') ? getLoggedUser() : null;
+        $db->prepare("INSERT INTO ai_chat_log (username, question, tools, ok) VALUES (:u,:q,:t,:o)")
+           ->execute([':u' => $u['username'] ?? '', ':q' => mb_substr($question, 0, 500), ':t' => implode(',', $tools), ':o' => $ok ? 1 : 0]);
+    } catch (Exception $e) {}
+}
+
+/** Executa a conversa: $history = [['role'=>'user|assistant','content'=>...], ...]. */
+function aiChatRun($history) {
+    $cfg = aiGetConfig('chat');
+    if ($cfg['key'] === '' || !$cfg['enabled']) return ['ok' => false, 'error' => 'IA não configurada. Configure em Configurações > Inteligência Artificial.'];
+    $sys = "Você é o assistente do painel PABX Prisma (Issabel/Asterisk). Hoje é " . date('d/m/Y H:i') . ". "
+         . "Responda em português, curto e objetivo. Use SOMENTE dados retornados pelas ferramentas; nunca invente números, ramais ou ligações. "
+         . "Se faltar informação (ex.: qual ramal), pergunte. Você só consulta (não altera nada). Para tabelas use markdown. Para gravações use recording_link e entregue o link em markdown [Ouvir gravação](url). "
+         . "Se o usuário pedir algo fora do escopo do PABX, explique educadamente o que você pode fazer.";
+    if ($cfg['prompt'] !== '') $sys = $cfg['prompt'] . "\n\n" . $sys;
+    $msgs = [['role' => 'system', 'content' => $sys]];
+    foreach (array_slice($history, -12) as $h) {
+        if (in_array($h['role'] ?? '', ['user', 'assistant'], true) && is_string($h['content'] ?? null)) $msgs[] = ['role' => $h['role'], 'content' => mb_substr($h['content'], 0, 2000)];
+    }
+    $used = [];
+    for ($i = 0; $i < 5; $i++) {
+        $r = aiChatRaw($msgs, $cfg);
+        if (!$r['ok']) return ['ok' => false, 'error' => $r['error'], 'tools' => $used];
+        $m = $r['message'];
+        if (empty($m['tool_calls'])) return ['ok' => true, 'text' => trim(preg_replace('#<think>.*?</think>#is', '', (string)($m['content'] ?? ''))), 'tools' => $used];
+        $msgs[] = ['role' => 'assistant', 'content' => $m['content'] ?? '', 'tool_calls' => $m['tool_calls']];
+        foreach ($m['tool_calls'] as $tc) {
+            $nm = $tc['function']['name'] ?? ''; $args = json_decode($tc['function']['arguments'] ?? '{}', true) ?: [];
+            $used[] = $nm;
+            $res = aiChatExecTool($nm, $args);
+            $msgs[] = ['role' => 'tool', 'tool_call_id' => $tc['id'] ?? '', 'content' => mb_substr(json_encode($res, JSON_UNESCAPED_UNICODE), 0, 12000)];
+        }
+    }
+    return ['ok' => false, 'error' => 'A consulta ficou longa demais; tente reformular a pergunta.', 'tools' => $used];
 }

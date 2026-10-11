@@ -186,7 +186,8 @@ try {
                                                 'send_whatsapp' => '💬 Disparos WA',
                                                 'manage_settings' => '⚙️ Alterar Configs',
                                                 'schedule_reports' => '📅 Agendamentos',
-                                                'click_to_call' => '📞 Click-to-Call'
+                                                'click_to_call' => '📞 Click-to-Call',
+                                                'ai_chat' => '🤖 Chat IA'
                                             ];
                                             $plist = $u['permissions_list'] ?? [];
                                         ?>
@@ -359,6 +360,10 @@ try {
                         <input type="checkbox" name="permissions[]" value="click_to_call" class="perm-check rounded border-slate-700 bg-slate-900 text-blue-500 focus:ring-blue-500 w-4 h-4 cursor-pointer">
                         <span class="font-bold text-slate-200">📞 Executar Webphone & Click-to-Call</span>
                     </label>
+                    <label class="flex items-center gap-2.5 p-2.5 bg-slate-950 rounded-xl border border-slate-800 cursor-pointer hover:bg-slate-800/40 transition sm:col-span-2">
+                        <input type="checkbox" name="permissions[]" value="ai_chat" class="perm-check rounded border-slate-700 bg-slate-900 text-blue-500 focus:ring-blue-500 w-4 h-4 cursor-pointer">
+                        <span class="font-bold text-slate-200">🤖 Usar o Chat com IA (assistente)</span>
+                    </label>
                 </div>
             </div>
 
@@ -376,11 +381,11 @@ try {
 const PERMISSION_PRESETS = {
     'Administrador': [
         'mod_dashboard', 'mod_filas', 'mod_whatsapp', 'mod_relatorios', 'mod_configuracoes',
-        'listen_recordings', 'send_whatsapp', 'manage_settings', 'schedule_reports', 'click_to_call'
+        'listen_recordings', 'send_whatsapp', 'manage_settings', 'schedule_reports', 'click_to_call', 'ai_chat'
     ],
     'Supervisor': [
         'mod_dashboard', 'mod_filas', 'mod_whatsapp', 'mod_relatorios',
-        'listen_recordings', 'send_whatsapp', 'schedule_reports', 'click_to_call'
+        'listen_recordings', 'send_whatsapp', 'schedule_reports', 'click_to_call', 'ai_chat'
     ],
     'Usuário': [
         'mod_dashboard', 'mod_filas', 'click_to_call'

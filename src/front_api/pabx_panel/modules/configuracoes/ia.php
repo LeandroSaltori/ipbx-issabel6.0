@@ -42,6 +42,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $msg = "Configurações Universais do Copiloto de IA salvas com sucesso!";
     }
 
+    // ─── Salvar / testar "Quem faz o quê" (provedor e modelo por função da IA) ───
+    if (isset($_POST['action_save_ai_roles']) || isset($_POST['action_test_ai_roles'])) {
+        $__save = $db->prepare("INSERT OR REPLACE INTO settings (key_name, value_val) VALUES (:k, :v)");
+        foreach (array_keys(aiProviderDefaults()) as $__p) {
+            $__kv = trim($_POST['ai_key_' . $__p] ?? '');
+            if (!empty($_POST['ai_key_clear_' . $__p])) $__save->execute([':k' => 'ai_key_' . $__p, ':v' => '']);
+            elseif ($__kv !== '') $__save->execute([':k' => 'ai_key_' . $__p, ':v' => $__kv]);
+        }
+        foreach (array_keys(aiRoles()) as $__r) {
+            $__prov = trim($_POST["ai_role_{$__r}_provider"] ?? '');
+            if ($__prov !== '' && !isset(aiProviderDefaults()[$__prov])) $__prov = '';
+            $__save->execute([':k' => "ai_role_{$__r}_provider", ':v' => $__prov]);
+            $__save->execute([':k' => "ai_role_{$__r}_model", ':v' => trim($_POST["ai_role_{$__r}_model"] ?? '')]);
+        }
+        $msg = "Funções da IA salvas! Cada função passa a usar o provedor e o modelo escolhidos.";
+        if (isset($_POST['action_test_ai_roles'])) {
+            $__res = [];
+            foreach (aiRoles() as $__r => $__lbl) {
+                $__sel = aiRoleChoice($__r);
+                if (!$__sel) { $__res[] = "$__lbl: usa a configuração geral"; continue; }
+                $__cfg = aiGetConfig($__r);
+                if ($__r === 'audio') {
+                    if (!in_array($__cfg['provider'], ['openai', 'groq'], true)) { $__res[] = "$__lbl: ❌ {$__cfg['provider']} não oferece transcrição"; continue; }
+                    $__ids = aiAvailableModels($__cfg['provider'], $__cfg['key'], $__cfg['base_url'], true);
+                    $__res[] = "$__lbl: " . (($__ids && in_array($__cfg['audio'], $__ids, true)) ? "✅ {$__cfg['provider']} / {$__cfg['audio']}" : "❌ modelo '{$__cfg['audio']}' não disponível para esta chave");
+                } else {
+                    $__t = aiChatCompletion('Responda apenas: OK', 'ping', 15, $__cfg);
+                    $__res[] = "$__lbl: " . ($__t['ok'] ? "✅ {$__cfg['provider']} / {$__cfg['model']}" : "❌ " . $__t['error']);
+                }
+            }
+            $msg = implode(' | ', $__res);
+        }
+    }
+
     // ─── Salvar ElevenLabs ────────────────────────────────────────────────────
     if (isset($_POST['action_save_elevenlabs'])) {
         $db->prepare("INSERT OR REPLACE INTO settings (key_name, value_val) VALUES
@@ -297,6 +331,71 @@ $ia_tab = isset($_GET['ia_tab']) ? $_GET['ia_tab'] : 'copiloto';
                             <i class="fa-solid fa-floppy-disk"></i> Salvar Copiloto IA
                         </button>
                     </div>
+                </div>
+            </form>
+
+            <!-- Quem faz o quê: provedor/modelo por função -->
+            <?php
+                $__defs = aiProviderDefaults();
+                $__provLabels = ['openai' => 'OpenAI (GPT)', 'groq' => 'Groq', 'gemini' => 'Google Gemini', 'deepseek' => 'DeepSeek'];
+                $__hints = [
+                    'audio'    => 'Somente OpenAI (whisper-1) ou Groq (whisper-large-v3 / turbo) transcrevem áudio.',
+                    'insights' => 'Texto curto e frequente: modelos rápidos e baratos (ex.: llama-3.3-70b no Groq ou gpt-4o-mini).',
+                    'chat'     => 'Conversa com o assistente do painel; precisa de modelo que suporte ferramentas (ex.: gpt-4o-mini, llama-3.3-70b).',
+                ];
+            ?>
+            <form method="POST" class="p-5 rounded-2xl bg-slate-950 border border-brand-500/30 space-y-4">
+                <div class="flex items-center gap-2 text-brand-400 font-bold text-xs uppercase tracking-wider">
+                    <i class="fa-solid fa-diagram-project"></i> Quem faz o quê — IA por função
+                </div>
+                <p class="text-slate-400 text-xs">Guarde uma chave por provedor e escolha qual provedor e modelo atende cada função. Função sem escolha usa a configuração geral acima.</p>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                    <?php foreach ($__defs as $__p => $__d): $__has = aiKeyFor($__p) !== ''; ?>
+                    <div class="p-3 rounded-xl bg-slate-900 border border-slate-800 space-y-1.5">
+                        <label class="font-bold text-slate-300 flex items-center justify-between">
+                            <span><?php echo htmlspecialchars($__provLabels[$__p] ?? $__p); ?></span>
+                            <span class="text-[10px] <?php echo $__has ? 'text-emerald-400' : 'text-slate-500'; ?>"><?php echo $__has ? '● chave salva' : '○ sem chave'; ?></span>
+                        </label>
+                        <input type="password" name="ai_key_<?php echo $__p; ?>" autocomplete="new-password" placeholder="<?php echo $__has ? 'Deixe em branco para manter a chave atual' : 'Cole a API Key'; ?>"
+                               class="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono focus:border-brand-500 focus:outline-none">
+                        <?php if ($__has && getSetting('ai_key_' . $__p) !== ''): ?>
+                        <label class="text-[10px] text-slate-500 flex items-center gap-1"><input type="checkbox" name="ai_key_clear_<?php echo $__p; ?>" value="1"> remover esta chave</label>
+                        <?php endif; ?>
+                    </div>
+                    <?php endforeach; ?>
+                </div>
+
+                <div class="space-y-3 text-xs">
+                    <?php foreach (aiRoles() as $__r => $__lbl):
+                        $__rp = (string)getSetting("ai_role_{$__r}_provider");
+                        $__rm = (string)getSetting("ai_role_{$__r}_model");
+                    ?>
+                    <div class="p-3 rounded-xl bg-slate-900 border border-slate-800">
+                        <div class="font-bold text-slate-200 mb-0.5"><?php echo htmlspecialchars($__lbl); ?></div>
+                        <div class="text-[10px] text-slate-500 mb-2"><?php echo htmlspecialchars($__hints[$__r]); ?></div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <select name="ai_role_<?php echo $__r; ?>_provider" class="px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white focus:border-brand-500 focus:outline-none">
+                                <option value="">Usar configuração geral</option>
+                                <?php foreach ($__defs as $__p => $__d):
+                                    if ($__r === 'audio' && !in_array($__p, ['openai', 'groq'], true)) continue; ?>
+                                <option value="<?php echo $__p; ?>" <?php echo $__rp === $__p ? 'selected' : ''; ?>><?php echo htmlspecialchars($__provLabels[$__p] ?? $__p); ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                            <input type="text" name="ai_role_<?php echo $__r; ?>_model" value="<?php echo htmlspecialchars($__rm); ?>" placeholder="Modelo (vazio = automático)"
+                                   class="px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono focus:border-brand-500 focus:outline-none">
+                        </div>
+                    </div>
+                    <?php endforeach; ?>
+                </div>
+
+                <div class="flex items-center justify-end gap-2 flex-wrap">
+                    <button type="submit" name="action_test_ai_roles" value="1" class="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-extrabold rounded-xl transition border border-slate-700 flex items-center gap-2 text-xs" style="white-space:nowrap;flex-shrink:0;width:auto;overflow:visible">
+                        <i class="fa-solid fa-plug-circle-check text-brand-400"></i> Salvar e Testar
+                    </button>
+                    <button type="submit" name="action_save_ai_roles" value="1" class="px-5 py-2.5 bg-brand-600 hover:bg-brand-500 text-white font-extrabold rounded-xl transition flex items-center gap-2 text-xs" style="white-space:nowrap;flex-shrink:0;width:auto;overflow:visible">
+                        <i class="fa-solid fa-floppy-disk"></i> Salvar Funções
+                    </button>
                 </div>
             </form>
 
