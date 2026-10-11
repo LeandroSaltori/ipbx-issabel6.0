@@ -376,6 +376,9 @@ function setFopMode(mode) {
 
 
 // ─── Situação em tempo real do ramal (chamando / tocando / falando com quem e há quanto tempo) ───
+function fopStatusLabel(st) {
+    return (st === 'Indisponível' || st === 'Offline') ? 'Sem registro' : st;
+}
 function fopFmtSecs(sec) {
     sec = Math.max(0, parseInt(sec || 0, 10));
     const m = Math.floor(sec / 60), s = sec % 60;
@@ -480,9 +483,9 @@ async function updateIntegratedExtensions(cachedExts) {
                 stIcon = 'fa-bell';
             } else if (e.status === 'Indisponível' || e.status === 'Offline') {
                 stColor = 'bg-slate-800 text-slate-500 border-slate-700';
-                stBg = 'bg-slate-900/40 border-slate-800/60 opacity-75';
-                stBorder = 'border-slate-800/60';
-                stIcon = 'fa-circle-xmark';
+                stBg = 'bg-slate-900/30 border-slate-800/50 opacity-50 grayscale';
+                stBorder = 'border-slate-800/50';
+                stIcon = 'fa-plug-circle-xmark';
             }
 
             const partnerTitle = e.partner ? `Em ligação com: ${e.partner}` : `${e.name}`;
@@ -496,7 +499,7 @@ async function updateIntegratedExtensions(cachedExts) {
                 const stBadge = extCard.querySelector('.ext-status-badge');
                 if (stBadge) {
                     stBadge.className = `px-1.5 py-0.5 rounded text-[9px] font-bold ${stColor} uppercase tracking-wider flex items-center gap-1 ext-status-badge`;
-                    stBadge.innerHTML = `<i class="fa-solid ${stIcon}"></i> ${e.status}`;
+                    stBadge.innerHTML = `<i class="fa-solid ${stIcon}"></i> ${fopStatusLabel(e.status)}`;
                 }
 
                 const partnerBox = extCard.querySelector('.ext-partner-box');
@@ -519,7 +522,7 @@ async function updateIntegratedExtensions(cachedExts) {
                             <span class="text-xs font-extrabold font-mono text-white">${e.id}</span>
                         </div>
                         <span class="px-1.5 py-0.5 rounded text-[9px] font-bold ${stColor} uppercase tracking-wider flex items-center gap-1 ext-status-badge">
-                            <i class="fa-solid ${stIcon}"></i> ${e.status}
+                            <i class="fa-solid ${stIcon}"></i> ${fopStatusLabel(e.status)}
                         </span>
                     </div>
 
@@ -534,7 +537,7 @@ async function updateIntegratedExtensions(cachedExts) {
                             <button onclick="amiClickToCall('${e.id}','')" title="Discar para Ramal ${e.id}" class="w-6 h-6 rounded bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500 hover:text-white transition flex items-center justify-center text-[10px] shrink-0">
                                 <i class="fa-solid fa-phone"></i>
                             </button>
-                            <button onclick="${hasWa ? `openFopWaModal('${e.id}', '${e.name}')` : `alert('Sem WhatsApp cadastrado para o ramal ${e.id}')`}" title="${waTitle}" class="w-6 h-6 rounded ${waBtnClass} transition flex items-center justify-center text-[10px] shrink-0">
+                            <button onclick="${hasWa ? `openFopWaModal('${e.id}', ${JSON.stringify(e.name || '').replace(/"/g, '&quot;')}, '${String(e.whatsapp || '').replace(/\D/g, '')}')` : `alert('Sem WhatsApp cadastrado para o ramal ${e.id}')`}" title="${waTitle}" class="w-6 h-6 rounded ${waBtnClass} transition flex items-center justify-center text-[10px] shrink-0">
                                 <i class="fa-brands fa-whatsapp"></i>
                             </button>
                         </div>
@@ -730,9 +733,9 @@ async function updateFOP() {
                 stIcon = 'fa-bell';
             } else if (e.status === 'Indisponível' || e.status === 'Offline') {
                 stColor = 'bg-slate-800 text-slate-500 border-slate-700';
-                stBg = 'bg-slate-900/40 border-slate-800/60 opacity-75';
-                stBorder = 'border-slate-800/60';
-                stIcon = 'fa-circle-xmark';
+                stBg = 'bg-slate-900/30 border-slate-800/50 opacity-50 grayscale';
+                stBorder = 'border-slate-800/50';
+                stIcon = 'fa-plug-circle-xmark';
             }
 
             const partnerTitle = e.partner ? `Em ligação com: ${e.partner}` : `${e.id} - ${e.name}`;
@@ -745,7 +748,7 @@ async function updateFOP() {
                 const stBadge = extCard.querySelector('.fop-status-badge');
                 if (stBadge) {
                     stBadge.className = `px-2 py-1 rounded-md text-[10px] font-bold ${stColor} uppercase tracking-wider flex items-center gap-1.5 fop-status-badge`;
-                    stBadge.innerHTML = `<i class="fa-solid ${stIcon}"></i> ${e.status}`;
+                    stBadge.innerHTML = `<i class="fa-solid ${stIcon}"></i> ${fopStatusLabel(e.status)}`;
                 }
 
                 const partnerBox = extCard.querySelector('.fop-partner-box');
@@ -772,7 +775,7 @@ async function updateFOP() {
                             </div>
                         </div>
                         <span class="px-2 py-1 rounded-md text-[10px] font-bold ${stColor} uppercase tracking-wider flex items-center gap-1.5 fop-status-badge">
-                            <i class="fa-solid ${stIcon}"></i> ${e.status}
+                            <i class="fa-solid ${stIcon}"></i> ${fopStatusLabel(e.status)}
                         </span>
                     </div>
 
@@ -788,7 +791,7 @@ async function updateFOP() {
                             <button onclick="amiClickToCall('${e.id}','')" title="Discar" class="w-8 h-8 rounded-lg bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500 hover:text-white border border-indigo-500/20 transition flex items-center justify-center text-xs">
                                 <i class="fa-solid fa-phone"></i>
                             </button>
-                            <button onclick="${hasWa ? `openFopWaModal('${e.id}', '${e.name}')` : `alert('Sem WhatsApp cadastrado para o ramal ${e.id}')`}" title="${waTitle}" class="w-8 h-8 rounded-lg ${waBtnClass} transition flex items-center justify-center text-xs">
+                            <button onclick="${hasWa ? `openFopWaModal('${e.id}', ${JSON.stringify(e.name || '').replace(/"/g, '&quot;')}, '${String(e.whatsapp || '').replace(/\D/g, '')}')` : `alert('Sem WhatsApp cadastrado para o ramal ${e.id}')`}" title="${waTitle}" class="w-8 h-8 rounded-lg ${waBtnClass} transition flex items-center justify-center text-xs">
                                 <i class="fa-brands fa-whatsapp"></i>
                             </button>
                         </div>
@@ -824,7 +827,7 @@ setInterval(() => {
 }, 2000);
 
 // ─── Modal WhatsApp Atendente ─────────────────────────────────────────────────
-function openFopWaModal(ext, name) {
+function openFopWaModal(ext, name, phone) {
     const modal    = document.getElementById('modal-fop-whatsapp');
     const subt     = document.getElementById('fop-wa-subtitle');
     const targetExt= document.getElementById('fop-wa-target-ext');
@@ -832,7 +835,14 @@ function openFopWaModal(ext, name) {
     if (modal)     modal.classList.remove('hidden');
     if (subt)      subt.innerText = `Ramal ${ext} (${name})`;
     if (targetExt) targetExt.value = ext;
-    if (phoneInp && !phoneInp.value) phoneInp.value = '55119';
+    if (phoneInp) {
+        // sempre o WhatsApp cadastrado no ramal (Nomes & Tecnologia); nada de número "chutado"
+        let n = String(phone || '').replace(/\D/g, '');
+        if (n && (n.length === 10 || n.length === 11)) n = '55' + n;
+        phoneInp.value = n;
+    }
+    const msgInp = document.getElementById('fop-wa-msg-text');
+    if (msgInp) msgInp.value = '';
 }
 function closeFopWaModal() {
     const modal = document.getElementById('modal-fop-whatsapp');
@@ -843,6 +853,7 @@ async function submitFopWhatsappMsg(e) {
     const phone = document.getElementById('fop-wa-target-phone')?.value;
     const msg   = document.getElementById('fop-wa-msg-text')?.value;
     if (!phone || !msg) return;
+    if (phone.replace(/\D/g, '').length < 10) { alert('Informe o número com DDD (ex.: 5516999999999).'); return; }
     try {
         const res = await fetch('index.php?api_action=send_whatsapp_message', {
             method: 'POST',
