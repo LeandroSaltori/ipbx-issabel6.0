@@ -119,7 +119,7 @@ function auditPageLabels() {
         'relatorios' => 'Relatórios', 'whatsapp' => 'WhatsApp', 'telefonia' => 'Telefonia', 'configuracoes' => 'Configurações',
         'ia_analytics' => 'Auditoria & Análise de IA', 'filas_stats' => 'Estatísticas de Filas',
         'cdr_gravacoes' => 'CDR e Gravações', 'graphic_reports' => 'Relatórios Gráficos',
-        'relatorio_geral' => 'Relatório Geral', 'relatorio_filas' => 'Relatório de Filas',
+        'relatorio_geral' => 'Relatório Geral', 'relatorio_filas' => 'Relatório de Filas', 'pausas_agentes' => 'Pausas dos Agentes', 'autoatendimento' => 'Autoatendimento do Ramal',
         'logs' => 'Logs', 'usuarios' => 'Usuários', 'ia' => 'Configuração de IA', 'smtp' => 'SMTP',
         'ami' => 'AMI', 'api' => 'API', 'api_connection' => 'Conexão API',
     ];

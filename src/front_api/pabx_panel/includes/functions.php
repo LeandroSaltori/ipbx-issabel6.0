@@ -5669,3 +5669,37 @@ function aiChatRun($history) {
     }
     return ['ok' => false, 'error' => 'A consulta ficou longa demais; tente reformular a pergunta.', 'tools' => $used];
 }
+
+// =========================================================================
+// AUTOATENDIMENTO DO RAMAL: Não Perturbe e Desvios (AstDB - o mesmo que a GUI nativa do Issabel/FreePBX lê)
+// =========================================================================
+/** Retorna ext => ['dnd'=>bool,'cf'=>'','cfb'=>'','cfu'=>''] lendo 'database show' do Asterisk. */
+function getExtensionFeatureStates() {
+    $out = [];
+    foreach (['DND' => 'dnd', 'CF' => 'cf', 'CFB' => 'cfb', 'CFU' => 'cfu'] as $fam => $field) {
+        $raw = asteriskCliOutput('database show ' . $fam);
+        foreach (preg_split('/\r?\n/', $raw) as $ln) {
+            if (preg_match('#^/' . $fam . '/(\d+)\s*:\s*(.*)$#', trim($ln), $m)) {
+                $v = trim($m[2]);
+                if (!isset($out[$m[1]])) $out[$m[1]] = ['dnd' => false, 'cf' => '', 'cfb' => '', 'cfu' => ''];
+                $out[$m[1]][$field] = ($field === 'dnd') ? (strtoupper($v) === 'YES') : $v;
+            }
+        }
+    }
+    return $out;
+}
+
+/** Aplica DND/CF/CFB/CFU de um ramal no AstDB via AMI (valor vazio remove a chave). */
+function setExtensionFeature($ext, $field, $value) {
+    $ext = preg_replace('/\D/', '', (string)$ext);
+    $map = ['dnd' => 'DND', 'cf' => 'CF', 'cfb' => 'CFB', 'cfu' => 'CFU'];
+    if ($ext === '' || !isset($map[$field])) return ['success' => false, 'error' => 'Parâmetro inválido.'];
+    if ($field === 'dnd') $value = $value ? 'YES' : '';
+    else $value = preg_replace('/[^0-9*#+]/', '', (string)$value);
+    if ($value === '') $r = executeAsteriskAMICommand('DBDel', ['Family' => $map[$field], 'Key' => $ext]);
+    else               $r = executeAsteriskAMICommand('DBPut', ['Family' => $map[$field], 'Key' => $ext, 'Val' => $value]);
+    $resp = (string)($r['response'] ?? '');
+    // DBDel de chave inexistente também é aceitável (já estava limpo)
+    if (!empty($r['success']) && (stripos($resp, 'Response: Success') !== false || ($value === '' && stripos($resp, 'Response:') !== false))) return ['success' => true];
+    return ['success' => false, 'error' => $r['error'] ?? (preg_match('/Message:\s*(.+)/i', $resp, $m) ? trim($m[1]) : 'Falha no AMI')];
+}

@@ -71,6 +71,10 @@ function isGroupActive($modules_array) {
                     <span>Painel FOP Operador</span>
                 </a>
                 <?php if (hasUserPermission('manage_settings')): ?>
+                <a href="index.php?module=ramais&action=autoatendimento" class="flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all <?php echo isNavActive('ramais', 'autoatendimento') ? 'bg-brand-500/20 text-brand-400 border border-brand-500/30 font-bold' : 'text-slate-300 hover:bg-slate-800/60 hover:text-white'; ?>">
+                    <i class="fa-solid fa-user-gear w-4 text-center text-brand-400"></i>
+                    <span>Autoatendimento (DND & Desvios)</span>
+                </a>
                 <a href="index.php?module=ramais&action=editar_nome" class="flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all <?php echo isNavActive('ramais', 'editar_nome') ? 'bg-brand-500/20 text-brand-400 border border-brand-500/30 font-bold' : 'text-slate-300 hover:bg-slate-800/60 hover:text-white'; ?>">
                     <i class="fa-solid fa-id-card w-4 text-center"></i>
                     <span>Nomes & Tecnologia</span>
@@ -170,6 +174,10 @@ function isGroupActive($modules_array) {
                 <a href="index.php?module=relatorios&action=cdr_gravacoes" class="flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all <?php echo isNavActive('relatorios', 'cdr_gravacoes') ? 'bg-brand-500/20 text-brand-400 border border-brand-500/30 font-bold' : 'text-slate-300 hover:bg-slate-800/60 hover:text-white'; ?>">
                     <i class="fa-solid fa-headset w-4 text-center"></i>
                     <span>CDR & Gravações</span>
+                </a>
+                <a href="index.php?module=relatorios&action=pausas_agentes" class="flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all <?php echo isNavActive('relatorios', 'pausas_agentes') ? 'bg-brand-500/20 text-brand-400 border border-brand-500/30 font-bold' : 'text-slate-400 hover:text-white hover:bg-slate-800/60'; ?>">
+                    <i class="fa-solid fa-pause-circle w-4 text-center text-violet-400"></i>
+                    <span>Pausas & Tempo Logado</span>
                 </a>
                 <a href="index.php?module=relatorios&action=graphic_reports" class="flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all <?php echo isNavActive('relatorios', 'graphic_reports') ? 'bg-brand-500/20 text-brand-400 border border-brand-500/30 font-bold' : 'text-slate-300 hover:bg-slate-800/60 hover:text-white'; ?>">
                     <i class="fa-solid fa-chart-pie w-4 text-center text-cyan-400"></i>
