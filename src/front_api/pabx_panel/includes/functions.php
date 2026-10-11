@@ -4651,39 +4651,45 @@ function processQueueAbandonNotifications($ast) {
         $events = $st->fetchAll(PDO::FETCH_ASSOC);
 
         $max_id = $last;
+        $blocked = false;   // um envio que falhou segura o cursor para ser tentado de novo (até 3 vezes)
+        $advance = function ($id) use (&$max_id, &$blocked) { if (!$blocked) $max_id = max($max_id, (int)$id); };
         $q_enter = $ast->prepare("SELECT data2 FROM queue_log WHERE callid = :c AND event = 'ENTERQUEUE' ORDER BY id ASC LIMIT 1");
-        $dup = $db->prepare("SELECT COUNT(*) FROM sent_logs WHERE call_id = :c AND UPPER(rule_type) = 'FILA_ABANDONO' AND extension = :q");
         $q_cfg = $db->prepare("SELECT queue_name, abandon_enabled, abandon_msg, supervisor_whatsapp FROM queues_config WHERE queue_number = :q LIMIT 1");
         $now = date('d/m/Y H:i:s');
 
         foreach ($events as $ev) {
-            $max_id = max($max_id, (int)$ev['id']);
             $out['processed']++;
             $q = (string)$ev['queuename'];
             $q_cfg->execute([':q' => $q]);
             $cfg = $q_cfg->fetch(PDO::FETCH_ASSOC);
-            if (!$cfg || empty($cfg['abandon_enabled'])) { $out['skipped']++; continue; }
-
-            $dup->execute([':c' => $ev['callid'], ':q' => $q]);
-            if ((int)$dup->fetchColumn() > 0) { $out['skipped']++; continue; }
+            if (!$cfg || empty($cfg['abandon_enabled'])) { $out['skipped']++; $advance($ev['id']); continue; }
 
             $q_enter->execute([':c' => $ev['callid']]);
             $caller = preg_replace('/\D/', '', (string)$q_enter->fetchColumn());
-            if ($caller === '' || strlen($caller) < 8) { $out['skipped']++; continue; } // sem número externo identificável
+            if ($caller === '' || strlen($caller) < 8) { $out['skipped']++; $advance($ev['id']); continue; } // sem número externo identificável
 
             $q_name = !empty($cfg['queue_name']) ? $cfg['queue_name'] : $q;
             $tpl = !empty($cfg['abandon_msg']) ? $cfg['abandon_msg'] : getRule('queue_abandon_msg_default');
             if (empty($tpl)) { $tpl = 'Olá! Vimos que você ligou para o setor {NOME_FILA} às {DATA_HORA} e a chamada não pôde ser atendida. Em breve entraremos em contato!'; }
             $msg = str_replace(['{NOME_FILA}', '{CLIENTE}', '{DATA_HORA}'], [$q_name, $caller, $now], $tpl);
 
-            $ok = sendWhatsAppMessageViaZPro($api_url, $api_token, $caller, $msg, (string)$ev['callid'], $q, 'FILA_ABANDONO');
-            if ($ok) { $out['sent']++; } else { $out['skipped']++; }
+            // Envio ÚNICO por chamada e destinatário; só repete se o envio anterior FALHOU (máx. 3 tentativas)
+            $ckey = 'ABAN_' . md5($ev['callid'] . '|' . $q);
+            $failed = false;
+            if (missedGuardAcquire($ckey, $caller, $q, (string)$ev['callid'], substr($caller, -8))) {
+                $ok = sendWhatsAppMessageViaZPro($api_url, $api_token, $caller, $msg, (string)$ev['callid'], $q, 'FILA_ABANDONO');
+                missedGuardFinish($ckey, $caller, $ok);
+                if ($ok) { $out['sent']++; } else { $out['skipped']++; $failed = true; }
+            } else { $out['skipped']++; }
 
             $sup = preg_replace('/\D/', '', (string)($cfg['supervisor_whatsapp'] ?? ''));
-            if ($sup !== '') {
+            if ($sup !== '' && missedGuardAcquire($ckey . '_SUP', $sup, $q, (string)$ev['callid'] . '_SUP', substr($sup, -8))) {
                 $sup_msg = "⚠️ *Abandono na fila {$q_name}*\n\nCliente *{$caller}* desistiu de aguardar às *{$now}*.";
-                sendWhatsAppMessageViaZPro($api_url, $api_token, $sup, $sup_msg, (string)$ev['callid'] . '_SUP', $q, 'FILA_ABANDONO_SUP');
+                $okS = sendWhatsAppMessageViaZPro($api_url, $api_token, $sup, $sup_msg, (string)$ev['callid'] . '_SUP', $q, 'FILA_ABANDONO_SUP');
+                missedGuardFinish($ckey . '_SUP', $sup, $okS);
+                if (!$okS) $failed = true;
             }
+            if ($failed) $blocked = true; else $advance($ev['id']);
         }
         saveSetting('abandon_last_queue_log_id', (string)$max_id);
     } catch (Exception $e) {
@@ -5091,7 +5097,7 @@ function processCallSummaryNotifications($cdr) {
         $calls = $st->fetchAll(PDO::FETCH_ASSOC);
     } catch (Exception $e) { $out['error'] = $e->getMessage(); return $out; }
 
-    $dup = $db->prepare("SELECT COUNT(*) FROM sent_logs WHERE call_id = :c AND extension = :e AND rule_type = 'RESUMO_CHAMADA'");
+    $dup = $db->prepare("SELECT COUNT(*) FROM sent_logs WHERE call_id = :c AND extension = :e AND rule_type = 'RESUMO_CHAMADA' AND status IN ('SUCCESS','IGNORADO')");
     $ins = $db->prepare("INSERT INTO sent_logs (phone, call_id, extension, rule_type, message, status) VALUES (:p, :c, :e, 'RESUMO_CHAMADA', :m, :s)");
     $cfg = aiGetConfig('insights');
     $cfgAudio = aiGetConfig('audio');
@@ -5099,8 +5105,11 @@ function processCallSummaryNotifications($cdr) {
     foreach ($calls as $c) {
         foreach (array_unique([$c['dst'], $c['src']]) as $ext) {
             if (!isset($cfgs[$ext])) continue;
+            // Envio ÚNICO por chamada/ramal; só repete se o anterior falhou (máx. 3 tentativas)
+            $skey = 'SUMM_' . md5($c['uniqueid'] . '|' . $ext);
             $dup->execute([':c' => $c['uniqueid'], ':e' => $ext]);
-            if ((int)$dup->fetchColumn() > 0) continue;
+            if ((int)$dup->fetchColumn() > 0) continue;   // já enviado (ou ignorado) pelo histórico
+            if (!missedGuardAcquire($skey, (string)$cfgs[$ext]['whatsapp_number'], $ext)) continue;
             $out['processed']++;
             $e = $cfgs[$ext];
             $parts = []; $why = [];
@@ -5130,10 +5139,12 @@ function processCallSummaryNotifications($cdr) {
             if (!$parts) {
                 $ins->execute([':p' => $e['whatsapp_number'], ':c' => $c['uniqueid'], ':e' => $ext, ':m' => 'Ignorado: ' . implode('; ', $why), ':s' => 'IGNORADO']);
                 $out['skipped']++;
+                missedGuardFinish($skey, (string)$e['whatsapp_number'], true);
                 continue;
             }
             $msg = $head . "\n\n" . implode("\n\n", $parts);
             $ok = sendWhatsAppMessageViaZPro($api_url, $api_token, $e['whatsapp_number'], $msg, $c['uniqueid'], $ext, 'RESUMO_CHAMADA');
+            missedGuardFinish($skey, (string)$e['whatsapp_number'], $ok);
             $ok ? $out['sent']++ : $out['skipped']++;
         }
     }
