@@ -83,6 +83,15 @@ $data_hora = date('d/m/Y H:i:s');
 $api_url   = getSetting('api_url')   ?: getSetting('prismabot_api_url');
 $api_token = getSetting('api_token') ?: getSetting('prismabot_api_token');
 
+if (waProvider() === 'uazapi') {
+    if (!whatsappProviderConfigured()) {
+        if (function_exists('pabx_log')) pabx_log('whatsapp', 'ERROR', "AGI Interrompido: UAZAPI sem URL do servidor ou token da instância em Configurações -> API", []);
+        exit(0);
+    }
+    $api_url = $api_url ?: 'uazapi';
+    $api_token = $api_token ?: 'uazapi';
+}
+
 if (empty($api_url) || empty($api_token)) {
     if (function_exists('pabx_log')) {
         pabx_log('whatsapp', 'ERROR', "AGI Interrompido: Credenciais da API Z-PRO não configuradas em Configurações -> API", [

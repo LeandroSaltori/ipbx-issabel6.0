@@ -72,6 +72,53 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
+    // 1b. Servidor de envio WhatsApp (Prismabot/Z-PRO ou UAZAPI)
+    $uaz_qr = '';
+    if (isset($_POST['action_save_wa_provider']) || isset($_POST['action_test_uazapi']) || isset($_POST['action_connect_uazapi'])) {
+        $active_tab = 'prismabot';
+        $prov = (($_POST['wa_provider'] ?? 'zpro') === 'uazapi') ? 'uazapi' : 'zpro';
+        $u_url = rtrim(trim($_POST['uazapi_url'] ?? ''), '/');
+        $u_tok = trim($_POST['uazapi_token'] ?? '');
+        if ($u_url !== '' && !preg_match('#^https?://#i', $u_url)) $u_url = 'https://' . $u_url;
+        saveSetting('wa_provider', $prov);
+        saveSetting('uazapi_url', $u_url);
+        if ($u_tok !== '') saveSetting('uazapi_token', $u_tok);
+        $findKey = function ($arr, $key) use (&$findKey) {
+            if (!is_array($arr)) return '';
+            foreach ($arr as $k => $v) {
+                if ($k === $key && is_scalar($v) && $v !== '') return (string)$v;
+                if (is_array($v)) { $r = $findKey($v, $key); if ($r !== '') return $r; }
+            }
+            return '';
+        };
+        if (isset($_POST['action_save_wa_provider'])) {
+            $msg_status = $prov === 'uazapi' ? "Servidor de envio: UAZAPI. Todas as mensagens passam a sair por ela." : "Servidor de envio: API Prismabot / Z-PRO.";
+            logUserAction("Servidor de envio WhatsApp", $prov, "CONFIG");
+        } elseif (isset($_POST['action_test_uazapi'])) {
+            $r = uazapiRequest('GET', '/instance/status', null, 8);
+            $d = json_decode($r['resp'], true);
+            $st = is_array($d) ? strtolower($findKey($d, 'status')) : '';
+            if ($r['error'] !== '') { $msg_error = "⚠️ " . $r['error']; }
+            elseif ($r['http'] === 401 || $r['http'] === 403) { $msg_error = "⚠️ Token da instância recusado (HTTP {$r['http']}). Confira o token."; }
+            elseif ($r['http'] >= 200 && $r['http'] < 300) {
+                if ($st === 'connected') $msg_status = "✅ UAZAPI conectada e WhatsApp pareado (status: connected).";
+                else $msg_error = "⚠️ UAZAPI alcançada, mas o WhatsApp não está conectado (status: " . ($st ?: 'desconhecido') . "). Use \"Gerar QR Code\" e leia com o celular.";
+            } else { $msg_error = "⚠️ UAZAPI respondeu HTTP {$r['http']}. Confira a URL do servidor."; }
+            logUserAction("Teste UAZAPI", "HTTP " . $r['http'] . " status=" . $st, "CONFIG");
+        } else {
+            $r = uazapiRequest('POST', '/instance/connect', new stdClass(), 15);
+            $d = json_decode($r['resp'], true);
+            $qr = is_array($d) ? $findKey($d, 'qrcode') : '';
+            if ($r['error'] !== '') { $msg_error = "⚠️ " . $r['error']; }
+            elseif ($qr !== '') {
+                $uaz_qr = (strpos($qr, 'data:image') === 0) ? $qr : ('data:image/png;base64,' . $qr);
+                $msg_status = "Leia o QR Code abaixo no WhatsApp: Aparelhos conectados > Conectar um aparelho.";
+            } elseif ($r['http'] >= 200 && $r['http'] < 300) { $msg_status = "A instância já está conectada ou em processo de conexão."; }
+            else { $msg_error = "⚠️ Não foi possível gerar o QR Code (HTTP {$r['http']})."; }
+            logUserAction("Conectar UAZAPI", "HTTP " . $r['http'], "CONFIG");
+        }
+    }
+
     // 2. API Prismabot & Sincronização de Custom Destinations
     if (isset($_POST['action_save_prismabot_api']) || isset($_POST['action_test_prismabot_api']) || isset($_POST['action_sync_custom_destinations'])) {
         $active_tab = 'prismabot';
@@ -421,6 +468,58 @@ if (empty($currentPbxToken) && !empty($currentPbxPass) && $_SERVER['REQUEST_METH
 
     <!-- CONTEÚDO ABA 2: API PRISMABOT -->
     <div id="tab-content-prismabot" class="space-y-4 tab-pane hidden">
+        <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+            <div class="border-b border-slate-800 pb-3 flex items-center gap-3">
+                <div class="p-3 bg-emerald-500/10 rounded-xl border border-emerald-500/20 text-emerald-400"><i class="fa-brands fa-whatsapp text-xl"></i></div>
+                <div>
+                    <h3 class="text-base font-bold text-slate-100">Servidor de envio WhatsApp</h3>
+                    <p class="text-xs text-slate-400">Escolha por onde as mensagens (NPS, chamadas perdidas, gravações) são enviadas. Só um fica ativo por vez.</p>
+                </div>
+            </div>
+            <?php $__prov = (($settings['wa_provider'] ?? '') === 'uazapi') ? 'uazapi' : 'zpro'; ?>
+            <form method="POST" action="index.php?module=configuracoes&action=api" class="space-y-4 text-xs">
+                <input type="hidden" name="active_tab" value="prismabot">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <label class="flex items-start gap-3 p-4 rounded-xl border border-slate-800 bg-slate-950 cursor-pointer">
+                        <input type="radio" name="wa_provider" value="zpro" <?php echo $__prov === 'zpro' ? 'checked' : ''; ?> onchange="toggleWaProvider()" class="mt-1 accent-amber-500">
+                        <span><b class="text-slate-100">API Prismabot (Z-PRO)</b><br><span class="text-slate-400">Para clientes com o serviço Prismabot contratado. Configurada na seção abaixo.</span></span>
+                    </label>
+                    <label class="flex items-start gap-3 p-4 rounded-xl border border-slate-800 bg-slate-950 cursor-pointer">
+                        <input type="radio" name="wa_provider" value="uazapi" <?php echo $__prov === 'uazapi' ? 'checked' : ''; ?> onchange="toggleWaProvider()" class="mt-1 accent-emerald-500">
+                        <span><b class="text-slate-100">UAZAPI</b><br><span class="text-slate-400">Para clientes sem Prismabot: o próprio sistema envia pelo WhatsApp pareado via QR Code.</span></span>
+                    </label>
+                </div>
+                <div id="wa-uazapi-fields" class="space-y-3 <?php echo $__prov === 'uazapi' ? '' : 'hidden'; ?>">
+                    <div>
+                        <label class="block font-bold text-slate-300 mb-1.5 uppercase tracking-wider text-[11px]">URL do servidor UAZAPI</label>
+                        <input type="text" name="uazapi_url" value="<?php echo htmlspecialchars((string)($settings['uazapi_url'] ?? '')); ?>" placeholder="https://seu-servidor.uazapi.com" class="w-full px-3 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono focus:border-emerald-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block font-bold text-slate-300 mb-1.5 uppercase tracking-wider text-[11px]">Token da instância</label>
+                        <input type="password" name="uazapi_token" value="" placeholder="<?php echo !empty($settings['uazapi_token']) ? '•••••••• (salvo — deixe em branco para manter)' : 'Cole o token da instância'; ?>" autocomplete="off" class="w-full px-3 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono focus:border-emerald-500 focus:outline-none">
+                    </div>
+                    <p class="text-[11px] text-slate-400">Respostas do NPS: configure na UAZAPI um webhook (evento <code class="text-slate-300">messages</code>) para <code class="text-slate-300">https://SEU-PAINEL/pabx_panel/index.php?api_action=whatsapp_webhook&amp;token=<?php echo htmlspecialchars((string)getSetting('webhook_token')); ?></code></p>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                    <button type="submit" name="action_save_wa_provider" style="white-space:nowrap !important;flex-shrink:0 !important;width:auto !important;overflow:visible !important;text-overflow:clip !important;" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl"><i class="fa-solid fa-floppy-disk mr-1"></i> Salvar servidor de envio</button>
+                    <span id="wa-uazapi-btns" class="<?php echo $__prov === 'uazapi' ? '' : 'hidden'; ?> flex flex-wrap gap-2">
+                        <button type="submit" name="action_test_uazapi" style="white-space:nowrap !important;flex-shrink:0 !important;width:auto !important;overflow:visible !important;text-overflow:clip !important;" class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl"><i class="fa-solid fa-plug mr-1"></i> Testar conexão</button>
+                        <button type="submit" name="action_connect_uazapi" style="white-space:nowrap !important;flex-shrink:0 !important;width:auto !important;overflow:visible !important;text-overflow:clip !important;" class="px-5 py-2.5 bg-slate-700 hover:bg-slate-600 text-white font-bold rounded-xl"><i class="fa-solid fa-qrcode mr-1"></i> Gerar QR Code</button>
+                    </span>
+                </div>
+                <?php if (!empty($uaz_qr)): ?>
+                    <div class="p-4 bg-white rounded-xl inline-block"><img src="<?php echo htmlspecialchars($uaz_qr, ENT_QUOTES); ?>" alt="QR Code WhatsApp" style="width:240px;height:240px"></div>
+                <?php endif; ?>
+            </form>
+            <script>
+            function toggleWaProvider() {
+                var u = document.querySelector('input[name="wa_provider"][value="uazapi"]').checked;
+                document.getElementById('wa-uazapi-fields').classList.toggle('hidden', !u);
+                document.getElementById('wa-uazapi-btns').classList.toggle('hidden', !u);
+            }
+            </script>
+        </div>
+
         <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
             <div class="border-b border-slate-800 pb-3 flex items-center gap-3">
                 <div class="p-3 bg-amber-500/10 rounded-xl border border-amber-500/20 text-amber-400">

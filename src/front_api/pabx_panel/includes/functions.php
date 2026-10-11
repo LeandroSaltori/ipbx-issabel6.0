@@ -1539,6 +1539,65 @@ function getAsteriskConferences() {
     return array_values($conf_map);
 }
 
+/** Provedor de envio WhatsApp ativo: 'zpro' (Prismabot/Z-PRO, padrão) ou 'uazapi'. */
+function waProvider() {
+    return getSetting('wa_provider') === 'uazapi' ? 'uazapi' : 'zpro';
+}
+
+/** Há credenciais completas para o provedor ativo? */
+function whatsappProviderConfigured() {
+    if (waProvider() === 'uazapi') {
+        return trim((string)getSetting('uazapi_url')) !== '' && trim((string)getSetting('uazapi_token')) !== '';
+    }
+    return trim((string)getSetting('api_url')) !== '' && trim((string)getSetting('api_token')) !== '';
+}
+
+/** Chamada genérica à UAZAPI (header "token" = token da instância). */
+function uazapiRequest($method, $path, $body = null, $timeout = 10) {
+    $base  = rtrim(trim((string)getSetting('uazapi_url')), '/');
+    $token = trim((string)getSetting('uazapi_token'));
+    if ($base === '' || $token === '') {
+        return ['http' => 0, 'resp' => '', 'error' => 'UAZAPI não configurada (URL do servidor ou token da instância ausente).'];
+    }
+    $ch = curl_init($base . $path);
+    $opts = [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT        => $timeout,
+        CURLOPT_SSL_VERIFYPEER => false,
+        CURLOPT_SSL_VERIFYHOST => false,
+        CURLOPT_HTTPHEADER     => ['Content-Type: application/json', 'Accept: application/json', 'token: ' . $token],
+    ];
+    if (strtoupper($method) === 'POST') {
+        $opts[CURLOPT_POST] = true;
+        $opts[CURLOPT_POSTFIELDS] = json_encode($body ?? new stdClass(), JSON_UNESCAPED_UNICODE);
+    }
+    curl_setopt_array($ch, $opts);
+    $resp = curl_exec($ch);
+    $http = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $err  = curl_error($ch);
+    curl_close($ch);
+    return ['http' => $http, 'resp' => (string)$resp, 'error' => $err ? ('cURL Error: ' . $err) : ''];
+}
+
+/** Envia texto pela UAZAPI. Retorna ['ok','http','resp','error']. */
+function uazapiSendText($number, $text) {
+    $num = preg_replace('/\D/', '', (string)$number);
+    if (strlen($num) === 10 || strlen($num) === 11) $num = '55' . $num;
+    if ($num === '' || trim((string)$text) === '') {
+        return ['ok' => false, 'http' => 0, 'resp' => '', 'error' => 'Número ou mensagem vazios'];
+    }
+    $r = uazapiRequest('POST', '/send/text', ['number' => $num, 'text' => $text]);
+    $ok = ($r['error'] === '' && $r['http'] >= 200 && $r['http'] < 300);
+    $err = $r['error'];
+    if (!$ok && $err === '') {
+        $d = json_decode($r['resp'], true);
+        $detail = is_array($d) ? ($d['error'] ?? $d['message'] ?? '') : '';
+        $err = 'HTTP ' . $r['http'] . ($detail ? ': ' . (is_scalar($detail) ? $detail : json_encode($detail)) : '');
+        if ($r['http'] === 401) $err .= ' (token da instância inválido)';
+    }
+    return ['ok' => $ok, 'http' => $r['http'], 'resp' => $r['resp'], 'error' => $err];
+}
+
 function sendWhatsAppAPI($phone, $message, $call_id = 'MANUAL', $extension = 'GERAL', $rule_type = 'DESCONHECIDO') {
     global $db;
     $api_url = getSetting('api_url');
@@ -1553,7 +1612,13 @@ function sendWhatsAppAPI($phone, $message, $call_id = 'MANUAL', $extension = 'GE
     $err_msg = '';
     $http_code = 0;
 
-    if (empty($api_url) || empty($api_token)) {
+    if (waProvider() === 'uazapi') {
+        $u = uazapiSendText($phone, $message);
+        $http_code    = $u['http'];
+        $response_log = $u['resp'] !== '' ? $u['resp'] : json_encode(['error' => $u['error']]);
+        $err_msg      = $u['error'];
+        $status       = $u['ok'] ? 'SUCCESS' : 'ERROR';
+    } elseif (empty($api_url) || empty($api_token)) {
         $err_msg = 'API Prismabot não configurada (URL ou Token ausente). Configure em Configurações > API.';
         $response_log = json_encode(['error' => $err_msg]);
     } else {
@@ -3621,8 +3686,11 @@ function isWhatsappApiActive() {
     }
     if (!$db) return false;
 
+    if (function_exists('whatsappProviderConfigured') && function_exists('getSetting')) {
+        try { if (waProvider() === 'uazapi') return whatsappProviderConfigured(); } catch (Exception $e) {}
+    }
     try {
-        $st = $db->query("SELECT value FROM settings WHERE key_name = 'api_token'");
+        $st = $db->query("SELECT value_val AS value FROM settings WHERE key_name = 'api_token'");
         if ($st) {
             $row = $st->fetch(PDO::FETCH_ASSOC);
             if ($row && !empty(trim($row['value']))) {
@@ -4082,6 +4150,23 @@ function getExtensionCustomData($ext) {
  * Envia uma mensagem via REST API Z-PRO (Prismabot) com cURL seguro
  */
 function sendWhatsAppMessageViaZPro($api_url, $api_token, $number, $message, $call_id = '', $extension = 'AGI', $rule_type = 'AGI_ZPRO') {
+    if (waProvider() === 'uazapi') {
+        $u = uazapiSendText($number, $message);
+        if (function_exists('pabx_log')) {
+            pabx_log('whatsapp', $u['ok'] ? 'INFO' : 'ERROR', "Envio AGI UAZAPI para " . preg_replace('/\D/', '', (string)$number) . " [HTTP {$u['http']}]", ['error' => $u['error'], 'response' => substr($u['resp'], 0, 300)]);
+        }
+        try {
+            global $db;
+            if ($db) {
+                $db->prepare("INSERT INTO sent_logs (phone, message, status, call_id, extension, rule_type, response_raw, created_at) VALUES (:p, :m, :s, :c, :e, :r, :rr, CURRENT_TIMESTAMP)")->execute([
+                    ':p' => preg_replace('/\D/', '', (string)$number), ':m' => $message, ':s' => $u['ok'] ? 'SUCCESS' : 'ERROR',
+                    ':c' => $call_id !== '' ? $call_id : ('AGI_' . time()), ':e' => $extension, ':r' => $rule_type,
+                    ':rr' => substr($u['resp'] !== '' ? $u['resp'] : $u['error'], 0, 1000)
+                ]);
+            }
+        } catch (Exception $e_log) {}
+        return $u['ok'];
+    }
     if (empty($api_url) || empty($api_token) || empty($number) || empty($message)) {
         return false;
     }

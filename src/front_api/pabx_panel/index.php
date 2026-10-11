@@ -87,9 +87,9 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
             }
             return '';
         };
-        $fromMe = $pick($in, ['fromMe', 'message.fromMe', 'data.fromMe', 'msg.fromMe']);
-        $phone  = preg_replace('/\D/', '', $pick($in, ['number', 'from', 'phone', 'contact.number', 'ticket.contact.number', 'data.from', 'message.from', 'msg.from']));
-        $text   = trim($pick($in, ['body', 'text', 'message.body', 'message.text', 'data.body', 'msg.body', 'message']));
+        $fromMe = $pick($in, ['fromMe', 'message.fromMe', 'data.fromMe', 'msg.fromMe', 'message.key.fromMe']);
+        $phone  = preg_replace('/\D/', '', $pick($in, ['number', 'from', 'phone', 'contact.number', 'ticket.contact.number', 'data.from', 'message.from', 'msg.from', 'message.chatid', 'message.sender', 'chat.phone', 'chat.wa_chatid']));
+        $text   = trim($pick($in, ['body', 'text', 'message.body', 'message.text', 'data.body', 'msg.body', 'message.content', 'message']));
         if ($fromMe === '1' || strtolower($fromMe) === 'true' || $phone === '' || $text === '') {
             echo json_encode(['success' => true, 'ignored' => true]);
             exit;
