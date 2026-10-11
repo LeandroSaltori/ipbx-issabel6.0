@@ -369,7 +369,10 @@ $exts_list = $db->query("SELECT * FROM extensions_config ORDER BY CAST(extension
                             </td>
 
                             <td class="py-3 px-3 text-slate-400 font-mono text-[11px]"><?php echo htmlspecialchars($ext['whatsapp_number'] ?: '-'); ?></td>
-                            <td class="py-3 px-3 text-right">
+                            <td class="py-3 px-3 text-right whitespace-nowrap">
+                                <button type="button" onclick="openExtHistory('<?php echo htmlspecialchars($ext['extension'], ENT_QUOTES); ?>', '<?php echo htmlspecialchars($ext['agent_name'], ENT_QUOTES); ?>')" style="white-space:nowrap !important;flex-shrink:0 !important;width:auto !important;overflow:visible !important;text-overflow:clip !important;" class="px-2.5 py-1 mr-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-bold border border-slate-700">
+                                    <i class="fa-solid fa-clock-rotate-left mr-1"></i> Histórico
+                                </button>
                                 <button type="button" onclick="openEditModal('<?php echo $ext['extension']; ?>', '<?php echo htmlspecialchars($ext['agent_name'], ENT_QUOTES); ?>', '<?php echo $ext['tech']; ?>', '<?php echo htmlspecialchars($ext['whatsapp_number'] ?? '', ENT_QUOTES); ?>', <?php echo !empty($ext['notify_agent_missed'])?1:0; ?>, <?php echo !empty($ext['notify_agent_internal'])?1:0; ?>, <?php echo !empty($ext['notify_client_busy'])?1:0; ?>, <?php echo !empty($ext['send_ai_summary'])?1:0; ?>)" class="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg text-xs transition font-bold">
                                     <i class="fa-solid fa-pen-to-square mr-1"></i> Editar
                                 </button>
@@ -519,5 +522,44 @@ function filterExtensionsTable() {
             r.style.display = 'none';
         }
     });
+}
+</script>
+
+<style>
+dialog#modal-hist-ramal { background:#1c1b2f; color:#e2e8f0; border:1px solid #3b3a5c; border-radius:16px; padding:0; width:min(900px,94vw); max-height:88vh; }
+dialog#modal-hist-ramal::backdrop { background: rgba(0,0,0,0.65); backdrop-filter: blur(4px); }
+</style>
+<script>
+function openExtHistory(ext, name) {
+    let d = document.getElementById('modal-hist-ramal');
+    if (!d) {
+        d = document.createElement('dialog');
+        d.id = 'modal-hist-ramal';
+        d.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid #3b3a5c;background:linear-gradient(90deg,#7c3aed,#6366f1);border-radius:16px 16px 0 0"><b id="hist-ramal-title" style="color:#fff;font-size:14px"></b><button type="button" id="hist-ramal-close" style="white-space:nowrap !important;flex-shrink:0 !important;width:auto !important;overflow:visible !important;text-overflow:clip !important;background:rgba(255,255,255,.15);color:#fff;border-radius:8px;padding:4px 12px;font-size:12px;font-weight:700">Fechar</button></div><div id="hist-ramal-body" style="padding:16px 18px;overflow:auto;max-height:72vh;font-size:12px"></div>';
+        document.body.appendChild(d);
+        d.querySelector('#hist-ramal-close').addEventListener('click', () => d.close());
+        d.addEventListener('click', e => { if (e.target === d) d.close(); });
+    }
+    const esc = t => String(t == null ? '' : t).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    d.querySelector('#hist-ramal-title').textContent = 'Histórico de envios — Ramal ' + ext + (name ? ' · ' + name : '');
+    const body = d.querySelector('#hist-ramal-body');
+    body.innerHTML = '<span style="color:#94a3b8">Carregando...</span>';
+    d.showModal();
+    fetch('index.php?api_action=get_ext_history&ext=' + encodeURIComponent(ext)).then(r => r.json()).then(j => {
+        if (!j.success) { body.innerHTML = '<span style="color:#fb7185">' + esc(j.error || 'Falha ao carregar') + '</span>'; return; }
+        if (!j.logs.length) { body.innerHTML = '<span style="color:#94a3b8">Nenhuma mensagem enviada por este ramal ainda.</span>'; return; }
+        let h = '<div style="display:flex;gap:8px;margin-bottom:12px"><span style="background:#10b98133;color:#6ee7b7;padding:3px 10px;border-radius:8px;font-weight:700">Sucesso: ' + j.totals.SUCCESS + '</span><span style="background:#f43f5e33;color:#fda4af;padding:3px 10px;border-radius:8px;font-weight:700">Erros: ' + j.totals.ERROR + '</span><span style="background:#33415566;color:#cbd5e1;padding:3px 10px;border-radius:8px;font-weight:700">Outros: ' + j.totals.OUTROS + '</span></div>';
+        j.logs.forEach(l => {
+            const ok = l.status === 'SUCCESS', bad = (l.status === 'ERROR' || l.status === 'FAILED');
+            const col = ok ? '#6ee7b7' : (bad ? '#fda4af' : '#cbd5e1');
+            h += '<div style="background:#252440;border:1px solid #3b3a5c;border-radius:12px;padding:10px 12px;margin-bottom:8px">'
+              + '<div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:6px"><span style="color:#a5b4fc;font-weight:700">' + esc(l.rule_type || '-') + '</span><span style="color:' + col + ';font-weight:700">' + esc(l.status) + '</span><span style="color:#94a3b8">' + esc(l.created_at) + '</span></div>'
+              + '<div style="color:#94a3b8;margin-bottom:4px">Para: <span style="font-family:monospace;color:#e2e8f0">' + esc(l.phone || '-') + '</span></div>'
+              + '<div style="white-space:pre-wrap;color:#e2e8f0">' + esc(l.message) + '</div>'
+              + (bad && l.response_raw ? '<div style="margin-top:6px;padding:6px 8px;background:#f43f5e1a;border-radius:8px;color:#fda4af;font-family:monospace;word-break:break-all">Retorno da API: ' + esc(l.response_raw) + '</div>' : '')
+              + '</div>';
+        });
+        body.innerHTML = h;
+    }).catch(e => { body.innerHTML = '<span style="color:#fb7185">Erro de comunicação: ' + esc(e.message) + '</span>'; });
 }
 </script>

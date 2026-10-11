@@ -185,6 +185,23 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
         exit;
     }
 
+    if ($action === 'get_ext_history') {
+        $ext = trim($_GET['ext'] ?? '');
+        header('Content-Type: application/json; charset=utf-8');
+        if ($ext === '' || !preg_match('/^[0-9A-Za-z_\-]{1,20}$/', $ext)) { echo json_encode(['success' => false, 'error' => 'Ramal inválido']); exit; }
+        $st = $db->prepare("SELECT id, phone, call_id, rule_type, message, status, response_raw, created_at FROM sent_logs WHERE extension = :e ORDER BY id DESC LIMIT 200");
+        $st->execute([':e' => $ext]);
+        $rows = $st->fetchAll(PDO::FETCH_ASSOC);
+        $tot = ['SUCCESS' => 0, 'ERROR' => 0, 'OUTROS' => 0];
+        foreach ($rows as &$r) {
+            $r['response_raw'] = mb_substr((string)$r['response_raw'], 0, 600);
+            if ($r['status'] === 'SUCCESS') $tot['SUCCESS']++; elseif ($r['status'] === 'ERROR' || $r['status'] === 'FAILED') $tot['ERROR']++; else $tot['OUTROS']++;
+        }
+        unset($r);
+        echo json_encode(['success' => true, 'ext' => $ext, 'totals' => $tot, 'logs' => $rows], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
     if ($action === 'get_logs') {
         $stmt = $db->query("SELECT * FROM sent_logs ORDER BY id DESC LIMIT 50");
         $logs = $stmt->fetchAll(PDO::FETCH_ASSOC);
