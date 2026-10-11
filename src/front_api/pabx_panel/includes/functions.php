@@ -5862,6 +5862,7 @@ function integrationStatusChecks() {
             $add('Bancos de dados', 'CDR (asteriskcdrdb)', 'ok', $last ? 'Última chamada registrada: ' . $last : 'Conectado, sem chamadas ainda.');
         } catch (Exception $e) { $add('Bancos de dados', 'CDR (asteriskcdrdb)', 'warn', 'Conectado, mas a tabela cdr não respondeu.'); }
     } else { $add('Bancos de dados', 'CDR (asteriskcdrdb)', 'fail', 'Não foi possível conectar ao MySQL.'); }
+    try { queueLogImportFromFile(); } catch (Throwable $e) {}
     $qdb = function_exists('getAsteriskDBConnection') ? getAsteriskDBConnection() : null;
     if ($qdb) {
         try {
@@ -6064,4 +6065,55 @@ function f2bUnban($jail, $ip) {
     if (!in_array($jail, ['sshd', 'asterisk', 'apache-auth', 'issabel-gui', 'ipbx-front-api'], true) || !f2bIpValid($ip) || !is_executable('/usr/bin/issabel-helper')) return false;
     @exec('/usr/bin/issabel-helper fb_client unban ' . escapeshellarg($jail) . ' ' . escapeshellarg($ip) . ' 2>&1', $o, $rc);
     return $rc === 0;
+}
+
+/**
+ * O Asterisk padrão grava /var/log/asterisk/queue_log em ARQUIVO. Se não existir tabela queue_log em nenhum banco
+ * (asterisk / asteriskcdrdb), importa o arquivo de forma incremental para asterisk.queue_log, que é o que os relatórios leem.
+ * Se a tabela já existir por outro meio (realtime), não faz nada. Retorna ['imported'=>n,'note'=>string].
+ */
+function queueLogImportFromFile($path = '/var/log/asterisk/queue_log') {
+    $r = ['imported' => 0, 'note' => ''];
+    if (!@is_readable($path)) { $r['note'] = 'arquivo ilegível'; return $r; }
+    $pdo = getAsteriskPdoConnection('asterisk');
+    if (!$pdo) { $r['note'] = 'sem conexão com o banco asterisk'; return $r; }
+    $managed = getSetting('queue_log_import_enabled') === '1';
+    if (!$managed) {
+        // só assume a tabela se ela não existir em nenhum dos dois bancos
+        foreach (['asterisk', 'asteriskcdrdb'] as $dbn) {
+            $c = ($dbn === 'asterisk') ? $pdo : getAsteriskPdoConnection($dbn);
+            if (!$c) continue;
+            try { $c->query("SELECT 1 FROM queue_log LIMIT 1"); $r['note'] = 'tabela queue_log já existe (não gerenciada)'; return $r; } catch (Exception $e) {}
+        }
+        try {
+            $pdo->exec("CREATE TABLE IF NOT EXISTS queue_log (id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY, time DATETIME NOT NULL, callid VARCHAR(64), queuename VARCHAR(64), agent VARCHAR(64), event VARCHAR(32), data1 VARCHAR(255), data2 VARCHAR(255), data3 VARCHAR(255), data4 VARCHAR(255), data5 VARCHAR(255), KEY idx_time (time), KEY idx_event (event), KEY idx_callid (callid))");
+            saveSetting('queue_log_import_enabled', '1');
+            saveSetting('queue_log_import_offset', '0');
+        } catch (Exception $e) { $r['note'] = 'não foi possível criar a tabela: ' . $e->getMessage(); return $r; }
+    }
+    clearstatcache(true, $path);
+    $size = (int)@filesize($path);
+    $off = (int)getSetting('queue_log_import_offset');
+    if ($size < $off) $off = 0; // arquivo rotacionado
+    if ($size === $off) return $r;
+    $fh = @fopen($path, 'r');
+    if (!$fh) return $r;
+    fseek($fh, $off);
+    $ins = $pdo->prepare("INSERT INTO queue_log (time, callid, queuename, agent, event, data1, data2, data3, data4, data5) VALUES (?,?,?,?,?,?,?,?,?,?)");
+    $n = 0; $pos = $off;
+    $pdo->beginTransaction();
+    while ($n < 20000 && ($line = fgets($fh)) !== false) {
+        if (substr($line, -1) !== "\n") break; // linha incompleta: lê na próxima rodada
+        $pos += strlen($line);
+        $f = explode('|', rtrim($line, "\r\n"));
+        if (count($f) < 5 || !ctype_digit($f[0]) || $f[4] === 'CONFIGRELOAD') continue;
+        $f = array_pad($f, 10, '');
+        $ins->execute([date('Y-m-d H:i:s', (int)$f[0]), $f[1], $f[2], $f[3], $f[4], $f[5], $f[6], $f[7], $f[8], $f[9]]);
+        $n++;
+    }
+    $pdo->commit();
+    fclose($fh);
+    saveSetting('queue_log_import_offset', (string)$pos);
+    $r['imported'] = $n;
+    return $r;
 }

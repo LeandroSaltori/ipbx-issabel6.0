@@ -9,6 +9,7 @@ if (PHP_SAPI !== 'cli') { http_response_code(404); exit; }
 require_once __DIR__ . '/../includes/functions.php';
 cronHeartbeat('send_queue_abandon');
 
+try { queueLogImportFromFile(); } catch (Throwable $e) { pabx_log('whatsapp', 'ERROR', 'Importação queue_log: ' . $e->getMessage()); }
 $ast = null;
 foreach (['asterisk', 'asteriskcdrdb'] as $dbname) {
     $conn = getAsteriskPdoConnection($dbname);
