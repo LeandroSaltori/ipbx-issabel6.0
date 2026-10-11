@@ -14,16 +14,24 @@ if (!is_dir(__DIR__ . '/../../config')) {
     @mkdir(__DIR__ . '/../../config', 0755, true);
 }
 
+// Senha padrão de fábrica: NUNCA no código. Vem da variável IPBX_SMTP_DEFAULT_PASSWORD ou do arquivo
+// /etc/ipbx/smtp_default.json ({"password":"..."}, legível pelo usuário do Apache). Ausente = SMTP sem senha até configurar.
+$__factoryPwd = (string)getenv('IPBX_SMTP_DEFAULT_PASSWORD');
+if ($__factoryPwd === '' && is_readable('/etc/ipbx/smtp_default.json')) {
+    $__fj = @json_decode((string)@file_get_contents('/etc/ipbx/smtp_default.json'), true);
+    if (is_array($__fj) && !empty($__fj['password'])) $__factoryPwd = (string)$__fj['password'];
+}
+
 // Configurações Padrão de Fábrica (Prisma Telecom)
 $defaultSmtpConfig = [
     'host'       => 'mail.prismatelecom.com',
     'port'       => '465',
     'user'       => 'suporte@prismatelecom.com',
-    'password'   => encryptSmtpPassword('ls251289@'),
+    'password'   => $__factoryPwd !== '' ? encryptSmtpPassword($__factoryPwd) : '',
     'security'   => 'ssl', // ssl, tls, none
     'from_email' => 'suporte@prismatelecom.com',
     'from_name'  => 'IPbx Prisma - Suporte',
-    'is_active'  => true
+    'is_active'  => $__factoryPwd !== ''
 ];
 
 $smtpConfig = $defaultSmtpConfig;
@@ -117,7 +125,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_type']) && $_P
         $smtpConfig['password'] = encryptSmtpPassword($inputPass);
     } elseif ($smtpConfig['host'] === 'mail.prismatelecom.com' && empty($smtpConfig['password'])) {
         // Mantém a senha padrão Prisma protegida se não for alterada
-        $smtpConfig['password'] = encryptSmtpPassword('ls251289@');
+        $smtpConfig['password'] = ($__factoryPwd !== '' ? encryptSmtpPassword($__factoryPwd) : '');
     }
 
     @file_put_contents($jsonSmtpFile, json_encode($smtpConfig, JSON_PRETTY_PRINT));
