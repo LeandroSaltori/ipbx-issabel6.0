@@ -10,7 +10,7 @@ $states = getExtensionFeatureStates();
 <div class="space-y-5">
     <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-5">
         <h2 class="text-lg font-extrabold text-white flex items-center gap-2"><i class="fa-solid fa-user-gear text-brand-400"></i> Autoatendimento do Ramal</h2>
-        <p class="text-xs text-slate-400 mt-1">Não Perturbe e desvios de chamada por ramal. As alterações valem na hora e aparecem também na interface nativa do Issabel (mesmo registro do Asterisk).</p>
+        <p class="text-xs text-slate-400 mt-1">Não Perturbe e desvios de chamada por ramal. As alterações valem na hora e aparecem também na interface nativa do PABX (mesmo registro do PABX).</p>
     </div>
     <div id="af-msg" class="hidden p-3 rounded-xl text-xs font-bold"></div>
     <div class="bg-slate-900/90 border border-slate-800 rounded-2xl overflow-x-auto">

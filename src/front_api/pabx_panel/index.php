@@ -52,7 +52,7 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
                 'success'    => true,
                 'extensions' => $res['extensions'] ?? 0,
                 'queues'     => $res['queues'] ?? 0,
-                'message'    => 'Sincronização com o PABX Asterisk concluída com sucesso!'
+                'message'    => 'Sincronização com o PABX concluída com sucesso!'
             ]);
         } catch (Exception $e) {
             echo json_encode(['success' => false, 'error' => 'Falha na sincronização com o PABX: ' . $e->getMessage()]);
@@ -466,7 +466,7 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
             echo json_encode([
                 'success' => $ok,
                 'message' => $ok ? "{$labels[$type]} iniciada: o ramal $sup_ext vai tocar; atenda para monitorar o ramal $target_ext." : null,
-                'error'   => $ok ? '' : (preg_match('/Message:\s*(.+)/i', $res['response'] ?? '', $mm) ? trim($mm[1]) : ($res['error'] ?? 'Asterisk recusou a ação.'))
+                'error'   => $ok ? '' : (preg_match('/Message:\s*(.+)/i', $res['response'] ?? '', $mm) ? trim($mm[1]) : ($res['error'] ?? 'PABX recusou a ação.'))
             ]);
             exit;
         }
@@ -558,7 +558,7 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
         $apiRes = $apiClient->originateCall($from, $to);
         echo json_encode([
             'success' => $apiRes['success'], 
-            'message' => $apiRes['success'] ? "Chamada disparada via REST API do ramal $from para $to!" : ($ami_res['error'] ?: 'Falha ao conectar no Asterisk')
+            'message' => $apiRes['success'] ? "Chamada disparada via REST API do ramal $from para $to!" : ($ami_res['error'] ?: 'Falha ao conectar no PABX')
         ]);
         exit;
     }
@@ -681,9 +681,9 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
         if ($pdo) {
             $stmt = $pdo->query("SELECT COUNT(*) FROM cdr");
             $count = $stmt ? $stmt->fetchColumn() : 0;
-            echo json_encode(['success' => true, 'message' => "⚡ Conexão com Banco MySQL (asteriskcdrdb) realizada com SUCESSO! Total de $count registros no CDR."]);
+            echo json_encode(['success' => true, 'message' => "⚡ Conexão com Banco MySQL (CDR) realizada com SUCESSO! Total de $count registros no CDR."]);
         } else {
-            echo json_encode(['success' => false, 'error' => 'Falha ao conectar no MySQL do Asterisk. Verifique host, usuário e senha.']);
+            echo json_encode(['success' => false, 'error' => 'Falha ao conectar no MySQL do PABX. Verifique host, usuário e senha.']);
         }
         exit;
     }
@@ -780,7 +780,7 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
         }
         if (!$row || empty($row['recordingfile'])) { echo json_encode(['success' => false, 'error' => 'Chamada ou gravação não encontrada no CDR.']); exit; }
         $path = findRecordingPath($row['recordingfile'], $row['calldate']);
-        if ($path === '') { echo json_encode(['success' => false, 'error' => 'Arquivo de gravação não encontrado em /var/spool/asterisk/monitor.']); exit; }
+        if ($path === '') { echo json_encode(['success' => false, 'error' => 'Arquivo de gravação não encontrado.']); exit; }
 
         $tr = aiTranscribeFile($path, $cfgA);
         if (!$tr['ok']) { echo json_encode(['success' => false, 'error' => 'Transcrição: ' . $tr['error']]); exit; }
@@ -1014,7 +1014,7 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
         }
 
         if (empty($audioFilePath)) {
-            echo json_encode(['success' => false, 'error' => 'Arquivo de áudio não encontrado na pasta do Asterisk.']);
+            echo json_encode(['success' => false, 'error' => 'Arquivo de áudio não encontrado na pasta do PABX.']);
             exit;
         }
 
@@ -1063,7 +1063,7 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
         if ($cfg['key'] === '')   $notice = 'IA não configurada em Configurações > Inteligência Artificial: exibindo apenas as métricas reais.';
         elseif (!$cfg['enabled']) $notice = 'Copiloto de IA desativado em Configurações: exibindo apenas as métricas reais.';
         elseif ($aiError !== '')  $notice = 'Falha na IA (' . $aiError . '): exibindo apenas as métricas reais.';
-        elseif (!$m['ok'])        $notice = 'Não foi possível ler o CDR (asteriskcdrdb).';
+        elseif (!$m['ok'])        $notice = 'Não foi possível ler o CDR.';
 
         echo json_encode([
             'success' => true,
@@ -2155,7 +2155,7 @@ if ($__route_perm !== '' && !hasUserPermission($__route_perm)) {
 
             } catch (err) {
                 if (label) label.innerHTML = `<span class="text-rose-400 font-bold"><i class="fa-solid fa-circle-xmark"></i> Erro WSS</span>`;
-                showWebphoneError("Erro de Conexão WebSocket", `Não foi possível abrir o socket em ${wss}. Abra a URL no navegador para aceitar o certificado SSL autoassinado do Asterisk.`);
+                showWebphoneError("Erro de Conexão WebSocket", `Não foi possível abrir o socket em ${wss}. Abra a URL no navegador para aceitar o certificado SSL autoassinado do PABX.`);
             }
         }
 
@@ -2222,7 +2222,7 @@ if ($__route_perm !== '' && !hasUserPermission($__route_perm)) {
             const icon = document.querySelector('#btn-header-sync i, header button i.fa-rotate');
             if (icon) icon.classList.add('fa-spin');
 
-            showToastNotification('Sincronização PABX', 'Sincronizando ramais e filas diretamente do Servidor PABX Asterisk...', 'info');
+            showToastNotification('Sincronização PABX', 'Sincronizando ramais e filas diretamente do Servidor PABX...', 'info');
 
             try {
                 const res = await fetch('index.php?api_action=sync_assets');
@@ -2293,7 +2293,7 @@ if ($__route_perm !== '' && !hasUserPermission($__route_perm)) {
                 if (json.success) {
                     showIaToast(`📞 Chamada Disparada! O seu ramal ${from} está tocando.`, true);
                 } else {
-                    alert(`⚠️ Falha ao Disparar Chamada via AMI:\n\n${json.error || 'Erro de comunicação no Asterisk'}`);
+                    alert(`⚠️ Falha ao Disparar Chamada via AMI:\n\n${json.error || 'Erro de comunicação no PABX'}`);
                 }
             } catch(e) {
                 alert("Erro ao conectar no servidor PABX: " + e.message);
@@ -2880,7 +2880,7 @@ if ($__route_perm !== '' && !hasUserPermission($__route_perm)) {
                 </div>
                 <div>
                     <h4 class="text-base font-black text-white">Sincronização Concluída!</h4>
-                    <p class="text-xs text-slate-400">Espelhamento direto com o Servidor PABX Asterisk</p>
+                    <p class="text-xs text-slate-400">Espelhamento direto com o Servidor PABX</p>
                 </div>
             </div>
 

@@ -30,7 +30,7 @@ $__btn = 'style="white-space:nowrap;flex-shrink:0;width:auto;overflow:visible"';
     <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div>
             <h2 class="text-lg font-extrabold text-white flex items-center gap-2"><i class="fa-solid fa-shield-halved text-rose-400"></i> Painel de Segurança</h2>
-            <p class="text-xs text-slate-400 mt-1">Tentativas de acesso indevido registradas pelo Asterisk e IPs bloqueados pelo fail2ban. Somente leitura.</p>
+            <p class="text-xs text-slate-400 mt-1">Tentativas de acesso indevido registradas pelo PABX e IPs bloqueados pelo fail2ban. Somente leitura.</p>
         </div>
         <div class="flex items-center gap-2 text-xs flex-wrap">
             <span class="px-2.5 py-1 rounded-lg border font-bold bg-amber-500/20 text-amber-300 border-amber-500/30"><?php echo count($__s['tentativas']); ?> tentativas recentes</span>
@@ -45,7 +45,7 @@ $__btn = 'style="white-space:nowrap;flex-shrink:0;width:auto;overflow:visible"';
     <?php if ($__err): ?><div class="bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs rounded-xl px-4 py-3"><?php echo htmlspecialchars($__err); ?></div><?php endif; ?>
     <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 text-xs space-y-3">
         <div class="font-extrabold text-slate-300 uppercase tracking-wider">Whitelist (IPs que nunca são bloqueados)</div>
-        <p class="text-slate-400">Sincronizada com o Fail2ban nativo do Issabel (Security &gt; Fail2ban): o que for salvo aqui aparece lá, e vice-versa.</p>
+        <p class="text-slate-400">Sincronizada com a proteção nativa do PABX: o que for salvo aqui vale também na configuração do servidor, e vice-versa.</p>
         <div class="flex flex-wrap gap-2">
             <?php foreach ($__wl as $w): ?>
             <form method="post" class="inline-flex items-center gap-2 px-2.5 py-1 rounded-lg border border-slate-600 text-slate-100"><span class="font-mono"><?php echo htmlspecialchars($w); ?></span>
@@ -59,8 +59,8 @@ $__btn = 'style="white-space:nowrap;flex-shrink:0;width:auto;overflow:visible"';
             <button class="px-4 py-2 rounded-lg bg-brand-600 hover:bg-brand-500 text-white font-bold" <?php echo $__btn; ?>><i class="fa-solid fa-plus"></i> Adicionar</button></form>
         <?php endif; ?>
         <?php if ($__jails): ?>
-        <div class="pt-2 text-slate-400">Jails ativos no Issabel: <?php foreach ($__jails as $j) echo '<span class="inline-block mr-2 px-2 py-0.5 rounded border border-slate-700 ' . ($j['enabled'] ? 'text-emerald-300' : 'text-slate-500') . '">' . htmlspecialchars($j['name']) . ' (' . (int)$j['maxretry'] . ' falhas / ' . (int)$j['bantime'] . 'h)</span>'; ?></div>
-        <?php else: ?><div class="pt-2 text-amber-300">Jails do Issabel não encontrados em /var/www/db/iptables.db: whitelist indisponível neste servidor.</div><?php endif; ?>
+        <div class="pt-2 text-slate-400">Jails ativos no PABX: <?php foreach ($__jails as $j) echo '<span class="inline-block mr-2 px-2 py-0.5 rounded border border-slate-700 ' . ($j['enabled'] ? 'text-emerald-300' : 'text-slate-500') . '">' . htmlspecialchars($j['name']) . ' (' . (int)$j['maxretry'] . ' falhas / ' . (int)$j['bantime'] . 'h)</span>'; ?></div>
+        <?php else: ?><div class="pt-2 text-amber-300">Configuração de bloqueios do PABX não encontrada: whitelist indisponível neste servidor.</div><?php endif; ?>
     </div>
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
         <div class="bg-slate-900/90 border border-slate-800 rounded-2xl overflow-hidden">

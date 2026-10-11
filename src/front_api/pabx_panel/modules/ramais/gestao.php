@@ -41,9 +41,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($ext_num !== false) {
             $ring_res = applyExtensionRingtime($ext_num, $ring_limit);
             if ($ring_res['success']) {
-                $msg .= $ring_limit > 0 ? " Tempo de toque do ramal $ext_num aplicado no Asterisk: {$ring_limit}s." : " Tempo de toque do ramal $ext_num volta ao padrão do PABX.";
+                $msg .= $ring_limit > 0 ? " Tempo de toque do ramal $ext_num aplicado no PABX: {$ring_limit}s." : " Tempo de toque do ramal $ext_num volta ao padrão do PABX.";
             } else {
-                $msg .= " Atenção: salvo no painel, mas não aplicado no Asterisk (" . $ring_res['error'] . ").";
+                $msg .= " Atenção: salvo no painel, mas não aplicado no PABX (" . $ring_res['error'] . ").";
             }
         }
     } elseif (isset($_POST['action_bulk_permissions'])) {

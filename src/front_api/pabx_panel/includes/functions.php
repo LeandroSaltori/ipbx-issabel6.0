@@ -156,7 +156,7 @@ function executeClickToCall($from_ext, $destination_num) {
     }
 
     if (!$authenticated || !$socket) {
-        $detail = !empty($last_error_reason) ? "Resposta do Asterisk: '$last_error_reason'" : "Credenciais recusadas pelo Asterisk";
+        $detail = !empty($last_error_reason) ? "Resposta do PABX: '$last_error_reason'" : "Credenciais recusadas pelo PABX";
         return ['success' => false, 'error' => "Falha de Autenticação no AMI ($host:$port). $detail. Certifique-se de que 'Habilitado para Web' está SIM no PABX e o usuário/senha estão corretos."];
     }
 
@@ -313,7 +313,7 @@ function pauseAsteriskQueueMember($queue, $iface, $pause = true, $paused = 1, $r
     if (stripos($raw, 'Response: Success') !== false) {
         return ['success' => true, 'error' => ''];
     }
-    $msg = 'Asterisk recusou a ação.';
+    $msg = 'PABX recusou a ação.';
     if (preg_match('/Message:\s*(.+)/i', $raw, $m)) $msg = trim($m[1]);
     return ['success' => false, 'error' => $msg];
 }
@@ -709,7 +709,7 @@ function syncPrismaAssets() {
                 }
             }
         }
-        return ['success' => true, 'extensions' => $ext_count, 'queues' => $queue_count, 'note' => 'Sincronizado via arquivos de configuração nativos do Issabel'];
+        return ['success' => true, 'extensions' => $ext_count, 'queues' => $queue_count, 'note' => 'Sincronizado via arquivos de configuração nativos do PABX'];
     }
 }
 
@@ -852,7 +852,7 @@ function getAsteriskTrunksStatus() {
                     'name' => $t_name,
                     'tech' => $t_tech,
                     'channelid' => (string)$r['channelid'],
-                    'status' => 'Sem verificação', // só vira Registrado/Desconectado se o Asterisk confirmar
+                    'status' => 'Sem verificação', // só vira Registrado/Desconectado se a central confirmar
                     'active_calls' => 0,
                     'channels' => []
                 ];
@@ -2365,7 +2365,7 @@ function getAsteriskQueueFullDetails($q_num, $ast_db = null) {
 
     // Max wait time
     $maxwait = $raw_kv['maxwait'] ?? null;
-    if ($cfg_found && $maxwait === '') $maxwait = '0'; // vazio no FreePBX = sem limite
+    if ($cfg_found && $maxwait === '') $maxwait = '0'; // vazio = sem limite
     if ($maxwait !== null && is_numeric($maxwait)) {
         $sec = intval($maxwait);
         if ($sec == 0) $details['max_wait_time_label'] = 'Sem Limite (Ilimitado)';
@@ -2646,7 +2646,7 @@ function resolveAsteriskDestinationTree($dest, $ast_db = null, $ext_names = [], 
         return [
             'type' => 'hangup',
             'title' => 'Encerrar Chamada (Hangup / Desconectar)',
-            'desc' => 'Conexão encerrada pelo PABX Asterisk',
+            'desc' => 'Conexão encerrada pelo PABX',
             'badge' => 'Fim de Chamada',
             'color' => 'rose'
         ];
@@ -2963,7 +2963,7 @@ function resolveAsteriskDestinationTree($dest, $ast_db = null, $ext_names = [], 
         return [
             'type' => 'hangup',
             'title' => $bh_title,
-            'desc' => 'Finalizado diretamente pelo PABX Asterisk',
+            'desc' => 'Finalizado diretamente pelo PABX',
             'badge' => 'Fim de Chamada',
             'color' => 'rose'
         ];
@@ -3054,7 +3054,7 @@ function getPABXInboundCallFlows() {
     // Sem rotas reais: NÃO inventa fluxo. A tela mostra o motivo.
     if (empty($flows)) {
         $GLOBALS['__flows_status'] = !$ast_db
-            ? 'Não foi possível conectar ao banco "asterisk" do Issabel (verifique /etc/amportal.conf e o MySQL).'
+            ? 'Não foi possível conectar ao banco de dados do PABX (verifique as credenciais em Configurações e o MySQL).'
             : (!empty($GLOBALS['__flows_error']) ? 'Erro ao ler as rotas de entrada: ' . $GLOBALS['__flows_error'] : 'Nenhuma rota de entrada (DID) cadastrada em Conectividade > Rotas de Entrada.');
     }
 
@@ -4209,7 +4209,7 @@ function saveAsteriskTimeGroupRule($tg_id, $tg_name, $time_start, $time_end, $w_
         $ast_db = getAsteriskDBConnection();
         if (!$ast_db) $ast_db = getAsteriskPdoConnection('asterisk');
     }
-    if (!$ast_db) return ['success' => false, 'message' => 'Sem conexão com banco Asterisk'];
+    if (!$ast_db) return ['success' => false, 'message' => 'Sem conexão com banco PABX'];
 
     try {
         if ($tg_id === 'NEW' || empty($tg_id)) {
@@ -4239,7 +4239,7 @@ function saveAsteriskTimeGroupRule($tg_id, $tg_name, $time_start, $time_end, $w_
 
         return [
             'success' => true,
-            'message' => "Regra de horário ('$rule_str') adicionada com sucesso ao PABX Issabel!",
+            'message' => "Regra de horário ('$rule_str') adicionada com sucesso ao PABX!",
             'timegroupid' => $tg_id,
             'rule' => $rule_str
         ];
@@ -4264,7 +4264,7 @@ function deleteAsteriskTimeGroupRule($detail_id, $ast_db = null) {
 
         applyFreepbxConfig($ast_db);
 
-        return ['success' => true, 'message' => 'Regra removida com sucesso do PABX Issabel!'];
+        return ['success' => true, 'message' => 'Regra removida com sucesso do PABX!'];
     } catch (Exception $e) {
         return ['success' => false, 'message' => 'Erro ao deletar regra: ' . $e->getMessage()];
     }
@@ -4371,7 +4371,7 @@ function updateAsteriskAnnouncementAudio($ann_id, $rec_id, $ast_db = null) {
 function syncCustomDestinationsWithAsterisk() {
     $ast_db = function_exists('getAsteriskPdoConnection') ? getAsteriskPdoConnection('asterisk') : null;
     if (!$ast_db) {
-        return ['success' => false, 'message' => 'Não foi possível conectar ao banco de dados MySQL do PABX Asterisk (asterisk).'];
+        return ['success' => false, 'message' => 'Não foi possível conectar ao banco de dados MySQL do PABX.'];
     }
 
     // 1. Inspecionar colunas reais da tabela custom_destinations no MySQL do PABX
@@ -4393,7 +4393,7 @@ function syncCustomDestinationsWithAsterisk() {
     }
 
     if (empty($cols)) {
-        return ['success' => false, 'message' => 'Tabela asterisk.custom_destinations não encontrada no MySQL do PABX.'];
+        return ['success' => false, 'message' => 'Tabela de destinos personalizados não encontrada no MySQL do PABX.'];
     }
 
     // Identificar a coluna chave de destino (custom_dest, custom_destination, destination, target, dest, id)
@@ -4487,7 +4487,7 @@ function syncCustomDestinationsWithAsterisk() {
 
         return [
             'success' => true,
-            'message' => "{$updated} Custom Destinations sincronizados com sucesso no PABX Asterisk!",
+            'message' => "{$updated} Custom Destinations sincronizados com sucesso no PABX!",
             'count'   => $updated
         ];
     } catch (Exception $e) {
@@ -4592,7 +4592,7 @@ function sendWhatsAppMessageViaZPro($api_url, $api_token, $number, $message, $ca
     }
 
     if (function_exists('pabx_log')) {
-        pabx_log('whatsapp', $ok ? 'INFO' : 'ERROR', "Envio AGI Z-PRO para {$clean_num} [HTTP {$http_code}]", [
+        pabx_log('whatsapp', $ok ? 'INFO' : 'ERROR', "Envio AGI Prismabot para {$clean_num} [HTTP {$http_code}]", [
             'payload' => $payload,
             'response' => $resp
         ]);
@@ -5362,7 +5362,7 @@ function asteriskBlacklistList() {
     if (empty($res['success'])) return ['success' => false, 'items' => [], 'error' => $res['error'] ?? 'Falha ao consultar o AMI.'];
     $items = [];
     foreach (preg_split('/\r?\n/', (string)($res['response'] ?? '')) as $line) {
-        $line = preg_replace('/^Output:\s*/i', '', trim($line)); // Asterisk 13+ prefixa cada linha com "Output:"
+        $line = preg_replace('/^Output:\s*/i', '', trim($line)); // versões recentes prefixam cada linha com "Output:"
         if (preg_match('#^/blacklist/(\S+)\s*:\s*(.*)$#', $line, $m)) {
             $val = trim($m[2]);
             $items[] = ['number' => $m[1], 'description' => ($val === '' || $val === '1') ? 'Bloqueado' : $val];
@@ -5377,9 +5377,9 @@ function asteriskBlacklistAdd($num, $desc = '') {
     $desc = trim(preg_replace('/[\r\n"]+/', ' ', (string)$desc));
     $res = executeAsteriskAMICommand('DBPut', ['Family' => 'blacklist', 'Key' => $n, 'Val' => ($desc !== '' ? mb_substr($desc, 0, 60) : '1')]);
     if (empty($res['success']) || stripos((string)($res['response'] ?? ''), 'Response: Success') === false) {
-        return ['success' => false, 'error' => $res['error'] ?? 'O Asterisk não confirmou a gravação.'];
+        return ['success' => false, 'error' => $res['error'] ?? 'O PABX não confirmou a gravação.'];
     }
-    if (function_exists('pabx_log')) pabx_log('user_actions', 'INFO', '[TELEFONIA] Número adicionado à blacklist do Issabel', ['numero' => $n]);
+    if (function_exists('pabx_log')) pabx_log('user_actions', 'INFO', '[TELEFONIA] Número adicionado à blacklist do PABX', ['numero' => $n]);
     return ['success' => true, 'error' => ''];
 }
 
@@ -5388,9 +5388,9 @@ function asteriskBlacklistDelete($num) {
     if ($n === '') return ['success' => false, 'error' => 'Número inválido.'];
     $res = executeAsteriskAMICommand('DBDel', ['Family' => 'blacklist', 'Key' => $n]);
     if (empty($res['success']) || stripos((string)($res['response'] ?? ''), 'Response: Success') === false) {
-        return ['success' => false, 'error' => $res['error'] ?? 'O Asterisk não confirmou a remoção.'];
+        return ['success' => false, 'error' => $res['error'] ?? 'O PABX não confirmou a remoção.'];
     }
-    if (function_exists('pabx_log')) pabx_log('user_actions', 'INFO', '[TELEFONIA] Número removido da blacklist do Issabel', ['numero' => $n]);
+    if (function_exists('pabx_log')) pabx_log('user_actions', 'INFO', '[TELEFONIA] Número removido da blacklist do PABX', ['numero' => $n]);
     return ['success' => true, 'error' => ''];
 }
 
@@ -5857,7 +5857,7 @@ function aiChatRun($history) {
     $sys = "Você é o assistente do IPbx Prisma, a central telefônica da Prisma Telecom. Hoje é " . date('d/m/Y H:i') . ". "
          . "Responda em português, curto e objetivo. Use SOMENTE dados retornados pelas ferramentas; nunca invente números, ramais ou ligações. "
          . "Se faltar informação (ex.: qual ramal), pergunte. Você só consulta; as únicas ações são: send_report (resumo por WhatsApp, só após o usuário confirmar o número) e propose_extension_feature (apenas PROPÕE; o usuário confirma por um botão e você nunca diz que foi feito antes disso). Para tabelas use markdown. Para gravações use recording_link e entregue o link em markdown [Ouvir gravação](url). "
-         . "Nunca cite os nomes Issabel, Asterisk, FreePBX, Elastix, Z-PRO ou ZPRO: o produto se chama IPbx Prisma e o serviço de WhatsApp se chama Prismabot. Se precisar falar da tecnologia, diga apenas \"o sistema\" ou \"a central\". "
+         . "Nunca cite nomes de softwares de terceiros da central telefônica nem do serviço de WhatsApp: o produto se chama IPbx Prisma e o serviço de WhatsApp se chama Prismabot. Se precisar falar da tecnologia, diga apenas \"o sistema\" ou \"a central\". "
          . "Se o usuário pedir algo fora do escopo do PABX, explique educadamente o que você pode fazer.";
     if ($cfg['prompt'] !== '') $sys = $cfg['prompt'] . "\n\n" . $sys;
     $msgs = [['role' => 'system', 'content' => $sys]];
@@ -5985,18 +5985,18 @@ function integrationStatusChecks() {
 
     // --- Asterisco / AMI
     $ami = executeAsteriskAMICommand('Ping');
-    $add('Asterisk', 'AMI (porta 5038)', !empty($ami['success']) ? 'ok' : 'fail', !empty($ami['success']) ? 'Autenticado e respondendo.' : ($ami['error'] ?? 'Sem resposta.'));
+    $add('Central (PABX)', 'AMI (porta 5038)', !empty($ami['success']) ? 'ok' : 'fail', !empty($ami['success']) ? 'Autenticado e respondendo.' : ($ami['error'] ?? 'Sem resposta.'));
     $up = trim(asteriskCliOutput('core show uptime'));
-    $add('Asterisk', 'Console do Asterisk', $up !== '' ? 'ok' : 'warn', $up !== '' ? preg_replace('/\s+/', ' ', substr($up, 0, 110)) : 'Sem saída do comando "core show uptime".');
+    $add('Central (PABX)', 'Console do PABX', $up !== '' ? 'ok' : 'warn', $up !== '' ? preg_replace('/\s+/', ' ', substr($up, 0, 110)) : 'Sem resposta do console do PABX.');
 
     // --- Bancos
     $cdr = getAsteriskPdoConnection('asteriskcdrdb');
     if ($cdr) {
         try {
             $last = $cdr->query("SELECT MAX(calldate) FROM cdr")->fetchColumn();
-            $add('Bancos de dados', 'CDR (asteriskcdrdb)', 'ok', $last ? 'Última chamada registrada: ' . $last : 'Conectado, sem chamadas ainda.');
-        } catch (Exception $e) { $add('Bancos de dados', 'CDR (asteriskcdrdb)', 'warn', 'Conectado, mas a tabela cdr não respondeu.'); }
-    } else { $add('Bancos de dados', 'CDR (asteriskcdrdb)', 'fail', 'Não foi possível conectar ao MySQL.'); }
+            $add('Bancos de dados', 'CDR (registro de chamadas)', 'ok', $last ? 'Última chamada registrada: ' . $last : 'Conectado, sem chamadas ainda.');
+        } catch (Exception $e) { $add('Bancos de dados', 'CDR (registro de chamadas)', 'warn', 'Conectado, mas a tabela cdr não respondeu.'); }
+    } else { $add('Bancos de dados', 'CDR (registro de chamadas)', 'fail', 'Não foi possível conectar ao MySQL.'); }
     try { queueLogImportFromFile(); } catch (Throwable $e) {}
     $qdb = function_exists('getAsteriskDBConnection') ? getAsteriskDBConnection() : null;
     if ($qdb) {
@@ -6007,12 +6007,12 @@ function integrationStatusChecks() {
     } else { $add('Bancos de dados', 'queue_log (filas)', 'fail', 'Não foi possível conectar ao banco "asterisk".'); }
     $nx = 0; $nq = 0;
     try { $nx = (int)$db->query("SELECT COUNT(*) FROM extensions_config")->fetchColumn(); $nq = (int)$db->query("SELECT COUNT(*) FROM queues_config")->fetchColumn(); } catch (Exception $e) {}
-    $add('Bancos de dados', 'Ramais e filas sincronizados', ($nx > 0 ? 'ok' : 'warn'), "$nx ramais e $nq filas lidos do Issabel.");
+    $add('Bancos de dados', 'Ramais e filas sincronizados', ($nx > 0 ? 'ok' : 'warn'), "$nx ramais e $nq filas lidos do PABX.");
     try { saveSetting('status_probe', (string)time()); $w2 = true; } catch (Exception $e) { $w2 = false; }
     $add('Bancos de dados', 'Configurações do painel (SQLite)', $w2 ? 'ok' : 'fail', $w2 ? 'Leitura e escrita funcionando.' : 'Sem permissão de escrita no banco do painel.');
 
     $pa = pbxapiAvailable();
-    $add('Asterisk', 'REST API do PABX (opcional)', $pa ? 'ok' : 'off', $pa ? 'Respondendo e autenticada.' : 'Não utilizada: o painel lê direto do banco e do AMI do Issabel.');
+    $add('Central (PABX)', 'REST API do PABX (opcional)', $pa ? 'ok' : 'off', $pa ? 'Respondendo e autenticada.' : 'Não utilizada: o painel lê direto do banco e do gerenciador (AMI) do PABX.');
 
     // --- Gravações
     $mon = '/var/spool/asterisk/monitor';
@@ -6023,7 +6023,7 @@ function integrationStatusChecks() {
     // --- WhatsApp
     $prov = waProvider();
     $conf = whatsappProviderConfigured();
-    $add('WhatsApp', 'Servidor de envio', $conf ? 'ok' : 'fail', ($prov === 'uazapi' ? 'uazapi' : 'Prismabot / Z-PRO') . ($conf ? ': credenciais preenchidas.' : ': credenciais incompletas.'));
+    $add('WhatsApp', 'Servidor de envio', $conf ? 'ok' : 'fail', ($prov === 'uazapi' ? 'uazapi' : 'Prismabot') . ($conf ? ': credenciais preenchidas.' : ': credenciais incompletas.'));
     if ($prov === 'uazapi' && $conf) {
         $u = uazapiRequest('GET', '/instance/status', null, 6);
         $d = json_decode($u['resp'], true);
@@ -6089,7 +6089,7 @@ function securityOverview() {
         if ($t !== null && stripos($t, 'SecurityEvent=') !== false) { $txt = $t; $origem = $f; break; }
     }
     if ($txt === null) {
-        $res['avisos'][] = 'Log de segurança do Asterisk não encontrado ou sem permissão de leitura (/var/log/asterisk/security_log). Habilite "security" em logger.conf.';
+        $res['avisos'][] = 'Registro de segurança do PABX não encontrado ou sem permissão de leitura. Peça ao suporte para habilitar o registro de segurança.';
     } else {
         $bad = ['InvalidAccountID', 'InvalidPassword', 'ChallengeResponseFailed', 'FailedACL', 'InvalidTransport', 'AuthMethodNotAllowed', 'ChallengeSentFailed'];
         $lines = array_slice(preg_split('/\r?\n/', $txt), -6000);
@@ -6111,7 +6111,7 @@ function securityOverview() {
     // 2) Bloqueios do fail2ban (log)
     $f2b = securityTailFile('/var/log/fail2ban.log');
     if ($f2b === null) {
-        $res['avisos'][] = 'Log do fail2ban (/var/log/fail2ban.log) não encontrado ou sem permissão de leitura.';
+        $res['avisos'][] = 'Registro de bloqueios do fail2ban não encontrado ou sem permissão de leitura.';
     } else {
         $state = [];
         foreach (preg_split('/\r?\n/', $f2b) as $ln) {
@@ -6159,7 +6159,7 @@ function f2bWhitelistSave(array $ips) {
     foreach ($ips as $ip) { $ip = trim($ip); if ($ip !== '' && f2bIpValid($ip)) $clean[$ip] = true; }
     $value = trim('127.0.0.1 ' . implode(' ', array_keys($clean)));
     $path = f2bNativeDbPath();
-    if (!@is_writable($path)) return ['ok' => false, 'msg' => 'Banco de jails do Issabel sem permissão de escrita.'];
+    if (!@is_writable($path)) return ['ok' => false, 'msg' => 'Banco de jails do PABX sem permissão de escrita.'];
     try {
         $p = new PDO('sqlite:' . $path);
         $p->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
@@ -6181,7 +6181,7 @@ function f2bWhitelistSave(array $ips) {
         @exec('/usr/bin/issabel-helper fb_client reload 2>&1', $o, $rc);
         $applied = ($rc === 0);
     }
-    return ['ok' => $applied, 'msg' => $applied ? 'Whitelist salva e aplicada no Fail2ban do Issabel.' : 'Whitelist salva no Issabel, mas não foi possível recarregar o Fail2ban agora (será aplicada ao recarregar em Security > Fail2ban).'];
+    return ['ok' => $applied, 'msg' => $applied ? 'Whitelist salva e aplicada no Fail2ban do PABX.' : 'Whitelist salva no PABX, mas não foi possível recarregar o Fail2ban agora (será aplicada ao recarregar em Security > Fail2ban).'];
 }
 /** IPs banidos agora, pelo mesmo comando da tela nativa (Security > Fail2ban Banned IPs). */
 function f2bBannedNative() {

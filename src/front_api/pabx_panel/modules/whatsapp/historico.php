@@ -144,7 +144,7 @@ if (isset($_GET['export']) && in_array($_GET['export'], ['csv', 'xlsx', 'pdf'], 
                                                 <?php echo htmlspecialchars($dst_display); ?>
                                             </button>
                                         <?php elseif ($dst_contact && isset($dst_contact['source']) && $dst_contact['source'] == 'Issabel'): ?>
-                                            <?php $tooltip = "Agenda Issabel\nNome: " . $dst_contact['name'] . "\nTelefone: " . $dst_contact['phone']; ?>
+                                            <?php $tooltip = "Agenda PABX\nNome: " . $dst_contact['name'] . "\nTelefone: " . $dst_contact['phone']; ?>
                                             <button type="button" onclick="openGlobalAddContactModal('<?php echo htmlspecialchars($dst_contact['phone']); ?>', '', '<?php echo htmlspecialchars($dst_contact['name'], ENT_QUOTES); ?>', '', '', '', '')" title="<?php echo htmlspecialchars($tooltip); ?>" class="hover:underline hover:text-emerald-300 transition text-left cursor-pointer">
                                                 <?php echo htmlspecialchars($dst_display); ?>
                                             </button>

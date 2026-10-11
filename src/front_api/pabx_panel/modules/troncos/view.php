@@ -19,7 +19,7 @@
         </div>
 
         <div id="trunks-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            <div class="col-span-full text-center py-6 text-slate-500 text-xs">Consultando troncos configurados no Asterisk...</div>
+            <div class="col-span-full text-center py-6 text-slate-500 text-xs">Consultando troncos configurados no PABX...</div>
         </div>
     </div>
 </div>

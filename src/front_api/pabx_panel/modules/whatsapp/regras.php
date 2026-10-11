@@ -37,7 +37,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (function_exists('syncCustomDestinationsWithAsterisk')) {
             $syncRes = syncCustomDestinationsWithAsterisk();
             if (!empty($syncRes['success'])) {
-                $msg = "Regras de mensagens salvas e sincronizadas automaticamente no PABX Asterisk!";
+                $msg = "Regras de mensagens salvas e sincronizadas automaticamente no PABX!";
             } else {
                 $msg = "Regras de mensagens salvas com sucesso! (Aviso PABX: " . $syncRes['message'] . ")";
             }
@@ -103,7 +103,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $msg = "🚀 Mensagem de teste enviada com SUCESSO para o WhatsApp " . htmlspecialchars($clean_test_phone) . "! Verifique a mensagem no seu celular.";
                 $msg_type = 'success';
             } else {
-                $err_detail = !empty($res['error']) ? $res['error'] : 'Erro na comunicação cURL/API Z-PRO';
+                $err_detail = !empty($res['error']) ? $res['error'] : 'Erro na comunicação cURL/API Prismabot';
                 $msg = "⚠️ FALHA no disparo de teste para {$clean_test_phone}: " . htmlspecialchars($err_detail);
                 $msg_type = 'error';
             }
@@ -185,7 +185,7 @@ $nps_msg      = getRule('nps_msg')                   ?: $DEFAULT_TEMPLATES['nps_
                     <h3 class="text-sm font-bold text-white flex items-center gap-2">
                         <i class="fa-solid fa-wand-magic-sparkles text-emerald-400"></i> Modelos de Notificação WhatsApp (URA, Filas & Transbordo)
                     </h3>
-                    <span class="text-xs text-slate-400">Edite as mensagens disparadas pelo PABX Asterisk para clientes e atendentes</span>
+                    <span class="text-xs text-slate-400">Edite as mensagens disparadas pelo PABX para clientes e atendentes</span>
                 </div>
                 <button type="submit" name="action_restore_defaults" onclick="return confirm('Deseja restaurar todas as mensagens para o padrão de fábrica da Prisma Telecom?')" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-bold rounded-lg border border-slate-700 transition flex items-center gap-1.5">
                     <i class="fa-solid fa-rotate-left text-amber-400"></i> Restaurar Padrões de Fábrica
@@ -314,7 +314,7 @@ $nps_msg      = getRule('nps_msg')                   ?: $DEFAULT_TEMPLATES['nps_
                 <h3 class="text-sm font-bold text-white flex items-center gap-2">
                     <i class="fa-solid fa-paper-plane text-emerald-400"></i> Sandbox de Teste de Disparo Real de WhatsApp
                 </h3>
-                <span class="text-xs text-slate-400">Insira um número de celular abaixo para validar a entrega da mensagem via API Z-PRO em tempo real</span>
+                <span class="text-xs text-slate-400">Insira um número de celular abaixo para validar a entrega da mensagem via API Prismabot em tempo real</span>
             </div>
             <span class="px-2.5 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-[10px] font-bold uppercase tracking-wider">
                 Validação em Tempo Real

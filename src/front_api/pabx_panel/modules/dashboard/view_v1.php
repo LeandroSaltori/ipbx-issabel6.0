@@ -738,7 +738,7 @@ if ($ast_db) {
     <!-- BLOCO 2: MONITORAMENTO DE FILAS REAIS + AUTOMAÇÃO WHATSAPP & NPS -->
     <div class="grid grid-cols-1 lg:grid-cols-4 gap-4">
 
-        <!-- Filas Reais do Asterisk (Exibe as filas cadastradas no PABX) -->
+        <!-- Filas Reais do PABX (Exibe as filas cadastradas no PABX) -->
         <?php if (!empty($real_queues)): ?>
             <?php foreach (array_slice($real_queues, 0, 2) as $rq): ?>
                 <?php 
@@ -747,7 +747,7 @@ if ($ast_db) {
                 $callers_waiting_cnt = isset($rt_info['callers_waiting']) && is_array($rt_info['callers_waiting']) ? count($rt_info['callers_waiting']) : 0;
                 $longest_wait_str = isset($rt_info['longest_wait']) && !empty($rt_info['longest_wait']) ? $rt_info['longest_wait'] : '0s';
                 ?>
-                <div title="Fila de atendimento de voz configurada no servidor Asterisk PABX" class="bg-slate-900/90 border border-slate-800 p-4 rounded-2xl shadow-xl flex flex-col justify-between space-y-3 hover:border-slate-700 transition">
+                <div title="Fila de atendimento de voz configurada no servidor PABX" class="bg-slate-900/90 border border-slate-800 p-4 rounded-2xl shadow-xl flex flex-col justify-between space-y-3 hover:border-slate-700 transition">
                     <div class="flex items-center justify-between">
                         <h3 class="text-xs font-extrabold text-white uppercase tracking-wider flex items-center gap-2">
                             <i class="fa-solid fa-headset text-brand-400"></i> <?php echo htmlspecialchars(formatEndpointName($rq['queue_num'])); ?>
@@ -772,7 +772,7 @@ if ($ast_db) {
                 </div>
             <?php endforeach; ?>
         <?php else: ?>
-            <!-- Caso não tenha filas ativas cadastradas no Asterisk -->
+            <!-- Caso não tenha filas ativas cadastradas no PABX -->
             <div title="Status das filas de atendimento telefônico receptivo da central" class="bg-slate-900/90 border border-slate-800 p-4 rounded-2xl shadow-xl flex flex-col justify-between space-y-3 lg:col-span-2">
                 <div class="flex items-center justify-between">
                     <h3 class="text-xs font-extrabold text-white uppercase tracking-wider flex items-center gap-2">
@@ -812,7 +812,7 @@ if ($ast_db) {
                 <?php else: ?>
                     <div class="py-1">
                         <span class="text-xs font-bold text-slate-400 block">Sem disparos ativados</span>
-                        <span class="text-[10px] text-slate-500 block mt-0.5">Módulo WhatsApp/ZPRO não configurado.</span>
+                        <span class="text-[10px] text-slate-500 block mt-0.5">Módulo WhatsApp/Prismabot não configurado.</span>
                     </div>
                 <?php endif; ?>
             </div>
@@ -857,7 +857,7 @@ if ($ast_db) {
         <div class="p-5 border-b border-slate-800 flex items-center justify-between">
             <div>
                 <h3 class="text-sm font-extrabold text-white flex items-center gap-2">
-                    <i class="fa-solid fa-microphone text-brand-400"></i> Gravações do Asterisk CDR & Transcrição IA
+                    <i class="fa-solid fa-microphone text-brand-400"></i> Gravações do CDR & Transcrição IA
                 </h3>
                 <span class="text-xs text-slate-400">Ouça os áudios gravados ou solicite a transcrição em texto via IA sob demanda</span>
             </div>
@@ -1433,7 +1433,7 @@ async function openKpiDetailModal(kpiType) {
         <tr>
             <td colspan="7" class="py-12 text-center text-slate-500 font-sans">
                 <i class="fa-solid fa-spinner fa-spin text-brand-400 text-2xl block mb-3 mx-auto"></i>
-                Consultando chamadas reais do Asterisk PABX...
+                Consultando chamadas reais do PABX...
             </td>
         </tr>
     `;

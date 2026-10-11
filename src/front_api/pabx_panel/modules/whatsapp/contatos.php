@@ -384,7 +384,7 @@ $active_tab = isset($_GET['crm_tab']) ? $_GET['crm_tab'] : 'contacts';
                         </td>
                         <td class="p-3">
                             <span class="px-2 py-0.5 rounded text-[9px] font-bold <?php echo $srcCls; ?>">
-                                <?php echo htmlspecialchars($c['source']); ?>
+                                <?php echo htmlspecialchars(aiBrandScrub((string)$c['source'])); ?>
                             </span>
                         </td>
                         <td class="p-3 text-right">

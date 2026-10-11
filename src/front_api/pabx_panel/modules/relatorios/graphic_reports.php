@@ -700,7 +700,7 @@ async function submitWhatsAppReport() {
 
         <!-- Footer -->
         <div class="flex items-center justify-between border-t border-slate-800 pt-3 flex-shrink-0 text-xs">
-            <span class="text-slate-500 font-mono text-[11px]"><i class="fa-solid fa-shield-halved text-emerald-400"></i> Dados auditados diretamente da base Asterisk CDR</span>
+            <span class="text-slate-500 font-mono text-[11px]"><i class="fa-solid fa-shield-halved text-emerald-400"></i> Dados auditados diretamente da base CDR</span>
             <button onclick="closeKpiCallsModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl transition text-xs">
                 Fechar Janela
             </button>

@@ -39,7 +39,7 @@ function auditMaskPhone($v) {
 
 function auditApiLabels() {
     return [
-        'sync_assets' => 'Sincronizou ramais/filas/troncos do Issabel',
+        'sync_assets' => 'Sincronizou ramais/filas/troncos do PABX',
         'fop_action' => 'Executou ação no painel de operador (FOP)',
         'originate_call' => 'Originou chamada',
         'save_contact' => 'Salvou contato',

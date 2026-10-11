@@ -119,7 +119,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             return '';
         };
         if (isset($_POST['action_save_wa_provider'])) {
-            $msg_status = $prov === 'uazapi' ? "Servidor de envio: UAZAPI. Todas as mensagens passam a sair por ela." : "Servidor de envio: API Prismabot / Z-PRO.";
+            $msg_status = $prov === 'uazapi' ? "Servidor de envio: UAZAPI. Todas as mensagens passam a sair por ela." : "Servidor de envio: API Prismabot.";
             logUserAction("Servidor de envio WhatsApp", $prov, "CONFIG");
         } elseif (isset($_POST['action_test_uazapi'])) {
             $r = uazapiRequest('GET', '/instance/status', null, 8);
@@ -212,19 +212,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $msg_error = "⚠️ Erro de Conexão cURL com Prismabot: " . $curlErr;
                     logSystemError("Erro cURL Teste Prismabot", ['error' => $curlErr, 'url' => $bot_url]);
                 } elseif ($httpCode >= 200 && $httpCode < 300) {
-                    $msg_status = "⚡ Conexão com API Prismabot / Z-PRO realizada com SUCESSO! (HTTP $httpCode)";
+                    $msg_status = "⚡ Conexão com API Prismabot realizada com SUCESSO! (HTTP $httpCode)";
                     logUserAction("Teste Prismabot API", "Conexão bem sucedida HTTP $httpCode", "CONFIG");
                 } elseif (strpos((string)$out, 'ERR_API_REQUIRES_SESSION') !== false || ($httpCode >= 400 && $httpCode < 500 && $httpCode !== 403 && $httpCode !== 404)) {
-                    $msg_status = "⚡ API Z-PRO / Prismabot ALCANÇADA com sucesso! A URL do Endpoint é válida e responde a requisições POST (HTTP $httpCode).";
-                    logUserAction("Teste Prismabot API", "API Z-PRO ativa HTTP $httpCode", "CONFIG");
+                    $msg_status = "⚡ API Prismabot ALCANÇADA com sucesso! A URL do Endpoint é válida e responde a requisições POST (HTTP $httpCode).";
+                    logUserAction("Teste Prismabot API", "API Prismabot ativa HTTP $httpCode", "CONFIG");
                 } elseif ($httpCode === 403) {
-                    $msg_error = "⚠️ Falha de Autenticação (HTTP 403: Invalid Token). O token fornecido não foi aceito pela API Z-PRO / Prismabot.";
+                    $msg_error = "⚠️ Falha de Autenticação (HTTP 403: Invalid Token). O token fornecido não foi aceito pela API Prismabot.";
                     logSystemError("Erro Auth 403 Teste Prismabot", ['response' => $out, 'url' => $bot_url]);
                 } elseif ($httpCode === 404) {
-                    $msg_error = "⚠️ Endpoint não encontrado (HTTP 404). Verifique se a URL da API Z-PRO foi colada corretamente.";
+                    $msg_error = "⚠️ Endpoint não encontrado (HTTP 404). Verifique se a URL da API Prismabot foi colada corretamente.";
                     logSystemError("Erro HTTP 404 Teste Prismabot", ['url' => $bot_url]);
                 } else {
-                    $msg_status = "⚡ API Prismabot/Z-PRO alcançada com código HTTP $httpCode.";
+                    $msg_status = "⚡ API Prismabot alcançada com código HTTP $httpCode.";
                     logUserAction("Teste Prismabot API", "Status HTTP $httpCode", "CONFIG");
                 }
                 }
@@ -251,9 +251,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } else {
                 $err_detail = $res['error'] ?? 'Erro desconhecido no envio';
                 if (strpos($err_detail, 'ERR_API_REQUIRES_SESSION') !== false) {
-                    $msg_error = "⚠️ Falha no envio (HTTP 400: ERR_API_REQUIRES_SESSION). A instância do WhatsApp no painel Z-PRO está desconectada (necessita escanear o QR Code no Z-PRO) ou requer a inclusão do ID da Sessão (WhatsApp ID).";
+                    $msg_error = "⚠️ Falha no envio (HTTP 400: ERR_API_REQUIRES_SESSION). A instância do WhatsApp no painel Prismabot está desconectada (necessita escanear o QR Code no Prismabot) ou requer a inclusão do ID da Sessão (WhatsApp ID).";
                 } elseif (strpos($err_detail, '403') !== false) {
-                    $msg_error = "⚠️ Falha de Autenticação (HTTP 403: Invalid Token). Verifique se o Token colado em Configurações é o token ativo no Z-PRO.";
+                    $msg_error = "⚠️ Falha de Autenticação (HTTP 403: Invalid Token). Verifique se o Token colado em Configurações é o token ativo no Prismabot.";
                 } else {
                     $msg_error = "⚠️ Falha ao disparar mensagem de teste: " . htmlspecialchars($err_detail);
                 }
@@ -291,16 +291,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
                         PDO::ATTR_TIMEOUT => 3
                     ]);
-                    $msg_status = "🗄️ Conexão com o Banco de Dados MySQL (asteriskcdrdb) realizada com SUCESSO!";
+                    $msg_status = "🗄️ Conexão com o Banco de Dados MySQL (CDR) realizada com SUCESSO!";
                 } catch (Exception $em) {
-                    logSystemError("Falha conexao MySQL Asterisk", ['error' => $em->getMessage(), 'host' => $m_host]);
+                    logSystemError("Falha conexao MySQL PABX", ['error' => $em->getMessage(), 'host' => $m_host]);
                     $msg_error = "Falha ao conectar no MySQL: " . $em->getMessage();
                 }
             } else {
                 $msg_status = "Configurações do Banco MySQL salvas com sucesso!";
             }
         } catch (Exception $e) {
-            logSystemError("Erro ao salvar dados MySQL Asterisk", ['error' => $e->getMessage()]);
+            logSystemError("Erro ao salvar dados MySQL PABX", ['error' => $e->getMessage()]);
             $msg_error = "Erro ao salvar dados do MySQL: " . $e->getMessage();
         }
     } elseif (isset($_POST['action_reset_mysql'])) {
@@ -509,7 +509,7 @@ if (empty($currentPbxToken) && !empty($currentPbxPass) && $_SERVER['REQUEST_METH
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <label class="flex items-start gap-3 p-4 rounded-xl border border-slate-800 bg-slate-950 cursor-pointer">
                         <input type="radio" name="wa_provider" value="zpro" <?php echo $__prov === 'zpro' ? 'checked' : ''; ?> onchange="toggleWaProvider()" class="mt-1 accent-amber-500">
-                        <span><b class="text-slate-100">API Prismabot (Z-PRO)</b><br><span class="text-slate-400">Para clientes com o serviço Prismabot contratado. Configurada na seção abaixo.</span></span>
+                        <span><b class="text-slate-100">API Prismabot</b><br><span class="text-slate-400">Para clientes com o serviço Prismabot contratado. Configurada na seção abaixo.</span></span>
                     </label>
                     <label class="flex items-start gap-3 p-4 rounded-xl border border-slate-800 bg-slate-950 cursor-pointer">
                         <input type="radio" name="wa_provider" value="uazapi" <?php echo $__prov === 'uazapi' ? 'checked' : ''; ?> onchange="toggleWaProvider()" class="mt-1 accent-emerald-500">
@@ -584,8 +584,8 @@ if (empty($currentPbxToken) && !empty($currentPbxPass) && $_SERVER['REQUEST_METH
                                 <i class="fa-solid fa-diagram-project text-lg"></i>
                             </div>
                             <div>
-                                <h4 class="text-sm font-bold text-cyan-200">Custom Destinations do PABX Asterisk (Sincronização Ativa)</h4>
-                                <p class="text-[11px] text-slate-400">Estes 4 Custom Destinations são gravados na tabela <code class="text-cyan-300">asterisk.custom_destinations</code> do PABX Asterisk com os modelos de mensagem em tempo real no campo Notes!</p>
+                                <h4 class="text-sm font-bold text-cyan-200">Custom Destinations do PABX (Sincronização Ativa)</h4>
+                                <p class="text-[11px] text-slate-400">Estes 4 Custom Destinations são gravados na tabela de destinos personalizados do PABX com os modelos de mensagem em tempo real no campo Notes!</p>
                             </div>
                         </div>
                         <div class="flex items-center gap-2">
@@ -669,7 +669,7 @@ if (empty($currentPbxToken) && !empty($currentPbxPass) && $_SERVER['REQUEST_METH
             </form>
             </div><!-- /wa-zpro-fields -->
 
-            <!-- WEBHOOK DE RESPOSTAS NPS (Z-PRO -> PABX) -->
+            <!-- WEBHOOK DE RESPOSTAS NPS (Prismabot -> PABX) -->
             <?php
                 $wh_token = getSetting('webhook_token');
                 if (empty($wh_token)) { $wh_token = bin2hex(random_bytes(16)); saveSetting('webhook_token', $wh_token); }
@@ -683,7 +683,7 @@ if (empty($currentPbxToken) && !empty($currentPbxPass) && $_SERVER['REQUEST_METH
                         <i class="fa-solid fa-star text-amber-400 text-base"></i>
                         <strong class="text-white text-xs">Webhook de respostas da Pesquisa NPS</strong>
                     </div>
-                    <p class="text-[11px] text-slate-400">Cadastre esta URL como webhook de mensagens recebidas no Z-PRO. Respostas de 1 a 5 a uma pesquisa NPS enviada nas últimas 48h são gravadas no painel.</p>
+                    <p class="text-[11px] text-slate-400">Cadastre esta URL como webhook de mensagens recebidas no Prismabot. Respostas de 1 a 5 a uma pesquisa NPS enviada nas últimas 48h são gravadas no painel.</p>
                     <input type="text" readonly value="<?php echo htmlspecialchars($wh_url); ?>" onclick="this.select()" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-[11px] font-mono text-amber-200">
                 </div>
             </div>
@@ -753,7 +753,7 @@ if (empty($currentPbxToken) && !empty($currentPbxPass) && $_SERVER['REQUEST_METH
                         </div>
                         <div class="md:col-span-8">
                             <label class="block font-bold text-slate-400 mb-1 text-[10px]">Mensagem de Teste</label>
-                            <input type="text" name="test_wa_msg" value="Olá! Teste de disparo instantâneo IPbx Prisma x Z-PRO / Prismabot WhatsApp API." required class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-white font-mono">
+                            <input type="text" name="test_wa_msg" value="Olá! Teste de disparo instantâneo IPbx Prisma x Prismabot WhatsApp API." required class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-white font-mono">
                         </div>
                     </div>
                     <div class="flex justify-end pt-1">
@@ -775,7 +775,7 @@ if (empty($currentPbxToken) && !empty($currentPbxPass) && $_SERVER['REQUEST_METH
                 </div>
                 <div>
                     <h3 class="text-base font-bold text-slate-100">
-                        Banco de Dados MySQL CDR (`asteriskcdrdb`)
+                        Banco de Dados MySQL CDR
                     </h3>
                     <p class="text-xs text-slate-400">Leitura direta do histórico de gravações, relatórios e métricas do PABX (Autodetectado)</p>
                 </div>

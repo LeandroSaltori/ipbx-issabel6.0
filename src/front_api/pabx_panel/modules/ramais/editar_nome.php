@@ -68,8 +68,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_update_ext_nam
         } else {
             // Sem REST API: grava o nome direto no Issabel (aparece também na interface nativa)
             $okDirect = renameExtensionInIssabel($target_ext, $new_name, $new_tech);
-            $apiRes = ['success' => $okDirect, 'message' => $okDirect ? '' : 'não foi possível gravar no Issabel (verifique a senha do MySQL).'];
-            if ($okDirect && !empty($secret)) { $msg_extra = ' A senha do ramal só pode ser alterada pela REST API ou pelo Issabel.'; }
+            $apiRes = ['success' => $okDirect, 'message' => $okDirect ? '' : 'não foi possível gravar no PABX (verifique a senha do MySQL).'];
+            if ($okDirect && !empty($secret)) { $msg_extra = ' A senha do ramal só pode ser alterada pela REST API ou pelo PABX.'; }
         }
 
         if ($apiRes['success']) {
@@ -430,12 +430,12 @@ if ($__aba === 'desvios' && hasUserPermission('manage_settings')) {
                 </div>
                 <div style="display:none">
                     <label class="block text-slate-300 font-bold mb-1">Tecnologia</label>
-                    <select id="modal_tech" name="tech" tabindex="-1" onmousedown="return false" onkeydown="return false" title="Definida no Issabel ao criar o ramal" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-400 opacity-70 cursor-not-allowed">
+                    <select id="modal_tech" name="tech" tabindex="-1" onmousedown="return false" onkeydown="return false" title="Definida no PABX ao criar o ramal" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-400 opacity-70 cursor-not-allowed">
                         <option value="PJSIP">PJSIP</option>
                         <option value="SIP">SIP (Chan_SIP)</option>
                         <option value="IAX2">IAX2</option>
                     </select>
-                    <p class="text-[10px] text-slate-500 mt-1">Definida no Issabel ao criar o ramal (somente leitura).</p>
+                    <p class="text-[10px] text-slate-500 mt-1">Definida no PABX ao criar o ramal (somente leitura).</p>
                 </div>
             </div>
 

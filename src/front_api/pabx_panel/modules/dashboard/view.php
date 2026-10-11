@@ -51,7 +51,7 @@ if (empty($recent_calls)) {
 
         <div class="flex items-center gap-3">
             <span class="px-3 py-1.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-xl text-xs font-bold flex items-center gap-2">
-                <i class="fa-solid fa-circle-check animate-pulse"></i> Asterisk PBX Online
+                <i class="fa-solid fa-circle-check animate-pulse"></i> PABX Online
             </span>
             <a href="index.php?module=filas&action=flowchart" class="px-3.5 py-1.5 bg-cyan-600/20 hover:bg-cyan-600/40 text-cyan-300 border border-cyan-500/40 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow">
                 <i class="fa-solid fa-diagram-project"></i> Ver Fluxograma
@@ -119,7 +119,7 @@ if (empty($recent_calls)) {
         </div>
     </div>
 
-    <!-- Copiloto ZPRO & Insights de IA -->
+    <!-- Copiloto Prismabot & Insights de IA -->
     <div class="bg-gradient-to-r from-purple-950/80 via-slate-900 to-slate-900 border border-purple-500/30 rounded-3xl p-6 shadow-2xl space-y-4">
         <div class="flex items-center justify-between border-b border-purple-500/20 pb-3">
             <div class="flex items-center gap-3">
@@ -179,7 +179,7 @@ if (empty($recent_calls)) {
                     <h3 class="text-sm font-bold text-white flex items-center gap-2">
                         <i class="fa-solid fa-phone-volume text-indigo-400"></i> Últimas Ligações no PABX
                     </h3>
-                    <span class="text-xs text-slate-400">Extrato em tempo real da tabela Asterisk CDR</span>
+                    <span class="text-xs text-slate-400">Extrato em tempo real da tabela CDR</span>
                 </div>
                 <a href="index.php?module=relatorios&action=cdr_gravacoes" class="text-xs text-indigo-400 hover:text-indigo-300 font-bold flex items-center gap-1">
                     Ver CDR <i class="fa-solid fa-chevron-right text-[10px]"></i>
@@ -200,7 +200,7 @@ if (empty($recent_calls)) {
                     <tbody class="divide-y divide-slate-800/80 font-mono text-[11px]">
                         <?php if (empty($recent_calls)): ?>
                             <tr>
-                                <td colspan="5" class="p-6 text-center text-slate-500 font-sans">Nenhuma ligação registrada no Asterisk CDR.</td>
+                                <td colspan="5" class="p-6 text-center text-slate-500 font-sans">Nenhuma ligação registrada no CDR.</td>
                             </tr>
                         <?php else: ?>
                             <?php foreach ($recent_calls as $call): ?>

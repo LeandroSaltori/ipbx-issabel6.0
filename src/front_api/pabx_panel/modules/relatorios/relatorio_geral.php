@@ -324,7 +324,7 @@ if ($ast_db) {
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <!-- BLOCO 1: CONTADORES DE CHAMADAS (COM PORCENTAGEM) -->
         <div class="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-4">
-            <h4 class="text-sm font-extrabold text-white flex items-center justify-between border-b border-slate-800 pb-3" title="Contadores numéricos e percentuais de todas as chamadas processadas no Asterisk">
+            <h4 class="text-sm font-extrabold text-white flex items-center justify-between border-b border-slate-800 pb-3" title="Contadores numéricos e percentuais de todas as chamadas processadas no PABX">
                 <span class="flex items-center gap-2"><i class="fa-solid fa-list-ol text-cyan-400"></i> Contadores de Chamadas</span>
                 <span class="text-xs text-cyan-300 font-mono flex items-center gap-1"><i class="fa-solid fa-hand-pointer text-[10px]"></i> Clique nos cards</span>
             </h4>
@@ -569,7 +569,7 @@ if ($ast_db) {
                         <tr>
                             <td colspan="7" class="py-12 text-center text-slate-500">
                                 <i class="fa-solid fa-spinner fa-spin text-brand-400 text-xl block mb-2"></i>
-                                Consultando chamadas reais do Asterisk PABX...
+                                Consultando chamadas reais do PABX...
                             </td>
                         </tr>
                     </tbody>
@@ -620,7 +620,7 @@ async function openKpiCallsModal(kpiType, customTitle = '') {
         <tr>
             <td colspan="7" class="py-12 text-center text-slate-500 font-sans">
                 <i class="fa-solid fa-spinner fa-spin text-brand-400 text-2xl block mb-3 mx-auto"></i>
-                Consultando chamadas reais do Asterisk PABX...
+                Consultando chamadas reais do PABX...
             </td>
         </tr>
     `;

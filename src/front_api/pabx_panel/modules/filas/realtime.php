@@ -165,7 +165,7 @@ if ($period_preset === 'quarter')   $date_label = "Últimos 3 Meses";
         <div class="text-center space-y-3">
             <i class="fa-solid fa-inbox text-slate-600 text-4xl block"></i>
             <p class="text-slate-400 font-bold">Nenhuma fila cadastrada ou ativa</p>
-            <p class="text-slate-600 text-xs">Configure filas no Asterisk e sincronize em Configurações &gt; API.</p>
+            <p class="text-slate-600 text-xs">Configure filas no PABX e sincronize em Configurações &gt; API.</p>
         </div>
     </div>
 </div>

@@ -312,7 +312,7 @@ function exportToCSV() {
                                                 <?php echo htmlspecialchars($src_display); ?>
                                             </button>
                                         <?php elseif ($src_contact && isset($src_contact['source']) && $src_contact['source'] == 'Issabel'): ?>
-                                            <?php $tooltip = "Agenda Issabel\nNome: " . $src_contact['name'] . "\nTelefone: " . $src_contact['phone']; ?>
+                                            <?php $tooltip = "Agenda PABX\nNome: " . $src_contact['name'] . "\nTelefone: " . $src_contact['phone']; ?>
                                             <button type="button" onclick="openGlobalAddContactModal('<?php echo htmlspecialchars($src_contact['phone']); ?>', '', '<?php echo htmlspecialchars($src_contact['name'], ENT_QUOTES); ?>', '', '', '', '')" title="<?php echo htmlspecialchars($tooltip); ?>" class="hover:underline hover:text-emerald-300 transition text-left cursor-pointer">
                                                 <?php echo htmlspecialchars($src_display); ?>
                                             </button>
@@ -526,7 +526,7 @@ function exportToCSV() {
     </script>
 </div>
 
-<!-- Modal Copiloto IA ZPRO para Análise de Chamadas -->
+<!-- Modal Copiloto IA Prismabot para Análise de Chamadas -->
 <div id="modal-ai-call-summary" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
     <div class="bg-slate-900 border border-purple-500/30 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4">
         <div class="flex items-center justify-between border-b border-slate-800 pb-3">

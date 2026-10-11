@@ -61,7 +61,7 @@ function agiGetVariable($name) {
 
 // Log inicial de rastreamento AGI
 if (function_exists('pabx_log')) {
-    pabx_log('whatsapp', 'INFO', "AGI Executado pelo Asterisk [Evento: {$event_type}]", [
+    pabx_log('whatsapp', 'INFO', "AGI Executado pelo PABX [Evento: {$event_type}]", [
         'caller_id'  => $caller_id,
         'called_ext' => $called_ext,
         'queue_name' => $queue_name,
@@ -94,7 +94,7 @@ if (waProvider() === 'uazapi') {
 
 if (empty($api_url) || empty($api_token)) {
     if (function_exists('pabx_log')) {
-        pabx_log('whatsapp', 'ERROR', "AGI Interrompido: Credenciais da API Z-PRO não configuradas em Configurações -> API", [
+        pabx_log('whatsapp', 'ERROR', "AGI Interrompido: Credenciais da API Prismabot não configuradas em Configurações -> API", [
             'api_url' => $api_url ? 'Configurada' : 'Vazia',
             'api_token' => $api_token ? 'Configurado' : 'Vazio'
         ]);
@@ -204,7 +204,7 @@ if (!empty($template) && !empty($target_number)) {
     }
 
     $rule_map = ['no_answer' => 'FILA_ABANDONO', 'missed_extension' => 'ATENDENTE_NAO_ATENDEU', 'nps' => 'NPS', 'transbordo' => 'TRANSBORDO', 'audio' => 'AUDIO'];
-    $sent = sendWhatsAppMessageViaZPro($api_url, $api_token, $target_number, $msg_cliente, 'AGI_' . time(), ($called_ext ?: 'AGI'), ($rule_map[$event_type] ?? 'AGI_ZPRO'));
+    $sent = sendWhatsAppMessageViaZPro($api_url, $api_token, $target_number, $msg_cliente, 'AGI_' . time(), ($called_ext ?: 'AGI'), ($rule_map[$event_type] ?? 'AGI_Prismabot'));
     if (function_exists('pabx_log')) {
         pabx_log('whatsapp', $sent ? 'INFO' : 'ERROR', "Resultado do envio da mensagem de evento '{$event_type}'", [
             'target_number' => $target_number,

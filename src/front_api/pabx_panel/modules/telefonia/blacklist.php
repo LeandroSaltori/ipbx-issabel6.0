@@ -16,7 +16,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($res['success']) {
                 $msg_status = "Número '$num' adicionado à Blacklist do PABX com sucesso!";
             } else {
-                $msg_error = "Erro ao adicionar à Blacklist: " . ($res['error'] ?? 'Falha ao falar com o Asterisk');
+                $msg_error = "Erro ao adicionar à Blacklist: " . ($res['error'] ?? 'Falha ao falar com o PABX');
             }
         }
     }
@@ -28,7 +28,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($res['success']) {
                 $msg_status = "Número '$num' removido da Blacklist do PABX.";
             } else {
-                $msg_error = "Erro ao remover da Blacklist: " . ($res['error'] ?? 'Falha ao falar com o Asterisk');
+                $msg_error = "Erro ao remover da Blacklist: " . ($res['error'] ?? 'Falha ao falar com o PABX');
             }
         }
     }
@@ -38,7 +38,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $blRes = asteriskBlacklistList();
 $blacklistItems = $blRes['items'];
 if (!$blRes['success'] && $msg_error === '') {
-    $msg_error = 'Não foi possível ler a blacklist do Issabel: ' . $blRes['error'];
+    $msg_error = 'Não foi possível ler a blacklist do PABX: ' . $blRes['error'];
 }
 ?>
 

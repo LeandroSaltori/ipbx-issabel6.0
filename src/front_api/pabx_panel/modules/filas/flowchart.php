@@ -273,7 +273,7 @@ if (!function_exists('renderDynamicFlowNode')) {
                                 <div class="space-y-1 text-[11px] text-slate-300">
                                     <div>🎙️ Gravação: <strong class="text-white"><?php echo htmlspecialchars($qDetails['recording'] ?? 'Ativa'); ?></strong></div>
                                     <div>🔊 Modo: <span class="text-purple-200"><?php echo htmlspecialchars($qDetails['recording_mode'] ?? 'Incluir Tempo de Espera'); ?></span></div>
-                                    <div>⚡ Tecnologia: <span class="text-purple-300 font-bold">SIP / PJSIP Asterisk</span></div>
+                                    <div>⚡ Tecnologia: <span class="text-purple-300 font-bold">SIP / PJSIP</span></div>
                                 </div>
                             </div>
                         </div>
@@ -332,7 +332,7 @@ if (!function_exists('renderDynamicFlowNode')) {
                                 </div>
                                 <?php endif; ?>
                             <?php else: ?>
-                                <div class="text-xs text-slate-300 italic">Mensagem sonora configurada no Asterisk sem gravação customizada.</div>
+                                <div class="text-xs text-slate-300 italic">Mensagem sonora configurada no PABX sem gravação customizada.</div>
                             <?php endif; ?>
 
                         </div>
@@ -501,7 +501,7 @@ if (!function_exists('renderDynamicFlowNode')) {
                             </span>
                             <span class="px-2.5 py-1 bg-rose-500/20 text-rose-200 text-[9px] font-mono rounded">Desconectar</span>
                         </div>
-                        <p class="text-xs text-slate-300">Conexão finalizada diretamente pelo PABX Asterisk.</p>
+                        <p class="text-xs text-slate-300">Conexão finalizada diretamente pelo PABX.</p>
                     </div>
                 </div>
                 <?php
@@ -1037,7 +1037,7 @@ if (!function_exists('renderDynamicFlowNode')) {
                 </div>
                 <div>
                     <h4 class="text-lg font-black text-white">Gerenciar Condições de Horário, Feriados & Áudio PABX</h4>
-                    <p class="text-xs text-slate-300">Sincronização 100% direta com MySQL Issabel/Asterisk e recarga instantânea de dialplan</p>
+                    <p class="text-xs text-slate-300">Sincronização 100% direta com banco de dados do PABX e recarga instantânea de dialplan</p>
                 </div>
             </div>
             <button onclick="closeFeriadosModal()" class="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition">
@@ -1083,7 +1083,7 @@ if (!function_exists('renderDynamicFlowNode')) {
             <!-- TABELA DE REGRAS DO GRUPO SELECIONADO -->
             <div class="space-y-3">
                 <div class="text-xs font-black text-slate-300 uppercase tracking-wide flex items-center justify-between">
-                    <span class="flex items-center gap-2"><i class="fa-solid fa-list-check text-amber-400"></i> Regras Cadastradas neste Grupo no Issabel:</span>
+                    <span class="flex items-center gap-2"><i class="fa-solid fa-list-check text-amber-400"></i> Regras Cadastradas neste Grupo no PABX:</span>
                     <span id="tg-rules-count-badge" class="text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded font-mono">0 regras</span>
                 </div>
 

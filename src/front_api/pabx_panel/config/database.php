@@ -106,7 +106,7 @@ try {
     if (strpos($e->getMessage(), 'readonly') !== false || strpos($e->getMessage(), 'PERM') !== false || strpos($e->getMessage(), 'attempt to write') !== false) {
         die('<div style="font-family:sans-serif; background:#0f172a; color:#f8fafc; padding:30px; border-radius:12px; max-width:650px; margin:50px auto; border:1px solid #334155;">
             <h2 style="color:#ef4444; margin-top:0;">⚠️ Permissão de Escrita Necessária no Linux PABX</h2>
-            <p>O servidor Apache/Asterisk não tem permissão para escrever na pasta do painel.</p>
+            <p>O servidor Apache/PABX não tem permissão para escrever na pasta do painel.</p>
             <pre style="background:#020617; padding:15px; border-radius:8px; color:#38bdf8; font-size:14px;">chown -R asterisk:asterisk /var/www/html/front_api
 chmod -R 775 /var/www/html/front_api</pre>
         </div>');

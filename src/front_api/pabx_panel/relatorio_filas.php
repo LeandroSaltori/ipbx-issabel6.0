@@ -1149,7 +1149,7 @@ table.data-table tr:nth-child(even) td{background:var(--table-stripe);}
         <button type="button" class="btn btn-primary" onclick="openManualModal()" title="Abrir o Manual do Usu&aacute;rio interativo do IPbx Prisma">
             &#128214; Manual
         </button>
-        <a href="javascript:void(0)" onclick="window.open(window.location.href, '_blank')" class="btn btn-primary" style="background:#16a085;" title="Abrir o relat&oacute;rio em janela inteira e separada da moldura do PABX Issabel">
+        <a href="javascript:void(0)" onclick="window.open(window.location.href, '_blank')" class="btn btn-primary" style="background:#16a085;" title="Abrir o relat&oacute;rio em janela inteira e separada da moldura do PABX">
              &#8599; Expandir Aba
         </a>
     </div>
@@ -1473,7 +1473,7 @@ table.data-table tr:nth-child(even) td{background:var(--table-stripe);}
             <ul style="font-size:12px;color:var(--text-color);margin-left:20px;">
                 <li><strong>Auto-Refresh:</strong> No topo da tela, ative a atualiza&ccedil;&atilde;o autom&aacute;tica (30s ou 60s) para monitores/TVs de opera&ccedil;&atilde;o.</li>
                 <li><strong>Tema Escuro / Claro:</strong> Alterne o visual para melhor conforto de leitura.</li>
-                <li><strong>Expandir Aba:</strong> Abra o relat&oacute;rio fora da janela emoldurada do Issabel.</li>
+                <li><strong>Expandir Aba:</strong> Abra o relat&oacute;rio fora da janela emoldurada do PABX.</li>
                 <li><strong>Filtros Avan&ccedil;ados:</strong> Combine filtros de Data, Filas, Agente, Status e N&uacute;mero.</li>
             </ul>
         </div>

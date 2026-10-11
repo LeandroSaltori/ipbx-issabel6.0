@@ -115,7 +115,7 @@ function get_pabx_log_categories() {
         LOG_CAT_SYSTEM   => ['title' => 'Erros do Sistema & PHP', 'icon' => 'fa-solid fa-bug', 'color' => 'rose'],
         LOG_CAT_SMTP     => ['title' => 'SMTP & Disparo E-mails', 'icon' => 'fa-solid fa-envelope', 'color' => 'amber'],
         LOG_CAT_API      => ['title' => 'API REST PABX', 'icon' => 'fa-solid fa-code', 'color' => 'cyan'],
-        LOG_CAT_AMI      => ['title' => 'Asterisk AMI (Manager)', 'icon' => 'fa-solid fa-server', 'color' => 'purple'],
+        LOG_CAT_AMI      => ['title' => 'Conexão AMI (Manager)', 'icon' => 'fa-solid fa-server', 'color' => 'purple'],
         LOG_CAT_AI       => ['title' => 'Copiloto de IA & LLMs', 'icon' => 'fa-solid fa-wand-magic-sparkles', 'color' => 'indigo'],
         LOG_CAT_WA       => ['title' => 'Prismabot WhatsApp API', 'icon' => 'fa-brands fa-whatsapp', 'color' => 'teal'],
         LOG_CAT_SECURITY => ['title' => 'Segurança & Permissões', 'icon' => 'fa-solid fa-shield-halved', 'color' => 'blue'],

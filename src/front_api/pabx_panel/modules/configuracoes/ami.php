@@ -30,7 +30,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ':db_host' => $db_host, ':db_port' => $db_port, ':db_user' => $db_user, ':db_pass' => $db_pass,
             ':audio_url' => $audio_base_url
         ]);
-        $msg = "Configurações do Asterisk AMI, Banco MySQL e URL de Gravações salvas com sucesso!";
+        $msg = "Configurações do AMI, Banco MySQL e URL de Gravações salvas com sucesso!";
     } elseif (isset($_POST['action_test_ami'])) {
         $test_ami_result = executeClickToCall('1000', '1001');
     } elseif (isset($_POST['action_test_db'])) {
@@ -39,7 +39,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             try {
                 $stmt = $test_pdo->query("SELECT COUNT(*) FROM cdr");
                 $count = $stmt ? $stmt->fetchColumn() : 0;
-                $test_db_result = ['success' => true, 'message' => "Conexão com o banco de dados MySQL 'asteriskcdrdb' realizada com sucesso! Total de $count chamadas encontradas no CDR."];
+                $test_db_result = ['success' => true, 'message' => "Conexão com o banco de dados MySQL do CDR realizada com sucesso! Total de $count chamadas encontradas no CDR."];
             } catch (Exception $ex_db) {
                 $test_db_result = ['success' => true, 'message' => "Conexão com o servidor MySQL estabelecida com sucesso!"];
             }
@@ -80,16 +80,16 @@ $audio_base_url = getSetting('audio_base_url') ?: '';
     <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-5 shadow-xl space-y-4 max-w-2xl">
         <div class="border-b border-slate-800 pb-3">
             <h3 class="text-sm font-bold text-white flex items-center gap-2">
-                <i class="fa-solid fa-plug text-cyan-400"></i> Conexão Asterisk AMI (Click-to-Call & FOP)
+                <i class="fa-solid fa-plug text-cyan-400"></i> Conexão AMI (Click-to-Call & FOP)
             </h3>
-            <span class="text-xs text-slate-400">Configuração das credenciais do Manager Asterisk para execução de chamadas e escuta espiã</span>
+            <span class="text-xs text-slate-400">Configuração das credenciais do gerenciador (AMI) para execução de chamadas e escuta espiã</span>
         </div>
 
         <?php if ($test_ami_result !== null): ?>
             <div class="p-4 rounded-xl text-xs font-bold <?php echo $test_ami_result['success'] ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'; ?>">
                 <div class="flex items-center gap-2">
                     <i class="fa-solid <?php echo $test_ami_result['success'] ? 'fa-circle-check' : 'fa-circle-exclamation'; ?>"></i>
-                    <span><?php echo $test_ami_result['success'] ? 'Conexão AMI estabelecida com sucesso com o Asterisk!' : 'Falha na conexão AMI: ' . htmlspecialchars($test_ami_result['error']); ?></span>
+                    <span><?php echo $test_ami_result['success'] ? 'Conexão AMI estabelecida com sucesso com o PABX!' : 'Falha na conexão AMI: ' . htmlspecialchars($test_ami_result['error']); ?></span>
                 </div>
             </div>
         <?php endif; ?>
@@ -99,13 +99,13 @@ $audio_base_url = getSetting('audio_base_url') ?: '';
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                    <label class="block font-bold text-slate-300 mb-1">Host AMI Asterisk</label>
+                    <label class="block font-bold text-slate-300 mb-1">Host do gerenciador (AMI)</label>
                     <input type="text" name="ami_host" value="<?php echo htmlspecialchars($ami_host); ?>" required
                            class="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-white font-mono focus:border-cyan-500 focus:outline-none">
                 </div>
 
                 <div>
-                    <label class="block font-bold text-slate-300 mb-1">Porta AMI Asterisk</label>
+                    <label class="block font-bold text-slate-300 mb-1">Porta do gerenciador (AMI)</label>
                     <input type="text" name="ami_port" value="<?php echo htmlspecialchars($ami_port); ?>" required
                            class="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-white font-mono focus:border-cyan-500 focus:outline-none">
                 </div>
@@ -129,7 +129,7 @@ $audio_base_url = getSetting('audio_base_url') ?: '';
             <div class="border-t border-slate-800 pt-4 space-y-3">
                 <div class="flex items-center gap-2">
                     <i class="fa-solid fa-database text-purple-400"></i>
-                    <h4 class="font-extrabold text-white text-xs">Conexão Banco de Dados MySQL (asteriskcdrdb)</h4>
+                    <h4 class="font-extrabold text-white text-xs">Conexão Banco de Dados MySQL (CDR)</h4>
                 </div>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
@@ -146,7 +146,7 @@ $audio_base_url = getSetting('audio_base_url') ?: '';
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                         <label class="block font-bold text-slate-300 mb-1">Usuário MySQL DB</label>
-                        <input type="text" name="asterisk_db_user" value="<?php echo htmlspecialchars($db_user); ?>" required placeholder="root ou asteriskuser"
+                        <input type="text" name="asterisk_db_user" value="<?php echo htmlspecialchars($db_user); ?>" required placeholder="root ou usuário do banco"
                                class="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-white font-mono focus:border-purple-500 focus:outline-none">
                     </div>
                     <div>
@@ -211,7 +211,7 @@ $audio_base_url = getSetting('audio_base_url') ?: '';
             <span>Instruções para Ativação do AMI no Servidor PABX</span>
         </div>
         <p class="text-slate-400">
-            O <strong>AMI (Asterisk Manager Interface)</strong> permite a execução de chamadas (Click-to-Call), escuta espiã (Spy) e desconexão de canais em tempo real.
+            O <strong>AMI (interface de gerenciamento do PABX)</strong> permite a execução de chamadas (Click-to-Call), escuta espiã (Spy) e desconexão de canais em tempo real.
         </p>
         <div class="space-y-2 bg-slate-950 p-4 rounded-xl border border-slate-800/80">
             <h4 class="font-bold text-cyan-300 flex items-center gap-1.5">
@@ -219,7 +219,7 @@ $audio_base_url = getSetting('audio_base_url') ?: '';
             </h4>
             <ol class="list-decimal list-inside space-y-2 text-slate-300 pl-1">
                 <li>Acesse a interface web de administração do seu <strong>Servidor PABX</strong>.</li>
-                <li>Navegue até o menu <strong>PBX &gt; PBX Configuration &gt; Asterisk Manager Settings</strong>.</li>
+                <li>Localize as configurações do <strong>gerenciador (AMI)</strong> do PABX.</li>
                 <li>Certifique-se de que a opção <strong>Web Enabled</strong> está definida como <strong>Yes</strong>.</li>
                 <li>Verifique ou crie o usuário Manager (ex: <code class="bg-slate-900 px-1.5 py-0.5 rounded text-cyan-300 font-mono">admin</code>) e defina a senha do Manager.</li>
                 <li>Garanta que as permissões de leitura e escrita (<code class="bg-slate-900 px-1 py-0.5 rounded text-slate-400">Read/Write</code>) incluam: <code class="bg-slate-900 px-1 py-0.5 rounded text-emerald-400 font-mono">system, call, log, verbose, command, agent, user, config, originate</code>.</li>

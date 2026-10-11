@@ -133,7 +133,7 @@ function authLogin($email, $password) {
         authLogFail2ban($email);
         if (function_exists('pabx_log')) pabx_log('security', 'WARNING', 'Falha de login no painel', ['email' => $email, 'ip' => authClientIp()]); if (function_exists('pabx_log')) pabx_log('user_actions', 'WARNING', '[AUTH] Tentativa de login falhou', ['usuario' => $email]);
         $hint = authFail2banActive()
-            ? ' Após várias falhas seu IP é bloqueado pelo Fail2ban do Issabel.'
+            ? ' Após várias falhas seu IP é bloqueado pelo Fail2ban do PABX.'
             : '';
         return ['success' => false, 'error' => 'E-mail ou senha inválidos.' . $hint];
     }
