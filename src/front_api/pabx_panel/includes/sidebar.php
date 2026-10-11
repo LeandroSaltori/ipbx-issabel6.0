@@ -238,6 +238,12 @@ function isGroupActive($modules_array) {
 
     <!-- Footer System Status, Theme Toggle & User Profile -->
     <div class="p-2 bg-slate-950/80 border-t border-slate-800 space-y-1">
+        <!-- Novidades do sistema (histórico de entregas) -->
+        <button type="button" onclick="openRoadmapModal()" class="w-full px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 border border-amber-500/30 text-slate-300 hover:text-white text-[11px] font-bold transition flex items-center justify-between">
+            <span class="flex items-center gap-2"><i class="fa-solid fa-rocket text-amber-400"></i><span>Novidades</span></span>
+            <span class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
+        </button>
+
         <!-- Botão Modo Claro / Modo Escuro -->
         <button id="btn-theme-toggle" onclick="toggleThemeMode()" class="w-full px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white text-[11px] font-bold transition flex items-center justify-between shadow">
             <span class="flex items-center gap-2">

@@ -1,0 +1,24 @@
+<?php
+/**
+ * Histórico de novidades do painel (mostrado ao cliente em "Novidades").
+ * Para registrar uma entrega nova: acrescente um item em 'done' (a mais recente primeiro).
+ * 'plan' lista o que está em andamento / próximos passos.
+ */
+return [
+    'done' => [
+        ['mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-robot', 'titulo' => 'Chat com IA no painel', 'desc' => 'Assistente flutuante que responde sobre ligações, ramais, filas e gravações usando os dados reais do seu PABX. Liberado por usuário.'],
+        ['mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-diagram-project', 'titulo' => 'IA por função', 'desc' => 'Escolha qual IA faz a transcrição de áudio, os resumos/insights e o chat, com chave própria por provedor.'],
+        ['mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-pause-circle', 'titulo' => 'Pausas & Tempo Logado dos agentes', 'desc' => 'Relatório com tempo logado, tempo em pausa, motivos e detalhe de cada pausa.'],
+        ['mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-user-gear', 'titulo' => 'Autoatendimento do ramal', 'desc' => 'Não Perturbe e desvios de chamada por ramal, sincronizados com a interface nativa do Issabel.'],
+        ['mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-display', 'titulo' => 'FOP em tempo real', 'desc' => 'Status ao vivo dos ramais (chamando, em conversa, com quem), ramais sem registro esmaecidos, escuta/sussurro/intervenção, desligar chamada e pausa de agentes nas filas.'],
+        ['mes' => 'Outubro/2026', 'novo' => false, 'icon' => 'fa-whatsapp fa-brands', 'titulo' => 'WhatsApp: Prismabot ou uazapi', 'desc' => 'Dois servidores de envio à escolha. Histórico de envios e erros por ramal.'],
+        ['mes' => 'Outubro/2026', 'novo' => false, 'icon' => 'fa-file-export', 'titulo' => 'Relatórios com anexo e exportação completa', 'desc' => 'Envio por WhatsApp/e-mail com Excel, PDF ou CSV; exportação sempre do período inteiro; CDR com paginação 20/50/100.'],
+        ['mes' => 'Outubro/2026', 'novo' => false, 'icon' => 'fa-bell', 'titulo' => 'Chamada perdida avisada uma única vez', 'desc' => 'O WhatsApp de chamada perdida é enviado uma vez e só repete se o envio falhar.'],
+    ],
+    'plan' => [
+        ['icon' => 'fa-triangle-exclamation', 'titulo' => 'Alerta de tronco fora do ar', 'desc' => 'Aviso por WhatsApp ao supervisor quando uma linha cair.'],
+        ['icon' => 'fa-shield-halved', 'titulo' => 'Painel de segurança', 'desc' => 'Bloqueios do firewall e tentativas de invasão.'],
+        ['icon' => 'fa-phone-volume', 'titulo' => 'Provisionamento de telefones IP', 'desc' => 'Configurar o aparelho automaticamente pelo MAC.'],
+        ['icon' => 'fa-clipboard-list', 'titulo' => 'Formulários de atendimento', 'desc' => 'Registro do motivo e resultado da chamada pelo atendente.'],
+    ],
+];

@@ -2939,100 +2939,56 @@ if ($__route_perm !== '' && !hasUserPermission($__route_perm)) {
         </div>
     </div>
 
-    <!-- WIDGET FLUTUANTE DE ROADMAP & ATUALIZAÇÕES DO SISTEMA (Canto Inferior Direito) -->
-    <div class="fixed bottom-4 right-4 z-40 flex items-center gap-2">
-        <button onclick="openRoadmapModal()" class="px-3.5 py-2 bg-slate-900/90 hover:bg-slate-800 text-slate-200 border border-amber-500/40 rounded-full text-xs font-black shadow-xl backdrop-blur-md transition-all hover:scale-105 flex items-center gap-2">
-            <span class="w-2 h-2 rounded-full bg-amber-400 animate-ping"></span>
-            <i class="fa-solid fa-rocket text-amber-400"></i>
-            <span>Roadmap de Atualizações</span>
-        </button>
-    </div>
-
-    <!-- MODAL ROADMAP DE ATUALIZAÇÕES DO SISTEMA -->
-    <div id="modal-roadmap" class="fixed inset-0 z-[9999] hidden bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
-        <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-2xl w-full p-6 space-y-5 shadow-2xl max-h-[90vh] overflow-y-auto custom-scrollbar">
+    <!-- NOVIDADES DO SISTEMA (histórico de entregas) - <dialog> nativo (Top Layer) -->
+    <?php $__chg = @include __DIR__ . '/includes/changelog.php'; if (!is_array($__chg)) $__chg = ['done' => [], 'plan' => []]; ?>
+    <style>
+    dialog#modal-roadmap { border: 1px solid #334155; border-radius: 24px; padding: 0; background: #0f172a; color: #e2e8f0; width: min(680px, calc(100vw - 24px)); max-height: 90vh; }
+    dialog#modal-roadmap::backdrop { background: rgba(0, 0, 0, 0.65); backdrop-filter: blur(4px); }
+    </style>
+    <dialog id="modal-roadmap">
+        <div class="p-6 space-y-5">
             <div class="flex items-center justify-between border-b border-slate-800 pb-3">
                 <div class="flex items-center gap-3">
-                    <div class="p-3 bg-amber-500/10 rounded-2xl border border-amber-500/20 text-amber-400">
-                        <i class="fa-solid fa-rocket text-xl"></i>
-                    </div>
+                    <div class="p-3 bg-amber-500/10 rounded-2xl border border-amber-500/20 text-amber-400"><i class="fa-solid fa-rocket text-xl"></i></div>
                     <div>
-                        <h4 class="text-base font-black text-white">Roadmap de Atualizações & Melhorias do Sistema</h4>
-                        <p class="text-xs text-slate-400">Acompanhamento transparente de recursos em produção e desenvolvimento</p>
+                        <h4 class="text-base font-black text-white">Novidades & Melhorias do Sistema</h4>
+                        <p class="text-xs text-slate-400">Histórico do que foi entregue e do que vem a seguir</p>
                     </div>
                 </div>
-                <button onclick="closeModal('modal-roadmap')" class="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition">
-                    <i class="fa-solid fa-xmark text-lg"></i>
-                </button>
+                <button type="button" onclick="document.getElementById('modal-roadmap').close()" class="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition" style="white-space:nowrap;flex-shrink:0;width:auto;overflow:visible"><i class="fa-solid fa-xmark text-lg"></i></button>
             </div>
-
-            <!-- SEÇÃO DE RECURSOS CONCLUÍDOS -->
             <div class="space-y-3">
-                <div class="text-xs font-black text-emerald-400 uppercase tracking-wider flex items-center gap-2">
-                    <i class="fa-solid fa-circle-check"></i> Recursos Concluídos & 100% Operacionais:
-                </div>
+                <div class="text-xs font-black text-emerald-400 uppercase tracking-wider flex items-center gap-2"><i class="fa-solid fa-circle-check"></i> Entregue</div>
                 <div class="space-y-2 text-xs text-slate-300">
+                    <?php foreach ($__chg['done'] as $__c): ?>
                     <div class="p-3 bg-slate-950 rounded-2xl border border-emerald-500/20 flex items-start gap-2.5">
-                        <i class="fa-solid fa-check text-emerald-400 mt-0.5"></i>
-                        <div>
-                            <strong class="text-white block">Espelhamento Direct PABX Asterisk</strong>
-                            <p class="text-slate-400 text-[11px]">Dados 100% reais sem mocks ou ramais genéricos. Qualquer alteração reflete nos dois sentidos.</p>
+                        <i class="fa-solid <?php echo htmlspecialchars($__c['icon'] ?? 'fa-check'); ?> text-emerald-400 mt-0.5"></i>
+                        <div class="min-w-0">
+                            <strong class="text-white block"><?php echo htmlspecialchars($__c['titulo']); ?>
+                                <?php if (!empty($__c['novo'])): ?><span class="ml-1 text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-black uppercase">Novo</span><?php endif; ?>
+                                <span class="ml-1 text-[10px] text-slate-500 font-normal"><?php echo htmlspecialchars($__c['mes'] ?? ''); ?></span>
+                            </strong>
+                            <p class="text-slate-400 text-[11px]"><?php echo htmlspecialchars($__c['desc']); ?></p>
                         </div>
                     </div>
-                    <div class="p-3 bg-slate-950 rounded-2xl border border-emerald-500/20 flex items-start gap-2.5">
-                        <i class="fa-solid fa-check text-emerald-400 mt-0.5"></i>
-                        <div>
-                            <strong class="text-white block">Player Único de Áudio Global</strong>
-                            <p class="text-slate-400 text-[11px]">Garante que apenas 1 áudio/gravação toque por vez no sistema, pausando os demais automaticamente.</p>
-                        </div>
-                    </div>
-                    <div class="p-3 bg-slate-950 rounded-2xl border border-emerald-500/20 flex items-start gap-2.5">
-                        <i class="fa-solid fa-check text-emerald-400 mt-0.5"></i>
-                        <div>
-                            <strong class="text-white block">Sincronização Visual de PABX sem Erros de IP / Undefined</strong>
-                            <p class="text-slate-400 text-[11px]">Modal customizado com contagem exata de ramais e filas importados.</p>
-                        </div>
-                    </div>
-                    <div class="p-3 bg-slate-950 rounded-2xl border border-emerald-500/20 flex items-start gap-2.5">
-                        <i class="fa-solid fa-check text-emerald-400 mt-0.5"></i>
-                        <div>
-                            <strong class="text-white block">Modo Claro com Alto Contraste & Legibilidade</strong>
-                            <p class="text-slate-400 text-[11px]">Paleta de cores otimizada para legibilidade perfeita de textos, tabelas e relatórios.</p>
-                        </div>
-                    </div>
+                    <?php endforeach; ?>
                 </div>
             </div>
-
-            <!-- SEÇÃO DE RECURSOS EM DESENVOLVIMENTO -->
-            <div class="space-y-3 pt-2">
-                <div class="text-xs font-black text-amber-400 uppercase tracking-wider flex items-center gap-2">
-                    <i class="fa-solid fa-clock-rotate-left"></i> Em Validação & Ajuste Fino:
-                </div>
+            <?php if (!empty($__chg['plan'])): ?>
+            <div class="space-y-3">
+                <div class="text-xs font-black text-amber-400 uppercase tracking-wider flex items-center gap-2"><i class="fa-solid fa-clock-rotate-left"></i> Próximos passos</div>
                 <div class="space-y-2 text-xs text-slate-300">
+                    <?php foreach ($__chg['plan'] as $__c): ?>
                     <div class="p-3 bg-slate-950 rounded-2xl border border-amber-500/20 flex items-start gap-2.5">
-                        <i class="fa-solid fa-gear text-amber-400 mt-0.5 animate-spin"></i>
-                        <div>
-                            <strong class="text-white block">Gestão de Condições Especiais de Horário & Feriados PABX</strong>
-                            <p class="text-slate-400 text-[11px]">Sincronização estrita por `timegroupid` e faixas de horário personalizadas (Em testes finais).</p>
-                        </div>
+                        <i class="fa-solid <?php echo htmlspecialchars($__c['icon'] ?? 'fa-gear'); ?> text-amber-400 mt-0.5"></i>
+                        <div class="min-w-0"><strong class="text-white block"><?php echo htmlspecialchars($__c['titulo']); ?></strong><p class="text-slate-400 text-[11px]"><?php echo htmlspecialchars($__c['desc']); ?></p></div>
                     </div>
-                    <div class="p-3 bg-slate-950 rounded-2xl border border-amber-500/20 flex items-start gap-2.5">
-                        <i class="fa-solid fa-gear text-amber-400 mt-0.5 animate-spin"></i>
-                        <div>
-                            <strong class="text-white block">Disparo de Resumos de IA via WhatsApp e E-mail Universal</strong>
-                            <p class="text-slate-400 text-[11px]">Ícones com validação automática das conexões globais de SMTP e WhatsApp API.</p>
-                        </div>
-                    </div>
+                    <?php endforeach; ?>
                 </div>
             </div>
-
-            <div class="pt-3 border-t border-slate-800 flex justify-end">
-                <button onclick="closeModal('modal-roadmap')" class="px-5 py-2 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl text-xs transition">
-                    Fechar Roadmap
-                </button>
-            </div>
+            <?php endif; ?>
         </div>
-    </div>
+    </dialog>
 
     <!-- CONTAINER DE TOASTS FLUTUANTES -->
     <div id="toast-container" class="fixed top-20 right-5 z-[99999] space-y-3 pointer-events-none"></div>
@@ -3054,7 +3010,7 @@ if ($__route_perm !== '' && !hasUserPermission($__route_perm)) {
 
         function openRoadmapModal() {
             const modal = document.getElementById('modal-roadmap');
-            if (modal) modal.classList.remove('hidden');
+            if (modal && modal.showModal) modal.showModal();
         }
 
 
