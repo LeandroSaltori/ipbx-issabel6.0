@@ -7,6 +7,7 @@
 if (PHP_SAPI !== 'cli') { http_response_code(404); exit; }
 
 require_once __DIR__ . '/../includes/functions.php';
+cronHeartbeat('send_call_summaries');
 
 $cdr = getAsteriskPdoConnection('asteriskcdrdb');
 if (!$cdr) {

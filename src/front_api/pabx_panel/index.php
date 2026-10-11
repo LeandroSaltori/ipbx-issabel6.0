@@ -1130,7 +1130,7 @@ $allowed_modules = [
     'relatorios' => ['ia_analytics', 'filas_stats', 'cdr_gravacoes', 'graphic_reports', 'relatorio_geral', 'relatorio_filas', 'pausas_agentes'],
     'whatsapp' => ['regras', 'historico', 'disparos', 'contatos'],
     'telefonia' => ['blacklist'],
-    'configuracoes' => ['ami', 'ia', 'api', 'usuarios', 'api_connection', 'smtp', 'logs']
+    'configuracoes' => ['ami', 'ia', 'api', 'usuarios', 'api_connection', 'smtp', 'logs', 'status']
 ];
 
 if (!isset($allowed_modules[$module]) || !in_array($action, $allowed_modules[$module])) {

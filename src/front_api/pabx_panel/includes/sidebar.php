@@ -225,6 +225,10 @@ function isGroupActive($modules_array) {
                     <i class="fa-solid fa-envelope-circle-check w-4 text-center text-amber-400"></i>
                     <span>Servidor SMTP & Disparos</span>
                 </a>
+                <a href="index.php?module=configuracoes&action=status" class="flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all <?php echo isNavActive('configuracoes', 'status') ? 'bg-brand-500/20 text-brand-400 border border-brand-500/30 font-bold' : 'text-slate-300 hover:bg-slate-800/60 hover:text-white'; ?>">
+                    <i class="fa-solid fa-heart-pulse w-4 text-center text-rose-400"></i>
+                    <span>Status da Integração</span>
+                </a>
                 <a href="index.php?module=configuracoes&action=logs" class="flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all <?php echo isNavActive('configuracoes', 'logs') ? 'bg-brand-500/20 text-brand-400 border border-brand-500/30 font-bold' : 'text-slate-300 hover:bg-slate-800/60 hover:text-white'; ?>">
                     <i class="fa-solid fa-terminal w-4 text-center text-emerald-400"></i>
                     <span>Logs & Diagnósticos</span>

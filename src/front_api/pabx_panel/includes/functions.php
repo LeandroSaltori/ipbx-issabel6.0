@@ -5768,3 +5768,94 @@ function checkTrunkAlerts() {
     }
     return $res;
 }
+
+// =========================================================================
+// STATUS DA INTEGRAÇÃO (somente leitura; nunca envia mensagens nem altera dados)
+// =========================================================================
+/** Marca que um cron rodou agora (lido pela tela "Status da integração"). */
+function cronHeartbeat($name) {
+    try { saveSetting('cron_last_' . preg_replace('/[^a-z_]/', '', $name), (string)time()); } catch (Exception $e) {}
+}
+
+/** Retorna lista de ['grupo','nome','estado'(ok|warn|fail|off),'detalhe']. */
+function integrationStatusChecks() {
+    global $db;
+    $r = [];
+    $add = function ($g, $n, $s, $d) use (&$r) { $r[] = ['grupo' => $g, 'nome' => $n, 'estado' => $s, 'detalhe' => $d]; };
+
+    // --- Asterisco / AMI
+    $ami = executeAsteriskAMICommand('Ping');
+    $add('Asterisk', 'AMI (porta 5038)', !empty($ami['success']) ? 'ok' : 'fail', !empty($ami['success']) ? 'Autenticado e respondendo.' : ($ami['error'] ?? 'Sem resposta.'));
+    $up = trim(asteriskCliOutput('core show uptime'));
+    $add('Asterisk', 'Console do Asterisk', $up !== '' ? 'ok' : 'warn', $up !== '' ? preg_replace('/\s+/', ' ', substr($up, 0, 110)) : 'Sem saída do comando "core show uptime".');
+
+    // --- Bancos
+    $cdr = getAsteriskPdoConnection('asteriskcdrdb');
+    if ($cdr) {
+        try {
+            $last = $cdr->query("SELECT MAX(calldate) FROM cdr")->fetchColumn();
+            $add('Bancos de dados', 'CDR (asteriskcdrdb)', 'ok', $last ? 'Última chamada registrada: ' . $last : 'Conectado, sem chamadas ainda.');
+        } catch (Exception $e) { $add('Bancos de dados', 'CDR (asteriskcdrdb)', 'warn', 'Conectado, mas a tabela cdr não respondeu.'); }
+    } else { $add('Bancos de dados', 'CDR (asteriskcdrdb)', 'fail', 'Não foi possível conectar ao MySQL.'); }
+    $qdb = function_exists('getAsteriskDBConnection') ? getAsteriskDBConnection() : null;
+    if ($qdb) {
+        try {
+            $n = (int)$qdb->query("SELECT COUNT(*) FROM queue_log")->fetchColumn();
+            $add('Bancos de dados', 'queue_log (filas)', 'ok', number_format($n, 0, ',', '.') . ' eventos registrados.');
+        } catch (Exception $e) { $add('Bancos de dados', 'queue_log (filas)', 'warn', 'Conectado, mas queue_log não encontrada.'); }
+    } else { $add('Bancos de dados', 'queue_log (filas)', 'fail', 'Não foi possível conectar ao banco "asterisk".'); }
+    $nx = 0; $nq = 0;
+    try { $nx = (int)$db->query("SELECT COUNT(*) FROM extensions_config")->fetchColumn(); $nq = (int)$db->query("SELECT COUNT(*) FROM queues_config")->fetchColumn(); } catch (Exception $e) {}
+    $add('Bancos de dados', 'Ramais e filas sincronizados', ($nx > 0 ? 'ok' : 'warn'), "$nx ramais e $nq filas lidos do Issabel.");
+    try { saveSetting('status_probe', (string)time()); $w2 = true; } catch (Exception $e) { $w2 = false; }
+    $add('Bancos de dados', 'Configurações do painel (SQLite)', $w2 ? 'ok' : 'fail', $w2 ? 'Leitura e escrita funcionando.' : 'Sem permissão de escrita no banco do painel.');
+
+    // --- Gravações
+    $mon = '/var/spool/asterisk/monitor';
+    $add('Gravações', 'Pasta de gravações', is_readable($mon) ? 'ok' : 'warn', is_readable($mon) ? 'Legível pelo painel.' : 'Pasta ausente ou sem permissão de leitura.');
+    $pub = trim((string)getSetting('public_base_url'));
+    $add('Gravações', 'URL pública (links de gravação)', $pub !== '' ? 'ok' : 'warn', $pub !== '' ? $pub : 'Não configurada: links de gravação por WhatsApp não serão enviados.');
+
+    // --- WhatsApp
+    $prov = waProvider();
+    $conf = whatsappProviderConfigured();
+    $add('WhatsApp', 'Servidor de envio', $conf ? 'ok' : 'fail', ($prov === 'uazapi' ? 'uazapi' : 'Prismabot / Z-PRO') . ($conf ? ': credenciais preenchidas.' : ': credenciais incompletas.'));
+    if ($prov === 'uazapi' && $conf) {
+        $u = uazapiRequest('GET', '/instance/status', null, 6);
+        $d = json_decode($u['resp'], true);
+        $stt = is_array($d) ? (string)($d['instance']['status'] ?? $d['status'] ?? '') : '';
+        $add('WhatsApp', 'Instância uazapi', ($u['error'] === '' && $u['http'] === 200 && stripos($stt, 'connected') !== false) ? 'ok' : 'warn', $u['error'] !== '' ? $u['error'] : ('Estado: ' . ($stt !== '' ? $stt : 'HTTP ' . $u['http'])));
+    }
+    $add('WhatsApp', 'Respostas de pesquisa (NPS)', getSetting('webhook_token') ? 'ok' : 'warn', getSetting('webhook_token') ? 'Webhook com token gerado.' : 'Webhook ainda não gerado.');
+    $tr = getSetting('trunk_alert_enabled') === '1';
+    $add('WhatsApp', 'Alerta de tronco', $tr ? (count(trunkAlertNumbers()) ? 'ok' : 'warn') : 'off', $tr ? (count(trunkAlertNumbers()) . ' número(s) cadastrado(s).') : 'Desativado.');
+
+    // --- IA
+    foreach (aiRoles() as $role => $lbl) {
+        $c = aiGetConfig($role);
+        $sel = aiRoleChoice($role);
+        if ($c['key'] === '') $add('Inteligência Artificial', $lbl, 'off', 'Sem chave de API configurada.');
+        elseif (!$c['enabled']) $add('Inteligência Artificial', $lbl, 'off', 'Copiloto desativado.');
+        else $add('Inteligência Artificial', $lbl, 'ok', ($sel ? 'Função própria: ' : 'Configuração geral: ') . $c['provider'] . ' / ' . ($role === 'audio' ? ($c['audio'] ?: '-') : ($c['model'] ?: '-')));
+    }
+
+    // --- SMTP
+    $smtpOk = false; $f = __DIR__ . '/../config/smtp_settings.json';
+    if (is_file($f)) { $j = @json_decode((string)@file_get_contents($f), true); $smtpOk = is_array($j) && !empty($j['host']) && !empty($j['user']) && !empty($j['password']); }
+    $add('E-mail', 'SMTP', $smtpOk ? 'ok' : 'warn', $smtpOk ? 'Servidor, usuário e senha preenchidos.' : 'SMTP sem senha/usuário: envio de relatórios por e-mail não funcionará.');
+
+    // --- Troncos
+    try {
+        $tk = getAsteriskTrunksStatus(); $up = 0; $dn = 0;
+        foreach ($tk as $t) { if ($t['status'] === 'Registrado') $up++; elseif ($t['status'] === 'Desconectado') $dn++; }
+        $add('Telefonia', 'Troncos', $dn > 0 ? 'warn' : ($tk ? 'ok' : 'warn'), count($tk) . " troncos: $up registrados, $dn desconectados.");
+    } catch (Exception $e) { $add('Telefonia', 'Troncos', 'warn', 'Não foi possível consultar.'); }
+
+    // --- Crons
+    foreach (['send_missed_calls' => 'Aviso de chamada perdida', 'send_queue_abandon' => 'Aviso de abandono de fila', 'send_call_summaries' => 'Resumo/gravação ao atendente', 'check_trunks' => 'Alerta de tronco'] as $k => $lbl) {
+        $t = (int)getSetting('cron_last_' . $k);
+        if ($t <= 0) $add('Tarefas automáticas', $lbl, 'warn', 'Ainda não registrou execução (aguarde 1-2 minutos após atualizar).');
+        else { $age = time() - $t; $add('Tarefas automáticas', $lbl, $age <= 180 ? 'ok' : 'fail', 'Última execução há ' . ($age < 90 ? $age . 's' : round($age / 60) . ' min') . ($age <= 180 ? '.' : ' — cron parado? verifique /etc/cron.d/ipbx-front-api.')); }
+    }
+    return $r;
+}
