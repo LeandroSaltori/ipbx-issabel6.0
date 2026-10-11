@@ -1595,6 +1595,117 @@ function sendWhatsAppFile($phone, $fileName, $content, $mime = 'application/octe
     return ['success' => $ok, 'error' => $err];
 }
 
+/** Converte o CSV do relatório (',' ou ';') em matriz de linhas. Linhas em branco viram []. */
+function shareParseCsv($csv) {
+    $csv = preg_replace('/^\xEF\xBB\xBF/', '', (string)$csv);
+    $lines = preg_split('/\r\n|\n|\r/', rtrim($csv));
+    $first = $lines[0] ?? '';
+    $delim = (substr_count($first, ';') > substr_count($first, ',')) ? ';' : ',';
+    $rows = [];
+    foreach ($lines as $ln) {
+        if (trim($ln) === '') { $rows[] = []; continue; }
+        $rows[] = str_getcsv($ln, $delim, '"', '');
+    }
+    return $rows;
+}
+
+/** Gera um .xlsx real (1 planilha, cabeçalhos em negrito). Retorna '' se ZipArchive indisponível. */
+function shareBuildXlsx($rows, $sheetName = 'Relatório') {
+    if (!class_exists('ZipArchive')) return '';
+    $esc = function ($t) { return htmlspecialchars((string)$t, ENT_XML1 | ENT_QUOTES, 'UTF-8'); };
+    $colName = function ($i) { $n = ''; $i++; while ($i > 0) { $m = ($i - 1) % 26; $n = chr(65 + $m) . $n; $i = intdiv($i - $m - 1, 26); } return $n; };
+    $sheet = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"/></sheetViews><cols><col min="1" max="30" width="22" customWidth="1"/></cols><sheetData>';
+    $prevBlank = true; $r = 0;
+    foreach ($rows as $row) {
+        $r++;
+        if (!$row) { $prevBlank = true; $sheet .= '<row r="' . $r . '"/>'; continue; }
+        $isHead = $prevBlank; $prevBlank = false;
+        $sheet .= '<row r="' . $r . '">';
+        foreach ($row as $ci => $v) {
+            $ref = $colName($ci) . $r; $v = (string)$v;
+            $style = $isHead ? ' s="1"' : '';
+            if (!$isHead && preg_match('/^-?\d{1,15}(\.\d+)?$/', $v) && !preg_match('/^0\d/', $v) && strlen($v) < 12) {
+                $sheet .= '<c r="' . $ref . '"' . $style . '><v>' . $v . '</v></c>';
+            } else {
+                $sheet .= '<c r="' . $ref . '"' . $style . ' t="inlineStr"><is><t xml:space="preserve">' . $esc($v) . '</t></is></c>';
+            }
+        }
+        $sheet .= '</row>';
+    }
+    $sheet .= '</sheetData></worksheet>';
+    $tmp = tempnam(sys_get_temp_dir(), 'xlsx');
+    $z = new ZipArchive();
+    if ($z->open($tmp, ZipArchive::OVERWRITE) !== true) return '';
+    $z->addFromString('[Content_Types].xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>');
+    $z->addFromString('_rels/.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>');
+    $z->addFromString('xl/workbook.xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="' . $esc(mb_substr(preg_replace('/[\\\\\/?*\[\]:]/', ' ', $sheetName), 0, 31)) . '" sheetId="1" r:id="rId1"/></sheets></workbook>');
+    $z->addFromString('xl/_rels/workbook.xml.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>');
+    $z->addFromString('xl/styles.xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE2E8F0"/></patternFill></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>');
+    $z->addFromString('xl/worksheets/sheet1.xml', $sheet);
+    $z->close();
+    $bin = (string)file_get_contents($tmp); @unlink($tmp);
+    return $bin;
+}
+
+/** Gera um PDF (A4 paisagem, Helvetica) com título, resumo e tabela(s). Sem bibliotecas externas. */
+function shareBuildPdf($title, $summary, $rows) {
+    $enc = function ($t) {
+        $t = (string)$t;
+        $c = @iconv('UTF-8', 'Windows-1252//TRANSLIT//IGNORE', $t);
+        if ($c === false) $c = preg_replace('/[^\x20-\x7E]/', '?', $t);
+        return str_replace(['\\', '(', ')', "\r", "\n"], ['\\\\', '\\(', '\\)', ' ', ' '], $c);
+    };
+    $W = 842; $H = 595; $M = 30; $fs = 8; $cw = $fs * 0.58; $lh = 13;
+    // larguras proporcionais ao conteúdo
+    $ncol = 1; $maxlen = [];
+    foreach ($rows as $r) { $ncol = max($ncol, count($r)); foreach ($r as $i => $v) $maxlen[$i] = max($maxlen[$i] ?? 4, min(34, mb_strlen((string)$v))); }
+    $wcol = []; $tot = 0;
+    for ($i = 0; $i < $ncol; $i++) { $wcol[$i] = (($maxlen[$i] ?? 4) + 2) * $cw; $tot += $wcol[$i]; }
+    $avail = $W - 2 * $M;
+    if ($tot > $avail) { $k = $avail / $tot; foreach ($wcol as &$w) $w *= $k; unset($w); }
+    $fit = function ($t, $w) use ($cw) { $t = (string)$t; $max = max(1, (int)floor(($w - 4) / $cw)); return mb_strlen($t) > $max ? mb_substr($t, 0, max(1, $max - 1)) . '…' : $t; };
+
+    $pages = []; $cur = ''; $y = $H - $M;
+    $newPage = function () use (&$cur, &$y, &$pages, $H, $M) { if ($cur !== '') $pages[] = $cur; $cur = ''; $y = $H - $M; };
+    $text = function ($x, $yy, $t, $bold = false, $size = 8) use (&$cur, $enc) { $cur .= 'BT /' . ($bold ? 'F2' : 'F1') . ' ' . $size . ' Tf ' . round($x, 2) . ' ' . round($yy, 2) . ' Td (' . $enc($t) . ") Tj ET\n"; };
+    // cabeçalho do documento
+    $cur .= "0.486 0.227 0.929 rg " . $M . ' ' . ($H - $M - 6) . ' ' . $avail . " 4 re f 0 g\n"; $y -= 22;
+    $text($M, $y, $title, true, 15); $y -= 16;
+    $text($M, $y, 'Gerado em ' . date('d/m/Y H:i') . ' - IPbx Prisma', false, 8); $y -= 16;
+    foreach (preg_split('/\r\n|\n|\r/', trim((string)$summary)) as $ln) { if ($ln === '') { $y -= 5; continue; } $text($M, $y, $ln, false, 9); $y -= 12; }
+    $y -= 8;
+    $prevBlank = true; $lastHead = null;
+    foreach ($rows as $row) {
+        if (!$row) { $prevBlank = true; $y -= 8; continue; }
+        $isHead = $prevBlank; $prevBlank = false;
+        if ($isHead) $lastHead = $row;
+        if ($y < $M + 30) { $newPage(); if ($lastHead && !$isHead) { $x = $M; $cur .= "0.886 0.910 0.941 rg " . $M . ' ' . ($y - 3) . ' ' . $avail . ' ' . $lh . " re f 0 g\n"; foreach ($lastHead as $i => $v) { $text($x + 2, $y, $fit($v, $wcol[$i]), true); $x += $wcol[$i]; } $y -= $lh; } }
+        $x = $M;
+        if ($isHead) $cur .= "0.886 0.910 0.941 rg " . $M . ' ' . ($y - 3) . ' ' . $avail . ' ' . $lh . " re f 0 g\n";
+        foreach ($row as $i => $v) { $text($x + 2, $y, $fit($v, $wcol[$i] ?? 40), $isHead); $x += ($wcol[$i] ?? 40); }
+        $y -= $lh;
+    }
+    if ($cur !== '') $pages[] = $cur;
+    $n = count($pages);
+    foreach ($pages as $i => &$pg) { $pg .= 'BT /F1 7 Tf ' . ($W / 2 - 25) . ' 16 Td (' . $enc('Página ' . ($i + 1) . '/' . $n) . ") Tj ET\n"; } unset($pg);
+    $objs = [1 => '<< /Type /Catalog /Pages 2 0 R >>', 3 => '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>', 4 => '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>'];
+    $kids = []; $id = 5;
+    foreach ($pages as $pg) {
+        $objs[$id] = '<< /Length ' . strlen($pg) . " >>\nstream\n" . $pg . "endstream";
+        $objs[$id + 1] = '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ' . $W . ' ' . $H . '] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents ' . $id . ' 0 R >>';
+        $kids[] = ($id + 1) . ' 0 R'; $id += 2;
+    }
+    $objs[2] = '<< /Type /Pages /Kids [' . implode(' ', $kids) . '] /Count ' . count($kids) . ' >>';
+    ksort($objs);
+    $out = "%PDF-1.4\n"; $off = [];
+    foreach ($objs as $num => $body) { $off[$num] = strlen($out); $out .= $num . " 0 obj\n" . $body . "\nendobj\n"; }
+    $xref = strlen($out);
+    $out .= "xref\n0 " . (count($objs) + 1) . "\n0000000000 65535 f \n";
+    foreach ($off as $o) $out .= sprintf("%010d 00000 n \n", $o);
+    $out .= "trailer\n<< /Size " . (count($objs) + 1) . " /Root 1 0 R >>\nstartxref\n" . $xref . "\n%%EOF";
+    return $out;
+}
+
 /**
  * Monta os anexos pedidos pelo modal de compartilhamento: CSV do relatório e/ou a gravação (uid).
  * Retorna [anexos[], avisos[]] onde anexo = ['name','type','content'].
@@ -1606,8 +1717,20 @@ function buildShareAttachments($body) {
         if (strlen($csv) > 3 * 1024 * 1024) { $warns[] = 'CSV maior que 3MB não foi anexado.'; }
         else {
             $fn = preg_replace('/[^A-Za-z0-9._\-]/', '_', basename((string)($body['filename'] ?? 'relatorio.csv')));
-            if (!preg_match('/\.csv$/i', $fn)) $fn .= '.csv';
-            $atts[] = ['name' => $fn, 'type' => 'text/csv', 'content' => (strpos($csv, "\xEF\xBB\xBF") === 0 ? '' : "\xEF\xBB\xBF") . $csv];
+            $base = preg_replace('/\.(csv|xlsx|pdf)$/i', '', $fn) ?: 'relatorio';
+            $fmt = strtolower((string)($body['format'] ?? 'xlsx'));
+            $rows = shareParseCsv($csv);
+            $title = trim((string)($body['title'] ?? 'Relatório')) ?: 'Relatório';
+            if ($fmt === 'pdf') {
+                $atts[] = ['name' => $base . '.pdf', 'type' => 'application/pdf', 'content' => shareBuildPdf($title, (string)($body['summary'] ?? ''), $rows)];
+            } elseif ($fmt === 'xlsx') {
+                $xl = shareBuildXlsx($rows, $title);
+                if ($xl !== '') { $atts[] = ['name' => $base . '.xlsx', 'type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'content' => $xl]; }
+                else { $warns[] = 'Excel indisponível no servidor (extensão zip do PHP): enviado em CSV.'; $fmt = 'csv'; }
+            } else { $fmt = 'csv'; }
+            if ($fmt === 'csv') {
+                $atts[] = ['name' => $base . '.csv', 'type' => 'text/csv', 'content' => (strpos($csv, "\xEF\xBB\xBF") === 0 ? '' : "\xEF\xBB\xBF") . $csv];
+            }
         }
     }
     $uid = trim((string)($body['uid'] ?? ''));

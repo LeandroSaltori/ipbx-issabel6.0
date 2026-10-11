@@ -3096,6 +3096,15 @@ if ($__route_perm !== '' && !hasUserPermission($__route_perm)) {
                     <input type="email" id="share-email-target" required placeholder="ex: cliente@empresa.com.br" class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs placeholder-slate-500 focus:border-amber-500 focus:outline-none transition">
                 </div>
 
+                <div id="share-email-format-box" class="space-y-1.5">
+                    <label class="text-xs font-bold text-slate-300">Formato do arquivo anexo</label>
+                    <div class="flex items-center gap-2 text-xs">
+                        <label class="flex items-center gap-1.5 px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl cursor-pointer"><input type="radio" name="share-email-format" value="xlsx" checked class="accent-amber-500"> <span class="text-slate-200 font-bold">Excel (.xlsx)</span></label>
+                        <label class="flex items-center gap-1.5 px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl cursor-pointer"><input type="radio" name="share-email-format" value="pdf" class="accent-amber-500"> <span class="text-slate-200 font-bold">PDF</span></label>
+                        <label class="flex items-center gap-1.5 px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl cursor-pointer"><input type="radio" name="share-email-format" value="csv" class="accent-amber-500"> <span class="text-slate-200 font-bold">CSV</span></label>
+                    </div>
+                </div>
+
                 <!-- Aviso sobre Status do SMTP -->
                 <div id="smtp-status-alert" class="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-xs text-amber-300 space-y-1">
                     <div class="flex items-center gap-2 font-bold">
@@ -3150,6 +3159,15 @@ if ($__route_perm !== '' && !hasUserPermission($__route_perm)) {
                     <textarea id="share-wa-msg" rows="2" placeholder="Mensagem personalizada (opcional)..." class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs placeholder-slate-500 focus:border-emerald-500 focus:outline-none transition"></textarea>
                 </div>
 
+                <div id="share-wa-format-box" class="space-y-1.5">
+                    <label class="text-xs font-bold text-slate-300">Formato do arquivo anexo</label>
+                    <div class="flex items-center gap-2 text-xs">
+                        <label class="flex items-center gap-1.5 px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl cursor-pointer"><input type="radio" name="share-wa-format" value="xlsx" checked class="accent-emerald-500"> <span class="text-slate-200 font-bold">Excel (.xlsx)</span></label>
+                        <label class="flex items-center gap-1.5 px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl cursor-pointer"><input type="radio" name="share-wa-format" value="pdf" class="accent-emerald-500"> <span class="text-slate-200 font-bold">PDF</span></label>
+                        <label class="flex items-center gap-1.5 px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl cursor-pointer"><input type="radio" name="share-wa-format" value="csv" class="accent-emerald-500"> <span class="text-slate-200 font-bold">CSV</span></label>
+                    </div>
+                </div>
+
                 <div class="pt-2 flex items-center justify-between gap-2">
                     <button type="button" onclick="openDirectWebWa()" class="px-3 py-2.5 bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-slate-700 rounded-xl text-xs font-bold transition flex items-center gap-1.5" title="Abrir no WhatsApp Web diretamente">
                         <i class="fa-brands fa-whatsapp text-sm"></i> Abrir Web
@@ -3166,6 +3184,20 @@ if ($__route_perm !== '' && !hasUserPermission($__route_perm)) {
     </div>
 
     <script>
+        function shareFormatInit(prefix) {
+            const box = document.getElementById(prefix + '-format-box');
+            const isRec = !!window.__shareUid || typeof window.__reportShare !== 'function';
+            if (box) box.classList.toggle('hidden', isRec);
+            let saved = ''; try { saved = localStorage.getItem('prisma_share_format') || ''; } catch (e) {}
+            if (saved) { const r = document.querySelector('input[name="' + prefix + '-format"][value="' + saved + '"]'); if (r) r.checked = true; }
+        }
+        function shareFormatValue(prefix) {
+            const r = document.querySelector('input[name="' + prefix + '-format"]:checked');
+            const v = r ? r.value : 'xlsx';
+            try { localStorage.setItem('prisma_share_format', v); } catch (e) {}
+            return v;
+        }
+
         function shareReportViaEmail(itemTitle, defaultEmail = '') {
             window.__shareDetail = window.__pendingDetail || ''; window.__pendingDetail = ''; window.__shareUid = window.__pendingUid || ''; window.__pendingUid = '';
             document.getElementById('share-email-subject-val').value = itemTitle;
@@ -3173,6 +3205,7 @@ if ($__route_perm !== '' && !hasUserPermission($__route_perm)) {
             const targetInput = document.getElementById('share-email-target');
             if (targetInput) targetInput.value = defaultEmail || localStorage.getItem('prisma_user_email') || '';
             
+            shareFormatInit('share-email');
             const modal = document.getElementById('modal-share-email');
             if (modal) modal.classList.remove('hidden');
         }
@@ -3184,6 +3217,7 @@ if ($__route_perm !== '' && !hasUserPermission($__route_perm)) {
             const targetInput = document.getElementById('share-wa-target');
             if (targetInput) targetInput.value = defaultPhone || '';
             
+            shareFormatInit('share-wa');
             const modal = document.getElementById('modal-share-whatsapp');
             if (modal) modal.classList.remove('hidden');
         }
@@ -3217,7 +3251,7 @@ if ($__route_perm !== '' && !hasUserPermission($__route_perm)) {
                 const res = await fetch('index.php?api_action=send_email_report', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify(Object.assign({ to: email, subject: itemTitle, message: itemTitle + (__rs && __rs.summary ? '\n\n' + __rs.summary : '') + (window.__shareUid && window.__shareDetail ? '\n\n' + window.__shareDetail : ''), uid: window.__shareUid || '' }, (__rs && !window.__shareUid) ? { csv: __rs.csv || '', filename: __rs.filename || 'relatorio.csv' } : {}))
+                    body: JSON.stringify(Object.assign({ to: email, subject: itemTitle, message: itemTitle + (__rs && __rs.summary ? '\n\n' + __rs.summary : '') + (window.__shareUid && window.__shareDetail ? '\n\n' + window.__shareDetail : ''), uid: window.__shareUid || '' }, (__rs && !window.__shareUid) ? { csv: __rs.csv || '', filename: __rs.filename || 'relatorio.csv', title: itemTitle, summary: __rs.summary || '', format: shareFormatValue('share-email') } : {}))
                 });
                 const data = await res.json();
                 if (data.success) {
@@ -3255,7 +3289,7 @@ if ($__route_perm !== '' && !hasUserPermission($__route_perm)) {
                 const res = await fetch('index.php?api_action=send_whatsapp_message', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify(Object.assign({ phone: phone, message: (custom ? custom + '\n\n' : '') + '📌 ' + itemTitle + (__rs && __rs.summary ? '\n\n' + __rs.summary : '') + (window.__shareUid && window.__shareDetail ? '\n\n' + window.__shareDetail : ''), uid: window.__shareUid || '' }, (__rs && !window.__shareUid) ? { csv: __rs.csv || '', filename: __rs.filename || 'relatorio.csv' } : {}))
+                    body: JSON.stringify(Object.assign({ phone: phone, message: (custom ? custom + '\n\n' : '') + '📌 ' + itemTitle + (__rs && __rs.summary ? '\n\n' + __rs.summary : '') + (window.__shareUid && window.__shareDetail ? '\n\n' + window.__shareDetail : ''), uid: window.__shareUid || '' }, (__rs && !window.__shareUid) ? { csv: __rs.csv || '', filename: __rs.filename || 'relatorio.csv', title: itemTitle, summary: __rs.summary || '', format: shareFormatValue('share-wa') } : {}))
                 });
                 const data = await res.json();
                 if (data.success) {
