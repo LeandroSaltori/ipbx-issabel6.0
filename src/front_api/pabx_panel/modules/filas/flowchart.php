@@ -335,12 +335,6 @@ if (!function_exists('renderDynamicFlowNode')) {
                                 <div class="text-xs text-slate-300 italic">Mensagem sonora configurada no Asterisk sem gravação customizada.</div>
                             <?php endif; ?>
 
-                            <div class="flex items-center justify-between pt-1 text-[11px]">
-                                <button onclick="speakAnnouncementText('Mensagem do PABX: <?php echo addslashes(htmlspecialchars($node['title'])); ?>.')" 
-                                        class="px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/40 text-amber-300 border border-amber-500/30 rounded-lg font-bold transition flex items-center gap-1.5">
-                                    <i class="fa-solid fa-bullhorn text-amber-400"></i> <span>Voz Sintetizada (pt-BR)</span>
-                                </button>
-                            </div>
                         </div>
                     </div>
 
@@ -388,10 +382,6 @@ if (!function_exists('renderDynamicFlowNode')) {
                                     <span class="flex items-center gap-2">
                                         <i class="fa-solid fa-file-audio text-cyan-400"></i> Áudio de Saudação URA: <code class="bg-slate-900 px-2 py-0.5 rounded text-cyan-300 text-[10px] font-mono"><?php echo htmlspecialchars($node['audio_file']); ?></code>
                                     </span>
-                                    <button onclick="speakAnnouncementText('Mensagem da URA: <?php echo addslashes(htmlspecialchars($node['title'])); ?>.')" 
-                                            class="px-2.5 py-1 bg-cyan-500/20 hover:bg-cyan-500/40 text-cyan-200 border border-cyan-500/30 rounded-lg text-[10px] font-bold transition flex items-center gap-1">
-                                        <i class="fa-solid fa-bullhorn"></i> <span>Voz Sintetizada</span>
-                                    </button>
                                 </div>
                                 <?php $__as = asteriskSoundStatus($node['audio_file']); ?>
                                 <?php if (!$__as['ok']): ?>

@@ -405,11 +405,50 @@ try {
     autoInjectPABXDialplan();
 } catch (Throwable $e_inj) {}
 
+/** A REST API do PABX (pbxapi) é opcional: só vale usá-la se estiver configurada E respondendo (checagem rápida, em cache de 5 min). */
+function pbxapiAvailable() {
+    static $memo = null;
+    if ($memo !== null) return $memo;
+    $c = json_decode((string)getSetting('pbxapi_probe'), true);
+    if (is_array($c) && time() - (int)($c['t'] ?? 0) < 300) return $memo = !empty($c['ok']);
+    $ok = false;
+    $url = trim((string)getSetting('pbxapi_url')) ?: 'https://127.0.0.1/pbxapi';
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_NOBODY => true, CURLOPT_CONNECTTIMEOUT => 2, CURLOPT_TIMEOUT => 3, CURLOPT_SSL_VERIFYPEER => false, CURLOPT_SSL_VERIFYHOST => false]);
+    curl_exec($ch); $http = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE); curl_close($ch);
+    if ($http > 0 && $http < 500) {
+        // Responde na rede: confirma que as credenciais do cliente REST realmente autenticam
+        global $db;
+        if (file_exists(__DIR__ . '/pbxapi_client.php')) {
+            require_once __DIR__ . '/pbxapi_client.php';
+            try { $auth = (new PbxApiClient($db))->authenticate(); $ok = !empty($auth['success']); } catch (Throwable $e) { $ok = false; }
+        }
+    }
+    saveSetting('pbxapi_probe', json_encode(['t' => time(), 'ok' => $ok]));
+    return $memo = $ok;
+}
+
+/** Renomeia o ramal direto no Issabel (users/devices) e recarrega o dialplan de forma suave. Retorna true se gravou. */
+function renameExtensionInIssabel($ext, $name, $tech = 'PJSIP') {
+    $ext = preg_replace('/\D/', '', (string)$ext);
+    $name = trim((string)$name);
+    if ($ext === '' || $name === '' || !function_exists('getPABXSystemConfig')) return false;
+    $conf = getPABXSystemConfig();
+    if (empty($conf['mysqlrootpwd'])) return false;
+    try {
+        $pdo = new PDO("mysql:host=localhost;dbname=asterisk;charset=utf8", 'root', $conf['mysqlrootpwd'], [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_TIMEOUT => 2]);
+        $pdo->prepare("UPDATE users SET name = :n WHERE extension = :e")->execute([':n' => $name, ':e' => $ext]);
+        $pdo->prepare("UPDATE devices SET description = :n WHERE id = :e")->execute([':n' => $name, ':e' => $ext]);
+        executeAsteriskAMICommand('Command', ['Command' => 'dialplan reload']);
+        return true;
+    } catch (Exception $e) { return false; }
+}
+
 function syncPrismaAssets() {
     global $db;
     
     // 1. Tentar sincronizar via REST API PABX (pbxapi) primeiro
-    if (file_exists(__DIR__ . '/pbxapi_client.php')) {
+    if (pbxapiAvailable() && file_exists(__DIR__ . '/pbxapi_client.php')) {
         require_once __DIR__ . '/pbxapi_client.php';
         $api = new PbxApiClient($db);
         
@@ -5809,6 +5848,9 @@ function integrationStatusChecks() {
     $add('Bancos de dados', 'Ramais e filas sincronizados', ($nx > 0 ? 'ok' : 'warn'), "$nx ramais e $nq filas lidos do Issabel.");
     try { saveSetting('status_probe', (string)time()); $w2 = true; } catch (Exception $e) { $w2 = false; }
     $add('Bancos de dados', 'Configurações do painel (SQLite)', $w2 ? 'ok' : 'fail', $w2 ? 'Leitura e escrita funcionando.' : 'Sem permissão de escrita no banco do painel.');
+
+    $pa = pbxapiAvailable();
+    $add('Asterisk', 'REST API do PABX (opcional)', $pa ? 'ok' : 'off', $pa ? 'Respondendo e autenticada.' : 'Não utilizada: o painel lê direto do banco e do AMI do Issabel.');
 
     // --- Gravações
     $mon = '/var/spool/asterisk/monitor';

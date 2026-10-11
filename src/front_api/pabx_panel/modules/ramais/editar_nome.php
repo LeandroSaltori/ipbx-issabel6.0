@@ -63,10 +63,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_update_ext_nam
         if (!empty($secret)) {
             $apiPayload['secret'] = $secret;
         }
-        $apiRes = $apiClient->updateExtension($target_ext, $apiPayload);
+        if (pbxapiAvailable()) {
+            $apiRes = $apiClient->updateExtension($target_ext, $apiPayload);
+        } else {
+            // Sem REST API: grava o nome direto no Issabel (aparece também na interface nativa)
+            $okDirect = renameExtensionInIssabel($target_ext, $new_name, $new_tech);
+            $apiRes = ['success' => $okDirect, 'message' => $okDirect ? '' : 'não foi possível gravar no Issabel (verifique a senha do MySQL).'];
+            if ($okDirect && !empty($secret)) { $msg_extra = ' A senha do ramal só pode ser alterada pela REST API ou pelo Issabel.'; }
+        }
 
         if ($apiRes['success']) {
-            $msg = "Ramal {$target_ext} e suas permissões atualizados com SUCESSO no PABX!";
+            $msg = "Ramal {$target_ext} e suas permissões atualizados com SUCESSO no PABX!" . ($msg_extra ?? '');
             $msg_type = 'success';
         } else {
             $msg = "Atualizado no painel local, mas aviso da API: " . ($apiRes['message'] ?? 'Verifique credenciais da API');
@@ -204,16 +211,18 @@ $exts_list = $db->query("SELECT * FROM extensions_config ORDER BY CAST(extension
         <div>
             <h2 class="text-xl font-bold text-slate-100 flex items-center gap-2">
                 <svg class="w-6 h-6 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
-                Gestão de Ramais & Atendentes (REST API)
+                Gestão de Ramais & Atendentes
             </h2>
             <p class="text-xs text-slate-400">Edite nomes, senhas e WhatsApp de notificação sincronizados diretamente no PABX</p>
         </div>
         
         <form method="POST" class="flex items-center gap-2 flex-wrap">
             <input type="hidden" name="action_bulk_permissions" value="1">
+            <?php if (pbxapiAvailable()): ?>
             <button type="submit" name="action_sync_api_extensions" class="px-3.5 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-cyan-500/20 transition-all flex items-center gap-1.5">
                 <i class="fa-solid fa-rotate"></i> Sincronizar API
             </button>
+            <?php endif; ?>
             <button type="submit" name="bulk_type" value="enable_all_missed" title="Ativar Notificações de Perdidas em Todos os Ramais" class="px-3 py-2 bg-brand-600 hover:bg-brand-500 text-white text-xs font-bold rounded-xl transition flex items-center gap-1.5 shadow">
                 <i class="fa-solid fa-bell"></i> Ativar Perdidas (Todos)
             </button>

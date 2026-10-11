@@ -22,7 +22,7 @@ $apiClient = new PbxApiClient($db);
 
 $msg_status = '';
 $msg_error  = '';
-$active_tab = isset($_POST['active_tab']) ? $_POST['active_tab'] : 'pbxapi';
+$active_tab = isset($_POST['active_tab']) ? $_POST['active_tab'] : (pbxapiAvailable() ? 'pbxapi' : 'prismabot');
 
 // Auto-detectar credenciais nativas
 $sysConf = function_exists('getPABXSystemConfig') ? @getPABXSystemConfig() : [];
@@ -349,7 +349,7 @@ $currentMyUser   = !empty($settings['asterisk_db_user']) ? $settings['asterisk_d
 $currentMyPass   = !empty($settings['asterisk_db_pass']) ? $settings['asterisk_db_pass'] : $auto_pass;
 
 // Tentar autenticar silenciosamente na REST API se token zerado
-if (empty($currentPbxToken) && !empty($currentPbxPass) && $_SERVER['REQUEST_METHOD'] !== 'POST') {
+if (empty($currentPbxToken) && !empty($currentPbxPass) && $_SERVER['REQUEST_METHOD'] !== 'POST' && pbxapiAvailable()) {
     $autoAuth = $apiClient->authenticate();
     if (!empty($autoAuth['success']) && !empty($autoAuth['token'])) {
         $currentPbxToken = $autoAuth['token'];
@@ -363,7 +363,7 @@ if (empty($currentPbxToken) && !empty($currentPbxPass) && $_SERVER['REQUEST_METH
         <button type="button" onclick="switchApiTab('pbxapi')" id="btn-tab-pbxapi" 
                 class="px-4 py-2.5 rounded-xl transition flex items-center gap-2 text-slate-400 hover:text-white">
             <i class="fa-solid fa-bolt text-cyan-400"></i>
-            <span>1. REST API PABX (`pbxapi`)</span>
+            <span>1. REST API PABX (`pbxapi`) <small class="font-normal opacity-70">— opcional</small></span>
         </button>
         <button type="button" onclick="switchApiTab('prismabot')" id="btn-tab-prismabot" 
                 class="px-4 py-2.5 rounded-xl transition flex items-center gap-2 text-slate-400 hover:text-white">
