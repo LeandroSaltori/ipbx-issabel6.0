@@ -600,6 +600,12 @@ if (!function_exists('renderDynamicFlowNode')) {
 
     <!-- LISTAGEM DAS ROTAS EM LAYOUT DE FLUXOGRAMA DE ÁRVORE -->
     <div class="space-y-10" id="flowchart-container">
+        <?php if (empty($flows)): ?>
+            <div class="bg-slate-900/60 rounded-3xl border border-amber-500/40 p-6 text-amber-300 text-sm font-bold flex items-center gap-3">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+                <span><?php echo htmlspecialchars($GLOBALS['__flows_status'] ?? 'Nenhuma rota de entrada encontrada.'); ?></span>
+            </div>
+        <?php endif; ?>
         <?php foreach ($flows as $index => $f): 
             $routeId = 'route-' . $index;
         ?>

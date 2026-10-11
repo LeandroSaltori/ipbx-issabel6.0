@@ -1680,10 +1680,10 @@ function resolveAsteriskDestLabel($dest, $ast_db = null) {
         }
         if ($q_num && $ast_db) {
             try {
-                $st = $ast_db->prepare("SELECT data, value FROM queues_config WHERE (extension = :ext OR extension = :ext_q) AND keyword IN ('description', 'displayname', 'descr') LIMIT 1");
-                $st->execute([':ext' => $q_num, ':ext_q' => "queue_$q_num"]);
+                $st = $ast_db->prepare("SELECT descr FROM queues_config WHERE extension = :ext LIMIT 1");
+                $st->execute([':ext' => $q_num]);
                 $r = $st->fetch(PDO::FETCH_ASSOC);
-                $q_name = trim($r['data'] !== '' ? $r['data'] : ($r['value'] ?? ''));
+                $q_name = trim((string)($r['descr'] ?? ''));
                 if ($q_name) return "Fila #$q_num ($q_name)";
             } catch (Exception $e) {}
         }
@@ -1702,7 +1702,7 @@ function resolveAsteriskDestLabel($dest, $ast_db = null) {
         }
         if ($ann_id && $ast_db) {
             try {
-                $st = $ast_db->prepare("SELECT * FROM announcements WHERE announcement_id = :id OR id = :id LIMIT 1");
+                $st = $ast_db->prepare("SELECT * FROM announcement WHERE announcement_id = :id LIMIT 1");
                 $st->execute([':id' => $ann_id]);
                 $r = $st->fetch(PDO::FETCH_ASSOC);
                 $ann_desc = $r['description'] ?? ($r['name'] ?? '');
@@ -1756,6 +1756,10 @@ function resolveAsteriskDestLabel($dest, $ast_db = null) {
         return "Menu URA" . ($ivr_id ? " #$ivr_id" : "");
     }
 
+    if (preg_match('/^ext-local,vm[bus]?(\d+)/i', $dest, $m_vml)) {
+        return "Caixa Postal (Voicemail) #" . $m_vml[1];
+    }
+
     if (strpos($dest, 'from-did-direct') === 0 || strpos($dest, 'ext-local') === 0) {
         $ext = preg_replace('/\D/', '', explode(',', $dest)[1] ?? '');
         return "Ramal Direto #$ext";
@@ -1767,8 +1771,38 @@ function resolveAsteriskDestLabel($dest, $ast_db = null) {
     }
 
     if (strpos($dest, 'app-blackhole') === 0 || strpos($dest, 'hangup') !== false) {
-        return "Desconectar / Fim";
+        $bh = strtolower(trim(explode(',', $dest)[1] ?? 'hangup'));
+        $bh_map = ['hangup' => 'Desconectar / Fim', 'busy' => 'Sinal de Ocupado', 'congestion' => 'Sinal de Congestionamento', 'ring' => 'Tocar até desistir', 'musiconhold' => 'Música de Espera'];
+        return $bh_map[$bh] ?? "Terminar chamada ($bh)";
     }
+
+    $dp = explode(',', $dest);
+    $dnum = preg_replace('/\D/', '', $dp[1] ?? '');
+    if (strpos($dest, 'app-daynight') === 0) {
+        $dn_name = '';
+        if ($ast_db && $dnum !== '') {
+            try {
+                $st = $ast_db->prepare("SELECT dest FROM daynight WHERE ext = :e AND dmode = 'fc_description' LIMIT 1");
+                $st->execute([':e' => $dnum]);
+                $dn_name = trim((string)$st->fetchColumn());
+            } catch (Exception $e) {}
+        }
+        return "Dia/Noite (Night Mode) #$dnum" . ($dn_name !== '' ? " ($dn_name)" : '');
+    }
+    if (strpos($dest, 'ext-miscdests') === 0) {
+        $md_name = '';
+        if ($ast_db && $dnum !== '') {
+            try {
+                $st = $ast_db->prepare("SELECT description FROM miscdests WHERE id = :i LIMIT 1");
+                $st->execute([':i' => $dnum]);
+                $md_name = trim((string)$st->fetchColumn());
+            } catch (Exception $e) {}
+        }
+        return "Destino Personalizado" . ($md_name !== '' ? ": $md_name" : " #$dnum");
+    }
+    if (strpos($dest, 'ext-meetme') === 0 || strpos($dest, 'conferences') === 0) return "Sala de Conferência #$dnum";
+    if (strpos($dest, 'app-pbdirectory') === 0) return "Diretório por Nome";
+    if (strpos($dest, 'ext-trunk') === 0) return "Saída por Tronco #$dnum";
 
     return "Destino: " . $dest;
 }
@@ -1788,14 +1822,14 @@ function getAsteriskQueueFullDetails($q_num, $ast_db = null) {
         'queue_num' => $q_num,
         'queue_name' => "Fila $q_num",
         'strategy' => 'ringall',
-        'strategy_label' => 'Ringall (Tocar Todos Simultaneamente)',
+        'strategy_label' => '—',
         'max_wait_time' => '120',
-        'max_wait_time_label' => '2 minutos',
-        'max_wait_mode' => 'Strict',
-        'agent_timeout' => 'Ilimitado',
+        'max_wait_time_label' => '—',
+        'max_wait_mode' => '—',
+        'agent_timeout' => '—',
         'agent_timeout_restart' => 'Não',
-        'retry' => '5 segundos',
-        'wrap_up_time' => '0 segundos',
+        'retry' => '—',
+        'wrap_up_time' => '—',
         'member_delay' => '0 segundos',
         'agent_announcement' => 'Nenhum',
         'report_hold_time' => 'Não',
@@ -1803,11 +1837,11 @@ function getAsteriskQueueFullDetails($q_num, $ast_db = null) {
         'auto_pause_busy' => 'Sim',
         'auto_pause_unavail' => 'Sim',
         'auto_pause_delay' => '0s',
-        'max_callers' => 'Sem Limite (No Max)',
-        'join_empty' => 'Sim (Yes)',
-        'leave_empty' => 'Não (No)',
+        'max_callers' => '—',
+        'join_empty' => '—',
+        'leave_empty' => '—',
         'penalty_members_limit' => 'Honor Penalties',
-        'announce_frequency' => '30 segundos',
+        'announce_frequency' => '—',
         'announce_position' => 'Sim',
         'announce_hold_time' => 'Sim',
         'ivr_breakout' => 'Nenhum',
@@ -1815,33 +1849,32 @@ function getAsteriskQueueFullDetails($q_num, $ast_db = null) {
         'event_when_called' => 'Sim',
         'member_status_event' => 'Sim',
         'service_level' => '1 minute (60s)',
-        'recording' => 'wav49 (Include Hold Time)',
-        'recording_mode' => 'Include Hold Time',
+        'recording' => '—',
+        'recording_mode' => '—',
         'caller_vol' => 'Sem Ajuste',
         'agent_vol' => 'Sem Ajuste',
         'mark_answered_elsewhere' => 'Sim',
         'members' => [],
-        'failover_dest' => 'app-blackhole,hangup,1',
-        'failover_label' => 'Encerrar Chamada (Hangup)'
+        'failover_dest' => '',
+        'failover_label' => 'Não configurado'
     ];
 
     $ext_names = getExtensionsMap();
     $raw_kv = [];
+    $cfg_found = false;
 
     if ($ast_db) {
-        // Query queues_config
+        // queues_config: UMA linha por fila (descr, maxwait, dest = destino de transbordo)
         try {
-            $stmt = $ast_db->prepare("SELECT keyword, data, value FROM queues_config WHERE (extension = :ext OR extension = :ext_q)");
-            $stmt->execute([':ext' => $q_num, ':ext_q' => "queue_$q_num"]);
-            while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-                $kw = strtolower(trim($row['keyword']));
-                $val = trim($row['data'] !== '' ? $row['data'] : $row['value']);
-                if (in_array($kw, ['member', 'members', 'static'])) {
-                    if (!isset($raw_kv['members'])) $raw_kv['members'] = [];
-                    $raw_kv['members'][] = $val;
-                } else {
-                    $raw_kv[$kw] = $val;
-                }
+            $stmt = $ast_db->prepare("SELECT * FROM queues_config WHERE extension = :ext LIMIT 1");
+            $stmt->execute([':ext' => $q_num]);
+            $cfg = $stmt->fetch(PDO::FETCH_ASSOC);
+            if ($cfg) {
+                $cfg_found = true;
+                if (!empty($cfg['descr'])) $raw_kv['description'] = trim($cfg['descr']);
+                $raw_kv['maxwait'] = trim((string)($cfg['maxwait'] ?? ''));
+                if (!empty($cfg['dest'])) $raw_kv['goto'] = trim($cfg['dest']);
+                if (!empty($cfg['monitor_type'])) $raw_kv['__monitor_type'] = trim($cfg['monitor_type']);
             }
         } catch (Exception $e) {}
 
@@ -1885,8 +1918,9 @@ function getAsteriskQueueFullDetails($q_num, $ast_db = null) {
     }
 
     // Max wait time
-    $maxwait = $raw_kv['maxwait'] ?? ($raw_kv['maxage'] ?? ($raw_kv['timeout'] ?? '120'));
-    if (is_numeric($maxwait)) {
+    $maxwait = $raw_kv['maxwait'] ?? null;
+    if ($cfg_found && $maxwait === '') $maxwait = '0'; // vazio no FreePBX = sem limite
+    if ($maxwait !== null && is_numeric($maxwait)) {
         $sec = intval($maxwait);
         if ($sec == 0) $details['max_wait_time_label'] = 'Sem Limite (Ilimitado)';
         elseif ($sec < 60) $details['max_wait_time_label'] = "{$sec} segundos";
@@ -1899,6 +1933,12 @@ function getAsteriskQueueFullDetails($q_num, $ast_db = null) {
     }
 
     if (!empty($raw_kv['maxwaitmode'])) $details['max_wait_mode'] = ucfirst($raw_kv['maxwaitmode']);
+    if (!empty($raw_kv['monitor-format'])) {
+        $details['recording'] = $raw_kv['monitor-format'];
+    } elseif (!empty($raw_kv['__monitor_type'])) {
+        $details['recording'] = $raw_kv['__monitor_type'];
+    }
+    if (!empty($raw_kv['monitor-join'])) $details['recording_mode'] = (strtolower($raw_kv['monitor-join']) === 'yes') ? 'Junta as pernas da chamada' : 'Pernas separadas';
 
     // Agent timeout & retry & wrapup
     if (isset($raw_kv['agenttimeout']) || isset($raw_kv['timeout'])) {
@@ -1974,6 +2014,7 @@ function getAsteriskQueueFullDetails($q_num, $ast_db = null) {
         $details['failover_dest'] = $failover;
         $details['failover_label'] = resolveAsteriskDestLabel($failover, $ast_db);
     }
+    $details['config_found'] = $cfg_found;
 
     return $details;
 }
@@ -2312,12 +2353,12 @@ function resolveAsteriskDestinationTree($dest, $ast_db = null, $ext_names = [], 
         $next_dest = "";
 
         if ($ast_db && $ann_id) {
-            $ann_row = fetchAsteriskConfigRow('announcements', $ann_id, ['announcement_id', 'id'], $ast_db);
+            $ann_row = fetchAsteriskConfigRow('announcement', $ann_id, ['announcement_id'], $ast_db);
             if ($ann_row) {
                 if (!empty($ann_row['description'])) $ann_name = $ann_row['description'];
                 elseif (!empty($ann_row['name'])) $ann_name = $ann_row['name'];
-                if (!empty($ann_row['destination'])) $next_dest = $ann_row['destination'];
-                elseif (!empty($ann_row['postdest'])) $next_dest = $ann_row['postdest'];
+                if (!empty($ann_row['post_dest'])) $next_dest = $ann_row['post_dest'];
+                elseif (!empty($ann_row['destination'])) $next_dest = $ann_row['destination'];
                 
                 $rec_id = $ann_row['recording_id'] ?? ($ann_row['recording'] ?? '');
                 if (!empty($rec_id)) {
@@ -2367,8 +2408,11 @@ function resolveAsteriskDestinationTree($dest, $ast_db = null, $ext_names = [], 
                 if (!empty($ivr_row['name'])) $ivr_title = $ivr_row['name'];
                 elseif (!empty($ivr_row['description'])) $ivr_title = $ivr_row['description'];
 
-                if (isset($ivr_row['timeout']) && $ivr_row['timeout'] !== '') {
-                    $timeout = $ivr_row['timeout'] . "s";
+                $ivr_to = $ivr_row['timeout_time'] ?? ($ivr_row['timeout'] ?? '');
+                if ($ivr_to !== '' && $ivr_to !== null) {
+                    $timeout = $ivr_to . "s";
+                } else {
+                    $timeout = '—';
                 }
                 if (isset($ivr_row['invalid_loops']) && $ivr_row['invalid_loops'] !== '') {
                     $invalid_loops = $ivr_row['invalid_loops'] . "x";
@@ -2422,6 +2466,21 @@ function resolveAsteriskDestinationTree($dest, $ast_db = null, $ext_names = [], 
         ];
     }
 
+    // 4.9 Caixa postal via ext-local,vmb200,1 (vmb=ocupado, vmu=indisponível, vms=sem saudação)
+    if (preg_match('/^ext-local,(vm[bus]?)(\d+)/i', $dest, $m_vm)) {
+        $vm_kinds = ['vmb' => 'mensagem de ocupado', 'vmu' => 'mensagem de indisponível', 'vms' => 'sem saudação', 'vm' => 'padrão'];
+        $vm_ext = $m_vm[2];
+        $vm_kind = $vm_kinds[strtolower($m_vm[1])] ?? 'padrão';
+        return [
+            'type' => 'voicemail',
+            'extension' => $vm_ext,
+            'title' => "Caixa Postal (Voicemail): Ramal #$vm_ext (" . ($ext_names[$vm_ext] ?? "Ramal $vm_ext") . ")",
+            'desc' => "Gravador de mensagens de voz — $vm_kind",
+            'badge' => 'Caixa Postal',
+            'color' => 'amber'
+        ];
+    }
+
     // 5. Ramal Direto (Extension)
     if (strpos($dest, 'from-did-direct') === 0 || strpos($dest, 'ext-local') === 0) {
         $ext = preg_replace('/\D/', '', explode(',', $dest)[1] ?? '');
@@ -2449,12 +2508,16 @@ function resolveAsteriskDestinationTree($dest, $ast_db = null, $ext_names = [], 
         ];
     }
 
-    // 6. Hangup / Encerrar Chamada
+    // 6. Terminar chamada (app-blackhole: hangup, busy, congestion, ...)
     if (strpos($dest, 'app-blackhole') === 0 || strpos($dest, 'hangup') !== false) {
+        $bh = strtolower(trim(explode(',', $dest)[1] ?? 'hangup'));
+        $bh_map = ['hangup' => 'Encerrar Chamada (Hangup)', 'busy' => 'Sinal de Ocupado', 'congestion' => 'Sinal de Congestionamento',
+                   'ring' => 'Tocar até desistir (Ring)', 'zapateller' => 'Tom de Informação (Zapateller)', 'musiconhold' => 'Música de Espera', 'playtones' => 'Reproduzir Tom'];
+        $bh_title = $bh_map[$bh] ?? "Terminar Chamada ($bh)";
         return [
             'type' => 'hangup',
-            'title' => 'Encerrar Chamada (Hangup / Desconectar)',
-            'desc' => 'Conexão finalizada diretamente pelo PABX Asterisk',
+            'title' => $bh_title,
+            'desc' => 'Finalizado diretamente pelo PABX Asterisk',
             'badge' => 'Fim de Chamada',
             'color' => 'rose'
         ];
@@ -2519,7 +2582,13 @@ function getPABXInboundCallFlows() {
                     $route_title = $desc !== '' ? $desc : "Rota Entrante $did_label";
 
                     $tree = resolveAsteriskDestinationTree($dest, $ast_db, $ext_names);
-                    $steps = buildFlowStepsFromDestination($dest, $ast_db, $ext_names, $did_label);
+                    $steps = [[
+                        'type' => 'trunk',
+                        'title' => 'Chamada Entrante (DID / Tronco)',
+                        'desc' => "DID: $did_label",
+                        'badge' => 'Entrada PABX',
+                        'color' => 'cyan'
+                    ], $tree];
 
                     if (!empty($steps)) {
                         $flows[] = [
@@ -2533,50 +2602,14 @@ function getPABXInboundCallFlows() {
                     }
                 }
             }
-        } catch (Exception $e) {}
+        } catch (Exception $e) { $GLOBALS['__flows_error'] = $e->getMessage(); }
     }
 
-    // 2. Se a tabela 'incoming' não retornar rotas, buscar TODAS as filas reais e criar o fluxo individual construído estritamente pelas configurações reais da fila
+    // Sem rotas reais: NÃO inventa fluxo. A tela mostra o motivo.
     if (empty($flows)) {
-        $all_queues = [];
-        if ($ast_db) {
-            try {
-                $q_stmt = $ast_db->query("SELECT DISTINCT extension FROM queues_config WHERE extension != '' AND extension REGEXP '^[0-9]+$'");
-                if ($q_stmt) {
-                    while ($qr = $q_stmt->fetch(PDO::FETCH_ASSOC)) {
-                        $all_queues[] = $qr['extension'];
-                    }
-                }
-            } catch (Exception $eq) {}
-        }
-
-        if (empty($all_queues) && $db) {
-            try {
-                $q_stmt2 = $db->query("SELECT queue_number FROM queues_config ORDER BY queue_number ASC");
-                if ($q_stmt2) {
-                    while ($qr2 = $q_stmt2->fetch(PDO::FETCH_ASSOC)) {
-                        $all_queues[] = $qr2['queue_number'];
-                    }
-                }
-            } catch (Exception $eq2) {}
-        }
-
-        foreach (array_unique($all_queues) as $q_num) {
-            $q_details = getAsteriskQueueFullDetails($q_num, $ast_db);
-            $q_name = $q_details['queue_name'];
-            $dest = "ext-queues,$q_num,1";
-            $tree = resolveAsteriskDestinationTree($dest, $ast_db, $ext_names);
-            $steps = buildFlowStepsFromDestination($dest, $ast_db, $ext_names, "Fila #$q_num ($q_name)");
-
-            $flows[] = [
-                'id' => $q_num,
-                'did' => "Fila #$q_num ($q_name)",
-                'description' => "Rota Entrante -> Fila $q_name (#$q_num)",
-                'destination' => $dest,
-                'tree' => $tree,
-                'steps' => $steps
-            ];
-        }
+        $GLOBALS['__flows_status'] = !$ast_db
+            ? 'Não foi possível conectar ao banco "asterisk" do Issabel (verifique /etc/amportal.conf e o MySQL).'
+            : (!empty($GLOBALS['__flows_error']) ? 'Erro ao ler as rotas de entrada: ' . $GLOBALS['__flows_error'] : 'Nenhuma rota de entrada (DID) cadastrada em Conectividade > Rotas de Entrada.');
     }
 
     return $flows;
@@ -3707,6 +3740,21 @@ function getAsteriskTimeGroupRules($tg_id, $ast_db = null) {
 /**
  * Salva uma nova regra de horário personalizada para um Time Group específico no Asterisk MySQL
  */
+/**
+ * Aplica ao Asterisk o que foi gravado no banco do FreePBX (retrieve_conf + dialplan reload, sem reiniciar)
+ * e limpa a flag "Apply Config" para o painel do Issabel não ficar pendente.
+ */
+function applyFreepbxConfig($ast_db = null) {
+    if (!function_exists('shell_exec')) return false;
+    @shell_exec("timeout 90 php /var/lib/asterisk/bin/retrieve_conf 2>/dev/null");
+    @shell_exec("asterisk -rx 'dialplan reload' 2>/dev/null");
+    try {
+        if (!$ast_db) $ast_db = getAsteriskDBConnection();
+        if ($ast_db) $ast_db->exec("UPDATE admin SET value = 'false' WHERE variable = 'need_reload'");
+    } catch (Exception $e) {}
+    return true;
+}
+
 function saveAsteriskTimeGroupRule($tg_id, $tg_name, $time_start, $time_end, $w_days, $m_days, $month, $ast_db = null) {
     if (!$ast_db) {
         $ast_db = getAsteriskDBConnection();
@@ -3738,9 +3786,7 @@ function saveAsteriskTimeGroupRule($tg_id, $tg_name, $time_start, $time_end, $w_
         $stmt_ins = $ast_db->prepare("INSERT INTO timegroups_details (timegroupid, time) VALUES (:tgid, :rule)");
         $stmt_ins->execute([':tgid' => $tg_id, ':rule' => $rule_str]);
 
-        if (function_exists('shell_exec')) {
-            @shell_exec("asterisk -rx 'dialplan reload' 2>/dev/null");
-        }
+        applyFreepbxConfig($ast_db);
 
         return [
             'success' => true,
@@ -3767,9 +3813,7 @@ function deleteAsteriskTimeGroupRule($detail_id, $ast_db = null) {
         $stmt_del = $ast_db->prepare("DELETE FROM timegroups_details WHERE id = :id");
         $stmt_del->execute([':id' => $detail_id]);
 
-        if (function_exists('shell_exec')) {
-            @shell_exec("asterisk -rx 'dialplan reload' 2>/dev/null");
-        }
+        applyFreepbxConfig($ast_db);
 
         return ['success' => true, 'message' => 'Regra removida com sucesso do PABX Issabel!'];
     } catch (Exception $e) {
@@ -3789,7 +3833,7 @@ function getAsteriskAnnouncementsList($ast_db = null) {
     if (!$ast_db) return $announcements;
 
     try {
-        $stmt = $ast_db->query("SELECT * FROM announcements");
+        $stmt = $ast_db->query("SELECT * FROM announcement");
         if ($stmt) {
             while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
                 $ann_id = $row['announcement_id'] ?? ($row['id'] ?? '');
@@ -3860,12 +3904,10 @@ function updateAsteriskAnnouncementAudio($ann_id, $rec_id, $ast_db = null) {
     if (!$ast_db || !$ann_id || !$rec_id) return ['success' => false, 'message' => 'Parâmetros inválidos'];
 
     try {
-        $stmt = $ast_db->prepare("UPDATE announcements SET recording_id = :recid WHERE announcement_id = :annid OR id = :annid");
+        $stmt = $ast_db->prepare("UPDATE announcement SET recording_id = :recid WHERE announcement_id = :annid");
         $stmt->execute([':recid' => $rec_id, ':annid' => $ann_id]);
 
-        if (function_exists('shell_exec')) {
-            @shell_exec("asterisk -rx 'dialplan reload' 2>/dev/null");
-        }
+        applyFreepbxConfig($ast_db);
 
         return ['success' => true, 'message' => 'Mensagem de áudio atualizada com sucesso no PABX!'];
     } catch (Exception $e) {
