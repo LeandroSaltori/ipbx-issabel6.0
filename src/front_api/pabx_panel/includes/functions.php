@@ -1097,7 +1097,8 @@ function getAsteriskQueuesRealtimeStatus($period = 'today') {
                         $iface = $im[1];
                     }
                     // Interface COMPLETA do membro (ex.: Local/200@from-queue/n) - necessária para QueuePause
-                    if (preg_match('/\(((?:PJSIP|SIP|DAHDI|Local|IAX2)\/[^\s\)]+)\)/i', $line_trimmed, $pm)) {
+                    // Formato real: "Nome (Local/200@from-queue/n from hint:200@ext-local) (ringinuse enabled) ..."
+                    if (preg_match('/\(((?:PJSIP|SIP|DAHDI|Local|IAX2)\/[^\s\)]+)/i', $line_trimmed, $pm)) {
                         $iface = $pm[1];
                     } elseif (preg_match('/^((?:PJSIP|SIP|DAHDI|Local|IAX2)\/[^\s\(]+)/i', $line_trimmed, $pm)) {
                         $iface = $pm[1];
