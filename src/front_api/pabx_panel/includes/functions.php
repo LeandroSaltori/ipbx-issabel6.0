@@ -906,7 +906,13 @@ function getAsteriskQueuesRealtimeStatus($period = 'today') {
     global $db;
     // Sincronizar em tempo real com o MySQL do PABX se necessário
     if (function_exists('syncPrismaAssets')) {
-        @syncPrismaAssets();
+        static $__last_sync = 0;
+        $__f = sys_get_temp_dir() . '/prisma_sync_assets.ts';
+        $__last_sync = (int)@file_get_contents($__f);
+        if (time() - $__last_sync > 60) {
+            @file_put_contents($__f, (string)time());
+            @syncPrismaAssets();
+        }
     }
     $queues_config = $db ? $db->query("SELECT * FROM queues_config ORDER BY queue_number ASC")->fetchAll(PDO::FETCH_ASSOC) : [];
     
@@ -974,27 +980,25 @@ function getAsteriskQueuesRealtimeStatus($period = 'today') {
             }
         } catch (Exception $eql) {}
 
-        // Complementar/Fallback via tabela CDR
+        // Fallback via CDR apenas para filas SEM nenhum registro no queue_log (decidido antes de somar)
         try {
+            $has_qlog = array_keys($period_stats);
             $q_cdr = $target_db->prepare("SELECT dst, disposition, duration, billsec FROM cdr WHERE calldate BETWEEN :sd AND :ed");
             $q_cdr->execute([':sd' => $sd_str, ':ed' => $ed_str]);
+            $cdr_stats = [];
             while ($row = $q_cdr->fetch(PDO::FETCH_ASSOC)) {
                 $qnum = trim($row['dst'] ?? '');
-                if (!$qnum) continue;
-                if (!isset($period_stats[$qnum])) {
-                    $period_stats[$qnum] = ['answered' => 0, 'abandoned' => 0, 'wait_sec_total' => 0];
-                }
-                // Se a fila não teve registros no queue_log para este período, usar o CDR
-                if ($period_stats[$qnum]['answered'] == 0 && $period_stats[$qnum]['abandoned'] == 0) {
-                    $disp = strtoupper(trim($row['disposition'] ?? ''));
-                    if ($disp === 'ANSWERED') {
-                        $period_stats[$qnum]['answered']++;
-                        $period_stats[$qnum]['wait_sec_total'] += max(0, intval($row['duration']) - intval($row['billsec']));
-                    } elseif ($disp === 'NO ANSWER' || $disp === 'BUSY' || $disp === 'FAILED') {
-                        $period_stats[$qnum]['abandoned']++;
-                    }
+                if ($qnum === '' || in_array($qnum, $has_qlog, true)) continue;
+                if (!isset($cdr_stats[$qnum])) $cdr_stats[$qnum] = ['answered' => 0, 'abandoned' => 0, 'wait_sec_total' => 0];
+                $disp = strtoupper(trim($row['disposition'] ?? ''));
+                if ($disp === 'ANSWERED') {
+                    $cdr_stats[$qnum]['answered']++;
+                    $cdr_stats[$qnum]['wait_sec_total'] += max(0, intval($row['duration']) - intval($row['billsec']));
+                } elseif ($disp === 'NO ANSWER' || $disp === 'BUSY' || $disp === 'FAILED') {
+                    $cdr_stats[$qnum]['abandoned']++;
                 }
             }
+            foreach ($cdr_stats as $k => $v) $period_stats[$k] = $v;
         } catch (Exception $eqc) {}
     }
 
@@ -1004,7 +1008,7 @@ function getAsteriskQueuesRealtimeStatus($period = 'today') {
 
     // Mapear canais ativos e seus CallerIDs do Asterisk
     $channel_caller_map = [];
-    $concise_out = function_exists('shell_exec') ? @shell_exec('asterisk -rx "core show channels concise" 2>/dev/null') : '';
+    $concise_out = asteriskCliOutput('core show channels concise');
     if (!empty($concise_out)) {
         $clines = explode("\n", str_replace("\r", "", $concise_out));
         foreach ($clines as $cline) {
@@ -1028,7 +1032,7 @@ function getAsteriskQueuesRealtimeStatus($period = 'today') {
         }
     }
 
-    $cli_output = function_exists('shell_exec') ? @shell_exec('asterisk -rx "queue show" 2>/dev/null') : '';
+    $cli_output = asteriskCliOutput('queue show');
 
     // Dividir a saída do CLI por blocos de cada fila
     $queue_blocks = [];
@@ -1092,11 +1096,20 @@ function getAsteriskQueuesRealtimeStatus($period = 'today') {
                     if (preg_match('/^([^\s\(]+)/', $line_trimmed, $im)) {
                         $iface = $im[1];
                     }
-                    if (preg_match('/(PJSIP|SIP|DAHDI|Local|IAX2)\/([^\s\/\)]+)/i', $line_trimmed, $pm)) {
-                        $iface = $pm[0];
+                    // Interface COMPLETA do membro (ex.: Local/200@from-queue/n) - necessária para QueuePause
+                    if (preg_match('/\(((?:PJSIP|SIP|DAHDI|Local|IAX2)\/[^\s\)]+)\)/i', $line_trimmed, $pm)) {
+                        $iface = $pm[1];
+                    } elseif (preg_match('/^((?:PJSIP|SIP|DAHDI|Local|IAX2)\/[^\s\(]+)/i', $line_trimmed, $pm)) {
+                        $iface = $pm[1];
                     }
+                    $is_paused = (bool)preg_match('/\(paused(?::[^)]*)?\)/i', $line_trimmed);
 
-                    $agent_ext = preg_replace('/\D/', '', $iface);
+                    $agent_ext = '';
+                    if (preg_match('/(?:PJSIP|SIP|DAHDI|IAX2)\/(\d+)/i', $iface, $em) || preg_match('/Local\/(\d+)@/i', $iface, $em)) {
+                        $agent_ext = $em[1];
+                    } else {
+                        $agent_ext = preg_replace('/\D/', '', $iface);
+                    }
                     if (empty($agent_ext) && preg_match('/^(\d+)/', $line_trimmed, $numMatch)) {
                         $agent_ext = $numMatch[1];
                     }
@@ -1132,12 +1145,13 @@ function getAsteriskQueuesRealtimeStatus($period = 'today') {
                         $st = 'Indisponível';
                     }
 
+                    if ($is_paused && $st !== 'Indisponível') $st = 'Pausado';
                     $members[] = [
                         'interface' => $iface ?: ('PJSIP/' . $agent_ext),
                         'extension' => $agent_ext ?: '?',
                         'name' => formatEndpointName($agent_ext),
                         'status' => $st,
-                        'paused' => false
+                        'paused' => $is_paused
                     ];
                 }
 
@@ -1254,17 +1268,17 @@ function getAsteriskActiveCallsDetailed() {
         } catch (Exception $e) {}
     }
 
-    $output = function_exists('shell_exec') ? @shell_exec('asterisk -rx "core show channels concise" 2>/dev/null') : '';
+    $output = asteriskCliOutput('core show channels concise');
     if (!empty($output)) {
         $lines = explode("\n", str_replace("\r", "", $output));
         foreach ($lines as $line) {
             $parts = explode('!', trim($line));
-            if (count($parts) >= 11) {
+            if (count($parts) >= 12) {
                 $channel   = $parts[0];
                 $context   = $parts[1];
                 $exten     = $parts[2];
                 $state     = $parts[4];
-                $duration  = (int)($parts[10] ?? 0);
+                $duration  = (int)($parts[11] ?? 0);
 
                 $src_ext = '';
                 if (preg_match('/(?:PJSIP|SIP|DAHDI|Local)\/(\d+)/i', $channel, $m)) {

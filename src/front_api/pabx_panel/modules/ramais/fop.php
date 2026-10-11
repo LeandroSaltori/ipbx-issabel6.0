@@ -602,17 +602,22 @@ async function updateIntegratedQueues() {
                 } else if (m.status === 'Indisponível') {
                     dotColor = 'bg-slate-600 text-slate-500';
                     stBadge = '<span class="text-[9px] font-semibold text-slate-500">Off</span>';
+                } else if (m.status === 'Pausado') {
+                    dotColor = 'bg-violet-500 text-violet-400';
+                    stBadge = '<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-300 border border-violet-500/30">Pausado</span>';
                 }
 
                 const displayName = m.name ? m.name : `Ramal ${m.extension}`;
+                const pauseBtn = (m.status === 'Indisponível' || !m.interface) ? '' :
+                    `<button type="button" onclick="fopPauseMember('${q.queue_number}','${m.interface}',${m.paused ? 1 : 0})" title="${m.paused ? 'Retomar na fila' : 'Pausar na fila'}" class="ml-1.5 text-[10px] px-1.5 py-0.5 rounded border border-slate-700 text-slate-300 hover:bg-slate-800" style="white-space:nowrap;flex-shrink:0;width:auto;overflow:visible">${m.paused ? '▶ Retomar' : '⏸ Pausar'}</button>`;
 
                 return `<div class="flex items-center justify-between p-1.5 bg-slate-950/80 rounded-xl border border-slate-800 text-xs">
                     <div class="flex items-center gap-2 overflow-hidden mr-2">
                         <span class="w-2 h-2 rounded-full ${dotColor} shrink-0"></span>
                         <span class="font-bold text-slate-200 text-[11px] truncate" title="${displayName}">${displayName}</span>
                     </div>
-                    <div>
-                        ${stBadge}
+                    <div class="flex items-center shrink-0">
+                        ${stBadge}${pauseBtn}
                     </div>
                 </div>`;
             }).join('') : '<div class="text-slate-500 text-xs italic py-1">Nenhum operador logado nesta fila.</div>';
@@ -870,12 +875,32 @@ async function submitFopWhatsappMsg(e) {
 // As chamadas de Click to Call utilizam a função global amiClickToCall(targetNum) do index.php
 
 function fopSpyCall(targetExt, type) {
-    const supExt = prompt(`Iniciar Escuta/Interpolação (${type}) no ramal ${targetExt}.\nDigite o número do seu ramal para ouvir:`, "");
+    let supExt = '';
+    try { supExt = localStorage.getItem('prisma_fop_sup_ext') || ''; } catch(e) {}
+    supExt = prompt(`Iniciar Escuta/Interpolação (${type}) no ramal ${targetExt}.\nDigite o número do seu ramal para ouvir:`, supExt);
     if (!supExt) return;
+    supExt = supExt.replace(/\D/g, '');
+    try { localStorage.setItem('prisma_fop_sup_ext', supExt); } catch(e) {}
     fetch(`index.php?api_action=fop_action&type=${encodeURIComponent(type)}&ext=${encodeURIComponent(targetExt)}&sup_ext=${encodeURIComponent(supExt)}`)
         .then(r => r.json())
         .then(d => {
-            alert(d.message || (d.success ? `Comando enviado com sucesso!` : 'Erro: ' + (d.error || d.message)));
+            alert(d.success ? (d.message || 'Comando enviado com sucesso!') : 'Erro: ' + (d.error || d.message));
+        })
+        .catch(err => alert('Erro: ' + err.message));
+}
+
+function fopPauseMember(queueNum, iface, isPaused) {
+    let reason = 'Pausa Operacional';
+    if (!isPaused) {
+        reason = prompt('Motivo da pausa (Almoço, Reunião, Banheiro...):', 'Almoço');
+        if (reason === null) return;
+        reason = reason || 'Pausa Operacional';
+    }
+    fetch(`index.php?api_action=fop_action&type=pause_queue_agent&queue=${encodeURIComponent(queueNum)}&interface=${encodeURIComponent(iface)}&paused=${isPaused ? 0 : 1}&reason=${encodeURIComponent(reason)}`)
+        .then(r => r.json())
+        .then(d => {
+            if (!d.success) alert('Erro: ' + (d.error || d.message || 'Falha ao alterar pausa'));
+            if (typeof updateIntegratedQueues === 'function') updateIntegratedQueues();
         })
         .catch(err => alert('Erro: ' + err.message));
 }
@@ -886,7 +911,8 @@ function fopHangupCall(channel) {
     fetch(`index.php?api_action=fop_action&type=hangup&channel=${encodeURIComponent(channel)}`)
         .then(r => r.json())
         .then(d => {
-            alert(d.message || (d.success ? `Chamada derrubada!` : 'Erro: ' + (d.error || d.message)));
+            alert(d.success ? (d.message || 'Chamada derrubada!') : 'Erro: ' + (d.error || d.message));
+            if (typeof updateFOP === 'function') updateFOP();
         })
         .catch(err => alert('Erro: ' + err.message));
 }

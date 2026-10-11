@@ -384,25 +384,47 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
                 echo json_encode(['success' => false, 'error' => 'Ramal de destino inválido.']);
                 exit;
             }
-            $spy_flag = 'q';
-            if ($type === 'whisper') $spy_flag = 'qw';
-            if ($type === 'barge') $spy_flag = 'qB';
-
-            $ami_res = executeClickToCall($sup_ext, "*55{$target_ext}");
+            $spy_flag = 'qE';
+            if ($type === 'whisper') $spy_flag = 'qwE';
+            if ($type === 'barge') $spy_flag = 'qBE';
+            if (empty($sup_ext) || $sup_ext === $target_ext) {
+                echo json_encode(['success' => false, 'error' => 'Informe o SEU ramal (diferente do ramal monitorado).']);
+                exit;
+            }
+            // Só espiona se o ramal está realmente em chamada (canal real)
+            $live = function_exists('getAsteriskLiveExtensionCalls') ? getAsteriskLiveExtensionCalls() : [];
+            if (!isset($live[$target_ext]) || empty($live[$target_ext]['channel'])) {
+                echo json_encode(['success' => false, 'error' => "O ramal $target_ext não está em chamada no momento."]);
+                exit;
+            }
+            // ChanSpy com prefixo do canal real (ex.: PJSIP/200)
+            $spy_prefix = preg_replace('/-[0-9a-f]+$/i', '', $live[$target_ext]['channel']);
+            $res = executeAsteriskAMICommand('Originate', [
+                'Channel'     => "Local/{$sup_ext}@from-internal",
+                'Application' => 'ChanSpy',
+                'Data'        => "{$spy_prefix},{$spy_flag}",
+                'CallerID'    => "Supervisao <{$sup_ext}>",
+                'Async'       => 'true',
+                'Timeout'     => '30000',
+            ]);
+            $ok = !empty($res['success']) && stripos($res['response'] ?? '', 'Response: Success') !== false;
+            $labels = ['spy' => 'Escuta', 'whisper' => 'Sussurro', 'barge' => 'Intervenção'];
             echo json_encode([
-                'success' => $ami_res['success'],
-                'message' => $ami_res['success'] ? "Escuta ($type) iniciada no ramal $sup_ext enviando ChanSpy($spy_flag) no ramal $target_ext" : $ami_res['error']
+                'success' => $ok,
+                'message' => $ok ? "{$labels[$type]} iniciada: o ramal $sup_ext vai tocar; atenda para monitorar o ramal $target_ext." : null,
+                'error'   => $ok ? '' : (preg_match('/Message:\s*(.+)/i', $res['response'] ?? '', $mm) ? trim($mm[1]) : ($res['error'] ?? 'Asterisk recusou a ação.'))
             ]);
             exit;
         }
 
         if ($type === 'hangup' && !empty($channel)) {
-            if (function_exists('shell_exec')) {
-                @shell_exec('asterisk -rx ' . escapeshellarg('channel request hangup ' . $channel) . ' 2>/dev/null');
-                echo json_encode(['success' => true, 'message' => "Solicitado Hangup no canal $channel"]);
-            } else {
-                echo json_encode(['success' => false, 'error' => "shell_exec desabilitado"]);
-            }
+            $res = executeAsteriskAMICommand('Hangup', ['Channel' => $channel, 'Cause' => '16']);
+            $ok = !empty($res['success']) && stripos($res['response'] ?? '', 'Response: Success') !== false;
+            echo json_encode([
+                'success' => $ok,
+                'message' => $ok ? "Chamada encerrada ($channel)." : null,
+                'error'   => $ok ? '' : (preg_match('/Message:\s*(.+)/i', $res['response'] ?? '', $mm) ? trim($mm[1]) : ($res['error'] ?? 'Não foi possível derrubar o canal.'))
+            ]);
             exit;
         }
 
