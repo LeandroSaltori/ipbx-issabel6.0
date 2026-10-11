@@ -229,91 +229,25 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
         $realtime_statuses = getAsteriskRealtimeStatuses();
         $exts = $db->query("SELECT * FROM extensions_config ORDER BY CAST(extension AS UNSIGNED) ASC")->fetchAll(PDO::FETCH_ASSOC);
 
-        $active_partners = [];
-        if (function_exists('shell_exec')) {
-            $chans = @shell_exec('asterisk -rx "core show channels concise" 2>/dev/null');
-            if ($chans) {
-                $lines = explode("\n", trim($chans));
-                foreach ($lines as $line) {
-                    $parts = explode('!', trim($line));
-                    if (count($parts) >= 8) {
-                        $ch         = trim($parts[0] ?? ''); // ex: PJSIP/201-0000000a
-                        $ext_field  = trim($parts[2] ?? ''); // ex: 203 ou s ou 12
-                        $app_data   = trim($parts[6] ?? ''); // ex: PJSIP/203,,Ttr ou 01199998888@from-internal
-                        $caller_raw = trim($parts[7] ?? ''); // ex: "201" <201> ou 201
-                        $bridged_ch = trim($parts[11] ?? ''); // ex: PJSIP/203-0000000b
-
-                        // Extrair número do ramal a partir do canal (ex: PJSIP/201-00000a -> 201)
-                        $channel_ext = '';
-                        if (preg_match('/^(?:PJSIP|SIP|DAHDI|Local|IAX2)\/(\d+)/i', $ch, $m_ch)) {
-                            $channel_ext = $m_ch[1];
-                        }
-
-                        if (empty($channel_ext)) continue;
-
-                        // Extrair número do chamador (CallerID)
-                        $caller_num = '';
-                        if (preg_match('/<(\d+)>/', $caller_raw, $m_cid)) {
-                            $caller_num = $m_cid[1];
-                        } elseif (preg_match('/^\d+$/', $caller_raw)) {
-                            $caller_num = $caller_raw;
-                        }
-
-                        // Extrair número do destino/discado
-                        $target_num = '';
-
-                        // 1. A partir de AppData (ex: Dial(PJSIP/203...))
-                        if (preg_match('/(?:PJSIP|SIP|DAHDI|Local|IAX2)\/(\d+)/i', $app_data, $m_app)) {
-                            $target_num = $m_app[1];
-                        }
-
-                        // 2. A partir do Canal Conectado (Bridged Channel)
-                        if (empty($target_num) && !empty($bridged_ch)) {
-                            if (preg_match('/(?:PJSIP|SIP|DAHDI|Local|IAX2)\/(\d+)/i', $bridged_ch, $m_br)) {
-                                $target_num = $m_br[1];
-                            }
-                        }
-
-                        // 3. A partir do campo Extension se for um número válido (diferente do ramal do canal)
-                        if (empty($target_num) && is_numeric($ext_field) && strlen($ext_field) >= 3 && $ext_field !== $channel_ext) {
-                            $target_num = $ext_field;
-                        }
-
-                        // Limpar prefixo 9 de discagem externa se houver
-                        if (strlen($target_num) >= 10 && $target_num[0] === '9') {
-                            $target_num = substr($target_num, 1);
-                        }
-
-                        // Determinar a direção da conversa para cada ramal envolvido
-                        if ($channel_ext === $caller_num) {
-                            // Este ramal é o ORIGINADOR (quem ligou) -> seu parceiro é o DESTINO
-                            if (!empty($target_num) && $target_num !== $channel_ext) {
-                                $active_partners[$channel_ext] = $target_num;
-                            }
-                        } else {
-                            // Este ramal é o DESTINO (quem está recebendo/tocando) -> seu parceiro é o ORIGINADOR
-                            if (!empty($caller_num) && $caller_num !== $channel_ext) {
-                                $active_partners[$channel_ext] = $caller_num;
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        $live_calls = getAsteriskLiveExtensionCalls();
 
         $fop_data = [];
         foreach ($exts as $e) {
             $num = $e['extension'];
             $st = isset($realtime_statuses[$num]) ? $realtime_statuses[$num] : 'Livre';
-            
+            $lv = $live_calls[$num] ?? null;
+            if ($lv) $st = $lv['status'];   // canais ativos são a fonte mais precisa
+
             $fop_data[] = [
                 'id' => $num,
                 'name' => formatEndpointName($num),
                 'tech' => strtoupper($e['tech'] ?: 'PJSIP'),
                 'whatsapp' => $e['whatsapp_number'],
                 'status' => $st,
-                'channel' => "PJSIP/{$num}",
-                'partner' => isset($active_partners[$num]) ? formatEndpointName($active_partners[$num]) : ''
+                'channel' => $lv ? $lv['channel'] : "PJSIP/{$num}",
+                'partner' => ($lv && $lv['partner'] !== '') ? formatEndpointName($lv['partner']) : '',
+                'kind' => $lv ? $lv['kind'] : '',
+                'secs' => $lv ? (int)$lv['secs'] : 0
             ];
         }
         echo json_encode($fop_data);

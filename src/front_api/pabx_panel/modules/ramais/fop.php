@@ -374,6 +374,30 @@ function setFopMode(mode) {
     }
 }
 
+
+// ─── Situação em tempo real do ramal (chamando / tocando / falando com quem e há quanto tempo) ───
+function fopFmtSecs(sec) {
+    sec = Math.max(0, parseInt(sec || 0, 10));
+    const m = Math.floor(sec / 60), s = sec % 60;
+    return String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+}
+function fopPartnerText(e) {
+    const t = e.secs ? ' · ' + fopFmtSecs(e.secs) : '';
+    if (e.kind === 'ringing_out') return '📤 Chamando ' + e.partner + t;
+    if (e.kind === 'ringing_in')  return '🔔 Recebendo de ' + e.partner + t;
+    return '📞 Falando com ' + e.partner + t;
+}
+// relógio local: mantém a duração subindo entre uma atualização e outra
+setInterval(() => {
+    document.querySelectorAll('.ext-partner-box[data-secs], .fop-partner-box[data-secs]').forEach(el => {
+        const base = parseInt(el.getAttribute('data-secs') || '0', 10);
+        const ts = parseInt(el.getAttribute('data-ts') || '0', 10);
+        if (!ts || !base) return;
+        const cur = base + Math.floor((Date.now() - ts) / 1000);
+        el.innerHTML = el.innerHTML.replace(/( · )?\d{2}:\d{2}$/, '') + ' · ' + fopFmtSecs(cur);
+    });
+}, 1000);
+
 // ─── Painel Integrado: Ramais Reais ──────────────────────────────────────────
 async function updateIntegratedPanel() {
     await Promise.all([updateIntegratedExtensions(), updateIntegratedQueues()]);
@@ -422,7 +446,7 @@ async function updateIntegratedExtensions(cachedExts) {
         // Atualização Suave In-Place (Sem piscar o DOM)
         exts.forEach(e => {
             const extCard = document.getElementById(`ext-card-${e.id}`);
-            const busy = e.status === 'Em Chamada' || e.status === 'Ocupado';
+            const busy = e.status === 'Em Chamada' || e.status === 'Ocupado' || e.status === 'Chamando';
             const tech = (e.tech || 'PJSIP').toUpperCase();
             
             let techClass = 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
@@ -439,7 +463,12 @@ async function updateIntegratedExtensions(cachedExts) {
             let stBorder = 'border-slate-800';
             let stIcon = 'fa-circle-check';
 
-            if (busy) {
+            if (e.status === 'Chamando') {
+                stColor = 'bg-sky-500/20 text-sky-300 border-sky-500/30';
+                stBg = 'bg-sky-950/20 border-sky-500/30';
+                stBorder = 'border-sky-500/50';
+                stIcon = 'fa-phone-flip';
+            } else if (busy) {
                 stColor = 'bg-rose-500/20 text-rose-300 border-rose-500/30';
                 stBg = 'bg-rose-950/20 border-rose-500/30';
                 stBorder = 'border-rose-500/50';
@@ -457,7 +486,7 @@ async function updateIntegratedExtensions(cachedExts) {
             }
 
             const partnerTitle = e.partner ? `Em ligação com: ${e.partner}` : `${e.name}`;
-            const partnerBadgeHtml = e.partner ? `<div class="ext-partner-box text-[10px] text-rose-300 font-mono bg-rose-500/10 px-2 py-0.5 rounded border border-rose-500/20 truncate">📞 ${e.partner}</div>` : '';
+            const partnerBadgeHtml = e.partner ? `<div class="ext-partner-box text-[10px] text-rose-300 font-mono bg-rose-500/10 px-2 py-0.5 rounded border border-rose-500/20 truncate" data-secs="${e.secs || 0}" data-ts="${Date.now()}">${fopPartnerText(e)}</div>` : '';
 
             if (extCard) {
                 // Atualiza campos in-place sem recriar o card
@@ -667,7 +696,7 @@ async function updateFOP() {
 
         exts.forEach(e => {
             const extCard = document.getElementById(`fop-card-${e.id}`);
-            const busy = e.status === 'Em Chamada' || e.status === 'Ocupado';
+            const busy = e.status === 'Em Chamada' || e.status === 'Ocupado' || e.status === 'Chamando';
             const tech = (e.tech || 'PJSIP').toUpperCase();
             
             let techClass = 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
@@ -684,7 +713,12 @@ async function updateFOP() {
             let stBorder = 'border-slate-800';
             let stIcon = 'fa-circle-check';
 
-            if (busy) {
+            if (e.status === 'Chamando') {
+                stColor = 'bg-sky-500/20 text-sky-300 border-sky-500/30';
+                stBg = 'bg-sky-950/20 border-sky-500/30';
+                stBorder = 'border-sky-500/50';
+                stIcon = 'fa-phone-flip';
+            } else if (busy) {
                 stColor = 'bg-rose-500/20 text-rose-300 border-rose-500/30';
                 stBg = 'bg-rose-950/20 border-rose-500/30';
                 stBorder = 'border-rose-500/50';
@@ -702,7 +736,7 @@ async function updateFOP() {
             }
 
             const partnerTitle = e.partner ? `Em ligação com: ${e.partner}` : `${e.id} - ${e.name}`;
-            const partnerBadgeHtml = e.partner ? `<div class="fop-partner-box text-[10px] text-rose-300 font-mono bg-rose-500/10 px-2 py-0.5 rounded border border-rose-500/20 truncate mt-2">📞 ${e.partner}</div>` : '';
+            const partnerBadgeHtml = e.partner ? `<div class="fop-partner-box text-[10px] text-rose-300 font-mono bg-rose-500/10 px-2 py-0.5 rounded border border-rose-500/20 truncate mt-2" data-secs="${e.secs || 0}" data-ts="${Date.now()}">${fopPartnerText(e)}</div>` : '';
 
             if (extCard) {
                 extCard.className = `p-4 rounded-2xl border ${stBorder} ${stBg} space-y-3 transition hover:scale-[1.02] shadow-xl flex flex-col justify-between`;

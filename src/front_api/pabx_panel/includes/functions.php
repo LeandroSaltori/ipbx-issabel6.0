@@ -674,39 +674,114 @@ function syncPrismaAssets() {
     }
 }
 
+/**
+ * Executa um comando CLI do Asterisk e devolve o texto limpo.
+ * Tenta o AMI (remove "Output: ", cabeçalhos e --END COMMAND--) e cai para `asterisk -rx`.
+ */
+function asteriskCliOutput($cmd) {
+    $out = '';
+    $ami = executeAsteriskAMICommand('Command', ['Command' => $cmd]);
+    if (!empty($ami['success']) && !empty($ami['response'])) {
+        $lines = [];
+        foreach (preg_split('/\r\n|\n|\r/', $ami['response']) as $ln) {
+            if (preg_match('/^(Response|Message|Privilege|ActionID):/i', $ln) || trim($ln) === '--END COMMAND--') continue;
+            $lines[] = preg_replace('/^Output:\s?/', '', $ln);
+        }
+        $out = trim(implode("\n", $lines));
+    }
+    if ($out === '' && function_exists('shell_exec')) {
+        $out = (string)@shell_exec('asterisk -rx ' . escapeshellarg($cmd) . ' 2>/dev/null');
+    }
+    return $out;
+}
+
 function getAsteriskRealtimeStatuses() {
     $statuses = [];
-    $output = '';
-
-    $ami_res = executeAsteriskAMICommand('Command', ['Command' => 'core show hints']);
-    if ($ami_res['success'] && !empty($ami_res['response'])) {
-        $output = $ami_res['response'];
-    } elseif (function_exists('shell_exec')) {
-        $output = @shell_exec('asterisk -rx "core show hints" 2>/dev/null');
-    }
-
-    if (!empty($output)) {
-        $lines = explode("\n", str_replace("\r", "", $output));
-        foreach ($lines as $line) {
-            if (preg_match('/^\s*(\d+)@[\w\-]+\s*:.*State:([A-Za-z0-9_]+)/i', $line, $m)) {
+    $output = asteriskCliOutput('core show hints');
+    if ($output !== '') {
+        foreach (explode("\n", str_replace("\r", "", $output)) as $line) {
+            if (preg_match('/^\s*(\d+)@[\w\-]+\s*:.*State:\s*([A-Za-z0-9_&+\- ]+?)\s{2,}/i', $line . '  ', $m)) {
                 $ext = $m[1];
                 $raw_st = strtolower($m[2]);
-                
-                if (strpos($raw_st, 'idle') !== false) {
-                    $statuses[$ext] = 'Livre';
-                } elseif (strpos($raw_st, 'inuse') !== false || strpos($raw_st, 'busy') !== false) {
-                    $statuses[$ext] = 'Em Chamada';
-                } elseif (strpos($raw_st, 'ringing') !== false || strpos($raw_st, 'ring') !== false) {
-                    $statuses[$ext] = 'Tocando';
-                } elseif (strpos($raw_st, 'unavail') !== false || strpos($raw_st, 'unknown') !== false) {
-                    $statuses[$ext] = 'Indisponível';
+                if (strpos($raw_st, 'unavail') !== false || strpos($raw_st, 'unknown') !== false || strpos($raw_st, 'invalid') !== false) {
+                    $st = 'Indisponível';
+                } elseif (strpos($raw_st, 'ring') !== false) {
+                    $st = 'Tocando';
+                } elseif (strpos($raw_st, 'inuse') !== false || strpos($raw_st, 'busy') !== false || strpos($raw_st, 'hold') !== false) {
+                    $st = 'Em Chamada';
                 } else {
-                    $statuses[$ext] = 'Livre';
+                    $st = 'Livre';
                 }
+                // vários hints para o mesmo ramal (ext-local, ext-findmefollow): o mais "ativo" vence
+                $rank = ['Livre' => 0, 'Indisponível' => 1, 'Em Chamada' => 2, 'Tocando' => 3];
+                if (!isset($statuses[$ext]) || $rank[$st] > $rank[$statuses[$ext]]) $statuses[$ext] = $st;
             }
         }
     }
     return $statuses;
+}
+
+/**
+ * Situação em tempo real de cada ramal a partir dos canais ativos do Asterisk.
+ * Retorna ext => ['status' => Chamando|Tocando|Em Chamada, 'partner' => número, 'kind' => ..., 'secs' => int, 'channel' => canal]
+ * (layout do `core show channels concise`: canal!ctx!exten!prio!estado!app!dados!callerid!conta!peer!amaflags!duração!bridge!uniqueid)
+ */
+function getAsteriskLiveExtensionCalls() {
+    $raw = asteriskCliOutput('core show channels concise');
+    if ($raw === '') return [];
+    $chans = [];
+    foreach (explode("\n", str_replace("\r", "", $raw)) as $line) {
+        $p = explode('!', trim($line));
+        if (count($p) < 8) continue;
+        $c = [
+            'name' => $p[0], 'exten' => $p[2], 'state' => strtolower($p[4]), 'app' => $p[5], 'data' => $p[6],
+            'cid' => trim($p[7]), 'secs' => isset($p[11]) && ctype_digit($p[11]) ? (int)$p[11] : 0,
+            'bridge' => isset($p[12]) ? trim($p[12]) : '', 'ext' => '', 'trunk' => false, 'local' => false,
+        ];
+        if (stripos($c['name'], 'Local/') === 0) { $c['local'] = true; }
+        elseif (preg_match('/^(?:PJSIP|SIP|IAX2)\/([^\-\/@]+)-/i', $c['name'], $m)) {
+            if (ctype_digit($m[1]) && strlen($m[1]) <= 6) $c['ext'] = $m[1]; else $c['trunk'] = true;
+        }
+        $chans[] = $c;
+    }
+    $isInternal = function ($n) { return ctype_digit((string)$n) && strlen((string)$n) <= 6; };
+    $live = [];
+    foreach ($chans as $c) {
+        if ($c['ext'] === '') continue;
+        $ext = $c['ext']; $partner = ''; $kind = ''; $status = '';
+        if ($c['state'] === 'ringing') {
+            $status = 'Tocando'; $kind = 'ringing_in';
+            if ($c['cid'] !== '' && $c['cid'] !== $ext) $partner = $c['cid'];
+            if ($partner === '') {
+                foreach ($chans as $o) {
+                    if ($o['app'] === 'Dial' && strpos($o['data'], '/' . $ext) !== false && $o['cid'] !== '' && $o['cid'] !== $ext) { $partner = $o['cid']; break; }
+                }
+            }
+        } elseif ($c['state'] === 'ring' || $c['state'] === 'dialing' || $c['state'] === 'dialing offhook' || $c['state'] === 'pre-ring') {
+            $status = 'Chamando'; $kind = 'ringing_out';
+            if (preg_match('/(?:PJSIP|SIP|IAX2)\/(\d+)/i', $c['data'], $m)) $partner = $m[1];
+            elseif ($c['exten'] !== '' && $c['exten'] !== 's') $partner = $c['exten'];
+        } elseif ($c['state'] === 'up') {
+            $status = 'Em Chamada'; $kind = 'talking';
+            if ($c['bridge'] !== '') {
+                foreach ($chans as $o) {
+                    if ($o['bridge'] === $c['bridge'] && $o['name'] !== $c['name'] && !$o['local']) {
+                        if ($o['ext'] !== '') { $partner = $o['ext']; }
+                        elseif ($o['cid'] !== '' && !$isInternal($o['cid'])) { $partner = $o['cid']; }
+                        elseif ($c['exten'] !== '' && $c['exten'] !== 's') { $partner = $c['exten']; }
+                        if ($partner !== '') break;
+                    }
+                }
+            }
+            if ($partner === '' && preg_match('/(?:PJSIP|SIP|IAX2)\/(\d+)/i', $c['data'], $m)) $partner = $m[1];
+            if ($partner === '' && $c['exten'] !== '' && $c['exten'] !== 's' && $c['exten'] !== $ext) $partner = $c['exten'];
+        } else { continue; }
+        // se o ramal já tem uma perna "Up" (conversa), ela vale mais que uma perna tocando
+        $rank = ['Tocando' => 1, 'Chamando' => 2, 'Em Chamada' => 3];
+        if (isset($live[$ext]) && $rank[$live[$ext]['status']] >= $rank[$status]) continue;
+        $live[$ext] = ['status' => $status, 'partner' => $partner, 'kind' => $kind, 'secs' => $c['secs'], 'channel' => $c['name']];
+    }
+    return $live;
 }
 
 function getAsteriskTrunksStatus() {
@@ -1593,6 +1668,35 @@ function sendWhatsAppFile($phone, $fileName, $content, $mime = 'application/octe
     } catch (Exception $e) {}
     if (function_exists('pabx_log')) pabx_log('whatsapp', $ok ? 'INFO' : 'ERROR', "Envio de arquivo {$fileName} para {$num} [HTTP {$http}]", ['error' => $err]);
     return ['success' => $ok, 'error' => $err];
+}
+
+/**
+ * Envia ao navegador a exportação COMPLETA de um relatório (csv | xlsx | pdf) e encerra a requisição.
+ * $rows = matriz de linhas (a 1ª é o cabeçalho). Aceita linhas em branco ([]) para separar tabelas.
+ */
+function reportExportSend($format, $baseName, $title, $summary, $rows) {
+    while (ob_get_level()) { ob_end_clean(); }
+    $base = preg_replace('/[^A-Za-z0-9._\-]/', '_', $baseName) ?: 'relatorio';
+    $format = strtolower((string)$format);
+    if ($format === 'pdf') {
+        $body = shareBuildPdf($title, $summary, $rows); $mime = 'application/pdf'; $fn = $base . '.pdf';
+    } else {
+        $body = ''; $fn = $base . '.xlsx'; $mime = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+        if ($format === 'xlsx') $body = shareBuildXlsx($rows, $title);
+        if ($body === '') {   // csv pedido (ou Excel indisponível): CSV com BOM e ';' para abrir direto no Excel BR
+            $fn = $base . '.csv'; $mime = 'text/csv; charset=UTF-8';
+            $body = "\xEF\xBB\xBF";
+            foreach ($rows as $r) {
+                $body .= implode(';', array_map(function ($v) { return '"' . str_replace('"', '""', (string)$v) . '"'; }, $r)) . "\r\n";
+            }
+        }
+    }
+    header('Content-Type: ' . $mime);
+    header('Content-Disposition: attachment; filename="' . $fn . '"');
+    header('Content-Length: ' . strlen($body));
+    header('Cache-Control: no-cache, must-revalidate');
+    echo $body;
+    exit;
 }
 
 /** Converte o CSV do relatório (',' ou ';') em matriz de linhas. Linhas em branco viram []. */
@@ -4454,7 +4558,9 @@ function sendWhatsAppMessageViaZPro($api_url, $api_token, $number, $message, $ca
                 ':rr' => substr((string)$resp, 0, 1000)
             ]);
         }
-    } catch (Exception $e_log) {}
+    } catch (Exception $e_log) {
+        if (function_exists('pabx_log')) pabx_log('whatsapp', 'ERROR', 'Falha ao gravar o envio no histórico (sent_logs): ' . $e_log->getMessage());
+    }
 
     return $ok;
 }
@@ -5200,6 +5306,45 @@ function amiCredentialDiagnosis($creds) {
  * Respeita as opções do ramal: Perdidas Ext./Int. e Notif. Ocupado. Ao cliente só envia se a regra
  * "missed_client_msg" estiver cadastrada. Não depende de gancho no dialplan do Asterisk.
  */
+/**
+ * Trava anti-duplicidade para avisos automáticos: garante UM envio por (chamada, destinatário).
+ * Retorna true se este processo pode enviar agora. Só libera novo envio se o anterior deu ERRO (máx. 3 tentativas).
+ * Se a trava não puder ser gravada, retorna false (prefere não enviar a enviar em duplicidade).
+ */
+function missedGuardAcquire($key, $recipient, $ext, $legacyCid = '', $phoneTail = '') {
+    global $db;
+    try {
+        if ($legacyCid !== '' && $phoneTail !== '') {
+            $lg = $db->prepare("SELECT COUNT(*) FROM sent_logs WHERE call_id = :c AND status = 'SUCCESS' AND phone LIKE :p");
+            $lg->execute([':c' => $legacyCid, ':p' => '%' . $phoneTail]);
+            if ((int)$lg->fetchColumn() > 0) {
+                $db->exec("CREATE TABLE IF NOT EXISTS missed_guard (call_key TEXT NOT NULL, recipient TEXT NOT NULL, ext TEXT, status TEXT DEFAULT 'PENDING', attempts INTEGER DEFAULT 1, updated_at DATETIME DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (call_key, recipient))");
+                $db->prepare("INSERT OR IGNORE INTO missed_guard (call_key, recipient, ext, status) VALUES (:k, :r, :e, 'SUCCESS')")->execute([':k' => $key, ':r' => $recipient, ':e' => $ext]);
+                return false;
+            }
+        }
+        $db->exec("CREATE TABLE IF NOT EXISTS missed_guard (call_key TEXT NOT NULL, recipient TEXT NOT NULL, ext TEXT, status TEXT DEFAULT 'PENDING', attempts INTEGER DEFAULT 1, updated_at DATETIME DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (call_key, recipient))");
+        $ins = $db->prepare("INSERT OR IGNORE INTO missed_guard (call_key, recipient, ext, status, attempts) VALUES (:k, :r, :e, 'PENDING', 1)");
+        $ins->execute([':k' => $key, ':r' => $recipient, ':e' => $ext]);
+        if ($ins->rowCount() === 1) return true;
+        // já existe: só tenta de novo se falhou e ainda há tentativas
+        $upd = $db->prepare("UPDATE missed_guard SET status = 'PENDING', attempts = attempts + 1, updated_at = CURRENT_TIMESTAMP WHERE call_key = :k AND recipient = :r AND status = 'ERROR' AND attempts < 3");
+        $upd->execute([':k' => $key, ':r' => $recipient]);
+        return $upd->rowCount() === 1;
+    } catch (Exception $e) {
+        if (function_exists('pabx_log')) pabx_log('whatsapp', 'ERROR', 'Trava anti-duplicidade indisponível (banco sem escrita?): nada foi enviado. ' . $e->getMessage());
+        return false;
+    }
+}
+
+function missedGuardFinish($key, $recipient, $ok) {
+    global $db;
+    try {
+        $db->prepare("UPDATE missed_guard SET status = :s, updated_at = CURRENT_TIMESTAMP WHERE call_key = :k AND recipient = :r")
+           ->execute([':s' => $ok ? 'SUCCESS' : 'ERROR', ':k' => $key, ':r' => $recipient]);
+    } catch (Exception $e) {}
+}
+
 function processMissedCallNotifications($cdr) {
     global $db;
     $out = ['processed' => 0, 'sent' => 0, 'skipped' => 0, 'error' => ''];
@@ -5228,13 +5373,18 @@ function processMissedCallNotifications($cdr) {
             AND calldate >= (:c - INTERVAL 2 SECOND) AND calldate <= (:c2 + INTERVAL :dur SECOND + INTERVAL 30 SECOND)");
     } catch (Exception $e) { $out['error'] = $e->getMessage(); return $out; }
 
-    $dup = $db->prepare("SELECT COUNT(*) FROM sent_logs WHERE call_id = :c AND extension = :e");
+    $dup = $db->prepare("SELECT COUNT(*) FROM sent_logs WHERE call_id = :c AND extension = :e AND rule_type = 'PERDIDA_IGNORADA'");
     $data_fmt = 'd/m/Y H:i:s';
+    $seen_keys = [];
 
     foreach ($rows as $c) {
         $ext = (string)$c['dst'];
         if (!isset($cfgs[$ext])) continue;
         $cid = 'MISS_' . $c['uniqueid'];
+        // chave do conteúdo (ramal + quem ligou + horário): várias linhas de CDR da mesma chamada contam como UMA
+        $ckey = 'MISS_' . md5($ext . '|' . preg_replace('/\D/', '', (string)$c['src']) . '|' . $c['calldate']);
+        if (isset($seen_keys[$ckey])) continue;
+        $seen_keys[$ckey] = true;
         $dup->execute([':c' => $cid, ':e' => $ext]);
         if ((int)$dup->fetchColumn() > 0) continue;
 
@@ -5258,14 +5408,24 @@ function processMissedCallNotifications($cdr) {
             $tpl = function_exists('getRule') ? getRule('missed_agent_msg') : '';
             if (empty($tpl)) $tpl = "⚠️ *Notificação de Chamada Perdida*\n\nOlá *{ATENDENTE}*! O cliente número *{CLIENTE}* tentou ligar no seu ramal *{RAMAL}* às *{DATA_HORA}* e a chamada não foi atendida.";
             $msg = str_replace(['{CLIENTE}', '{ATENDENTE}', '{RAMAL}', '{DATA_HORA}', '{NOME_FILA}'], [$caller, $agent_name, $ext, $when, 'Atendimento'], $tpl);
-            if (sendWhatsAppMessageViaZPro($api_url, $api_token, $e['whatsapp_number'], $msg, $cid, $ext, 'ATENDENTE_NAO_ATENDEU')) $out['sent']++;
+            $rcp = substr(preg_replace('/\D/', '', (string)$e['whatsapp_number']), -11);
+            if (missedGuardAcquire($ckey, 'A' . $rcp, $ext, $cid, substr($rcp, -9))) {
+                $okA = sendWhatsAppMessageViaZPro($api_url, $api_token, $e['whatsapp_number'], $msg, $cid, $ext, 'ATENDENTE_NAO_ATENDEU');
+                missedGuardFinish($ckey, 'A' . $rcp, $okA);
+                if ($okA) $out['sent']++;
+            }
             $did = true;
         }
 
         // Cliente: só com regra cadastrada; ocupado só se "Notif. Ocupado" estiver ativo no ramal
         if (!$internal && function_exists('getRule') && getRule('missed_client_msg') && ($c['disposition'] !== 'BUSY' || !empty($e['notify_client_busy']))) {
             $msgc = str_replace(['{CLIENTE}', '{NOME_FILA}', '{ATENDENTE}', '{RAMAL}', '{DATA_HORA}'], [$caller, 'Atendimento', $agent_name, $ext, $when], getRule('missed_client_msg'));
-            if (sendWhatsAppMessageViaZPro($api_url, $api_token, $caller, $msgc, $cid, $ext, 'ATENDENTE_NAO_ATENDEU')) $out['sent']++;
+            $rcp = substr($caller, -11);
+            if (missedGuardAcquire($ckey, 'C' . $rcp, $ext, $cid, substr($rcp, -9))) {
+                $okC = sendWhatsAppMessageViaZPro($api_url, $api_token, $caller, $msgc, $cid, $ext, 'ATENDENTE_NAO_ATENDEU');
+                missedGuardFinish($ckey, 'C' . $rcp, $okC);
+                if ($okC) $out['sent']++;
+            }
             $did = true;
         }
         if (!$did) {

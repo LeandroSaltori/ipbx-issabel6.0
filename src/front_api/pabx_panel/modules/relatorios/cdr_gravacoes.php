@@ -87,6 +87,26 @@ if ($ast_db) {
         $cdr_list = $q_cdr->fetchAll(PDO::FETCH_ASSOC);
     } catch (Exception $e) {}
 }
+
+// Exportação COMPLETA do período/filtros selecionados (não depende da página exibida)
+if (isset($_GET['export']) && in_array($_GET['export'], ['csv', 'xlsx', 'pdf'], true) && $ast_db && isset($__where)) {
+    $__fmt = $_GET['export'];
+    $__cap = ($__fmt === 'pdf') ? 20000 : 100000;
+    $__all = $ast_db->prepare("SELECT calldate, src, dst, disposition, duration, billsec, uniqueid, recordingfile FROM cdr WHERE " . $__where . " ORDER BY calldate DESC LIMIT " . (int)$__cap);
+    $__all->execute($params);
+    $__qm = function_exists('getQueuesMap') ? getQueuesMap() : []; $__em = function_exists('getExtensionsMap') ? getExtensionsMap() : [];
+    $__lbl = ['ANSWERED' => 'Atendida', 'NO ANSWER' => 'Não Atendeu', 'BUSY' => 'Ocupado', 'FAILED' => 'Falhou'];
+    $__rows = [['Data/Hora', 'Origem', 'Destino', 'Duração Total (s)', 'Duração Faturada (s)', 'Status', 'Gravação', 'UniqueID']];
+    foreach ($__all->fetchAll(PDO::FETCH_ASSOC) as $__r) {
+        $__d = strtoupper(trim($__r['disposition']));
+        $__rows[] = [date('d/m/Y H:i:s', strtotime($__r['calldate'])), formatEndpointName($__r['src'], $__qm, $__em), formatEndpointName($__r['dst'], $__qm, $__em),
+            (int)$__r['duration'], (int)$__r['billsec'], $__lbl[$__d] ?? ($__r['disposition'] ?: 'Falhou'), !empty($__r['recordingfile']) ? 'Sim' : 'Não', $__r['uniqueid']];
+    }
+    $__sum = "Período: " . date('d/m/Y H:i', strtotime($date_start)) . " a " . date('d/m/Y H:i', strtotime($date_end)) . "\n"
+        . "Total de chamadas: {$cdr_total} | Atendidas: {$cdr_ans}" . ($cdr_total ? ' (' . round($cdr_ans / $cdr_total * 100, 1) . '%)' : '') . " | Tempo médio de conversa: " . (int)$cdr_tma . "s"
+        . ($cdr_total > $__cap ? "\nAtenção: o período tem {$cdr_total} chamadas; este arquivo contém as {$__cap} mais recentes (limite do formato). Reduza o período para exportar tudo." : '');
+    reportExportSend($__fmt, 'extrato_cdr_' . date('Ymd_His'), 'Gravações & CDR do PABX', $__sum, $__rows);
+}
 ?>
 
 <div class="space-y-6">
@@ -102,10 +122,13 @@ if ($ast_db) {
             
             <!-- Botões Rápidos de Exportação e Impressão (Somente Ícones) -->
             <div class="flex items-center gap-2 flex-wrap print:hidden">
-                <button type="button" onclick="exportToCSV()" title="Exportar CSV (linhas da página exibida)" class="p-2.5 bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-slate-700 rounded-xl font-bold transition flex items-center justify-center shadow">
+                <button type="button" onclick="exportCdrFull('csv')" title="Exportar CSV (todo o período selecionado)" class="p-2.5 bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-slate-700 rounded-xl font-bold transition flex items-center justify-center shadow">
                     <i class="fa-solid fa-file-csv text-base"></i>
                 </button>
-                <button type="button" onclick="window.print()" title="Imprimir / Gerar PDF" class="p-2.5 bg-slate-800 hover:bg-slate-700 text-rose-400 border border-slate-700 rounded-xl font-bold transition flex items-center justify-center shadow">
+                <button type="button" onclick="exportCdrFull('xlsx')" title="Exportar Excel (todo o período selecionado)" class="p-2.5 bg-slate-800 hover:bg-slate-700 text-green-400 border border-slate-700 rounded-xl font-bold transition flex items-center justify-center shadow">
+                    <i class="fa-solid fa-file-excel text-base"></i>
+                </button>
+                <button type="button" onclick="exportCdrFull('pdf')" title="Exportar PDF (todo o período selecionado)" class="p-2.5 bg-slate-800 hover:bg-slate-700 text-rose-400 border border-slate-700 rounded-xl font-bold transition flex items-center justify-center shadow">
                     <i class="fa-solid fa-file-pdf text-base"></i>
                 </button>
             </div>
@@ -161,6 +184,12 @@ if ($ast_db) {
 function setPresetFilter(preset) {
     document.getElementById('preset_input').value = preset;
     document.forms[0].submit();
+}
+function exportCdrFull(fmt) {
+    const u = new URL(window.location.href);
+    u.searchParams.set('export', fmt);
+    u.searchParams.delete('page');
+    window.location.href = u.toString();
 }
 function exportToCSV() {
     let csv = "Data/Hora,Origem,Destino,Duracao_Faturada,Status\n";

@@ -35,6 +35,24 @@ $where_hist = 'WHERE ' . implode(' AND ', $where_conds);
 $logs = $db->query("SELECT * FROM sent_logs $where_hist ORDER BY id DESC LIMIT 500")->fetchAll(PDO::FETCH_ASSOC);
 
 $contacts_map = getContactsMap();
+
+// Exportação COMPLETA do período/filtros selecionados (a tela mostra no máximo 500 linhas)
+if (isset($_GET['export']) && in_array($_GET['export'], ['csv', 'xlsx', 'pdf'], true)) {
+    $__fmt = $_GET['export'];
+    $__cap = ($__fmt === 'pdf') ? 20000 : 200000;
+    $__all = $db->query("SELECT id, created_at, phone, extension, rule_type, status, message, response_raw FROM sent_logs $where_hist ORDER BY id DESC LIMIT " . (int)$__cap)->fetchAll(PDO::FETCH_ASSOC);
+    $__cm = getContactsMap();
+    $__rows = [['ID', 'Data/Hora', 'Telefone', 'Contato', 'Ramal', 'Tipo', 'Status', 'Mensagem', 'Retorno da API']];
+    $__ok = 0; $__err = 0;
+    foreach ($__all as $__l) {
+        $__nm = function_exists('lookupContactName') ? lookupContactName($__l['phone'], $__cm) : '';
+        if ($__l['status'] === 'SUCCESS') $__ok++; elseif ($__l['status'] === 'ERROR') $__err++;
+        $__rows[] = [$__l['id'], $__l['created_at'], $__l['phone'], $__nm, $__l['extension'], $__l['rule_type'], $__l['status'], $__l['message'], $__l['status'] === 'SUCCESS' ? '' : mb_substr((string)$__l['response_raw'], 0, 300)];
+    }
+    $__sum = "Período: " . date('d/m/Y H:i', strtotime($start_date)) . " a " . date('d/m/Y H:i', strtotime($end_date)) . ($search_phone !== '' ? " | Busca: {$search_phone}" : '') . "\n"
+        . "Mensagens no período: " . count($__all) . " | Sucesso: {$__ok} | Erros: {$__err}";
+    reportExportSend($__fmt, 'historico_whatsapp_' . date('Ymd_His'), 'Histórico de Envios WhatsApp', $__sum, $__rows);
+}
 ?>
 
 <div class="space-y-6">
@@ -74,8 +92,14 @@ $contacts_map = getContactsMap();
                     <i class="fa-solid fa-filter"></i> Filtrar
                 </button>
                 
-                <button type="button" onclick="exportHistoricoToCSV()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-slate-700 rounded-xl text-xs font-bold transition flex items-center gap-1" title="Exportar CSV">
+                <button type="button" onclick="exportHistoricoFull('csv')" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-slate-700 rounded-xl text-xs font-bold transition flex items-center gap-1" title="Exportar CSV (todo o período selecionado)">
                     <i class="fa-solid fa-file-csv"></i>
+                </button>
+                <button type="button" onclick="exportHistoricoFull('xlsx')" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-green-400 border border-slate-700 rounded-xl text-xs font-bold transition flex items-center gap-1" title="Exportar Excel (todo o período selecionado)">
+                    <i class="fa-solid fa-file-excel"></i>
+                </button>
+                <button type="button" onclick="exportHistoricoFull('pdf')" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-rose-400 border border-slate-700 rounded-xl text-xs font-bold transition flex items-center gap-1" title="Exportar PDF (todo o período selecionado)">
+                    <i class="fa-solid fa-file-pdf"></i>
                 </button>
             </form>
         </div>
@@ -163,10 +187,9 @@ function setPresetFilter(preset) {
     document.forms[0].submit();
 }
 
-function exportHistoricoToCSV() {
-    // Collect parameters
-    const qs = new URLSearchParams(new FormData(document.forms[0])).toString();
-    // In a real app we would have an export endpoint, but here we can just alert or redirect
-    alert("Exportação CSV ainda não implementada para Histórico WhatsApp, mas a interface está padronizada!");
+function exportHistoricoFull(fmt) {
+    const u = new URL(window.location.href);
+    u.searchParams.set('export', fmt);
+    window.location.href = u.toString();
 }
 </script>
