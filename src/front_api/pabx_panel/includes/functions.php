@@ -5578,6 +5578,11 @@ function aiChatToolDefs() {
         $fn('recording_link', 'Gera link temporário (7 dias) da gravação de uma chamada pelo uniqueid retornado em search_calls.', [
             'uniqueid' => ['type' => 'string'],
         ], ['uniqueid']),
+        $fn('propose_extension_feature', 'Propõe ligar/desligar Não Perturbe (dnd) ou desvio (cf incondicional, cfb ocupado, cfu indisponível) de um ramal. NÃO executa: o usuário precisa clicar em Confirmar. value: para dnd use on/off; para desvios, o número de destino (vazio = desativar).', [
+            'extension' => ['type' => 'string', 'description' => 'Ramal (ex.: 201)'],
+            'feature'   => ['type' => 'string', 'enum' => ['dnd', 'cf', 'cfb', 'cfu']],
+            'value'     => ['type' => 'string', 'description' => 'on/off para dnd; número de destino para desvios; vazio desativa'],
+        ], ['extension', 'feature']),
         $fn('send_report', 'Envia por WhatsApp o resumo do período (chamadas, atendidas, TMA, TME) para um número. SÓ chame depois de o usuário confirmar explicitamente o número de destino.', [
             'phone' => ['type' => 'string', 'description' => 'Número com DDD (ex.: 11999998888)'],
             'days'  => ['type' => 'integer', 'description' => 'Últimos N dias (1 = hoje). Padrão 1'],
@@ -5648,6 +5653,9 @@ function aiChatExecTool($name, $a) {
             }
             return ['filas' => $out];
         }
+        if ($name === 'propose_extension_feature') {
+            return aiProposeFeature($a['extension'] ?? '', strtolower((string)($a['feature'] ?? '')), $a['value'] ?? '');
+        }
         if ($name === 'send_report') {
             if (!hasUserPermission('send_whatsapp')) return ['error' => 'Este usuário não tem permissão para enviar WhatsApp.'];
             $ph = preg_replace('/\D/', '', (string)($a['phone'] ?? ''));
@@ -5716,13 +5724,98 @@ function aiChatLog($question, $tools, $ok) {
     } catch (Exception $e) {}
 }
 
+function aiChatUser() {
+    $u = function_exists('getLoggedUser') ? getLoggedUser() : null;
+    $n = trim((string)($u['username'] ?? ''));
+    return $n !== '' ? $n : 'painel';
+}
+function aiHistoryEnsure() {
+    global $db;
+    $db->exec("CREATE TABLE IF NOT EXISTS ai_chat_history (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT, role TEXT, content TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)");
+    $db->exec("CREATE TABLE IF NOT EXISTS ai_pending_actions (id TEXT PRIMARY KEY, username TEXT, ext TEXT, field TEXT, value TEXT, resumo TEXT, status TEXT, created_at INTEGER)");
+}
+function aiHistoryLoad($limit = 30) {
+    global $db;
+    try {
+        aiHistoryEnsure();
+        $st = $db->prepare("SELECT role, content FROM ai_chat_history WHERE username = ? ORDER BY id DESC LIMIT " . (int)$limit);
+        $st->execute([aiChatUser()]);
+        return array_reverse($st->fetchAll(PDO::FETCH_ASSOC));
+    } catch (Exception $e) { return []; }
+}
+function aiHistorySave($role, $content) {
+    global $db;
+    if (!in_array($role, ['user', 'assistant'], true) || trim((string)$content) === '') return;
+    try {
+        aiHistoryEnsure();
+        $u = aiChatUser();
+        $db->prepare("INSERT INTO ai_chat_history (username, role, content) VALUES (?,?,?)")->execute([$u, $role, mb_substr((string)$content, 0, 6000)]);
+        // mantém só as últimas 200 mensagens do usuário
+        $db->prepare("DELETE FROM ai_chat_history WHERE username = ? AND id NOT IN (SELECT id FROM ai_chat_history WHERE username = ? ORDER BY id DESC LIMIT 200)")->execute([$u, $u]);
+    } catch (Exception $e) {}
+}
+function aiHistoryClear() {
+    global $db;
+    try { aiHistoryEnsure(); $db->prepare("DELETE FROM ai_chat_history WHERE username = ?")->execute([aiChatUser()]); } catch (Exception $e) {}
+}
+/** Cria uma proposta pendente (NÃO executa). Retorna ['id'=>..., 'resumo'=>...] ou ['error'=>...]. */
+function aiProposeFeature($ext, $field, $value) {
+    global $db;
+    if (!hasUserPermission('manage_settings')) return ['error' => 'Este usuário não tem permissão para alterar ramais.'];
+    $ext = preg_replace('/\D/', '', (string)$ext);
+    $names = ['dnd' => 'Não Perturbe', 'cf' => 'Desvio incondicional', 'cfb' => 'Desvio quando ocupado', 'cfu' => 'Desvio quando indisponível'];
+    if (!isset($names[$field])) return ['error' => 'Recurso inválido. Use dnd, cf, cfb ou cfu.'];
+    aiHistoryEnsure();
+    $known = $db->prepare("SELECT agent_name FROM extensions_config WHERE extension = ?");
+    $known->execute([$ext]);
+    $row = $known->fetch(PDO::FETCH_ASSOC);
+    if ($ext === '' || !$row) return ['error' => "Ramal $ext não encontrado."];
+    $v = trim((string)$value);
+    if ($field === 'dnd') {
+        $on = in_array(strtolower($v), ['1', 'on', 'sim', 'ativar', 'yes', 'true'], true);
+        $v = $on ? '1' : '';
+        $resumo = ($on ? 'Ativar' : 'Desativar') . " Não Perturbe no ramal $ext";
+    } else {
+        $v = preg_replace('/[^0-9*#+]/', '', $v);
+        $resumo = $v === '' ? "Desativar {$names[$field]} do ramal $ext" : "Ativar {$names[$field]} do ramal $ext para $v";
+    }
+    if (!empty($row['agent_name'])) $resumo .= ' (' . $row['agent_name'] . ')';
+    $id = bin2hex(random_bytes(8));
+    $db->prepare("INSERT INTO ai_pending_actions (id, username, ext, field, value, resumo, status, created_at) VALUES (?,?,?,?,?,?,'pending',?)")
+       ->execute([$id, aiChatUser(), $ext, $field, $v, $resumo, time()]);
+    $GLOBALS['__ai_proposals'][] = ['id' => $id, 'resumo' => $resumo];
+    return ['proposta_criada' => true, 'resumo' => $resumo, 'instrucao' => 'NADA foi alterado ainda. Diga ao usuário para clicar em Confirmar no cartão exibido abaixo da sua resposta.'];
+}
+/** Confirma ou cancela uma proposta do próprio usuário (válida por 10 min). */
+function aiProposalResolve($id, $accept) {
+    global $db;
+    if (!hasUserPermission('manage_settings')) return ['success' => false, 'error' => 'Sem permissão.'];
+    aiHistoryEnsure();
+    $st = $db->prepare("SELECT * FROM ai_pending_actions WHERE id = ? AND username = ? AND status = 'pending'");
+    $st->execute([(string)$id, aiChatUser()]);
+    $p = $st->fetch(PDO::FETCH_ASSOC);
+    if (!$p) return ['success' => false, 'error' => 'Proposta não encontrada ou já resolvida.'];
+    if (time() - (int)$p['created_at'] > 600) {
+        $db->prepare("UPDATE ai_pending_actions SET status = 'expired' WHERE id = ?")->execute([$p['id']]);
+        return ['success' => false, 'error' => 'Proposta expirada. Peça novamente.'];
+    }
+    if (!$accept) {
+        $db->prepare("UPDATE ai_pending_actions SET status = 'cancelled' WHERE id = ?")->execute([$p['id']]);
+        return ['success' => true, 'message' => 'Cancelado. Nada foi alterado.'];
+    }
+    $r = setExtensionFeature($p['ext'], $p['field'], $p['field'] === 'dnd' ? (bool)$p['value'] : $p['value']);
+    $db->prepare("UPDATE ai_pending_actions SET status = ? WHERE id = ?")->execute([!empty($r['success']) ? 'done' : 'failed', $p['id']]);
+    if (function_exists('logUserAction')) logUserAction('Chat IA: ' . $p['resumo'], !empty($r['success']) ? 'confirmado' : ('falhou: ' . ($r['error'] ?? '')), 'CONFIG');
+    return !empty($r['success']) ? ['success' => true, 'message' => '✅ ' . $p['resumo'] . ' — feito.'] : ['success' => false, 'error' => $r['error'] ?? 'Falha ao aplicar.'];
+}
+
 /** Executa a conversa: $history = [['role'=>'user|assistant','content'=>...], ...]. */
 function aiChatRun($history) {
     $cfg = aiGetConfig('chat');
     if ($cfg['key'] === '' || !$cfg['enabled']) return ['ok' => false, 'error' => 'IA não configurada. Configure em Configurações > Inteligência Artificial.'];
     $sys = "Você é o assistente do painel PABX Prisma (Issabel/Asterisk). Hoje é " . date('d/m/Y H:i') . ". "
          . "Responda em português, curto e objetivo. Use SOMENTE dados retornados pelas ferramentas; nunca invente números, ramais ou ligações. "
-         . "Se faltar informação (ex.: qual ramal), pergunte. Você só consulta; a única ação permitida é send_report (envio do resumo por WhatsApp), e somente após o usuário confirmar o número. Para tabelas use markdown. Para gravações use recording_link e entregue o link em markdown [Ouvir gravação](url). "
+         . "Se faltar informação (ex.: qual ramal), pergunte. Você só consulta; as únicas ações são: send_report (resumo por WhatsApp, só após o usuário confirmar o número) e propose_extension_feature (apenas PROPÕE; o usuário confirma por um botão e você nunca diz que foi feito antes disso). Para tabelas use markdown. Para gravações use recording_link e entregue o link em markdown [Ouvir gravação](url). "
          . "Se o usuário pedir algo fora do escopo do PABX, explique educadamente o que você pode fazer.";
     if ($cfg['prompt'] !== '') $sys = $cfg['prompt'] . "\n\n" . $sys;
     $msgs = [['role' => 'system', 'content' => $sys]];

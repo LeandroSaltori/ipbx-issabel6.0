@@ -27,7 +27,7 @@ try {
 // =========================================================================
 // AUTENTICAÇÃO (portão único do painel)
 // =========================================================================
-$__api_action_names = ['get_logs', 'get_fop_extensions', 'get_trunks_status', 'get_queues_realtime', 'get_parking_lots', 'fop_action', 'originate_call', 'save_contact', 'test_llm_connection', 'analyze_pabx_insights', 'generate_ai_insights', 'get_ai_insights_history', 'delete_ai_insight', 'transcribe_audio', 'get_kpi_calls_detail', 'get_active_calls', 'get_time_groups', 'get_time_group_rules', 'save_time_group_rule', 'delete_time_group_rule', 'get_announcements_list', 'update_announcement_audio', 'sync_assets', 'ai_chat', 'ai_chat_info', 'ext_features_get', 'ext_features_set'];
+$__api_action_names = ['get_logs', 'get_fop_extensions', 'get_trunks_status', 'get_queues_realtime', 'get_parking_lots', 'fop_action', 'originate_call', 'save_contact', 'test_llm_connection', 'analyze_pabx_insights', 'generate_ai_insights', 'get_ai_insights_history', 'delete_ai_insight', 'transcribe_audio', 'get_kpi_calls_detail', 'get_active_calls', 'get_time_groups', 'get_time_group_rules', 'save_time_group_rule', 'delete_time_group_rule', 'get_announcements_list', 'update_announcement_audio', 'sync_assets', 'ai_chat', 'ai_chat_info', 'ai_chat_history', 'ai_chat_clear', 'ai_chat_confirm', 'ext_features_get', 'ext_features_set'];
 if (($_GET['api_action'] ?? '') === 'whatsapp_webhook') {
     // Webhook do Z-PRO: autenticado por token próprio, sem sessão
 } elseif (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['action'], $__api_action_names, true))) {
@@ -39,7 +39,7 @@ if (($_GET['api_action'] ?? '') === 'whatsapp_webhook') {
 // =========================================================================
 // HANDLER DE ENDPOINTS DE API (JSON)
 // =========================================================================
-if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['action'], ['get_logs', 'get_fop_extensions', 'get_trunks_status', 'get_queues_realtime', 'get_parking_lots', 'fop_action', 'originate_call', 'save_contact', 'test_llm_connection', 'analyze_pabx_insights', 'generate_ai_insights', 'get_ai_insights_history', 'delete_ai_insight', 'transcribe_audio', 'get_kpi_calls_detail', 'get_active_calls', 'get_time_groups', 'get_time_group_rules', 'save_time_group_rule', 'delete_time_group_rule', 'get_announcements_list', 'update_announcement_audio', 'sync_assets', 'ai_chat', 'ai_chat_info', 'ext_features_get', 'ext_features_set', 'whatsapp_webhook']))) {
+if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['action'], ['get_logs', 'get_fop_extensions', 'get_trunks_status', 'get_queues_realtime', 'get_parking_lots', 'fop_action', 'originate_call', 'save_contact', 'test_llm_connection', 'analyze_pabx_insights', 'generate_ai_insights', 'get_ai_insights_history', 'delete_ai_insight', 'transcribe_audio', 'get_kpi_calls_detail', 'get_active_calls', 'get_time_groups', 'get_time_group_rules', 'save_time_group_rule', 'delete_time_group_rule', 'get_announcements_list', 'update_announcement_audio', 'sync_assets', 'ai_chat', 'ai_chat_info', 'ai_chat_history', 'ai_chat_clear', 'ai_chat_confirm', 'ext_features_get', 'ext_features_set', 'whatsapp_webhook']))) {
     $action = $_GET['api_action'] ?? $_GET['action'];
     if (function_exists('auditRequest')) auditRequest('', '', true, (string)$action);
     while (ob_get_level()) { @ob_end_clean(); }
@@ -89,9 +89,28 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
         foreach (array_reverse($hist) as $h) { if (($h['role'] ?? '') === 'user') { $last = (string)($h['content'] ?? ''); break; } }
         if ($last === '') { echo json_encode(['success' => false, 'error' => 'Pergunta vazia.']); exit; }
         @set_time_limit(120);
+        $GLOBALS['__ai_proposals'] = [];
         $r = aiChatRun($hist);
         aiChatLog($last, $r['tools'] ?? [], !empty($r['ok']));
-        echo json_encode(!empty($r['ok']) ? ['success' => true, 'text' => $r['text'], 'tools' => $r['tools']] : ['success' => false, 'error' => $r['error']], JSON_UNESCAPED_UNICODE);
+        if (!empty($r['ok'])) { aiHistorySave('user', $last); aiHistorySave('assistant', $r['text']); }
+        echo json_encode(!empty($r['ok']) ? ['success' => true, 'text' => $r['text'], 'tools' => $r['tools'], 'proposals' => $GLOBALS['__ai_proposals']] : ['success' => false, 'error' => $r['error']], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    if ($action === 'ai_chat_history') {
+        if (!hasUserPermission('ai_chat')) { echo json_encode(['success' => false]); exit; }
+        echo json_encode(['success' => true, 'messages' => aiHistoryLoad(30)], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    if ($action === 'ai_chat_clear') {
+        if (!hasUserPermission('ai_chat')) { echo json_encode(['success' => false]); exit; }
+        aiHistoryClear();
+        echo json_encode(['success' => true]);
+        exit;
+    }
+    if ($action === 'ai_chat_confirm') {
+        if (!hasUserPermission('ai_chat')) { echo json_encode(['success' => false, 'error' => 'Sem acesso ao Chat IA.']); exit; }
+        $b = json_decode(file_get_contents('php://input'), true) ?: [];
+        echo json_encode(aiProposalResolve((string)($b['id'] ?? ''), !empty($b['accept'])), JSON_UNESCAPED_UNICODE);
         exit;
     }
 
@@ -3382,20 +3401,35 @@ dialog#ai-chat-dialog::backdrop{background:rgba(0,0,0,.65);backdrop-filter:blur(
   function add(cls, html){ var d = document.createElement('div'); d.className = 'ai-msg '+cls; d.innerHTML = html; body.appendChild(d); body.scrollTop = body.scrollHeight; return d; }
   function build(){
     dlg = document.createElement('dialog'); dlg.id = 'ai-chat-dialog';
-    dlg.innerHTML = '<div id="ai-chat-head"><span><i class="fa-solid fa-robot"></i> Assistente PABX Prisma</span><button type="button" id="ai-chat-x" title="Fechar">✕</button></div>'
+    dlg.innerHTML = '<div id="ai-chat-head"><span><i class="fa-solid fa-robot"></i> Assistente PABX Prisma</span><span><button type="button" id="ai-chat-new" title="Nova conversa"><i class="fa-solid fa-rotate-right"></i></button> <button type="button" id="ai-chat-x" title="Fechar">✕</button></span></div>'
       + '<div id="ai-chat-body"></div>'
       + '<form id="ai-chat-form"><input id="ai-chat-input" autocomplete="off" placeholder="Pergunte sobre ramais, ligações, filas..."><button id="ai-chat-send" type="submit">Enviar</button></form>';
     document.body.appendChild(dlg);
     body = dlg.querySelector('#ai-chat-body');
     dlg.querySelector('#ai-chat-x').onclick = function(){ dlg.close(); };
+    dlg.querySelector('#ai-chat-new').onclick = async function(){
+      try { await fetch('index.php?api_action=ai_chat_clear', {method:'POST'}); } catch(e){}
+      hist = []; body.innerHTML = ''; greet();
+    };
     dlg.addEventListener('click', function(e){ if (e.target === dlg) dlg.close(); });
     dlg.querySelector('#ai-chat-form').onsubmit = function(e){ e.preventDefault(); var i = dlg.querySelector('#ai-chat-input'); var v = i.value.trim(); if (v) { i.value = ''; send(v); } };
   }
   function greet(){
     started = true;
-    add('bot', '<b>Olá! Sou o assistente do seu PABX.</b><br>Consulto dados reais (somente leitura) e posso:<br>• listar ligações de um ramal ou número<br>• contar quantas vezes um número ligou<br>• resumir o período (atendidas, TMA, TME)<br>• mostrar status de ramais e filas<br>• gerar o link de uma gravação<br><span style="color:#94a3b8">Experimente:</span><br>'
+    add('bot', '<b>Olá! Sou o assistente do seu PABX.</b><br>Consulto dados reais e posso:<br>• listar ligações de um ramal ou número<br>• contar quantas vezes um número ligou<br>• resumir o período (atendidas, TMA, TME)<br>• mostrar status de ramais e filas<br>• gerar o link de uma gravação<br>• ligar/desligar Não Perturbe e desvios (com a sua confirmação)<br><span style="color:#94a3b8">Experimente:</span><br>'
       + SUG.map(function(s){ return '<button type="button" class="ai-chip" data-q="'+esc(s)+'">'+esc(s)+'</button>'; }).join(''));
     body.querySelectorAll('.ai-chip').forEach(function(b){ b.onclick = function(){ send(b.getAttribute('data-q')); }; });
+  }
+  function card(p){
+    var c = add('bot', '<b>Confirmar ação?</b><br>' + esc(p.resumo) + '<br><button type="button" class="ai-chip" data-ok="1">Confirmar</button><button type="button" class="ai-chip" data-ok="0">Cancelar</button>');
+    c.querySelectorAll('button').forEach(function(b){ b.onclick = async function(){
+      c.querySelectorAll('button').forEach(function(x){ x.disabled = true; });
+      try {
+        var r = await fetch('index.php?api_action=ai_chat_confirm', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({id:p.id, accept:b.getAttribute('data-ok')==='1'})});
+        var d = await r.json();
+        c.innerHTML = d.success ? esc(d.message || 'Feito.') : '⚠️ ' + esc(d.error || 'Falha.');
+      } catch(e){ c.innerHTML = '⚠️ ' + esc(e.message); }
+    }; });
   }
   async function send(text){
     if (busy) return; busy = true;
@@ -3404,12 +3438,23 @@ dialog#ai-chat-dialog::backdrop{background:rgba(0,0,0,.65);backdrop-filter:blur(
     try {
       var r = await fetch('index.php?api_action=ai_chat', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({messages: hist})});
       var d = await r.json();
-      if (d.success) { w.innerHTML = md(d.text || '(sem resposta)'); hist.push({role:'assistant', content:d.text || ''}); }
+      if (d.success) { w.innerHTML = md(d.text || '(sem resposta)'); hist.push({role:'assistant', content:d.text || ''}); (d.proposals || []).forEach(card); }
       else { w.innerHTML = '⚠️ ' + esc(d.error || 'Falha ao consultar a IA.'); hist.pop(); }
     } catch(e){ w.innerHTML = '⚠️ ' + esc(e.message); hist.pop(); }
     busy = false; body.scrollTop = body.scrollHeight;
   }
-  window.aiChatOpen = function(){ if (!dlg) build(); if (!started) greet(); dlg.showModal(); setTimeout(function(){ var i = dlg.querySelector('#ai-chat-input'); if (i) i.focus(); }, 50); };
+  async function loadHistory(){
+    try {
+      var r = await fetch('index.php?api_action=ai_chat_history'); var d = await r.json();
+      if (d.success && d.messages && d.messages.length) {
+        started = true;
+        d.messages.forEach(function(m){ hist.push({role:m.role, content:m.content}); add(m.role === 'user' ? 'me' : 'bot', m.role === 'user' ? esc(m.content) : md(m.content)); });
+        return true;
+      }
+    } catch(e){}
+    return false;
+  }
+  window.aiChatOpen = async function(){ if (!dlg) { build(); await loadHistory(); } if (!started) greet(); dlg.showModal(); setTimeout(function(){ var i = dlg.querySelector('#ai-chat-input'); if (i) i.focus(); }, 50); };
 })();
 </script>
 <?php endif; ?>

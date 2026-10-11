@@ -6,6 +6,7 @@
  */
 return [
     'done' => [
+        ['data' => '2026-10-11', 'mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-robot', 'titulo' => 'Chat IA com histórico e ações confirmadas', 'desc' => 'A conversa fica salva para cada usuário e você pode pedir ao chat para ligar ou desligar Não Perturbe e desvios de um ramal: ele só executa depois do seu clique em Confirmar.'],
         ['data' => '2026-10-11', 'mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-chart-column', 'titulo' => 'Relatórios de fila com o histórico real do Asterisk', 'desc' => 'O painel passa a ler sozinho o registro de filas do seu PABX, então os relatórios e avisos de abandono funcionam mesmo sem configuração extra.'],
         ['data' => '2026-10-11', 'mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-users-gear', 'titulo' => 'Ramais e Atendentes em um só lugar', 'desc' => 'Nomes, permissões, Não Perturbe e Desvios agora ficam na mesma tela, em abas. O menu também ficou mais limpo: Novidades, modo claro e perfil rolam junto com ele.'],
         ['data' => '2026-10-11', 'mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-paper-plane', 'titulo' => 'Relatório por WhatsApp pelo Chat IA', 'desc' => 'Peça no chat "envie o resumo de hoje para o número tal" e o relatório de chamadas chega por WhatsApp, só para quem tem permissão de envio.'],
