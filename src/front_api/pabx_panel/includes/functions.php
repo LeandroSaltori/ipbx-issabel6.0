@@ -5452,6 +5452,26 @@ function missedGuardFinish($key, $recipient, $ok) {
     } catch (Exception $e) {}
 }
 
+/**
+ * Decide se uma linha de CDR "não atendida" NÃO deve gerar aviso de chamada perdida.
+ * - tocou menos que o mínimo configurado (cliente desistiu / nem deu tempo de atender);
+ * - a mesma chamada (linkedid) foi atendida por outro ramal (grupo de toque, fila, captura, transferência).
+ * Retorna o motivo (texto) ou '' se deve avisar.
+ */
+function missedCallIgnoreReason($cdr, array $c, $minRing, $checkElsewhere) {
+    if (($c['disposition'] ?? '') === 'NO ANSWER' && $minRing > 0 && (int)($c['duration'] ?? 0) < $minRing) {
+        return 'Tocou apenas ' . (int)$c['duration'] . 's (mínimo ' . (int)$minRing . 's)';
+    }
+    if ($checkElsewhere && !empty($c['linkedid'])) {
+        try {
+            $q = $cdr->prepare("SELECT COUNT(*) FROM cdr WHERE linkedid = :l AND uniqueid <> :u AND disposition = 'ANSWERED' AND dst REGEXP '^[0-9]{2,5}$'");
+            $q->execute([':l' => $c['linkedid'], ':u' => $c['uniqueid']]);
+            if ((int)$q->fetchColumn() > 0) return 'Chamada atendida por outro ramal';
+        } catch (Exception $e) {}
+    }
+    return '';
+}
+
 function processMissedCallNotifications($cdr) {
     global $db;
     $out = ['processed' => 0, 'sent' => 0, 'skipped' => 0, 'error' => ''];
@@ -5468,7 +5488,9 @@ function processMissedCallNotifications($cdr) {
     if (!$cfgs) return $out;
 
     try {
-        $st = $cdr->prepare("SELECT uniqueid, calldate, src, dst, disposition, duration FROM cdr
+        $hasLinked = false;
+        try { $hasLinked = (bool)$cdr->query("SHOW COLUMNS FROM cdr LIKE 'linkedid'")->fetch(); } catch (Exception $e) {}
+        $st = $cdr->prepare("SELECT uniqueid, calldate, src, dst, disposition, duration" . ($hasLinked ? ", linkedid" : "") . " FROM cdr
             WHERE calldate >= :since AND calldate >= (NOW() - INTERVAL 30 MINUTE)
               AND disposition IN ('NO ANSWER', 'BUSY')
               AND dst REGEXP '^[0-9]{2,5}$'
@@ -5480,6 +5502,9 @@ function processMissedCallNotifications($cdr) {
             AND calldate >= (:c - INTERVAL 2 SECOND) AND calldate <= (:c2 + INTERVAL :dur SECOND + INTERVAL 30 SECOND)");
     } catch (Exception $e) { $out['error'] = $e->getMessage(); return $out; }
 
+    $minRing = getSetting('missed_min_ring_seconds');
+    $minRing = ($minRing === '' || !is_numeric($minRing)) ? 10 : max(0, min(60, (int)$minRing));
+    $checkElsewhere = getSetting('missed_ignore_answered_elsewhere') !== '0';
     $dup = $db->prepare("SELECT COUNT(*) FROM sent_logs WHERE call_id = :c AND extension = :e AND rule_type = 'PERDIDA_IGNORADA'");
     $data_fmt = 'd/m/Y H:i:s';
     $seen_keys = [];
@@ -5495,7 +5520,15 @@ function processMissedCallNotifications($cdr) {
         $dup->execute([':c' => $cid, ':e' => $ext]);
         if ((int)$dup->fetchColumn() > 0) continue;
 
-        // Chamada atendida por outro ramal (grupo de toque/fila): não é perdida
+        // Regras de inteligência: tempo mínimo de toque e atendimento por outro ramal
+        $why = missedCallIgnoreReason($cdr, $c, $minRing, $checkElsewhere);
+        if ($why !== '') {
+            try { $db->prepare("INSERT INTO sent_logs (phone, call_id, extension, rule_type, message, status) VALUES ('', :c, :e, 'PERDIDA_IGNORADA', :m, 'SKIPPED')")
+                ->execute([':c' => $cid, ':e' => $ext, ':m' => $why]); } catch (Exception $ex) {}
+            $out['skipped']++;
+            continue;
+        }
+        // Chamada atendida por outro ramal (grupo de toque/fila): não é perdida (heurística para CDR sem linkedid)
         try {
             $ans->execute([':s' => $c['src'], ':d' => $ext, ':c' => $c['calldate'], ':c2' => $c['calldate'], ':dur' => (int)$c['duration']]);
             if ((int)$ans->fetchColumn() > 0) continue;

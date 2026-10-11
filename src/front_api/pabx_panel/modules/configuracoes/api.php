@@ -89,6 +89,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         logUserAction("Alerta de tronco", getSetting('trunk_alert_enabled') === '1' ? 'ativado' : 'desativado', "CONFIG");
     }
 
+    // Chamadas perdidas: regras de inteligência
+    if (isset($_POST['action_save_missed_rules'])) {
+        $active_tab = 'prismabot';
+        $mr = max(0, min(60, (int)($_POST['missed_min_ring_seconds'] ?? 10)));
+        saveSetting('missed_min_ring_seconds', (string)$mr);
+        saveSetting('missed_ignore_answered_elsewhere', isset($_POST['missed_ignore_answered_elsewhere']) ? '1' : '0');
+        $msg_status = "Regras de chamada perdida salvas (mínimo de toque: {$mr}s).";
+        logUserAction("Regras de chamada perdida", "min_toque={$mr}s", "CONFIG");
+    }
+
     // 1b. Servidor de envio WhatsApp (Prismabot/Z-PRO ou UAZAPI)
     $uaz_qr = '';
     if (isset($_POST['action_save_wa_provider']) || isset($_POST['action_test_uazapi']) || isset($_POST['action_connect_uazapi'])) {
@@ -689,6 +699,25 @@ if (empty($currentPbxToken) && !empty($currentPbxPass) && $_SERVER['REQUEST_METH
                     <input type="hidden" name="action_save_public_url" value="1">
                     <input type="text" name="public_base_url" value="<?php echo htmlspecialchars((string)getSetting('public_base_url')); ?>" placeholder="https://pbx.seudominio.com.br/front_api" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-[11px] text-cyan-200 font-mono focus:border-cyan-500 focus:outline-none">
                     <button type="submit" style="white-space:nowrap !important;flex-shrink:0 !important;width:auto !important;overflow:visible !important;text-overflow:clip !important" class="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-xl text-xs transition"><i class="fa-solid fa-floppy-disk"></i> Salvar URL</button>
+                </form>
+            </div>
+
+            <!-- CHAMADAS PERDIDAS: REGRAS INTELIGENTES -->
+            <?php $__mr = getSetting('missed_min_ring_seconds'); $__mr = ($__mr === '' || !is_numeric($__mr)) ? 10 : (int)$__mr; ?>
+            <div class="pt-4 border-t border-slate-800/80">
+                <form method="POST" action="" class="bg-slate-950/80 p-4 rounded-2xl border border-amber-500/30 space-y-2">
+                    <input type="hidden" name="active_tab" value="prismabot">
+                    <div class="flex items-center gap-2 border-b border-slate-800 pb-2">
+                        <i class="fa-solid fa-phone-slash text-amber-400 text-base"></i>
+                        <strong class="text-white text-xs">Chamadas perdidas: quando avisar</strong>
+                    </div>
+                    <p class="text-[11px] text-slate-400">Evita avisos falsos: não avisa se a chamada tocou menos que o tempo mínimo (o cliente desistiu antes de dar tempo de atender) nem se outro ramal atendeu a mesma chamada (grupo de toque, fila ou captura).</p>
+                    <label class="flex items-center gap-2 text-xs text-slate-300">Tempo mínimo de toque (segundos)
+                        <input type="number" min="0" max="60" name="missed_min_ring_seconds" value="<?php echo $__mr; ?>" class="w-20 px-2 py-1 bg-slate-900 border border-slate-700 rounded-lg text-white"> <span class="text-slate-500">0 = avisar sempre</span></label>
+                    <label class="flex items-center gap-2 text-xs text-slate-300"><input type="checkbox" name="missed_ignore_answered_elsewhere" value="1" <?php echo getSetting('missed_ignore_answered_elsewhere') !== '0' ? 'checked' : ''; ?>> Não avisar se a chamada foi atendida por outro ramal</label>
+                    <div class="flex justify-end">
+                        <button type="submit" name="action_save_missed_rules" value="1" style="white-space:nowrap !important;flex-shrink:0 !important;width:auto !important;overflow:visible !important;text-overflow:clip !important" class="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-xl text-xs"><i class="fa-solid fa-floppy-disk mr-1"></i> Salvar</button>
+                    </div>
                 </form>
             </div>
 
