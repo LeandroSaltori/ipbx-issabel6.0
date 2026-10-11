@@ -4852,7 +4852,8 @@ function asteriskBlacklistList() {
     if (empty($res['success'])) return ['success' => false, 'items' => [], 'error' => $res['error'] ?? 'Falha ao consultar o AMI.'];
     $items = [];
     foreach (preg_split('/\r?\n/', (string)($res['response'] ?? '')) as $line) {
-        if (preg_match('#^/blacklist/(\S+)\s*:\s*(.*)$#', trim($line), $m)) {
+        $line = preg_replace('/^Output:\s*/i', '', trim($line)); // Asterisk 13+ prefixa cada linha com "Output:"
+        if (preg_match('#^/blacklist/(\S+)\s*:\s*(.*)$#', $line, $m)) {
             $val = trim($m[2]);
             $items[] = ['number' => $m[1], 'description' => ($val === '' || $val === '1') ? 'Bloqueado' : $val];
         }
