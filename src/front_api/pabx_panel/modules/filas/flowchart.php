@@ -313,6 +313,11 @@ if (!function_exists('renderDynamicFlowNode')) {
                                     <i class="fa-solid fa-file-audio text-amber-400"></i> Arquivo de Áudio: <code class="bg-slate-900 px-2 py-0.5 rounded text-amber-300 text-[10px] font-mono"><?php echo htmlspecialchars($node['audio_file']); ?></code>
                                 </div>
                                 
+                                <?php $__as = asteriskSoundStatus($node['audio_file']); ?>
+                                <?php if (!$__as['ok']): ?>
+                                    <div class="p-3 bg-rose-950/40 rounded-xl border border-rose-500/40 text-[11px] text-rose-200 font-bold"><i class="fa-solid fa-triangle-exclamation text-rose-400"></i> <?php echo htmlspecialchars($__as['msg']); ?></div>
+                                <?php else: ?>
+                                <span class="text-[10px] text-slate-400 font-mono">Arquivo no servidor: <?php echo htmlspecialchars($__as['path']); ?></span>
                                 <!-- Player de Áudio 100% Funcional (get_audio.php) -->
                                 <div class="p-3 bg-slate-950/90 rounded-xl border border-amber-500/40 flex flex-col sm:flex-row items-center justify-between gap-3 shadow">
                                     <div class="flex items-center gap-2 text-xs font-bold text-amber-300">
@@ -325,6 +330,7 @@ if (!function_exists('renderDynamicFlowNode')) {
                                         Seu navegador não suporta o elemento de áudio.
                                     </audio>
                                 </div>
+                                <?php endif; ?>
                             <?php else: ?>
                                 <div class="text-xs text-slate-300 italic">Mensagem sonora configurada no Asterisk sem gravação customizada.</div>
                             <?php endif; ?>
@@ -387,6 +393,10 @@ if (!function_exists('renderDynamicFlowNode')) {
                                         <i class="fa-solid fa-bullhorn"></i> <span>Voz Sintetizada</span>
                                     </button>
                                 </div>
+                                <?php $__as = asteriskSoundStatus($node['audio_file']); ?>
+                                <?php if (!$__as['ok']): ?>
+                                    <div class="p-3 bg-rose-950/40 rounded-xl border border-rose-500/40 text-[11px] text-rose-200 font-bold"><i class="fa-solid fa-triangle-exclamation text-rose-400"></i> <?php echo htmlspecialchars($__as['msg']); ?></div>
+                                <?php else: ?>
                                 <div class="flex flex-col sm:flex-row items-center justify-between gap-3 pt-1">
                                     <audio controls controlsList="nodownload" class="h-8 max-w-full sm:w-72 text-xs opacity-95">
                                         <source src="get_audio.php?file=<?php echo urlencode($node['audio_file']); ?>" type="audio/wav" onerror="var a=this.closest('audio');if(a&&!a.dataset.err){a.dataset.err=1;a.insertAdjacentHTML('afterend','<span class=&quot;text-[10px] text-rose-300 font-bold&quot;>Arquivo de áudio não encontrado no servidor (/var/lib/asterisk/sounds)</span>');}">
@@ -394,6 +404,7 @@ if (!function_exists('renderDynamicFlowNode')) {
                                     </audio>
                                     <span class="text-[10px] text-slate-400 font-mono">Tocada ao entrar no menu</span>
                                 </div>
+                                <?php endif; ?>
                             </div>
                         <?php endif; ?>
 

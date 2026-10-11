@@ -1804,7 +1804,7 @@ function resolveAsteriskDestLabel($dest, $ast_db = null) {
     if (strpos($dest, 'app-pbdirectory') === 0) return "Diretório por Nome";
     if (strpos($dest, 'ext-trunk') === 0) return "Saída por Tronco #$dnum";
 
-    return "Destino: " . $dest;
+    return "Destino do dialplan: " . $dest;
 }
 
 /**
@@ -2181,7 +2181,7 @@ function formatAsteriskTimeGroupDetails($tg_id, $ast_db = null) {
     }
 
     if (empty($formatted_rules)) {
-        $formatted_rules[] = "Horário Configurado no PABX";
+        $formatted_rules[] = "Nenhuma regra de horário cadastrada neste grupo (a condição nunca é verdadeira)";
     }
 
     return [
@@ -4786,4 +4786,40 @@ function asteriskSoundResolve($name) {
         $out[] = $found;
     }
     return $out;
+}
+
+
+/**
+ * Situação do arquivo de áudio de uma gravação do PABX no servidor (para exibir ao suporte/cliente).
+ * @return array ['ok'=>bool, 'path'=>string, 'msg'=>string]
+ */
+function asteriskSoundStatus($name) {
+    $found = asteriskSoundResolve((string)$name);
+    if (!empty($found)) return ['ok' => true, 'path' => implode(' + ', $found), 'msg' => ''];
+    $root = '/var/lib/asterisk/sounds';
+    $user = function_exists('posix_getpwuid') ? (posix_getpwuid(posix_geteuid())['name'] ?? '') : '';
+    if (!is_dir($root)) return ['ok' => false, 'path' => '', 'msg' => "Pasta de sons $root não existe neste servidor."];
+    $first = trim(explode('&', (string)$name)[0]);
+    $noext = preg_replace('/\.(wav|sln16|sln|g722|ulaw|alaw|gsm|mp3|ogg)$/i', '', ltrim($first, '/'));
+    foreach (['wav', 'WAV', 'sln16', 'g722', 'sln', 'ulaw', 'alaw', 'gsm', 'mp3', 'ogg'] as $e) {
+        $c = "$root/$noext.$e";
+        if (file_exists($c) && !is_readable($c)) {
+            return ['ok' => false, 'path' => $c, 'msg' => "O arquivo existe ($c), mas o usuário do painel" . ($user ? " ($user)" : '') . " não tem permissão de leitura."];
+        }
+    }
+    $dir = dirname("$root/$noext");
+    $hint = '';
+    if (is_dir($dir)) {
+        $base = strtolower(basename($noext));
+        $sim = [];
+        foreach ((array)@scandir($dir) as $f) {
+            if ($f === '.' || $f === '..') continue;
+            $nf = strtolower(pathinfo($f, PATHINFO_FILENAME));
+            if ($base !== '' && (strpos($nf, $base) !== false || strpos($base, $nf) !== false)) $sim[] = $f;
+        }
+        if ($sim) $hint = ' Arquivos parecidos na pasta: ' . implode(', ', array_slice($sim, 0, 5)) . '.';
+    } else {
+        $hint = " A pasta $dir não existe.";
+    }
+    return ['ok' => false, 'path' => "$root/$noext.*", 'msg' => "O PABX cadastra a gravação \"$first\", mas o arquivo não foi encontrado em $root/$noext.*." . $hint];
 }
