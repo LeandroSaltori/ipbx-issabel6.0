@@ -203,7 +203,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_create_ext_api
 }
 
 $exts_list = $db->query("SELECT * FROM extensions_config ORDER BY CAST(extension AS UNSIGNED) ASC")->fetchAll(PDO::FETCH_ASSOC);
+$__aba = ($_GET['aba'] ?? '') === 'desvios' ? 'desvios' : 'ramais';
+$__tab = function ($key, $label, $icon) use ($__aba) {
+    $on = $__aba === $key;
+    return '<a href="index.php?module=ramais&action=editar_nome' . ($key === 'desvios' ? '&aba=desvios' : '') . '" class="px-4 py-2 rounded-lg text-xs font-bold ' . ($on ? 'bg-brand-500/20 text-brand-400 border border-brand-500/30' : 'text-slate-400 hover:text-white hover:bg-slate-800/60 border border-transparent') . '" style="white-space:nowrap;flex-shrink:0;width:auto;overflow:visible"><i class="fa-solid ' . $icon . '"></i> ' . $label . '</a>';
+};
+$__tabbar = '<div class="flex flex-wrap gap-2 mb-4">' . $__tab('ramais', 'Ramais & Atendentes', 'fa-users-gear') . (hasUserPermission('manage_settings') ? $__tab('desvios', 'Não Perturbe & Desvios', 'fa-user-gear') : '') . '</div>';
+if ($__aba === 'desvios' && hasUserPermission('manage_settings')) {
+    echo $__tabbar;
+    include __DIR__ . '/autoatendimento.php';
+    return;
+}
 ?>
+<?php echo $__tabbar; ?>
 
 <div class="space-y-6">
     <!-- Header -->

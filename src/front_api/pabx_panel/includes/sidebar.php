@@ -71,17 +71,9 @@ function isGroupActive($modules_array) {
                     <span>Painel FOP Operador</span>
                 </a>
                 <?php if (hasUserPermission('manage_settings')): ?>
-                <a href="index.php?module=ramais&action=provisionamento" class="flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all <?php echo isNavActive('ramais', 'provisionamento') ? 'bg-brand-500/20 text-brand-400 border border-brand-500/30 font-bold' : 'text-slate-300 hover:bg-slate-800/60 hover:text-white'; ?>">
-                    <i class="fa-solid fa-phone-volume w-4 text-center text-emerald-400"></i>
-                    <span>Provisionamento IP</span>
-                </a>
-                <a href="index.php?module=ramais&action=autoatendimento" class="flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all <?php echo isNavActive('ramais', 'autoatendimento') ? 'bg-brand-500/20 text-brand-400 border border-brand-500/30 font-bold' : 'text-slate-300 hover:bg-slate-800/60 hover:text-white'; ?>">
-                    <i class="fa-solid fa-user-gear w-4 text-center text-brand-400"></i>
-                    <span>Autoatendimento (DND & Desvios)</span>
-                </a>
                 <a href="index.php?module=ramais&action=editar_nome" class="flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all <?php echo isNavActive('ramais', 'editar_nome') ? 'bg-brand-500/20 text-brand-400 border border-brand-500/30 font-bold' : 'text-slate-300 hover:bg-slate-800/60 hover:text-white'; ?>">
                     <i class="fa-solid fa-id-card w-4 text-center"></i>
-                    <span>Nomes & Tecnologia</span>
+                    <span>Ramais & Atendentes</span>
                 </a>
                 <a href="index.php?module=telefonia&action=blacklist" class="flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all <?php echo isNavActive('telefonia', 'blacklist') ? 'bg-brand-500/20 text-brand-400 border border-brand-500/30 font-bold' : 'text-slate-300 hover:bg-slate-800/60 hover:text-white'; ?>">
                     <i class="fa-solid fa-ban w-4 text-center text-rose-400"></i>
@@ -250,10 +242,8 @@ function isGroupActive($modules_array) {
         </div>
         <?php endif; ?>
 
-    </nav>
-
     <!-- Footer System Status, Theme Toggle & User Profile -->
-    <div class="p-2 bg-slate-950/80 border-t border-slate-800 space-y-1">
+    <div class="mt-4 p-2 bg-slate-950/80 border border-slate-800 rounded-xl space-y-1">
         <!-- Novidades do sistema (histórico de entregas) -->
         <button type="button" onclick="openRoadmapModal()" class="w-full px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 border border-amber-500/30 text-slate-300 hover:text-white text-[11px] font-bold transition flex items-center justify-between">
             <span class="flex items-center gap-2"><i class="fa-solid fa-rocket text-amber-400"></i><span>Novidades</span></span>
@@ -283,6 +273,7 @@ function isGroupActive($modules_array) {
         </div>
         <a href="index.php?auth=logout" class="flex items-center justify-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold text-rose-300 bg-rose-500/10 border border-rose-500/20 hover:bg-rose-500/20 transition sidebar-text" style="white-space:nowrap"><i class="fa-solid fa-right-from-bracket"></i> Sair</a>
     </div>
+    </nav>
 </aside>
 
 <script>

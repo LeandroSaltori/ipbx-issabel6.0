@@ -533,11 +533,13 @@ if (empty($currentPbxToken) && !empty($currentPbxPass) && $_SERVER['REQUEST_METH
                 var u = document.querySelector('input[name="wa_provider"][value="uazapi"]').checked;
                 document.getElementById('wa-uazapi-fields').classList.toggle('hidden', !u);
                 document.getElementById('wa-uazapi-btns').classList.toggle('hidden', !u);
+                var z = document.getElementById('wa-zpro-fields'); if (z) z.classList.toggle('hidden', u);
             }
             </script>
         </div>
 
         <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+            <div id="wa-zpro-fields" class="space-y-4 <?php echo $__prov === 'uazapi' ? 'hidden' : ''; ?>">
             <div class="border-b border-slate-800 pb-3 flex items-center gap-3">
                 <div class="p-3 bg-amber-500/10 rounded-xl border border-amber-500/20 text-amber-400">
                     <i class="fa-solid fa-key text-xl"></i>
@@ -655,6 +657,7 @@ if (empty($currentPbxToken) && !empty($currentPbxPass) && $_SERVER['REQUEST_METH
                     </button>
                 </div>
             </form>
+            </div><!-- /wa-zpro-fields -->
 
             <!-- WEBHOOK DE RESPOSTAS NPS (Z-PRO -> PABX) -->
             <?php

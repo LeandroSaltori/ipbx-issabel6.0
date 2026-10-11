@@ -5990,43 +5990,6 @@ function securityOverview() {
     return $res;
 }
 
-/** Provisionamento de telefones IP: tabela, token e leitura da senha SIP do ramal (somente leitura no Issabel). */
-function provEnsureTable() {
-    global $db;
-    $db->exec("CREATE TABLE IF NOT EXISTS prov_devices (mac TEXT PRIMARY KEY, ext TEXT, vendor TEXT, label TEXT, created_at TEXT, last_fetch TEXT)");
-}
-function provToken() {
-    $t = getSetting('prov_token');
-    if ($t === '') { $t = bin2hex(random_bytes(12)); saveSetting('prov_token', $t); }
-    return $t;
-}
-function provExtensionSecret($ext) {
-    $pdo = getAsteriskPdoConnection('asterisk');
-    if (!$pdo || !preg_match('/^\d{2,8}$/', (string)$ext)) return '';
-    foreach (['data', 'value'] as $col) {
-        try {
-            $st = $pdo->prepare("SELECT $col FROM sip WHERE id = ? AND keyword = 'secret' LIMIT 1");
-            $st->execute([$ext]);
-            $v = $st->fetchColumn();
-            if ($v !== false && $v !== '') return (string)$v;
-        } catch (Exception $e) {}
-    }
-    return '';
-}
-function provRenderConfig($vendor, $ext, $name, $secret, $host) {
-    $name = preg_replace('/[^\p{L}\p{N} _\-\.]/u', '', (string)$name) ?: $ext;
-    if ($vendor === 'grandstream') {
-        $x = fn($s) => htmlspecialchars((string)$s, ENT_XML1);
-        return '<?xml version="1.0" encoding="UTF-8"?>' . "\n<gs_provision version=\"1\">\n<config version=\"1\">\n"
-            . "<P271>1</P271>\n<P47>" . $x($host) . "</P47>\n<P35>" . $x($ext) . "</P35>\n<P36>" . $x($ext) . "</P36>\n<P34>" . $x($secret) . "</P34>\n<P3>" . $x($name) . "</P3>\n</config>\n</gs_provision>\n";
-    }
-    // Yealink (padrão)
-    return "#!version:1.0.0.1\n"
-        . "account.1.enable = 1\naccount.1.label = $name\naccount.1.display_name = $name\n"
-        . "account.1.auth_name = $ext\naccount.1.user_name = $ext\naccount.1.password = $secret\n"
-        . "account.1.sip_server.1.address = $host\naccount.1.sip_server.1.port = 5060\n";
-}
-
 /** Fail2ban HÍBRIDO: usa os jails/whitelist nativos do Issabel (Security > Fail2ban, /var/www/db/iptables.db). */
 function f2bNativeDbPath() { return defined('IPBX_F2B_DB') ? IPBX_F2B_DB : '/var/www/db/iptables.db'; }
 function f2bNativeJails() {
