@@ -5757,6 +5757,14 @@ function aiChatLog($question, $tools, $ok) {
     } catch (Exception $e) {}
 }
 
+/** Rede de segurança: o chat nunca exibe nomes de terceiros; usa os nomes comerciais (IPbx Prisma / Prismabot). */
+function aiBrandScrub($t) {
+    $t = preg_replace('/\b(issabel|elastix|freepbx)\b/iu', 'IPbx Prisma', $t);
+    $t = preg_replace('/\bz-?pro\b/iu', 'Prismabot', $t);
+    $t = preg_replace('/\basterisk\b/iu', 'sistema', $t);
+    return $t;
+}
+
 function aiChatUser() {
     $u = function_exists('getLoggedUser') ? getLoggedUser() : null;
     $n = trim((string)($u['username'] ?? ''));
@@ -5846,9 +5854,10 @@ function aiProposalResolve($id, $accept) {
 function aiChatRun($history) {
     $cfg = aiGetConfig('chat');
     if ($cfg['key'] === '' || !$cfg['enabled']) return ['ok' => false, 'error' => 'IA não configurada. Configure em Configurações > Inteligência Artificial.'];
-    $sys = "Você é o assistente do painel PABX Prisma (Issabel/Asterisk). Hoje é " . date('d/m/Y H:i') . ". "
+    $sys = "Você é o assistente do IPbx Prisma, a central telefônica da Prisma Telecom. Hoje é " . date('d/m/Y H:i') . ". "
          . "Responda em português, curto e objetivo. Use SOMENTE dados retornados pelas ferramentas; nunca invente números, ramais ou ligações. "
          . "Se faltar informação (ex.: qual ramal), pergunte. Você só consulta; as únicas ações são: send_report (resumo por WhatsApp, só após o usuário confirmar o número) e propose_extension_feature (apenas PROPÕE; o usuário confirma por um botão e você nunca diz que foi feito antes disso). Para tabelas use markdown. Para gravações use recording_link e entregue o link em markdown [Ouvir gravação](url). "
+         . "Nunca cite os nomes Issabel, Asterisk, FreePBX, Elastix, Z-PRO ou ZPRO: o produto se chama IPbx Prisma e o serviço de WhatsApp se chama Prismabot. Se precisar falar da tecnologia, diga apenas \"o sistema\" ou \"a central\". "
          . "Se o usuário pedir algo fora do escopo do PABX, explique educadamente o que você pode fazer.";
     if ($cfg['prompt'] !== '') $sys = $cfg['prompt'] . "\n\n" . $sys;
     $msgs = [['role' => 'system', 'content' => $sys]];
@@ -5860,7 +5869,7 @@ function aiChatRun($history) {
         $r = aiChatRaw($msgs, $cfg);
         if (!$r['ok']) return ['ok' => false, 'error' => $r['error'], 'tools' => $used];
         $m = $r['message'];
-        if (empty($m['tool_calls'])) return ['ok' => true, 'text' => trim(preg_replace('#<think>.*?</think>#is', '', (string)($m['content'] ?? ''))), 'tools' => $used];
+        if (empty($m['tool_calls'])) return ['ok' => true, 'text' => aiBrandScrub(trim(preg_replace('#<think>.*?</think>#is', '', (string)($m['content'] ?? '')))), 'tools' => $used];
         $msgs[] = ['role' => 'assistant', 'content' => $m['content'] ?? '', 'tool_calls' => $m['tool_calls']];
         foreach ($m['tool_calls'] as $tc) {
             $nm = $tc['function']['name'] ?? ''; $args = json_decode($tc['function']['arguments'] ?? '{}', true) ?: [];

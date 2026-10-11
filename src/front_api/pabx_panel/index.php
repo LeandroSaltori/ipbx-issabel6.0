@@ -3401,7 +3401,7 @@ dialog#ai-chat-dialog::backdrop{background:rgba(0,0,0,.65);backdrop-filter:blur(
   function add(cls, html){ var d = document.createElement('div'); d.className = 'ai-msg '+cls; d.innerHTML = html; body.appendChild(d); body.scrollTop = body.scrollHeight; return d; }
   function build(){
     dlg = document.createElement('dialog'); dlg.id = 'ai-chat-dialog';
-    dlg.innerHTML = '<div id="ai-chat-head"><span><i class="fa-solid fa-robot"></i> Assistente PABX Prisma</span><span><button type="button" id="ai-chat-new" title="Nova conversa"><i class="fa-solid fa-rotate-right"></i></button> <button type="button" id="ai-chat-x" title="Fechar">✕</button></span></div>'
+    dlg.innerHTML = '<div id="ai-chat-head"><span><i class="fa-solid fa-robot"></i> Assistente IPbx Prisma</span><span><button type="button" id="ai-chat-new" title="Nova conversa"><i class="fa-solid fa-rotate-right"></i></button> <button type="button" id="ai-chat-x" title="Fechar">✕</button></span></div>'
       + '<div id="ai-chat-body"></div>'
       + '<form id="ai-chat-form"><input id="ai-chat-input" autocomplete="off" placeholder="Pergunte sobre ramais, ligações, filas..."><button id="ai-chat-send" type="submit">Enviar</button></form>';
     document.body.appendChild(dlg);
