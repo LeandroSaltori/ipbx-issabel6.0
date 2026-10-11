@@ -4896,3 +4896,87 @@ function amiCredentialDiagnosis($creds) {
     $web = function_exists('posix_getpwuid') ? (posix_getpwuid(posix_geteuid())['name'] ?? '?') : '?';
     return '[Diagnóstico: usuários testados: ' . implode(', ', array_keys($users)) . '. Arquivos: ' . implode('; ', $files) . ". Usuário do painel: $web. Confira em Configurações > AMI.]";
 }
+
+
+/**
+ * Cron: avisa por WhatsApp o atendente do ramal quando uma chamada para ele NÃO foi atendida (lida do CDR do Issabel).
+ * Respeita as opções do ramal: Perdidas Ext./Int. e Notif. Ocupado. Ao cliente só envia se a regra
+ * "missed_client_msg" estiver cadastrada. Não depende de gancho no dialplan do Asterisk.
+ */
+function processMissedCallNotifications($cdr) {
+    global $db;
+    $out = ['processed' => 0, 'sent' => 0, 'skipped' => 0, 'error' => ''];
+    $api_url = getSetting('api_url') ?: getSetting('prismabot_api_url');
+    $api_token = getSetting('api_token') ?: getSetting('prismabot_api_token');
+    if (empty($api_url) || empty($api_token)) { $out['error'] = 'API WhatsApp não configurada.'; return $out; }
+
+    // Primeira execução: só vale para chamadas dali em diante
+    $since = getSetting('missed_since');
+    if (empty($since)) { saveSetting('missed_since', date('Y-m-d H:i:s')); return $out; }
+
+    $cfgs = [];
+    foreach ($db->query("SELECT * FROM extensions_config")->fetchAll(PDO::FETCH_ASSOC) as $r) $cfgs[(string)$r['extension']] = $r;
+    if (!$cfgs) return $out;
+
+    try {
+        $st = $cdr->prepare("SELECT uniqueid, calldate, src, dst, disposition, duration FROM cdr
+            WHERE calldate >= :since AND calldate >= (NOW() - INTERVAL 30 MINUTE)
+              AND disposition IN ('NO ANSWER', 'BUSY')
+              AND dst REGEXP '^[0-9]{2,5}$'
+              AND (calldate + INTERVAL duration SECOND) <= (NOW() - INTERVAL 5 SECOND)
+            ORDER BY calldate ASC LIMIT 200");
+        $st->execute([':since' => $since]);
+        $rows = $st->fetchAll(PDO::FETCH_ASSOC);
+        $ans = $cdr->prepare("SELECT COUNT(*) FROM cdr WHERE src = :s AND disposition = 'ANSWERED' AND dst <> :d
+            AND calldate >= (:c - INTERVAL 2 SECOND) AND calldate <= (:c2 + INTERVAL :dur SECOND + INTERVAL 30 SECOND)");
+    } catch (Exception $e) { $out['error'] = $e->getMessage(); return $out; }
+
+    $dup = $db->prepare("SELECT COUNT(*) FROM sent_logs WHERE call_id = :c AND extension = :e");
+    $data_fmt = 'd/m/Y H:i:s';
+
+    foreach ($rows as $c) {
+        $ext = (string)$c['dst'];
+        if (!isset($cfgs[$ext])) continue;
+        $cid = 'MISS_' . $c['uniqueid'];
+        $dup->execute([':c' => $cid, ':e' => $ext]);
+        if ((int)$dup->fetchColumn() > 0) continue;
+
+        // Chamada atendida por outro ramal (grupo de toque/fila): não é perdida
+        try {
+            $ans->execute([':s' => $c['src'], ':d' => $ext, ':c' => $c['calldate'], ':c2' => $c['calldate'], ':dur' => (int)$c['duration']]);
+            if ((int)$ans->fetchColumn() > 0) continue;
+        } catch (Exception $e) {}
+
+        $out['processed']++;
+        $e = $cfgs[$ext];
+        $caller = preg_replace('/\D/', '', (string)$c['src']);
+        if ($caller === '') { $out['skipped']++; continue; }
+        $internal = (strlen($caller) <= 5);
+        $flag = $internal ? 'notify_agent_internal' : 'notify_agent_missed';
+        $when = date($data_fmt, strtotime($c['calldate']));
+        $agent_name = !empty($e['agent_name']) ? $e['agent_name'] : "Ramal $ext";
+        $did = false;
+
+        if (!empty($e['whatsapp_number']) && !empty($e[$flag])) {
+            $tpl = function_exists('getRule') ? getRule('missed_agent_msg') : '';
+            if (empty($tpl)) $tpl = "⚠️ *Notificação de Chamada Perdida*\n\nOlá *{ATENDENTE}*! O cliente número *{CLIENTE}* tentou ligar no seu ramal *{RAMAL}* às *{DATA_HORA}* e a chamada não foi atendida.";
+            $msg = str_replace(['{CLIENTE}', '{ATENDENTE}', '{RAMAL}', '{DATA_HORA}', '{NOME_FILA}'], [$caller, $agent_name, $ext, $when, 'Atendimento'], $tpl);
+            if (sendWhatsAppMessageViaZPro($api_url, $api_token, $e['whatsapp_number'], $msg, $cid, $ext, 'ATENDENTE_NAO_ATENDEU')) $out['sent']++;
+            $did = true;
+        }
+
+        // Cliente: só com regra cadastrada; ocupado só se "Notif. Ocupado" estiver ativo no ramal
+        if (!$internal && function_exists('getRule') && getRule('missed_client_msg') && ($c['disposition'] !== 'BUSY' || !empty($e['notify_client_busy']))) {
+            $msgc = str_replace(['{CLIENTE}', '{NOME_FILA}', '{ATENDENTE}', '{RAMAL}', '{DATA_HORA}'], [$caller, 'Atendimento', $agent_name, $ext, $when], getRule('missed_client_msg'));
+            if (sendWhatsAppMessageViaZPro($api_url, $api_token, $caller, $msgc, $cid, $ext, 'ATENDENTE_NAO_ATENDEU')) $out['sent']++;
+            $did = true;
+        }
+        if (!$did) {
+            // Nada a enviar (sem WhatsApp no ramal ou opção desligada): registra para não reavaliar
+            try { $db->prepare("INSERT INTO sent_logs (phone, call_id, extension, rule_type, message, status) VALUES ('', :c, :e, 'PERDIDA_IGNORADA', :m, 'SKIPPED')")
+                ->execute([':c' => $cid, ':e' => $ext, ':m' => !empty($e['whatsapp_number']) ? 'Opção desligada no ramal' : 'Ramal sem WhatsApp cadastrado']); } catch (Exception $ex) {}
+            $out['skipped']++;
+        }
+    }
+    return $out;
+}
