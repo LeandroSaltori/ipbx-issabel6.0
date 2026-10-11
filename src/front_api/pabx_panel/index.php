@@ -1124,7 +1124,7 @@ if ($module === 'dashboard' && $action === 'view') {
 // Security Whitelist Router
 $allowed_modules = [
     'dashboard' => ['view_v1', 'view_v2', 'view'],
-    'ramais' => ['fop', 'editar_nome', 'gestao', 'autoatendimento'],
+    'ramais' => ['fop', 'editar_nome', 'gestao', 'autoatendimento', 'provisionamento'],
     'troncos' => ['view'],
     'filas' => ['realtime', 'flowchart', 'agentes'],
     'relatorios' => ['ia_analytics', 'filas_stats', 'cdr_gravacoes', 'graphic_reports', 'relatorio_geral', 'relatorio_filas', 'pausas_agentes', 'formularios'],

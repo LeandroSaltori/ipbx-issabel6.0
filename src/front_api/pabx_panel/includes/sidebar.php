@@ -71,6 +71,10 @@ function isGroupActive($modules_array) {
                     <span>Painel FOP Operador</span>
                 </a>
                 <?php if (hasUserPermission('manage_settings')): ?>
+                <a href="index.php?module=ramais&action=provisionamento" class="flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all <?php echo isNavActive('ramais', 'provisionamento') ? 'bg-brand-500/20 text-brand-400 border border-brand-500/30 font-bold' : 'text-slate-300 hover:bg-slate-800/60 hover:text-white'; ?>">
+                    <i class="fa-solid fa-phone-volume w-4 text-center text-emerald-400"></i>
+                    <span>Provisionamento IP</span>
+                </a>
                 <a href="index.php?module=ramais&action=autoatendimento" class="flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all <?php echo isNavActive('ramais', 'autoatendimento') ? 'bg-brand-500/20 text-brand-400 border border-brand-500/30 font-bold' : 'text-slate-300 hover:bg-slate-800/60 hover:text-white'; ?>">
                     <i class="fa-solid fa-user-gear w-4 text-center text-brand-400"></i>
                     <span>Autoatendimento (DND & Desvios)</span>
