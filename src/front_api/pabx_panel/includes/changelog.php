@@ -6,6 +6,7 @@
  */
 return [
     'done' => [
+        ['data' => '2026-10-11', 'mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-clipboard-list', 'titulo' => 'Formulários de atendimento', 'desc' => 'O atendente registra o motivo e o resultado de cada chamada, com listas que você mesmo personaliza e consulta por período.'],
         ['data' => '2026-10-11', 'mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-shield-halved', 'titulo' => 'Painel de segurança', 'desc' => 'Veja em uma tela as tentativas de acesso indevido ao seu PABX e os endereços que foram bloqueados automaticamente.'],
         ['data' => '2026-10-11', 'mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-broom', 'titulo' => 'Painel mais enxuto e rápido', 'desc' => 'Renomear ramal agora grava direto no Issabel, sem depender da REST API (que virou opcional); botões que não funcionavam foram retirados e o painel deixou de aguardar uma API que não responde.'],
         ['data' => '2026-10-11', 'mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-heart-pulse', 'titulo' => 'Status da Integração', 'desc' => 'Uma tela mostra se o Asterisk, os bancos, o WhatsApp, a IA, o e-mail e as tarefas automáticas estão funcionando, com o motivo quando algo falha. Fica em Configurações.'],
@@ -23,6 +24,5 @@ return [
     ],
     'plan' => [
         ['icon' => 'fa-phone-volume', 'titulo' => 'Provisionamento de telefones IP', 'desc' => 'Configurar o aparelho automaticamente pelo MAC.'],
-        ['icon' => 'fa-clipboard-list', 'titulo' => 'Formulários de atendimento', 'desc' => 'Registro do motivo e resultado da chamada pelo atendente.'],
     ],
 ];
