@@ -2966,7 +2966,7 @@ if ($__route_perm !== '' && !hasUserPermission($__route_perm)) {
                         <div class="min-w-0">
                             <strong class="text-white block"><?php echo htmlspecialchars($__c['titulo']); ?>
                                 <?php if (!empty($__c['novo'])): ?><span class="ml-1 text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-black uppercase">Novo</span><?php endif; ?>
-                                <span class="ml-1 text-[10px] text-slate-500 font-normal"><?php echo htmlspecialchars($__c['mes'] ?? ''); ?></span>
+                                <span class="ml-1 text-[10px] text-slate-500 font-normal"><?php echo htmlspecialchars(!empty($__c['data']) ? date('d/m/Y', strtotime($__c['data'])) : ($__c['mes'] ?? '')); ?></span>
                             </strong>
                             <p class="text-slate-400 text-[11px]"><?php echo htmlspecialchars($__c['desc']); ?></p>
                         </div>

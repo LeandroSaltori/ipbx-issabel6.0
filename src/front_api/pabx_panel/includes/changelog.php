@@ -1,11 +1,12 @@
 <?php
 /**
  * Histórico de novidades do painel (mostrado ao cliente em "Novidades").
- * Para registrar uma entrega nova: acrescente um item em 'done' (a mais recente primeiro).
+ * Atualizado a cada entrega (regra 10 do AGENTS.md): acrescente um item em 'done' (a mais recente primeiro), com 'data' AAAA-MM-DD.
  * 'plan' lista o que está em andamento / próximos passos.
  */
 return [
     'done' => [
+        ['data' => '2026-10-11', 'mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-rocket', 'titulo' => 'Novidades do sistema', 'desc' => 'Este histórico: todas as funções novas e correções passam a aparecer aqui automaticamente, no rodapé do menu.'],
         ['mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-robot', 'titulo' => 'Chat com IA no painel', 'desc' => 'Assistente flutuante que responde sobre ligações, ramais, filas e gravações usando os dados reais do seu PABX. Liberado por usuário.'],
         ['mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-diagram-project', 'titulo' => 'IA por função', 'desc' => 'Escolha qual IA faz a transcrição de áudio, os resumos/insights e o chat, com chave própria por provedor.'],
         ['mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-pause-circle', 'titulo' => 'Pausas & Tempo Logado dos agentes', 'desc' => 'Relatório com tempo logado, tempo em pausa, motivos e detalhe de cada pausa.'],

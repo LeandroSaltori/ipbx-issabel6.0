@@ -91,3 +91,12 @@ Este documento estabelece as regras e padrões arquiteturais obrigatórios para 
    - Diante de anomalias, coletar diagnósticos somente-leitura (crontabs, logs do Apache, processos e permissões em `/cache/`) antes de alterar qualquer arquivo.
 2. **Alimentação da Base Global (`ipbx-security-hardening.sh`):**
    - Consolidar continuamente novos padrões de vulnerabilidades/invasores detectados no repositório global para imunizar toda a frota de PBXs.
+
+---
+
+## 10. HISTÓRICO DE NOVIDADES ("Novidades" / Roadmap) — ATUALIZAÇÃO AUTOMÁTICA OBRIGATÓRIA
+1. **Todo commit que entrega nova função, melhoria visível ou correção relevante ao cliente DEVE incluir** uma entrada em `src/front_api/pabx_panel/includes/changelog.php` (lista `done`, mais recente primeiro) **no mesmo commit**, sem que o usuário precise pedir.
+2. Formato da entrada: `['data' => 'AAAA-MM-DD', 'mes' => 'Mês/AAAA', 'novo' => true, 'icon' => 'fa-...', 'titulo' => '...', 'desc' => '...']`. Texto em português, voltado ao cliente (o que ele ganha), sem jargão técnico, uma ou duas frases.
+3. Itens de `plan` que forem entregues são removidos de `plan` e passam para `done`. Novos planos acordados com o usuário entram em `plan`.
+4. Entradas com `'novo' => true` com mais de 30 dias devem ter `novo` alterado para `false`.
+5. Não registrar refatorações internas, testes ou ajustes sem efeito para o cliente.
