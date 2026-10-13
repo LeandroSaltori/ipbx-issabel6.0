@@ -7,6 +7,7 @@
 return [
     'done' => [
         ['data' => '2026-10-13', 'mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-arrow-rotate-left', 'titulo' => 'Voltar do navegador sem cair no painel antigo', 'desc' => 'Quem entra pelo Painel Novo e clica em Voltar não é mais levado ao painel clássico. Um atalho no menu permite abrir o clássico quando precisar.'],
+        ['data' => '2026-10-13', 'mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-wand-magic-sparkles', 'titulo' => 'Painel Novo já vem selecionado no login', 'desc' => 'Ao abrir a tela de login, o Painel Novo 6.0 já aparece marcado. Se você escolher o Clássico, o sistema lembra sua preferência.'],
         ['data' => '2026-10-13', 'mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-door-open', 'titulo' => 'Nova tela de login com a identidade da Prisma', 'desc' => 'Login moderno, com a logo, o mascote e a escolha entre o Painel Novo e o Clássico, e também ajustado para o celular.'],
         ['data' => '2026-10-13', 'mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-right-from-bracket', 'titulo' => 'Botão Sair corrigido', 'desc' => 'Ao clicar em Sair, você é desconectado de verdade e volta para a tela de login inicial.'],
         ['data' => '2026-10-13', 'mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-file-import', 'titulo' => 'Importação dos usuários do painel clássico', 'desc' => 'Traga todos os usuários já cadastrados no painel clássico com um clique, sem recriar um por um. Eles entram escolhendo o painel novo na tela de login.'],

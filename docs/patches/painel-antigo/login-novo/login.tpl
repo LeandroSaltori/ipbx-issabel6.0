@@ -89,8 +89,8 @@ body{font-family:'Noto Sans','Segoe UI',system-ui,sans-serif;color:#e6eef7;min-h
       </div>
       <div class="lbl">Abrir em</div>
       <div class="pn" id="painel-sel">
-        <label><input type="radio" name="painel" value="novo"><span class="t"><b>Painel Novo 6.0</b><small>Dashboard, filas ao vivo, relatórios e IA</small></span></label>
-        <label><input type="radio" name="painel" value="classico" checked><span class="t"><b>Painel Clássico</b><small>Configurações completas da central</small></span></label>
+        <label><input type="radio" name="painel" value="novo" checked><span class="t"><b>Painel Novo 6.0</b><small>Dashboard, filas ao vivo, relatórios e IA</small></span></label>
+        <label><input type="radio" name="painel" value="classico"><span class="t"><b>Painel Clássico</b><small>Configurações completas da central</small></span></label>
       </div>
       <button type="submit" class="go" name="submit_login" id="go"><span>Entrar</span><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
     </form>

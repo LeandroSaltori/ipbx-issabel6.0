@@ -16,7 +16,7 @@ return [
             'dica' => 'Os usuários continuam sendo criados no painel clássico. O painel novo só guarda as permissões e o WhatsApp de cada um. Para voltar ao painel clássico, use o atalho Painel clássico no rodapé do menu lateral; o botão Voltar do navegador não leva mais ao painel antigo.',
             'aviso' => 'Quem for desativado no painel novo perde o acesso mesmo entrando pelo clássico.'],
         ['t' => 'Sair do painel', 'd' => 'O botão Sair, no rodapé do menu lateral, encerra sua sessão e leva de volta à tela de login inicial.'],
-        ['t' => 'Tela de login', 'd' => 'A tela de login tem a identidade da Prisma Telecom e já traz a escolha entre o Painel Novo 6.0 e o Painel Clássico. Funciona também no celular.', 'passos' => ['Digite usuário e senha.', 'Em Abrir em, escolha Painel Novo 6.0 ou Painel Clássico.', 'Clique em Entrar. O olho no campo de senha mostra ou esconde o que você digitou.']],
+        ['t' => 'Tela de login', 'd' => 'A tela de login tem a identidade da Prisma Telecom e já traz a escolha entre o Painel Novo 6.0 (pré-selecionado) e o Painel Clássico. Depois do primeiro acesso, ela lembra a sua última escolha. Funciona também no celular.', 'passos' => ['Digite usuário e senha.', 'Em Abrir em, o Painel Novo 6.0 já vem marcado; se preferir, escolha o Painel Clássico.', 'Clique em Entrar. O olho no campo de senha mostra ou esconde o que você digitou.']],
         ['t' => 'Modo claro / escuro', 'd' => 'Você pode alternar o visual do painel pelo botão de tema.'],
     ]],
     ['id' => 'dashboard', 'titulo' => 'Dashboard', 'icon' => 'fa-chart-pie', 'itens' => [
