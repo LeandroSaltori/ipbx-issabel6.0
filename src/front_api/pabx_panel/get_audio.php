@@ -27,13 +27,19 @@ $foundPath = null;
 
 // 1. Se for por uniqueid (gravação CDR)
 if (!empty($uid)) {
-    $ast_db = getAsteriskDBConnection();
+    // A tabela cdr fica no banco asteriskcdrdb (o getAsteriskDBConnection aponta para o banco "asterisk")
+    $ast_db = function_exists('getAsteriskPdoConnection') ? getAsteriskPdoConnection('asteriskcdrdb') : null;
+    if (!$ast_db) $ast_db = getAsteriskDBConnection();
     if ($ast_db) {
         try {
             $stmt = $ast_db->prepare("SELECT recordingfile, calldate FROM cdr WHERE uniqueid = :uid LIMIT 1");
             $stmt->execute([':uid' => $uid]);
             $row = $stmt->fetch(PDO::FETCH_ASSOC);
-            if (!empty($row['recordingfile'])) {
+            if (!empty($row['recordingfile']) && function_exists('findRecordingPath')) {
+                $fp = findRecordingPath($row['recordingfile'], $row['calldate'] ?? '');
+                if ($fp !== '') $foundPath = $fp;
+            }
+            if (!$foundPath && !empty($row['recordingfile'])) {
                 $rec = $row['recordingfile'];
                 $cdate = $row['calldate'] ?? '';
                 $year = date('Y', strtotime($cdate));

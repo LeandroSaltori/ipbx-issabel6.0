@@ -5786,14 +5786,15 @@ function aiChatUser() {
 }
 function aiHistoryEnsure() {
     global $db;
-    $db->exec("CREATE TABLE IF NOT EXISTS ai_chat_history (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT, role TEXT, content TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)");
+    $db->exec("CREATE TABLE IF NOT EXISTS ai_chat_history (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT, role TEXT, content TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, archived INTEGER DEFAULT 0)");
+    try { $db->exec("ALTER TABLE ai_chat_history ADD COLUMN archived INTEGER DEFAULT 0"); } catch (Exception $e) {}
     $db->exec("CREATE TABLE IF NOT EXISTS ai_pending_actions (id TEXT PRIMARY KEY, username TEXT, ext TEXT, field TEXT, value TEXT, resumo TEXT, status TEXT, created_at INTEGER)");
 }
 function aiHistoryLoad($limit = 30) {
     global $db;
     try {
         aiHistoryEnsure();
-        $st = $db->prepare("SELECT role, content FROM ai_chat_history WHERE username = ? ORDER BY id DESC LIMIT " . (int)$limit);
+        $st = $db->prepare("SELECT role, content FROM ai_chat_history WHERE username = ? AND archived = 0 ORDER BY id DESC LIMIT " . (int)$limit);
         $st->execute([aiChatUser()]);
         return array_reverse($st->fetchAll(PDO::FETCH_ASSOC));
     } catch (Exception $e) { return []; }
@@ -5805,13 +5806,14 @@ function aiHistorySave($role, $content) {
         aiHistoryEnsure();
         $u = aiChatUser();
         $db->prepare("INSERT INTO ai_chat_history (username, role, content) VALUES (?,?,?)")->execute([$u, $role, mb_substr((string)$content, 0, 6000)]);
-        // mantém só as últimas 200 mensagens do usuário
-        $db->prepare("DELETE FROM ai_chat_history WHERE username = ? AND id NOT IN (SELECT id FROM ai_chat_history WHERE username = ? ORDER BY id DESC LIMIT 200)")->execute([$u, $u]);
+        // mantém as últimas 2000 mensagens do usuário
+        $db->prepare("DELETE FROM ai_chat_history WHERE username = ? AND id NOT IN (SELECT id FROM ai_chat_history WHERE username = ? ORDER BY id DESC LIMIT 2000)")->execute([$u, $u]);
     } catch (Exception $e) {}
 }
 function aiHistoryClear() {
     global $db;
-    try { aiHistoryEnsure(); $db->prepare("DELETE FROM ai_chat_history WHERE username = ?")->execute([aiChatUser()]); } catch (Exception $e) {}
+    // "Nova conversa" só esconde para o usuário; o registro continua disponível para o administrador
+    try { aiHistoryEnsure(); $db->prepare("UPDATE ai_chat_history SET archived = 1 WHERE username = ?")->execute([aiChatUser()]); } catch (Exception $e) {}
 }
 /** Cria uma proposta pendente (NÃO executa). Retorna ['id'=>..., 'resumo'=>...] ou ['error'=>...]. */
 function aiProposeFeature($ext, $field, $value) {
