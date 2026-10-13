@@ -1,0 +1,137 @@
+/* ==========================================================================
+   IPbx Prisma - Tema prisma_v6 (camada de cores, carregada por ÚLTIMO)
+   Padrão escuro do Painel Novo 6.0 / login. Para voltar ao visual anterior,
+   use o tema prisma_v5 (nada deste arquivo existe nele).
+   ========================================================================== */
+:root{
+  --p-bg:#14132a; --p-bg2:#1c1b2f; --p-card:#252440; --p-card2:#2d2c4d; --p-deep:#0f172a;
+  --p-line:rgba(139,92,246,.22); --p-line2:rgba(255,255,255,.08);
+  --p-text:#e6e5f5; --p-muted:#9a98bd; --p-head:#ffffff;
+  --p-v:#7c3aed; --p-i:#6366f1; --p-v2:#a78bfa;
+  --p-grad:linear-gradient(135deg,#7c3aed,#6366f1);
+  --p-ok:#22c55e; --p-warn:#f59e0b; --p-err:#ef4444; --p-info:#38bdf8;
+}
+html,body,body.page-body,body.mainBody,.page-container,.page-container .main-content{background:var(--p-bg)!important;color:var(--p-text)!important;font-family:'Segoe UI','Noto Sans',system-ui,sans-serif}
+.page-container .main-content{background:var(--p-bg)!important}
+a{color:var(--p-v2)} a:hover,a:focus{color:#c4b5fd}
+h1,h2,h3,h4,h5,h6,.h1,.h2,.h3,.h4,.h5,.h6{color:var(--p-head)}
+hr{border-color:var(--p-line2)}
+small,.text-muted,.help-block{color:var(--p-muted)!important}
+::selection{background:rgba(124,58,237,.55);color:#fff}
+::-webkit-scrollbar{width:10px;height:10px} ::-webkit-scrollbar-track{background:var(--p-bg2)} ::-webkit-scrollbar-thumb{background:#3b3a63;border-radius:6px} ::-webkit-scrollbar-thumb:hover{background:var(--p-v)}
+
+/* ---- Menu lateral ---- */
+body .page-container .sidebar-menu,
+body .page-container .sidebar-menu #main-menu,
+body .page-container .sidebar-menu #main-menu li ul{background:var(--p-bg2)!important;border-right:1px solid var(--p-line)}
+body .page-container .sidebar-menu .logo-env{background:var(--p-bg2)!important}
+body .page-container .sidebar-menu #main-menu li a{color:#c9c7ec!important;border-color:var(--p-line2)!important}
+body .page-container .sidebar-menu #main-menu li ul > li > a{color:#aaa8d0!important;background:transparent!important}
+body .page-container .sidebar-menu #main-menu li a:hover,
+body .page-container .sidebar-menu #main-menu li ul > li > a:hover{background:rgba(124,58,237,.18)!important;color:#fff!important}
+body .page-container .sidebar-menu #main-menu li.active > a,
+body .page-container .sidebar-menu #main-menu li.opened > a,
+body .page-container .sidebar-menu #main-menu li.active.opened > a{background:var(--p-grad)!important;color:#fff!important;box-shadow:0 4px 14px rgba(124,58,237,.35)}
+body .page-container .sidebar-menu #main-menu li#search,
+body .page-container .sidebar-menu #main-menu li#search .search-input{background:var(--p-card)!important;color:var(--p-text)!important}
+body .page-container .sidebar-menu #main-menu li#search input{background:transparent!important;color:var(--p-text)!important}
+body .page-container .sidebar-menu #main-menu li#search button i{color:var(--p-v2)!important}
+
+/* ---- Topo ---- */
+.main-content > .row:first-child,.navbar,.navbar-inverse,#neo-headerbox,#neo-topbar,.fondomenu_headertop{background:var(--p-bg2)!important;border-color:var(--p-line)!important;color:var(--p-text)!important}
+ul.neo-topbar-notification > li > a,ul.user-info > li > a,ul.user-info > li > a i,.profile-info > a{color:#c9c7ec!important}
+body .profile-info.dropdown .dropdown-menu,.dropdown-menu{background:var(--p-card)!important;border:1px solid var(--p-line)!important;box-shadow:0 12px 30px rgba(0,0,0,.5)!important}
+.dropdown-menu > li > a{color:var(--p-text)!important} .dropdown-menu > li > a:hover,.dropdown-menu > li > a:focus{background:rgba(124,58,237,.25)!important;color:#fff!important}
+.dropdown-menu .divider{background:var(--p-line2)}
+.breadcrumb{background:var(--p-card)!important;border:1px solid var(--p-line2)!important} .breadcrumb > li,.breadcrumb > li a,.breadcrumb > .active{color:var(--p-muted)!important}
+
+/* ---- Painéis / cartões / conteúdo ---- */
+#neo-contentbox,#neo-contentbox-maincolumn,#neo-modulecontent,div.neo-module-content,div.neo-module-content *,.neo-module-content td,.mainBody{color:var(--p-text)}
+#neo-contentbox,#neo-contentbox-maincolumn,#neo-contentbox-leftcolumn,#neo-modulecontent,div.neo-module-content{background:transparent!important}
+div.neo-module-title,div.neo-module-name-left,div.neo-module-name-right{background:transparent!important;color:var(--p-head)!important}
+.panel,.panel-default,.well,.neo-applet,div.neo-applet,.frameModule,.thumbnail,.list-group-item,.jumbotron{background:var(--p-card)!important;border:1px solid var(--p-line)!important;color:var(--p-text)!important;box-shadow:0 8px 24px rgba(0,0,0,.25)!important}
+.panel > .panel-heading,.panel-default > .panel-heading,.panel-heading,div.neo-applet-title{background:linear-gradient(135deg,rgba(124,58,237,.35),rgba(99,102,241,.25))!important;color:#fff!important;border-bottom:1px solid var(--p-line)!important}
+.panel-title,.panel-title a{color:#fff!important}
+.panel-footer{background:var(--p-card2)!important;border-top:1px solid var(--p-line2)!important}
+div.neo-applet-content,div.neo-applet-tdesc,div.neo-applet-titem,div.neo-applet-tline{color:var(--p-text)!important;background:transparent!important;border-color:var(--p-line2)!important}
+div.neo-applet-reload{color:var(--p-v2)!important}
+
+/* ---- Abas ---- */
+.nav-tabs{border-bottom:1px solid var(--p-line)!important}
+.nav-tabs > li > a{background:var(--p-card)!important;color:var(--p-muted)!important;border:1px solid var(--p-line2)!important}
+.nav-tabs > li > a:hover{background:var(--p-card2)!important;color:#fff!important}
+.nav-tabs > li.active > a,.nav-tabs > li.active > a:hover,.nav-tabs > li.active > a:focus{background:var(--p-grad)!important;color:#fff!important;border-color:transparent!important}
+.nav-pills > li.active > a{background:var(--p-grad)!important;color:#fff!important}
+.tab-content{background:var(--p-card)!important;border:1px solid var(--p-line)!important;color:var(--p-text)!important}
+div.neo-3mtab,div.neo-historybox-tab,div.neo-tabh,div.neo-tabv,div.neo-cmenutab{background:var(--p-card)!important;color:var(--p-muted)!important}
+div.neo-3mtabon,div.neo-historybox-tabon,div.neo-tabhon,div.neo-tabvon{background:var(--p-grad)!important;color:#fff!important}
+div.neo-3mtab a,div.neo-tabh a,div.neo-tabv a{color:var(--p-muted)!important} div.neo-3mtabon a,div.neo-tabhon a,div.neo-tabvon a{color:#fff!important}
+
+/* ---- Tabelas (Issabel + Bootstrap + DataTables) ---- */
+table,.table,table.issabel-standard-table,table.dataTable{color:var(--p-text)!important;background:transparent!important;border-color:var(--p-line2)!important}
+.table > thead > tr > th,.table > thead > tr > td,table.issabel-standard-table > thead > tr > th,table.dataTable thead th,.neo-table-header-row,.neo-table-header-row td,.neo-table-header-row th,table th{background:linear-gradient(135deg,#3b2a78,#33316b)!important;color:#fff!important;border-color:var(--p-line)!important}
+.table > tbody > tr > td,.table > tbody > tr > th,table.issabel-standard-table > tbody > tr > td,table td{background:transparent!important;color:var(--p-text)!important;border-color:var(--p-line2)!important}
+.table-striped > tbody > tr:nth-child(odd) > td,.table-striped > tbody > tr:nth-child(odd) > th,table.issabel-standard-table > tbody > tr:nth-child(odd) > td{background:rgba(255,255,255,.025)!important}
+.table-hover > tbody > tr:hover > td,table.issabel-standard-table > tbody > tr:hover > td,table.dataTable tbody tr:hover td{background:rgba(124,58,237,.18)!important}
+.neo-table-footer-row,.neo-table-footer-row td,table.issabel-standard-table > tfoot > tr,.neo-table-header-row-filter,.neo-table-header-row-navigation,#neo-table-header-filterrow,.neo-table-header-row-filter td{background:var(--p-card2)!important;color:var(--p-text)!important;border-color:var(--p-line2)!important}
+.neo-filter-control,div.neo-table-filter-controls,.filterForm,.filterForm td{background:transparent!important;color:var(--p-text)!important}
+.dataTables_wrapper,.dataTables_info,.dataTables_length,.dataTables_filter,.dataTables_paginate{color:var(--p-muted)!important}
+.pagination > li > a,.pagination > li > span,.paginate_button{background:var(--p-card)!important;border-color:var(--p-line2)!important;color:var(--p-text)!important}
+.pagination > .active > a,.pagination > .active > span,.paginate_button.current{background:var(--p-grad)!important;color:#fff!important;border-color:transparent!important}
+.items a,.itemsPagination{color:var(--p-v2)!important}
+
+/* ---- Formulários ---- */
+input[type=text],input[type=password],input[type=email],input[type=number],input[type=search],input[type=tel],input[type=url],input[type=date],input[type=time],input[type=file],textarea,select,.form-control,.areatexto,.neo-table-header-row input[type=text]{background:var(--p-deep)!important;color:var(--p-text)!important;border:1px solid var(--p-line)!important;border-radius:8px!important}
+input:focus,textarea:focus,select:focus,.form-control:focus{border-color:var(--p-i)!important;box-shadow:0 0 0 3px rgba(99,102,241,.25)!important;outline:none!important}
+input::placeholder,textarea::placeholder{color:#6f6d99!important}
+input[disabled],input[readonly],select[disabled],textarea[disabled],.form-control[disabled],.form-control[readonly]{background:#1a1930!important;color:#7d7ba6!important}
+select option{background:var(--p-card);color:var(--p-text)}
+label,.control-label,.form-label-style{color:#cfcdee!important}
+.input-group-addon{background:var(--p-card2)!important;border-color:var(--p-line)!important;color:var(--p-text)!important}
+.form-group.has-error .form-control{border-color:var(--p-err)!important}
+.select2-container .select2-choice,.select2-container-multi .select2-choices,.select2-drop,.select2-results,.chosen-container .chosen-single,.chosen-container-multi .chosen-choices,.chosen-drop,.chosen-container .chosen-drop{background:var(--p-deep)!important;color:var(--p-text)!important;border-color:var(--p-line)!important}
+.select2-results .select2-highlighted,.chosen-container .chosen-results li.highlighted{background:var(--p-grad)!important;color:#fff!important}
+
+/* ---- Botões ---- */
+.btn,button,input[type=button],input[type=submit],input[type=reset],.neo-table-toolbar-button,.exportButton,#neo-submit-button{white-space:nowrap!important;flex-shrink:0!important;width:auto!important;overflow:visible!important;text-overflow:clip!important;border-radius:8px!important}
+.btn-default,input[type=button],input[type=reset],.neo-table-toolbar-button{background:var(--p-card2)!important;color:var(--p-text)!important;border:1px solid var(--p-line)!important}
+.btn-default:hover,input[type=button]:hover,input[type=reset]:hover,.neo-table-toolbar-button:hover{background:#3a3965!important;color:#fff!important}
+.btn-primary,.btn-info,.btn-blue,input[type=submit],button[type=submit],#neo-submit-button,.exportButton{background:var(--p-grad)!important;color:#fff!important;border:none!important;box-shadow:0 4px 14px rgba(124,58,237,.35)}
+.btn-primary:hover,.btn-info:hover,input[type=submit]:hover,#neo-submit-button:hover{filter:brightness(1.12)}
+.btn-success,.btn-green{background:linear-gradient(135deg,#16a34a,#22c55e)!important;color:#fff!important;border:none!important}
+.btn-warning,.btn-orange{background:linear-gradient(135deg,#d97706,#f59e0b)!important;color:#fff!important;border:none!important}
+.btn-danger,.btn-red{background:linear-gradient(135deg,#dc2626,#ef4444)!important;color:#fff!important;border:none!important}
+.btn-link{color:var(--p-v2)!important}
+
+/* ---- Alertas / badges / modais ---- */
+.alert{border-radius:10px!important;border:1px solid var(--p-line)!important}
+.alert-success{background:rgba(34,197,94,.14)!important;color:#86efac!important}
+.alert-info{background:rgba(56,189,248,.14)!important;color:#7dd3fc!important}
+.alert-warning{background:rgba(245,158,11,.14)!important;color:#fcd34d!important}
+.alert-danger,.error{background:rgba(239,68,68,.14)!important;color:#fca5a5!important}
+.label,.badge{color:#fff!important} .label-default,.badge{background:#3a3965!important}
+.label-success{background:var(--p-ok)!important}.label-warning{background:var(--p-warn)!important}.label-danger{background:var(--p-err)!important}.label-info{background:var(--p-info)!important}.label-primary{background:var(--p-i)!important}
+.modal-content,.neo-modal-issabel-popup-box,#layerCM,#layerCM_content,.ui-dialog,.ui-widget-content,.ui-widget{background:var(--p-card)!important;color:var(--p-text)!important;border:1px solid var(--p-line)!important}
+.modal-header,.modal-footer,.ui-dialog-titlebar,.ui-widget-header,.neo-modal-issabel-popup-title,.layer_handle{background:var(--p-card2)!important;color:#fff!important;border-color:var(--p-line2)!important}
+.modal-backdrop,.neo-modal-issabel-popup-blockmask,.black_overlay{background:#000!important}
+.close{color:#fff!important;text-shadow:none!important}
+.ui-state-default,.ui-widget-content .ui-state-default{background:var(--p-card2)!important;color:var(--p-text)!important;border-color:var(--p-line)!important}
+.ui-state-hover,.ui-state-active,.ui-state-highlight{background:var(--p-grad)!important;color:#fff!important}
+.ui-datepicker,.ui-datepicker-header,.ui-timepicker-div{background:var(--p-card)!important;color:var(--p-text)!important}
+.ui-autocomplete,.ui-menu{background:var(--p-card)!important;border:1px solid var(--p-line)!important}
+.ui-menu .ui-menu-item a{color:var(--p-text)!important}
+
+/* ---- Rodapé, ajuda, notas, barra direita ---- */
+#neo-footerbox,.copyright,.letra_gris,.letra_disclaimer{background:transparent!important;color:var(--p-muted)!important}
+#neo-sticky-note,#neo-sticky-note-text,#neo-sticky-note-text-edit,div#chat,div#chat .chat-inner > .panel-group > .panel,.mb_message,.mb_title,.div_content_bubble{background:var(--p-card)!important;color:var(--p-text)!important;border-color:var(--p-line)!important}
+#neo-sticky-note-textarea{background:var(--p-deep)!important;color:var(--p-text)!important}
+.font-green{color:var(--p-ok)!important}.font-orange{color:var(--p-warn)!important}.font-red{color:var(--p-err)!important}
+.progress{background:var(--p-deep)!important}.progress-bar{background:var(--p-grad)!important}
+code,pre,kbd{background:var(--p-deep)!important;color:#c4b5fd!important;border:1px solid var(--p-line2)!important}
+img[src*="logo"]{background:transparent}
+
+/* ---- Linhas de tabela (o tema antigo pinta o <tr>, não só o <td>) ---- */
+table.issabel-standard-table>tbody>tr,.table>tbody>tr,table tbody tr,table.dataTable tbody tr{background:transparent!important;background-color:transparent!important}
+table.issabel-standard-table>tbody>tr:nth-child(even),.table-striped>tbody>tr:nth-child(even){background:rgba(255,255,255,.02)!important}
+table.issabel-standard-table>tbody>tr:hover,.table-hover>tbody>tr:hover{background:rgba(124,58,237,.18)!important}
+table.issabel-standard-table>tbody>tr>td a{color:var(--p-v2)!important}

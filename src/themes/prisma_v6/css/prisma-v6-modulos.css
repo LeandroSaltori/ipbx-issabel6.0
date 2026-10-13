@@ -1,0 +1,46 @@
+/* ==========================================================================
+   IPbx Prisma - tema prisma_v6: cores dos módulos próprios (CDR, Gravações,
+   Monitoramento, Pesquisa, Chamadas Perdidas, Resumo por Ramal, etc.).
+   Os módulos trazem CSS embutido na própria página (claro); esta camada
+   reaplica o padrão escuro SEM alterar nenhum arquivo dos módulos.
+   ========================================================================== */
+.mc-root,.sum-root,.cdr-root,.mon-root,.pq-root{color:var(--p-text)!important}
+.mc-title h2,.sum-title h2,.cdr-title h2,.mon-title h2,h2.module-title{color:#fff!important}
+.mc-root p,.sum-root p,.cdr-root p,.mon-root p{color:var(--p-muted)}
+
+/* cartões: filtros, KPIs, gráficos, tabelas */
+.filter-card-box,.kpi-card-item,.chart-card-box,.table-card-box,.timeline-card,.card-box,.kpi-card,.monitoring-card{background:var(--p-card)!important;border:1px solid var(--p-line)!important;box-shadow:0 8px 24px rgba(0,0,0,.28)!important;color:var(--p-text)!important}
+.kpi-card-item{border-left-width:4px!important}
+.kpi-card-num,.kpi-card-val{color:#fff!important}
+.kpi-card-title,.kpi-card-desc,.filter-field-group label,.pagination-info,.time-text,.speed-label{color:var(--p-muted)!important}
+.chart-card-box h4{color:#fff!important;border-bottom-color:var(--p-line2)!important}
+.chart-card-box canvas{filter:none}
+
+/* filtros */
+.filter-input,.filter-field-group select,.filter-field-group input{background:var(--p-deep)!important;color:var(--p-text)!important;border:1px solid var(--p-line)!important}
+.filter-input:focus{border-color:var(--p-i)!important;box-shadow:0 0 0 3px rgba(99,102,241,.25)!important}
+
+/* botões secundários / abas / paginação */
+.btn-reset,.btn-top-manual,.tab-btn,.page-link-btn,.btn-secondary{background:var(--p-card2)!important;color:var(--p-text)!important;border:1px solid var(--p-line)!important;white-space:nowrap!important;flex-shrink:0!important;width:auto!important;overflow:visible!important;text-overflow:clip!important}
+.btn-reset:hover,.btn-top-manual:hover,.page-link-btn:hover,.tab-btn:hover{background:#3a3965!important;color:#fff!important}
+.tab-btn.active,.page-link-btn.active,.page-link-btn.current{background:var(--p-grad)!important;color:#fff!important;border-color:transparent!important}
+.pagination-bar{background:transparent!important;color:var(--p-muted)!important;border-color:var(--p-line2)!important}
+.exten-badge{background:var(--p-deep)!important;color:#c4b5fd!important}
+
+/* tabelas dos módulos */
+.cdr-table,.monitoring-table,.mc-table,.sum-table,.pq-table,table.module-table{background:transparent!important;border-color:var(--p-line)!important;box-shadow:none!important}
+.cdr-table th,.monitoring-table th,.mc-table th,.sum-table th,.pq-table th{background:linear-gradient(135deg,#3b2a78,#33316b)!important;color:#fff!important;border-color:var(--p-line)!important}
+.cdr-table td,.monitoring-table td,.mc-table td,.sum-table td,.pq-table td{background:transparent!important;color:var(--p-text)!important;border-bottom:1px solid var(--p-line2)!important}
+.cdr-table tbody tr:nth-child(even),.monitoring-table tbody tr:nth-child(even),.mc-table tbody tr:nth-child(even),.sum-table tbody tr:nth-child(even),.pq-table tbody tr:nth-child(even){background:rgba(255,255,255,.02)!important}
+.cdr-table tbody tr:hover,.monitoring-table tbody tr:hover,.mc-table tbody tr:hover,.sum-table tbody tr:hover,.pq-table tbody tr:hover,.prisma-report-row-hover{background:rgba(124,58,237,.2)!important}
+.timeline-card-title,.timeline-card-body,.timeline-time{color:var(--p-text)!important}
+.timeline-container::before{background:var(--p-line)!important}
+.cel-info-banner{background:rgba(99,102,241,.15)!important;color:#c7d2fe!important;border-left-color:var(--p-i)!important}
+
+/* módulos que usam o estilo antigo (hardware_detector, sec_*, backup, etc.) */
+[style*="background:#f0f5ff"],[style*="background: #f0f5ff"]{background:var(--p-card2)!important;color:var(--p-text)!important}
+[style*="background:#fff;"],[style*="background: #fff;"],[style*="background:#ffffff"],[style*="background: #ffffff"],[style*="background:white"],[style*="background: white"],[style*="background-color:#fff"],[style*="background-color: #fff"],[style*="background-color:white"],[style*="background-color: white"]{background:var(--p-card)!important;color:var(--p-text)!important}
+[style*="background:#eee"],[style*="background: #eee"],[style*="background:#f0f0f0"],[style*="background:#f3f3f3"],[style*="background:#f9f9f9"],[style*="background:#f8f8f8"],[style*="background:#fafafa"],[style*="background:#efefef"]{background:var(--p-card2)!important;color:var(--p-text)!important}
+[style*="color:#333"],[style*="color: #333"],[style*="color:#444"],[style*="color:#555"],[style*="color:#000"],[style*="color:black"],[style*="color: black"]{color:var(--p-text)!important}
+.neo-module-content font,.neo-module-content b,.neo-module-content strong{color:inherit}
+iframe{background:var(--p-bg)}
