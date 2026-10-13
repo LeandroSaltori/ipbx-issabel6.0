@@ -4815,10 +4815,22 @@ function aiKeyFor($provider) {
 }
 
 /** Provedor/modelo escolhidos para uma função, ou null se a função usa a configuração geral. */
+/** Provedor automático de uma função: o primeiro que tiver chave guardada (transcrição só com Groq/OpenAI). */
+function aiAutoProvider($role) {
+    $order = $role === 'audio' ? ['groq', 'openai'] : ['groq', 'openai', 'gemini', 'deepseek'];
+    foreach ($order as $p) if (aiKeyFor($p) !== '') return $p;
+    return '';
+}
+
 function aiRoleChoice($role) {
     if ($role === '' || !isset(aiRoles()[$role])) return null;
     $p = trim((string)getSetting("ai_role_{$role}_provider"));
-    if ($p === '' || !isset(aiProviderDefaults()[$p])) return null;
+    if ($p === '' || !isset(aiProviderDefaults()[$p])) {
+        // "Automático": mantém a configuração geral antiga se existir; senão usa a primeira chave guardada
+        if (trim((string)getSetting('ai_api_key')) !== '') return null;
+        $p = aiAutoProvider($role);
+        if ($p === '') return null;
+    }
     $k = aiKeyFor($p);
     if ($k === '') return null;
     return ['provider' => $p, 'key' => $k, 'model' => trim((string)getSetting("ai_role_{$role}_model"))];

@@ -56,7 +56,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $__save->execute([':k' => "ai_role_{$__r}_provider", ':v' => $__prov]);
             $__save->execute([':k' => "ai_role_{$__r}_model", ':v' => trim($_POST["ai_role_{$__r}_model"] ?? '')]);
         }
-        $msg = "Funções da IA salvas! Cada função passa a usar o provedor e o modelo escolhidos.";
+        if (isset($_POST['ai_adv_present'])) {
+            $__save->execute([':k' => 'enable_copilot',    ':v' => isset($_POST['enable_copilot']) ? '1' : '0']);
+            $__save->execute([':k' => 'ai_custom_prompt',  ':v' => trim($_POST['ai_custom_prompt'] ?? '')]);
+            $__save->execute([':k' => 'ai_token_limit',    ':v' => (string)max(64, min(4000, (int)($_POST['ai_token_limit'] ?? 1024) ?: 1024))]);
+        }
+        $msg = "Configuração de IA salva! Cada função passa a usar o provedor escolhido (ou o automático).";
         if (isset($_POST['action_test_ai_roles'])) {
             $__res = [];
             foreach (aiRoles() as $__r => $__lbl) {
@@ -118,6 +123,23 @@ $el_model         = getSetting('elevenlabs_model')    ?: 'eleven_multilingual_v2
 $el_enabled       = getSetting('elevenlabs_enabled')  ?: '0';
 
 $ia_tab = isset($_GET['ia_tab']) ? $_GET['ia_tab'] : 'copiloto';
+
+$__provLabels = ['openai' => 'OpenAI (GPT)', 'groq' => 'Groq', 'gemini' => 'Google Gemini', 'deepseek' => 'DeepSeek'];
+/** O que cada função está usando de fato agora (sem chamar a internet). */
+$__roleSummary = function ($role) use ($__provLabels) {
+    $sel = aiRoleChoice($role);
+    $defs = aiProviderDefaults();
+    if ($sel) { $prov = $sel['provider']; $key = true; $model = $sel['model']; }
+    else {
+        $k = trim((string)getSetting('ai_api_key')); $prov = getSetting('ai_provider') ?: 'openai';
+        if (strpos($k, 'gsk_') === 0) $prov = 'groq'; elseif (strpos($k, 'AIza') === 0) $prov = 'gemini';
+        $key = $k !== ''; $model = '';
+    }
+    if ($model === '') $model = $role === 'audio' ? ($defs[$prov]['audio'] ?? '') : ($defs[$prov]['chat'] ?? '');
+    return ['prov' => $__provLabels[$prov] ?? $prov, 'model' => $model, 'ok' => $key];
+};
+$__anyKey = false;
+foreach (array_keys(aiProviderDefaults()) as $__pp) if (aiKeyFor($__pp) !== '') { $__anyKey = true; break; }
 ?>
 
 <div class="space-y-6">
@@ -145,42 +167,25 @@ $ia_tab = isset($_GET['ia_tab']) ? $_GET['ia_tab'] : 'copiloto';
             </form>
         </div>
 
-        <!-- Cards Status de Conectividade Global -->
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
-            <div class="p-3.5 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between">
-                <div>
-                    <span class="text-[10px] uppercase font-mono text-slate-500 font-bold block">Motor de IA LLM</span>
-                    <strong class="text-xs text-white capitalize flex items-center gap-1.5 mt-0.5">
-                        <i class="fa-solid fa-brain text-purple-400"></i> <?php echo htmlspecialchars($ai_provider); ?>
-                    </strong>
+        <!-- O que cada função da IA está usando agora -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 pt-2">
+            <?php foreach ([['audio','Transcrição de áudio','fa-wave-square','text-cyan-400'], ['insights','Copiloto e resumos','fa-brain','text-purple-400'], ['chat','Chat assistente','fa-comments','text-emerald-400']] as $__c):
+                $__sm = $__roleSummary($__c[0]); ?>
+            <div class="p-3.5 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between gap-2">
+                <div class="min-w-0">
+                    <span class="text-[10px] uppercase font-mono text-slate-500 font-bold block"><?php echo $__c[1]; ?></span>
+                    <strong class="text-xs text-white flex items-center gap-1.5 mt-0.5"><i class="fa-solid <?php echo $__c[2] . ' ' . $__c[3]; ?>"></i> <?php echo $__sm['ok'] ? htmlspecialchars($__sm['prov']) : 'Sem chave'; ?></strong>
+                    <?php if ($__sm['ok'] && $__sm['model'] !== ''): ?><span class="text-[10px] text-slate-500 font-mono block truncate"><?php echo htmlspecialchars($__sm['model']); ?></span><?php endif; ?>
                 </div>
-                <span class="px-2 py-0.5 rounded text-[9px] font-bold font-mono border <?php echo !empty($ai_api_key) ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border-rose-500/20'; ?>">
-                    <?php echo !empty($ai_api_key) ? '● API Chave OK' : '○ Sem API Key'; ?>
-                </span>
+                <span class="px-2 py-0.5 rounded text-[9px] font-bold font-mono border whitespace-nowrap <?php echo $__sm['ok'] ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border-rose-500/20'; ?>"><?php echo $__sm['ok'] ? '● Pronto' : '○ Falta chave'; ?></span>
             </div>
-
-            <div class="p-3.5 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between">
+            <?php endforeach; ?>
+            <div class="p-3.5 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between gap-2">
                 <div>
-                    <span class="text-[10px] uppercase font-mono text-slate-500 font-bold block">Transcrição & STT</span>
-                    <strong class="text-xs text-white font-mono flex items-center gap-1.5 mt-0.5">
-                        <i class="fa-solid fa-waveform text-cyan-400"></i> <?php echo htmlspecialchars($ai_model_audio); ?>
-                    </strong>
+                    <span class="text-[10px] uppercase font-mono text-slate-500 font-bold block">Voz (ElevenLabs)</span>
+                    <strong class="text-xs text-white flex items-center gap-1.5 mt-0.5"><i class="fa-solid fa-microphone text-amber-400"></i> <?php echo $el_enabled === '1' ? 'Habilitada' : 'Desabilitada'; ?></strong>
                 </div>
-                <span class="px-2 py-0.5 rounded text-[9px] font-bold font-mono border bg-cyan-500/10 text-cyan-300 border-cyan-500/20">
-                    Ativo
-                </span>
-            </div>
-
-            <div class="p-3.5 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between">
-                <div>
-                    <span class="text-[10px] uppercase font-mono text-slate-500 font-bold block">Síntese ElevenLabs</span>
-                    <strong class="text-xs text-white font-mono flex items-center gap-1.5 mt-0.5">
-                        <i class="fa-solid fa-microphone text-amber-400"></i> <?php echo $el_enabled === '1' ? 'Habilitado' : 'Desabilitado'; ?>
-                    </strong>
-                </div>
-                <span class="px-2 py-0.5 rounded text-[9px] font-bold font-mono border <?php echo ($el_enabled === '1' && !empty($el_api_key)) ? 'bg-amber-500/10 text-amber-300 border-amber-500/20' : 'bg-slate-800 text-slate-500 border-slate-700'; ?>">
-                    <?php echo ($el_enabled === '1' && !empty($el_api_key)) ? '● Ativo' : '○ Inativo'; ?>
-                </span>
+                <span class="px-2 py-0.5 rounded text-[9px] font-bold font-mono border whitespace-nowrap <?php echo ($el_enabled === '1' && !empty($el_api_key)) ? 'bg-amber-500/10 text-amber-300 border-amber-500/20' : 'bg-slate-800 text-slate-500 border-slate-700'; ?>"><?php echo ($el_enabled === '1' && !empty($el_api_key)) ? '● Ativa' : '○ Inativa'; ?></span>
             </div>
         </div>
 
@@ -200,32 +205,29 @@ $ia_tab = isset($_GET['ia_tab']) ? $_GET['ia_tab'] : 'copiloto';
     <!-- ─── TAB: COPILOTO IA ─────────────────────────────────────────────── -->
     <?php if ($ia_tab === 'copiloto'): ?>
     <div class="space-y-5">
-        <?php if (empty($ai_api_key)): ?>
+        <?php if (!$__anyKey): ?>
         <div class="p-4 rounded-xl bg-amber-500/10 text-amber-300 border border-amber-500/20 text-xs font-bold flex items-center gap-2">
             <i class="fa-solid fa-triangle-exclamation text-amber-400"></i>
-            Nenhuma API Key configurada. Sem chave, o Copiloto exibe apenas os números reais do CDR, sem análise generativa.
+            Nenhuma chave de IA guardada. Cole pelo menos uma chave no Passo 1 abaixo; sem ela o Copiloto mostra apenas os números reais do CDR, sem análise.
         </div>
         <?php endif; ?>
 
         <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl max-w-4xl space-y-6">
-            <div class="flex items-center gap-3 border-b border-slate-800 pb-4">
-                <div class="w-10 h-10 rounded-xl bg-brand-500/20 text-brand-400 border border-brand-500/30 flex items-center justify-center text-lg">
-                    <i class="fa-solid fa-robot"></i>
-                </div>
-                <div>
-                    <h4 class="text-sm font-extrabold text-white">Provedor LLM Universal & Copiloto Prismabot</h4>
-                    <span class="text-xs text-slate-400">Configuração universal compartilhada por todos os usuários do PABX</span>
-                </div>
-            </div>
+            <?php
+                $__defs = aiProviderDefaults();
+                $__hints = [
+                    'audio'    => 'Converte a gravação em texto. Só OpenAI ou Groq fazem isso.',
+                    'insights' => 'Resumos de chamada, auditoria e análises do Copiloto. Textos curtos: vale um modelo rápido e barato.',
+                    'chat'     => 'Conversa do assistente dentro do painel. Precisa de um modelo que use ferramentas.',
+                ];
+            ?>
+            <form method="POST" action="index.php?module=configuracoes&action=ia&ia_tab=copiloto" class="space-y-6 text-xs">
+                <input type="hidden" name="ai_adv_present" value="1">
 
-            <form method="POST" action="index.php?module=configuracoes&action=ia&ia_tab=copiloto" class="space-y-5 text-xs">
-                <input type="hidden" name="action_save_ia" value="1">
-
-                <!-- Toggle Ativo -->
                 <div class="flex items-center justify-between p-4 bg-slate-950 rounded-2xl border border-slate-800">
                     <div>
-                        <span class="font-extrabold text-white text-sm block">Copiloto de IA Ativo</span>
-                        <span class="text-slate-400">Habilita a assistente virtual e resumos automáticos no painel do PABX</span>
+                        <span class="font-extrabold text-white text-sm block">Inteligência Artificial ativa</span>
+                        <span class="text-slate-400">Liga o assistente do painel e os resumos automáticos. Desligada, nada é enviado a provedores de IA.</span>
                     </div>
                     <label class="relative inline-flex items-center cursor-pointer">
                         <input type="checkbox" name="enable_copilot" value="1" class="sr-only peer" <?php echo $enable_copilot === '1' ? 'checked' : ''; ?>>
@@ -233,169 +235,93 @@ $ia_tab = isset($_GET['ia_tab']) ? $_GET['ia_tab'] : 'copiloto';
                     </label>
                 </div>
 
-                <!-- Provedor LLM -->
-                <div>
-                    <label class="font-bold text-slate-300 block mb-2 flex items-center gap-1">
-                        <i class="fa-solid fa-layer-group text-brand-400"></i> Selecionar Provedor Universal
-                    </label>
-                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                        <?php foreach (['openai' => ['label'=>'OpenAI','icon'=>'fa-brain','color'=>'emerald'], 'groq' => ['label'=>'Groq','icon'=>'fa-bolt','color'=>'orange'], 'gemini' => ['label'=>'Gemini','icon'=>'fa-google','color'=>'blue'], 'deepseek' => ['label'=>'DeepSeek','icon'=>'fa-circle-nodes','color'=>'purple']] as $pv => $pi): ?>
-                        <label class="cursor-pointer">
-                            <input type="radio" name="ai_provider" value="<?php echo $pv; ?>" class="sr-only peer" <?php echo $ai_provider === $pv ? 'checked' : ''; ?> onchange="updateBaseUrlForProvider('<?php echo $pv; ?>')">
-                            <div class="p-3 bg-slate-950 border-2 border-slate-800 peer-checked:border-brand-500 rounded-xl text-center space-y-1 transition hover:border-slate-600">
-                                <i class="fa-solid <?php echo $pi['icon']; ?> text-<?php echo $pi['color']; ?>-400 text-lg block"></i>
-                                <span class="font-bold text-white text-xs block"><?php echo $pi['label']; ?></span>
-                            </div>
-                        </label>
+                <!-- PASSO 1 -->
+                <section class="space-y-3">
+                    <div class="flex items-center gap-2"><span class="w-6 h-6 rounded-full bg-brand-600 text-white font-extrabold flex items-center justify-center text-[11px]">1</span>
+                        <h4 class="text-sm font-extrabold text-white">Cole a chave do provedor que você usa</h4></div>
+                    <p class="text-slate-400">Basta uma. Se tiver mais de uma, o painel usa cada uma onde ela é melhor. A chave fica guardada só neste servidor.</p>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <?php foreach ($__defs as $__p => $__d): $__has = aiKeyFor($__p) !== ''; ?>
+                        <div class="p-3 rounded-xl bg-slate-950 border <?php echo $__has ? 'border-emerald-500/30' : 'border-slate-800'; ?> space-y-1.5">
+                            <label class="font-bold text-slate-300 flex items-center justify-between">
+                                <span><?php echo htmlspecialchars($__provLabels[$__p] ?? $__p); ?></span>
+                                <span class="text-[10px] <?php echo $__has ? 'text-emerald-400' : 'text-slate-500'; ?>"><?php echo $__has ? '● chave salva' : '○ sem chave'; ?></span>
+                            </label>
+                            <input type="password" name="ai_key_<?php echo $__p; ?>" autocomplete="new-password" placeholder="<?php echo $__has ? 'Em branco = manter a chave atual' : 'Cole a API Key'; ?>"
+                                   class="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white font-mono focus:border-brand-500 focus:outline-none">
+                            <?php if ($__has && getSetting('ai_key_' . $__p) !== ''): ?>
+                            <label class="text-[10px] text-slate-500 flex items-center gap-1"><input type="checkbox" name="ai_key_clear_<?php echo $__p; ?>" value="1"> remover esta chave</label>
+                            <?php endif; ?>
+                        </div>
                         <?php endforeach; ?>
                     </div>
-                </div>
+                </section>
 
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div class="sm:col-span-2">
-                        <label class="font-bold text-slate-300 block mb-1 flex items-center gap-1"><i class="fa-solid fa-key text-amber-400"></i> API Key *</label>
-                        <input type="hidden" name="ai_advanced" id="ai_advanced" value="0">
-                        <input type="password" name="ai_api_key" value="<?php echo htmlspecialchars($ai_api_key); ?>" placeholder="sk-...  |  gsk_...  |  AIza..."
-                               class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono focus:border-brand-500 focus:outline-none">
-                    </div>
-                    <p class="sm:col-span-2 text-[11px] text-slate-500">Só cole a chave e salve: o painel reconhece o provedor (<code>gsk_</code> = Groq, <code>AIza</code> = Gemini, <code>sk-</code> = OpenAI) e usa os modelos padrão dele.</p>
-                    <details class="sm:col-span-2 group" ontoggle="document.getElementById('ai_advanced').value = this.open ? '1' : '0';">
-                    <summary class="cursor-pointer text-slate-400 hover:text-white font-bold text-xs py-1"><i class="fa-solid fa-sliders"></i> Opções avançadas (opcional)</summary>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3">
-                    <div>
-                        <label class="font-bold text-slate-300 block mb-1 flex items-center justify-between">
-                            <span>URL Base da API <span class="text-slate-500 font-normal text-[10px]">(opcional)</span></span>
-                        </label>
-                        <input type="text" name="ai_base_url" id="ai_base_url_input" value="<?php echo htmlspecialchars($ai_base_url); ?>" placeholder="https://api.openai.com/v1"
-                               class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono placeholder-slate-600 focus:border-brand-500 focus:outline-none">
-                    </div>
-                    <div>
-                        <label class="font-bold text-slate-300 block mb-1 flex items-center justify-between">
-                            <span>Modelo de Chat (LLM)</span>
-                        </label>
-                        <select name="ai_model_chat" id="ai_model_chat_select" onchange="checkCustomModelInput('chat')"
-                                class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono focus:border-brand-500 focus:outline-none">
-                            <option value="gpt-4o-mini" <?php echo $ai_model_chat === 'gpt-4o-mini' ? 'selected' : ''; ?>>gpt-4o-mini (Recomendado / Econômico)</option>
-                            <option value="gpt-4o" <?php echo $ai_model_chat === 'gpt-4o' ? 'selected' : ''; ?>>gpt-4o (Mais Inteligente)</option>
-                            <option value="gpt-3.5-turbo" <?php echo $ai_model_chat === 'gpt-3.5-turbo' ? 'selected' : ''; ?>>gpt-3.5-turbo</option>
-                            <option value="custom" <?php echo !in_array($ai_model_chat, ['gpt-4o-mini','gpt-4o','gpt-3.5-turbo','llama-3.3-70b-versatile','llama3-8b-8192','gemini-1.5-flash','deepseek-chat']) ? 'selected' : ''; ?>>Outro modelo (Digitar manualmente...)</option>
-                        </select>
-                        <input type="text" id="ai_model_chat_custom" name="ai_model_chat_custom" value="<?php echo htmlspecialchars($ai_model_chat); ?>" placeholder="Ex: gpt-4-turbo"
-                               class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono mt-2 focus:border-brand-500 focus:outline-none hidden">
-                    </div>
-
-                    <div>
-                        <label class="font-bold text-slate-300 block mb-1 flex items-center justify-between">
-                            <span>Modelo de Áudio / Transcrição (STT)</span>
-                        </label>
-                        <select name="ai_model_audio" id="ai_model_audio_select" onchange="checkCustomModelInput('audio')"
-                                class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono focus:border-brand-500 focus:outline-none">
-                            <option value="whisper-1" <?php echo $ai_model_audio === 'whisper-1' ? 'selected' : ''; ?>>whisper-1 (Oficial OpenAI STT)</option>
-                            <option value="custom" <?php echo !in_array($ai_model_audio, ['whisper-1','whisper-large-v3','distil-whisper-large-v3-en']) ? 'selected' : ''; ?>>Outro modelo de áudio...</option>
-                        </select>
-                        <input type="text" id="ai_model_audio_custom" name="ai_model_audio_custom" value="<?php echo htmlspecialchars($ai_model_audio); ?>" placeholder="Ex: whisper-1"
-                               class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono mt-2 focus:border-brand-500 focus:outline-none hidden">
-                    </div>
-                    </div>
-
-                <!-- Prompt Personalizado -->
-                <div class="pt-3">
-                    <label class="font-bold text-slate-300 block mb-1 flex items-center justify-between">
-                        <span><i class="fa-solid fa-terminal text-brand-400"></i> Prompt Personalizado do Copiloto</span>
-                        <span class="text-[10px] text-slate-500 font-normal">Instrução de tom e regras do PABX</span>
-                    </label>
-                    <textarea name="ai_custom_prompt" rows="3" placeholder="Deixe em branco para usar o prompt padrão do sistema. Ex: Você é um assistente do PABX Prisma. Responda sempre de forma concisa e cortês."
-                              class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono text-xs focus:border-brand-500 focus:outline-none"><?php echo htmlspecialchars($ai_custom_prompt); ?></textarea>
-                </div>
-
-                <!-- Limite de Tokens -->
-                <div>
-                    <label class="font-bold text-slate-300 block mb-1 flex items-center justify-between">
-                        <span><i class="fa-solid fa-gauge-high text-cyan-400"></i> Limite de Tokens na Resposta (Max Tokens)</span>
-                    </label>
-                    <input type="number" name="ai_token_limit" value="<?php echo htmlspecialchars($ai_token_limit); ?>" placeholder="1024"
-                           class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono focus:border-brand-500 focus:outline-none">
-                </div>
-                    </details>
-                </div>
-
-                <div class="flex items-center justify-between pt-2 gap-3 flex-wrap">
-                    <p class="text-slate-500 text-[11px] flex items-center gap-1"><i class="fa-solid fa-shield text-brand-400"></i> Chaves salvas universalmente no banco local SQLite.</p>
-                    
-                    <div class="flex items-center gap-2">
-                        <button type="button" onclick="testLlmConnection()" id="btn-test-llm" class="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-extrabold rounded-xl transition border border-slate-700 flex items-center gap-2">
-                            <i class="fa-solid fa-plug-circle-check text-brand-400"></i> Testar Conexão IA
-                        </button>
-
-                        <button type="submit" class="px-5 py-2.5 bg-brand-600 hover:bg-brand-500 text-white font-extrabold rounded-xl transition shadow-lg shadow-brand-600/20 flex items-center gap-2">
-                            <i class="fa-solid fa-floppy-disk"></i> Salvar Copiloto IA
-                        </button>
-                    </div>
-                </div>
-            </form>
-
-            <!-- Quem faz o quê: provedor/modelo por função -->
-            <?php
-                $__defs = aiProviderDefaults();
-                $__provLabels = ['openai' => 'OpenAI (GPT)', 'groq' => 'Groq', 'gemini' => 'Google Gemini', 'deepseek' => 'DeepSeek'];
-                $__hints = [
-                    'audio'    => 'Somente OpenAI (whisper-1) ou Groq (whisper-large-v3 / turbo) transcrevem áudio.',
-                    'insights' => 'Texto curto e frequente: modelos rápidos e baratos (ex.: llama-3.3-70b no Groq ou gpt-4o-mini).',
-                    'chat'     => 'Conversa com o assistente do painel; precisa de modelo que suporte ferramentas (ex.: gpt-4o-mini, llama-3.3-70b).',
-                ];
-            ?>
-            <form method="POST" class="p-5 rounded-2xl bg-slate-950 border border-brand-500/30 space-y-4">
-                <div class="flex items-center gap-2 text-brand-400 font-bold text-xs uppercase tracking-wider">
-                    <i class="fa-solid fa-diagram-project"></i> Quem faz o quê — IA por função
-                </div>
-                <p class="text-slate-400 text-xs">Guarde uma chave por provedor e escolha qual provedor e modelo atende cada função. Função sem escolha usa a configuração geral acima.</p>
-
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                    <?php foreach ($__defs as $__p => $__d): $__has = aiKeyFor($__p) !== ''; ?>
-                    <div class="p-3 rounded-xl bg-slate-900 border border-slate-800 space-y-1.5">
-                        <label class="font-bold text-slate-300 flex items-center justify-between">
-                            <span><?php echo htmlspecialchars($__provLabels[$__p] ?? $__p); ?></span>
-                            <span class="text-[10px] <?php echo $__has ? 'text-emerald-400' : 'text-slate-500'; ?>"><?php echo $__has ? '● chave salva' : '○ sem chave'; ?></span>
-                        </label>
-                        <input type="password" name="ai_key_<?php echo $__p; ?>" autocomplete="new-password" placeholder="<?php echo $__has ? 'Deixe em branco para manter a chave atual' : 'Cole a API Key'; ?>"
-                               class="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono focus:border-brand-500 focus:outline-none">
-                        <?php if ($__has && getSetting('ai_key_' . $__p) !== ''): ?>
-                        <label class="text-[10px] text-slate-500 flex items-center gap-1"><input type="checkbox" name="ai_key_clear_<?php echo $__p; ?>" value="1"> remover esta chave</label>
-                        <?php endif; ?>
-                    </div>
-                    <?php endforeach; ?>
-                </div>
-
-                <div class="space-y-3 text-xs">
-                    <?php foreach (aiRoles() as $__r => $__lbl):
-                        $__rp = (string)getSetting("ai_role_{$__r}_provider");
-                        $__rm = (string)getSetting("ai_role_{$__r}_model");
-                    ?>
-                    <div class="p-3 rounded-xl bg-slate-900 border border-slate-800">
-                        <div class="font-bold text-slate-200 mb-0.5"><?php echo htmlspecialchars($__lbl); ?></div>
-                        <div class="text-[10px] text-slate-500 mb-2"><?php echo htmlspecialchars($__hints[$__r]); ?></div>
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                            <select name="ai_role_<?php echo $__r; ?>_provider" class="px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white focus:border-brand-500 focus:outline-none">
-                                <option value="">Usar configuração geral</option>
+                <!-- PASSO 2 -->
+                <section class="space-y-3">
+                    <div class="flex items-center gap-2"><span class="w-6 h-6 rounded-full bg-brand-600 text-white font-extrabold flex items-center justify-center text-[11px]">2</span>
+                        <h4 class="text-sm font-extrabold text-white">Escolha quem faz cada tarefa</h4></div>
+                    <p class="text-slate-400">Deixe em <b class="text-slate-200">Automático</b> e o painel escolhe sozinho entre as chaves que você colou. Só mude se quiser, por exemplo, usar um provedor mais barato para os resumos.</p>
+                    <div class="space-y-2">
+                        <?php foreach (aiRoles() as $__r => $__lbl): $__rp = (string)getSetting("ai_role_{$__r}_provider"); ?>
+                        <div class="p-3 rounded-xl bg-slate-950 border border-slate-800 grid grid-cols-1 sm:grid-cols-2 gap-2 items-center">
+                            <div>
+                                <div class="font-bold text-slate-200"><?php echo htmlspecialchars($__lbl); ?></div>
+                                <div class="text-[10px] text-slate-500"><?php echo htmlspecialchars($__hints[$__r]); ?></div>
+                            </div>
+                            <select name="ai_role_<?php echo $__r; ?>_provider" class="px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white focus:border-brand-500 focus:outline-none">
+                                <option value="">Automático (recomendado)</option>
                                 <?php foreach ($__defs as $__p => $__d):
-                                    if ($__r === 'audio' && !in_array($__p, ['openai', 'groq'], true)) continue; ?>
-                                <option value="<?php echo $__p; ?>" <?php echo $__rp === $__p ? 'selected' : ''; ?>><?php echo htmlspecialchars($__provLabels[$__p] ?? $__p); ?></option>
+                                    if ($__r === 'audio' && !in_array($__p, ['openai', 'groq'], true)) continue;
+                                    $__hk = aiKeyFor($__p) !== ''; ?>
+                                <option value="<?php echo $__p; ?>" <?php echo $__rp === $__p ? 'selected' : ''; ?>><?php echo htmlspecialchars(($__provLabels[$__p] ?? $__p) . ($__hk ? '' : ' (sem chave)')); ?></option>
                                 <?php endforeach; ?>
                             </select>
-                            <input type="text" name="ai_role_<?php echo $__r; ?>_model" value="<?php echo htmlspecialchars($__rm); ?>" placeholder="Modelo (vazio = automático)"
-                                   class="px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono focus:border-brand-500 focus:outline-none">
                         </div>
+                        <?php endforeach; ?>
                     </div>
-                    <?php endforeach; ?>
-                </div>
+                </section>
 
-                <div class="flex items-center justify-end gap-2 flex-wrap">
-                    <button type="submit" name="action_test_ai_roles" value="1" class="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-extrabold rounded-xl transition border border-slate-700 flex items-center gap-2 text-xs" style="white-space:nowrap;flex-shrink:0;width:auto;overflow:visible">
-                        <i class="fa-solid fa-plug-circle-check text-brand-400"></i> Salvar e Testar
-                    </button>
-                    <button type="submit" name="action_save_ai_roles" value="1" class="px-5 py-2.5 bg-brand-600 hover:bg-brand-500 text-white font-extrabold rounded-xl transition flex items-center gap-2 text-xs" style="white-space:nowrap;flex-shrink:0;width:auto;overflow:visible">
-                        <i class="fa-solid fa-floppy-disk"></i> Salvar Funções
-                    </button>
+                <!-- PASSO 3 -->
+                <section class="space-y-3">
+                    <div class="flex items-center gap-2"><span class="w-6 h-6 rounded-full bg-slate-700 text-white font-extrabold flex items-center justify-center text-[11px]">3</span>
+                        <h4 class="text-sm font-extrabold text-white">Ajustes finos <span class="text-slate-500 font-normal">(opcional)</span></h4></div>
+                    <details class="group">
+                        <summary class="cursor-pointer text-slate-400 hover:text-white font-bold py-1"><i class="fa-solid fa-sliders"></i> Mostrar ajustes</summary>
+                        <div class="space-y-3 pt-3">
+                            <div>
+                                <label class="font-bold text-slate-300 block mb-1">Instrução de tom do assistente <span class="text-slate-500 font-normal">(vazio = padrão do sistema)</span></label>
+                                <textarea name="ai_custom_prompt" rows="3" placeholder="Ex.: Responda sempre de forma curta e cordial."
+                                          class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:border-brand-500 focus:outline-none"><?php echo htmlspecialchars($ai_custom_prompt); ?></textarea>
+                            </div>
+                            <div>
+                                <label class="font-bold text-slate-300 block mb-1">Tamanho máximo das respostas <span class="text-slate-500 font-normal">(tokens)</span></label>
+                                <input type="number" name="ai_token_limit" value="<?php echo htmlspecialchars($ai_token_limit); ?>" min="64" max="4000"
+                                       class="w-full sm:w-48 px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono focus:border-brand-500 focus:outline-none">
+                            </div>
+                            <div>
+                                <label class="font-bold text-slate-300 block mb-1">Modelo específico por tarefa <span class="text-slate-500 font-normal">(vazio = o painel escolhe o melhor disponível)</span></label>
+                                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                    <?php foreach (aiRoles() as $__r => $__lbl): ?>
+                                    <input type="text" name="ai_role_<?php echo $__r; ?>_model" value="<?php echo htmlspecialchars((string)getSetting("ai_role_{$__r}_model")); ?>" placeholder="<?php echo htmlspecialchars($__lbl); ?>"
+                                           class="px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono focus:border-brand-500 focus:outline-none">
+                                    <?php endforeach; ?>
+                                </div>
+                            </div>
+                        </div>
+                    </details>
+                </section>
+
+                <div class="flex items-center justify-between pt-1 gap-3 flex-wrap">
+                    <p class="text-slate-500 text-[11px] flex items-center gap-1"><i class="fa-solid fa-shield text-brand-400"></i> Chaves guardadas somente no banco local deste servidor.</p>
+                    <div class="flex items-center gap-2">
+                        <button type="submit" name="action_test_ai_roles" value="1" style="white-space:nowrap !important;flex-shrink:0 !important;width:auto !important;overflow:visible !important;text-overflow:clip !important" class="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-extrabold rounded-xl transition border border-slate-700 flex items-center gap-2">
+                            <i class="fa-solid fa-plug-circle-check text-brand-400"></i> Salvar e Testar
+                        </button>
+                        <button type="submit" name="action_save_ai_roles" value="1" style="white-space:nowrap !important;flex-shrink:0 !important;width:auto !important;overflow:visible !important;text-overflow:clip !important" class="px-5 py-2.5 bg-brand-600 hover:bg-brand-500 text-white font-extrabold rounded-xl transition shadow-lg shadow-brand-600/20 flex items-center gap-2">
+                            <i class="fa-solid fa-floppy-disk"></i> Salvar
+                        </button>
+                    </div>
                 </div>
             </form>
 
