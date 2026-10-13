@@ -4814,6 +4814,15 @@ function aiKeyFor($provider) {
 }
 
 /** Provedor/modelo escolhidos para uma função, ou null se a função usa a configuração geral. */
+/** Chave mascarada para exibir (início e fim visíveis, resto oculto). '' se não houver chave. */
+function aiMaskKey($key) {
+    $key = trim((string)$key);
+    if ($key === '') return '';
+    $n = strlen($key);
+    if ($n <= 10) return str_repeat('•', $n);
+    return substr($key, 0, 4) . str_repeat('•', 12) . substr($key, -4);
+}
+
 /** Estado da última verificação da chave de um provedor: ['ok'=>bool,'t'=>ts,'msg'=>string] ou null. */
 function aiKeyStatus($provider) {
     $j = json_decode((string)getSetting('ai_key_status_' . $provider), true);

@@ -64,7 +64,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (isset($_POST['action_test_ai_key'])) {
             $__tp = (string)$_POST['action_test_ai_key'];
             $__tr = aiTestProviderKey($__tp);
-            $msg = ($__provLabelsTop[$__tp] ?? $__tp) . ': ' . ($__tr['ok'] ? '✅ chave aprovada.' : '❌ ' . $__tr['msg'] . '.');
+            $msg = ($__provLabelsTop[$__tp] ?? $__tp) . ': ' . ($__tr['ok'] ? '✅ chave aprovada e salva.' : '❌ ' . $__tr['msg'] . '. A chave ficou salva; corrija e teste de novo.');
             if (!$__tr['ok']) $msg_type = 'info';
         }
         if (isset($_POST['ai_adv_present'])) {
@@ -323,9 +323,10 @@ foreach (array_keys(aiProviderDefaults()) as $__pp) if (aiKeyFor($__pp) !== '') 
             <div class="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
                 <div class="flex items-center justify-between"><span class="font-extrabold text-white text-sm">Chave de acesso (API Key)</span><span class="px-2 py-0.5 rounded text-[10px] font-bold border <?php echo $__bg; ?>"><?php echo $__tx; ?></span></div>
                 <div class="flex items-center gap-2">
-                    <input type="password" name="ai_key_<?php echo $__p; ?>" autocomplete="new-password" placeholder="<?php echo $__has ? 'Em branco = manter a chave atual' : 'Cole a API Key aqui'; ?>" class="flex-1 min-w-0 px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-white font-mono focus:border-brand-500 focus:outline-none">
+                    <input type="password" name="ai_key_<?php echo $__p; ?>" autocomplete="new-password" placeholder="<?php echo $__has ? htmlspecialchars(aiMaskKey(aiKeyFor($__p))) . '  (salva)' : 'Cole a API Key aqui'; ?>" class="flex-1 min-w-0 px-3.5 py-2.5 bg-slate-900 border <?php echo $__has ? 'border-emerald-500/30' : 'border-slate-800'; ?> rounded-xl text-white font-mono placeholder-slate-300 focus:border-brand-500 focus:outline-none">
                     <button type="submit" name="action_test_ai_key" value="<?php echo $__p; ?>" style="<?php echo $__saveBtnStyle; ?>" class="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl border border-slate-700 flex items-center gap-1.5"><i class="fa-solid fa-flask text-brand-400"></i> Testar</button>
                 </div>
+                <?php if ($__has): ?><div class="text-emerald-400"><i class="fa-solid fa-lock"></i> Chave salva e oculta (<?php echo htmlspecialchars(aiMaskKey(aiKeyFor($__p))); ?>). Para trocar, cole uma nova no campo e clique em Testar ou Salvar.</div><?php endif; ?>
                 <?php if ($__st && empty($__st['ok'])): ?><div class="text-rose-300"><?php echo htmlspecialchars((string)($__st['msg'] ?? '')); ?></div><?php endif; ?>
                 <?php if ($__st && !empty($__st['ok']) && !empty($__st['t'])): ?><div class="text-slate-500">Testada em <?php echo date('d/m/Y H:i', (int)$__st['t']); ?>.</div><?php endif; ?>
                 <div class="flex items-center justify-between flex-wrap gap-2 text-[11px] text-slate-500">
