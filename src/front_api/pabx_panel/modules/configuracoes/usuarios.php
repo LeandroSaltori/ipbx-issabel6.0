@@ -27,6 +27,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_save_user'])) 
     }
 }
 
+// Importar usuários do painel clássico (sem senhas; entrada pela escolha na tela de login)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_import_classic']) && hasUserPermission('manage_settings')) {
+    require_once __DIR__ . '/../../includes/sso.php';
+    $imp = ssoImportAll();
+    if ($imp['ok']) {
+        $msg_success = "Importação concluída: {$imp['novos']} usuário(s) novo(s); {$imp['existentes']} já existiam e foram mantidos.";
+        logUserAction('Importou usuários do painel clássico', "novos={$imp['novos']}", 'CONFIG');
+    } else { $msg_error = $imp['error']; }
+}
+
 // Processar exclusão de usuário
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_delete_user'])) {
     $del_id = intval($_POST['delete_user_id'] ?? 0);
@@ -69,6 +79,11 @@ try {
             <span class="text-xs text-slate-400">Configuração individual de acessos por módulo, níveis de perfis pré-definidos (Admin, Supervisor, Usuário, Personalizado) e ações de áudio/WhatsApp</span>
         </div>
 
+        <?php if (hasUserPermission('manage_settings')): ?>
+        <form method="POST" onsubmit="return confirm('Importar os usuários do painel clássico? Os que já existem não serão alterados.');" style="margin:0">
+            <button type="submit" name="action_import_classic" value="1" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold transition flex items-center gap-1.5" style="white-space:nowrap;flex-shrink:0;width:auto;overflow:visible"><i class="fa-solid fa-file-import"></i> Importar do painel clássico</button>
+        </form>
+        <?php endif; ?>
         <button onclick="openAddUserModal()" class="px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white rounded-xl text-xs font-bold transition shadow-lg shadow-brand-600/20 flex items-center gap-1.5">
             <i class="fa-solid fa-user-plus"></i> Criar Novo Usuário
         </button>

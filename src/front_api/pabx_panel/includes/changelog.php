@@ -6,6 +6,7 @@
  */
 return [
     'done' => [
+        ['data' => '2026-10-13', 'mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-file-import', 'titulo' => 'Importação dos usuários do painel clássico', 'desc' => 'Traga todos os usuários já cadastrados no painel clássico com um clique, sem recriar um por um. Eles entram escolhendo o painel novo na tela de login.'],
         ['data' => '2026-10-13', 'mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-right-left', 'titulo' => 'Entrada única entre o painel clássico e o novo', 'desc' => 'Na própria tela de login, escolha entre o Painel Novo 6.0 e o clássico e entre direto no escolhido. Os usuários continuam sendo criados em um só lugar.'],
         ['data' => '2026-10-13', 'mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-link', 'titulo' => 'Endereço do webhook da pesquisa já correto na tela', 'desc' => 'Em APIs & Conexões, o endereço para cadastrar no Prismabot agora aparece com o endereço real do seu painel, pronto para copiar.'],
         ['data' => '2026-10-13', 'mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-book', 'titulo' => 'Manual da plataforma', 'desc' => 'Novo menu Manual com a explicação de todas as telas e funções do painel, com busca. Ele é atualizado a cada novidade.'],

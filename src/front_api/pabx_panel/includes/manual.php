@@ -63,7 +63,7 @@ return [
     ['id' => 'config', 'titulo' => 'Configurações', 'icon' => 'fa-gear', 'itens' => [
         ['t' => 'APIs & Conexões', 'd' => 'Conexão com a central e com o WhatsApp, além das regras de aviso de chamada perdida.'],
         ['t' => 'Inteligência Artificial', 'd' => 'Chave e modelo usados pelo assistente e pelos resumos.'],
-        ['t' => 'Usuários & Permissões', 'd' => 'Crie usuários e escolha quais telas e ações cada um pode usar.'],
+        ['t' => 'Usuários & Permissões', 'd' => 'Crie usuários e escolha quais telas e ações cada um pode usar. O botão Importar do painel clássico traz de uma vez todos os usuários já cadastrados lá, com nome, ramal e perfil conforme o grupo.', 'dica' => 'A importação não copia senhas: os usuários entram escolhendo o Painel Novo 6.0 na tela de login. Quem já foi importado não é alterado em uma nova importação.', 'aviso' => 'Cada importado começa com o menor acesso do grupo (administrador, supervisor ou usuário). Ajuste as permissões depois, se precisar.'],
         ['t' => 'Servidor SMTP & Disparos', 'd' => 'Configuração do e-mail usado para enviar relatórios.'],
         ['t' => 'Status da Integração', 'd' => 'Mostra se cada parte do sistema está funcionando.'],
         ['t' => 'Painel de Segurança', 'd' => 'Tentativas de acesso indevido, endereços bloqueados (com opção de desbloquear) e lista de endereços sempre liberados. A lista é a mesma usada pela proteção da central.'],

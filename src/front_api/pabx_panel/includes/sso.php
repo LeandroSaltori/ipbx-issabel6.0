@@ -109,3 +109,28 @@ function ssoHandle($token) {
     if (function_exists('pabx_log')) pabx_log('security', 'INFO', 'Login por entrada única', ['issabel_user' => $d['u'], 'ip' => function_exists('authClientIp') ? authClientIp() : '']);
     return ['ok' => true, 'error' => ''];
 }
+
+/**
+ * Importa em lote os usuários do painel clássico (nome, ramal e perfil pelo grupo). Senhas NÃO são lidas nem copiadas:
+ * o acesso é feito pela entrada única. Usuários já vinculados são mantidos como estão (ajustes manuais preservados).
+ */
+function ssoImportAll($aclPath = '/var/www/db/acl.db') {
+    global $db;
+    if (!is_readable($aclPath)) return ['ok' => false, 'error' => 'Base de usuários do painel clássico não encontrada neste servidor.'];
+    try {
+        $acl = new PDO('sqlite:' . $aclPath, null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+        $rows = $acl->query("SELECT u.name, u.description, u.extension, g.name AS grp FROM acl_user u LEFT JOIN acl_membership m ON m.id_user = u.id LEFT JOIN acl_group g ON g.id = m.id_group ORDER BY u.id")->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Exception $e) { return ['ok' => false, 'error' => 'Não foi possível ler os usuários do painel clássico.']; }
+    $byUser = [];
+    foreach ($rows as $r) { $u = (string)$r['name']; if ($u === '') continue; $byUser[$u]['n'] = $r['description'] ?: $u; $byUser[$u]['x'] = $r['extension']; if ($r['grp'] !== null) $byUser[$u]['g'][] = $r['grp']; }
+    $novos = 0; $existentes = 0;
+    ssoEnsureSchema();
+    foreach ($byUser as $login => $i) {
+        $st = $db->prepare("SELECT id FROM system_users WHERE issabel_user = :u");
+        $st->execute([':u' => $login]);
+        if ($st->fetchColumn()) { $existentes++; continue; }
+        ssoFindOrCreateUser(['u' => $login, 'g' => $i['g'] ?? [], 'n' => $i['n'], 'x' => $i['x']]);
+        $novos++;
+    }
+    return ['ok' => true, 'novos' => $novos, 'existentes' => $existentes];
+}
