@@ -412,7 +412,7 @@ foreach (array_keys(aiProviderDefaults()) as $__pp) if (aiKeyFor($__pp) !== '') 
                         <input type="password" name="elevenlabs_api_key" value="<?php echo htmlspecialchars($el_api_key); ?>"
                                placeholder="sk_..."
                                class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono focus:border-purple-500 focus:outline-none">
-                        <p class="text-slate-500 text-[10px] mt-1">Obtenha sua chave em <a href="https://elevenlabs.io" target="_blank" class="text-purple-400 hover:text-purple-300 underline">elevenlabs.io</a></p>
+                        <p class="text-slate-500 text-[10px] mt-1">Não tem chave? <a href="https://elevenlabs.io/app/settings/api-keys" target="_blank" rel="noopener" class="text-brand-400 underline">Gerar chave no site do provedor</a></p>
                     </div>
                     <div>
                         <label class="font-bold text-slate-300 block mb-1 flex items-center gap-1"><i class="fa-solid fa-microphone text-purple-400"></i> Voice ID</label>
