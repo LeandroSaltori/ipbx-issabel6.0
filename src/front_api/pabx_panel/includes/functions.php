@@ -4814,6 +4814,11 @@ function aiKeyFor($provider) {
 }
 
 /** Provedor/modelo escolhidos para uma função, ou null se a função usa a configuração geral. */
+/** Instrução de tom padrão do assistente (usada quando o cliente não define a sua). */
+function aiDefaultTone() {
+    return 'Você é o assistente do IPbx Prisma, sistema de telefonia e atendimento. Responda sempre em português do Brasil, de forma cordial, clara e objetiva, sem jargão técnico. Baseie-se apenas nos dados reais do sistema; se não souber ou não tiver o dado, diga isso em vez de inventar.';
+}
+
 /** Chave mascarada para exibir (início e fim visíveis, resto oculto). '' se não houver chave. */
 function aiMaskKey($key) {
     $key = trim((string)$key);
@@ -4926,7 +4931,7 @@ function aiGetConfig($role = '') {
         'model'    => $mChat,
         'audio'    => $mAudio,
         'tokens'   => max(64, min(4000, $limit ?: 1024)),
-        'prompt'   => trim((string)getSetting('ai_custom_prompt')),
+        'prompt'   => (trim((string)getSetting('ai_custom_prompt')) !== '' ? trim((string)getSetting('ai_custom_prompt')) : aiDefaultTone()),
         'enabled'  => getSetting('enable_copilot') !== '0',
     ];
 }

@@ -355,8 +355,9 @@ foreach (array_keys(aiProviderDefaults()) as $__pp) if (aiKeyFor($__pp) !== '') 
                 <button type="submit" name="action_save_ai_roles" value="1" style="<?php echo $__saveBtnStyle; ?>" class="px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white font-extrabold rounded-xl flex items-center gap-2"><i class="fa-solid fa-floppy-disk"></i> Salvar</button>
             </div>
             <div>
-                <label class="font-bold text-slate-300 block mb-1">Instrução de tom do assistente <span class="text-slate-500 font-normal">(vazio = padrão do sistema)</span></label>
-                <textarea name="ai_custom_prompt" rows="3" placeholder="Ex.: Responda sempre de forma curta e cordial." class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:border-brand-500 focus:outline-none"><?php echo htmlspecialchars($ai_custom_prompt); ?></textarea>
+                <label class="font-bold text-slate-300 block mb-1">Instrução de tom do assistente <span class="text-slate-500 font-normal">(já vem com o texto padrão do sistema)</span></label>
+                <textarea name="ai_custom_prompt" rows="3" placeholder="Ex.: Responda sempre de forma curta e cordial." class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:border-brand-500 focus:outline-none"><?php echo htmlspecialchars($ai_custom_prompt !== '' ? $ai_custom_prompt : aiDefaultTone()); ?></textarea>
+                <button type="button" onclick="document.querySelector('[name=ai_custom_prompt]').value=<?php echo htmlspecialchars(json_encode(aiDefaultTone(), JSON_UNESCAPED_UNICODE), ENT_QUOTES); ?>" style="<?php echo $__saveBtnStyle; ?>" class="mt-2 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-lg border border-slate-700 text-[11px]"><i class="fa-solid fa-rotate-left"></i> Voltar ao texto padrão</button>
             </div>
             <div>
                 <label class="font-bold text-slate-300 block mb-1">Tamanho máximo das respostas <span class="text-slate-500 font-normal">(tokens)</span></label>
