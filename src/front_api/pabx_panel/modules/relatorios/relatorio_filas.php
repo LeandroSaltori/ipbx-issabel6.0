@@ -29,6 +29,7 @@ $credsToTry = [
     ['user' => 'root', 'pass' => '']
 ];
 
+mysqli_report(MYSQLI_REPORT_OFF); // consultas que falham devem retornar false (e cair no próximo plano B), não derrubar a tela
 $conn = null;
 foreach ($credsToTry as $c) {
     $tmpConn = @mysqli_connect($dbHost, $c['user'], $c['pass']);
@@ -229,6 +230,7 @@ if (count($filasIn) > 0) {
     $whereCondStats .= " AND qs.qname IN ($filasCsv)";
     $whereCondLog   .= " AND queue IN ($filasCsv)";
 }
+$whereCondLog3 = str_replace(' AND queue IN (', ' AND queuename IN (', $whereCondLog);
 
 // Consulta Principal com Fallback Multi-Banco (qstatslite -> queue_log -> cdr)
 $chamadas = [];
@@ -266,6 +268,17 @@ if ($conn) {
         ORDER BY time ASC, uniqueid ASC
         ";
         $rDetalhe = @mysqli_query($conn, $sqlQueueLog2);
+    }
+
+    // 4. Fallback: layout padrão da tabela queue_log (callid/queuename), sem QStats
+    if (!$rDetalhe || mysqli_num_rows($rDetalhe) == 0) {
+        $sqlQueueLog3 = "
+        SELECT id AS queue_stats_id, callid AS uniqueid, time AS datetime, queuename AS qname_id, agent AS agent_id, event AS event_id, data1 AS info1, data2 AS info2, data3 AS info3
+        FROM asteriskcdrdb.queue_log
+        $whereCondLog3
+        ORDER BY time ASC, callid ASC
+        ";
+        $rDetalhe = @mysqli_query($conn, $sqlQueueLog3);
     }
 
     // Processar registros retornados das tabelas de eventos de fila

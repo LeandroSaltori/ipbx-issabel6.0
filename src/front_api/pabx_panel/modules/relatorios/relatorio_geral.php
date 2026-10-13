@@ -1,4 +1,7 @@
 <?php
+// Incluir chamadas internas (ramal a ramal) nos totais? Padrão: não.
+$include_internal = !empty($_GET['include_internal']) && $_GET['include_internal'] !== '0';
+
 /**
  * IPbx Prisma - Relatório Geral Estilo  v7.2
  * Com Porcentagens nos Cards, Tooltips Explicativos no Hover, Filtros Rápidos e Exportação (PDF, Excel e WhatsApp)

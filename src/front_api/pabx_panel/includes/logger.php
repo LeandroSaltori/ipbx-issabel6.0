@@ -256,6 +256,12 @@ set_exception_handler(function($exception) {
         'line'  => $exception->getLine(),
         'trace' => substr($exception->getTraceAsString(), 0, 500)
     ]);
+    // Em telas HTML, avisa em vez de deixar a página cortada em silêncio (API/JSON/CSV ficam intactos)
+    $__ct = '';
+    foreach (headers_list() as $__h) if (stripos($__h, 'Content-Type:') === 0) $__ct = strtolower($__h);
+    if ($__ct === '' || strpos($__ct, 'text/html') !== false) {
+        echo '<div style="margin:16px;padding:14px 18px;border:1px solid #be123c;background:#1f0a12;color:#fecdd3;border-radius:12px;font:13px sans-serif">Não foi possível carregar esta tela por completo. O problema foi registrado em Configurações &gt; Logs. Tente novamente em instantes.</div>';
+    }
 });
 
 require_once __DIR__ . '/audit_hook.php';
