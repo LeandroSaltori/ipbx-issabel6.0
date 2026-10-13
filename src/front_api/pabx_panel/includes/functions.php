@@ -5002,6 +5002,12 @@ function audioSigValid($uid, $exp, $sig) {
 /** Retorna '' se "URL pública do painel" não estiver configurada. */
 function audioSignedUrl($uid, $ttl = 604800) {
     $base = rtrim((string)getSetting('public_base_url'), '/');
+    if ($base === '' && PHP_SAPI !== 'cli' && !empty($_SERVER['HTTP_HOST'])) {
+        // Sem URL pública cadastrada: usa o endereço pelo qual o usuário acessou o painel agora
+        $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+        $dir = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/front_api/index.php')), '/');
+        if (preg_match('/^[A-Za-z0-9.\-:\[\]]+$/', $_SERVER['HTTP_HOST'])) $base = $scheme . '://' . $_SERVER['HTTP_HOST'] . $dir;
+    }
     if ($base === '') return '';
     $exp = time() + max(60, (int)$ttl);
     $sig = hash_hmac('sha256', $uid . '|' . $exp, audioLinkSecret());
@@ -5765,6 +5771,14 @@ function aiBrandScrub($t) {
     return $t;
 }
 
+/** Remove links que a IA não recebeu de uma ferramenta (evita endereços inventados). */
+function aiLinkScrub($text, array $allowed) {
+    $ok = function ($u) use ($allowed) { return in_array(rtrim($u, '.,;)'), $allowed, true); };
+    $text = preg_replace_callback('/\[([^\]]*)\]\((https?:\/\/[^\s)]+)\)/i', function ($m) use ($ok) { return $ok($m[2]) ? $m[0] : $m[1]; }, $text);
+    $text = preg_replace_callback('/(?<![\(\"\'])\bhttps?:\/\/[^\s)<>\"\']+/i', function ($m) use ($ok) { return $ok($m[0]) ? $m[0] : '(link indisponível)'; }, $text);
+    return $text;
+}
+
 function aiChatUser() {
     $u = function_exists('getLoggedUser') ? getLoggedUser() : null;
     $n = trim((string)($u['username'] ?? ''));
@@ -5858,6 +5872,7 @@ function aiChatRun($history) {
          . "Responda em português, curto e objetivo. Use SOMENTE dados retornados pelas ferramentas; nunca invente números, ramais ou ligações. "
          . "Se faltar informação (ex.: qual ramal), pergunte. Você só consulta; as únicas ações são: send_report (resumo por WhatsApp, só após o usuário confirmar o número) e propose_extension_feature (apenas PROPÕE; o usuário confirma por um botão e você nunca diz que foi feito antes disso). Para tabelas use markdown. Para gravações use recording_link e entregue o link em markdown [Ouvir gravação](url). "
          . "Nunca cite nomes de softwares de terceiros da central telefônica nem do serviço de WhatsApp: o produto se chama IPbx Prisma e o serviço de WhatsApp se chama Prismabot. Se precisar falar da tecnologia, diga apenas \"o sistema\" ou \"a central\". "
+         . "NUNCA invente links ou endereços: use somente links devolvidos pelas ferramentas (ex.: recording_link). Se a ferramenta devolver erro, explique o erro ao usuário. "
          . "Se o usuário pedir algo fora do escopo do PABX, explique educadamente o que você pode fazer.";
     if ($cfg['prompt'] !== '') $sys = $cfg['prompt'] . "\n\n" . $sys;
     $msgs = [['role' => 'system', 'content' => $sys]];
@@ -5865,16 +5880,21 @@ function aiChatRun($history) {
         if (in_array($h['role'] ?? '', ['user', 'assistant'], true) && is_string($h['content'] ?? null)) $msgs[] = ['role' => $h['role'], 'content' => mb_substr($h['content'], 0, 2000)];
     }
     $used = [];
+    $allowed = [];
+    foreach ($history as $h) {
+        if (($h['role'] ?? '') === 'assistant' && preg_match_all('/https?:\/\/[^\s)<>"\']+/i', (string)($h['content'] ?? ''), $um)) foreach ($um[0] as $u) $allowed[] = rtrim($u, '.,;)');
+    }
     for ($i = 0; $i < 5; $i++) {
         $r = aiChatRaw($msgs, $cfg);
         if (!$r['ok']) return ['ok' => false, 'error' => $r['error'], 'tools' => $used];
         $m = $r['message'];
-        if (empty($m['tool_calls'])) return ['ok' => true, 'text' => aiBrandScrub(trim(preg_replace('#<think>.*?</think>#is', '', (string)($m['content'] ?? '')))), 'tools' => $used];
+        if (empty($m['tool_calls'])) return ['ok' => true, 'text' => aiLinkScrub(aiBrandScrub(trim(preg_replace('#<think>.*?</think>#is', '', (string)($m['content'] ?? '')))), $allowed), 'tools' => $used];
         $msgs[] = ['role' => 'assistant', 'content' => $m['content'] ?? '', 'tool_calls' => $m['tool_calls']];
         foreach ($m['tool_calls'] as $tc) {
             $nm = $tc['function']['name'] ?? ''; $args = json_decode($tc['function']['arguments'] ?? '{}', true) ?: [];
             $used[] = $nm;
             $res = aiChatExecTool($nm, $args);
+            if (is_array($res) && !empty($res['link'])) $allowed[] = $res['link'];
             $msgs[] = ['role' => 'tool', 'tool_call_id' => $tc['id'] ?? '', 'content' => mb_substr(json_encode($res, JSON_UNESCAPED_UNICODE), 0, 12000)];
         }
     }
