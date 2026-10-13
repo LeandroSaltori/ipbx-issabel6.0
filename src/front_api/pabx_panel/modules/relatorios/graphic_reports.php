@@ -311,9 +311,12 @@ if (empty($queue_stats)) {
             <h3 class="text-sm font-extrabold text-white flex items-center gap-2">
                 <i class="fa-solid fa-wand-magic-sparkles text-purple-400 animate-pulse"></i> Copiloto de IA: Analisar Gráficos da Operação
             </h3>
-            <button onclick="runGraphicAiAnalysis()" id="btn-run-graphic-ai" class="px-4 py-1.5 bg-purple-600 hover:bg-purple-500 text-white font-extrabold rounded-xl text-xs transition shadow-lg shadow-purple-600/30 flex items-center gap-2">
+            <div class="flex items-center gap-2">
+                <button type="button" onclick="ipbxIaHistory('Relatórios Gráficos','Relatórios Gráficos')" style="white-space:nowrap !important;flex-shrink:0 !important;width:auto !important;overflow:visible !important;text-overflow:clip !important" class="px-4 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl text-xs border border-slate-700 flex items-center gap-2"><i class="fa-solid fa-clock-rotate-left"></i> Histórico</button>
+                <button onclick="runGraphicAiAnalysis()" id="btn-run-graphic-ai" class="px-4 py-1.5 bg-purple-600 hover:bg-purple-500 text-white font-extrabold rounded-xl text-xs transition shadow-lg shadow-purple-600/30 flex items-center gap-2">
                 <i class="fa-solid fa-sparkles"></i> Analisar com IA
             </button>
+            </div>
         </div>
         <div id="graphic-ai-container" class="bg-slate-950/80 p-4 rounded-xl border border-slate-800 hidden">
             <p id="graphic-ai-text" class="text-slate-300 text-xs leading-relaxed italic">--</p>
@@ -322,35 +325,14 @@ if (empty($queue_stats)) {
 
     <script>
     async function runGraphicAiAnalysis() {
-        const btn = document.getElementById('btn-run-graphic-ai');
-        const container = document.getElementById('graphic-ai-container');
-        const txt = document.getElementById('graphic-ai-text');
-        if (!btn || !txt) return;
-
-        const orig = btn.innerHTML;
-        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Processando...';
-        btn.disabled = true;
-
-        try {
-            const inc = <?php echo (int)$inc_calls; ?>;
-            const out = <?php echo (int)$out_calls; ?>;
-            const res = await fetch('index.php?api_action=analyze_pabx_insights', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ total: inc + out, atendidas: inc + out, tmaSec: 150, tmeSec: 8 })
-            });
-            const data = await res.json();
-            if (data.success) {
-                txt.innerText = `"Análise dos Gráficos (Período ${'<?php echo $start_date; ?>'} a ${'<?php echo $end_date; ?>'}): Total de ${inc + out} chamadas processadas (${inc} receptivas vs ${out} ativas). Distribuição de tráfego equilibrada com bom aproveitamento dos canais."`;
-                container.classList.remove('hidden');
-                if (typeof showIaToast === 'function') showIaToast('Análise de IA dos gráficos concluída!');
-            }
-        } catch(e) {
-            if (typeof showIaToast === 'function') showIaToast('Análise de IA concluída.', true);
-        } finally {
-            btn.innerHTML = orig;
-            btn.disabled = false;
-        }
+        // Somente totais reais deste relatório (receptivas x ativas); sem TMA/TME nem taxa de atendimento, que não existem aqui.
+        ipbxIaRun({
+            module: 'Relatórios Gráficos', btn: document.getElementById('btn-run-graphic-ai'),
+            box: document.getElementById('graphic-ai-container'), out: document.getElementById('graphic-ai-text'),
+            periodo: '<?php echo date('d/m/Y', strtotime($start_date)); ?> a <?php echo date('d/m/Y', strtotime($end_date)); ?>',
+            total: <?php echo (int)$inc_calls + (int)$out_calls; ?>,
+            extras: { 'Chamadas recebidas': '<?php echo (int)$inc_calls; ?>', 'Chamadas efetuadas': '<?php echo (int)$out_calls; ?>' }
+        });
     }
     </script>
 

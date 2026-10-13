@@ -55,6 +55,8 @@ return [
         ['t' => 'Relatórios gráficos', 'd' => 'Gráficos de volume de chamadas por período.'],
         ['t' => 'Relatório geral & mapa de calor', 'd' => 'Mostra os horários de maior movimento.'],
         ['t' => 'Relatórios de IA', 'd' => 'Resumos e análises das ligações geradas por inteligência artificial.'],
+        ['t' => 'Análise com IA e Histórico', 'd' => 'Os relatórios de Filas, Relatório Completo de Filas, Gráficos, Geral, CDR e Auditoria de IA, além do Dashboard, têm o botão Analisar com IA. A análise usa apenas os números reais do período que está na tela (chamadas, atendidas e, quando existirem, tempos médios), nunca valores supostos. Cada análise fica salva no botão Histórico da própria tela, com data, período e opção de excluir.', 'dica' => 'Se a IA não estiver configurada ou der erro, o painel mostra só as métricas reais, sem texto inventado.'],
+        ['t' => 'Assistente: externas, internas e todas', 'd' => 'Ao perguntar quantas ligações houve, o assistente sempre consulta o sistema e informa se o número é de chamadas externas (clientes), internas (ramal a ramal) ou todas. Por padrão ele fala das externas, o mesmo critério do Dashboard, e cita as internas à parte.'],
     ]],
     ['id' => 'assistente', 'titulo' => 'Assistente inteligente (Chat IA)', 'icon' => 'fa-robot', 'itens' => [
         ['t' => 'Como usar', 'd' => 'Clique no botão do assistente e escreva em linguagem normal, por exemplo: "quantas chamadas perdidas hoje?" ou "quem ligou do número 11 9999-0000?".'],

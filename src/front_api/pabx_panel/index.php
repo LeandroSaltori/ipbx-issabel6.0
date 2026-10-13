@@ -22,6 +22,11 @@ try {
         insights_json TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )");
+    foreach (['module' => "TEXT DEFAULT 'Dashboard'", 'period' => "TEXT DEFAULT ''"] as $__col => $__def) {
+        $__has = false;
+        foreach ($db->query("PRAGMA table_info(ai_insights_history)") as $__ci) { if ($__ci['name'] === $__col) $__has = true; }
+        if (!$__has) $db->exec("ALTER TABLE ai_insights_history ADD COLUMN $__col $__def");
+    }
 } catch (Exception $ex_sync) {}
 
 // =========================================================================
@@ -608,7 +613,9 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
         if (ob_get_level()) ob_end_clean();
         header('Content-Type: application/json');
         try {
-            $rows = $db->query("SELECT * FROM ai_insights_history ORDER BY id DESC LIMIT 50")->fetchAll(PDO::FETCH_ASSOC);
+            $__hm = trim((string)($_GET['module'] ?? ''));
+            if ($__hm !== '') { $__hs = $db->prepare("SELECT * FROM ai_insights_history WHERE module = :m ORDER BY id DESC LIMIT 50"); $__hs->execute([':m' => $__hm]); $rows = $__hs->fetchAll(PDO::FETCH_ASSOC); }
+            else $rows = $db->query("SELECT * FROM ai_insights_history ORDER BY id DESC LIMIT 50")->fetchAll(PDO::FETCH_ASSOC);
             foreach ($rows as &$r) {
                 $dec = json_decode((string)$r['insights_json'], true);
                 $r['insights'] = is_array($dec) ? $dec : [];
@@ -916,10 +923,14 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
         $body = json_decode(file_get_contents('php://input'), true) ?: [];
 
         $tot   = (int)($body['total'] ?? 0);
-        $atend = (int)($body['atendidas'] ?? 0);
-        $tma   = (int)($body['tmaSec'] ?? 0);
-        $tme   = (int)($body['tmeSec'] ?? 0);
-        $module = preg_replace('/[^\p{L}\p{N} _\-]/u', '', (string)($body['module'] ?? 'Geral'));
+        $atend = (isset($body['atendidas']) && $body['atendidas'] !== null && $body['atendidas'] !== '') ? (int)$body['atendidas'] : null;
+        // TMA/TME só entram se a tela enviou o valor real; ausente = não informado (nunca assumir número)
+        $tma   = (isset($body['tmaSec']) && $body['tmaSec'] !== null && $body['tmaSec'] !== '') ? (int)$body['tmaSec'] : null;
+        $tme   = (isset($body['tmeSec']) && $body['tmeSec'] !== null && $body['tmeSec'] !== '') ? (int)$body['tmeSec'] : null;
+        $module = preg_replace('/[^\p{L}\p{N} _\-]/u', '', (string)($body['module'] ?? 'Dashboard'));
+        $periodo = mb_substr(preg_replace('/[^\p{L}\p{N} _\-\/:.,()]/u', '', (string)($body['periodo'] ?? '')), 0, 80);
+        $extras = [];
+        if (!empty($body['extras']) && is_array($body['extras'])) foreach (array_slice($body['extras'], 0, 12) as $__k => $__v) { $extras[] = mb_substr(preg_replace('/[^\p{L}\p{N} _\-\/:.,%()]/u', '', (string)$__k), 0, 40) . ': ' . mb_substr(preg_replace('/[^\p{L}\p{N} _\-\/:.,%()]/u', '', (string)$__v), 0, 40); }
 
         $cfg = aiGetConfig('insights');
         $ai_configured = ($cfg['key'] !== '' && $cfg['enabled']);
@@ -928,10 +939,10 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
         $aiError = '';
 
         if ($ai_configured && $tot > 0) {
-            $pct = round(($atend / $tot) * 100, 1);
+            $pct = $atend !== null ? round(($atend / $tot) * 100, 1) : null;
             $r = aiChatCompletion(
                 'Você é analista de PABX IP. Retorne apenas JSON puro no formato {"insights": ["...","...","..."]}, com no máximo 3 itens curtos, objetivos e em português. Use somente os números informados; não invente dados.',
-                "Módulo: $module. Chamadas: $tot; atendidas: $atend ($pct%); TMA (conversa): {$tma}s; TME (espera): {$tme}s.",
+                "Módulo: $module." . ($periodo !== '' ? " Período: $periodo." : '') . " Chamadas: $tot" . ($atend !== null ? "; atendidas: $atend ($pct%)" : '') . ($tma !== null ? "; TMA (conversa): {$tma}s" : '') . ($tme !== null ? "; TME (espera): {$tme}s" : '') . '.' . ($extras ? ' Outros dados reais: ' . implode('; ', $extras) . '.' : '') . ' Se um indicador não foi informado, não comente sobre ele.',
                 20, $cfg
             );
             if ($r['ok']) {
@@ -944,7 +955,7 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
 
         $usedAi = !empty($insights);
         if (!$usedAi) $insights = $facts;
-        aiSaveHistory($usedAi ? $cfg['provider'] : 'metricas', $usedAi ? $cfg['model'] : 'sem-ia', $insights);
+        aiSaveHistory($usedAi ? $cfg['provider'] : 'metricas', $usedAi ? $cfg['model'] : 'sem-ia', $insights, $module, $periodo);
 
         $notice = null;
         if ($cfg['key'] === '')      $notice = 'IA não configurada (Configurações > Inteligência Artificial): exibindo apenas as métricas reais.';
@@ -3460,6 +3471,53 @@ dialog#ai-chat-dialog::backdrop{background:rgba(0,0,0,.65);backdrop-filter:blur(
 })();
 </script>
 <?php endif; ?>
+<script>
+/* Histórico de análises de IA (por tela). Usa <dialog> nativo na Top Layer. */
+/* Executa a análise de IA de uma tela usando SOMENTE números reais enviados pela própria tela. */
+window.ipbxIaRun = async function (o) {
+  var btn = o.btn, orig = btn ? btn.innerHTML : '';
+  if (btn) { btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Analisando...'; btn.disabled = true; }
+  var esc = function (t) { return String(t == null ? '' : t).replace(/[&<>"]/g, function (c) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); };
+  try {
+    var r = await fetch('index.php?api_action=analyze_pabx_insights', { method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ module: o.module, periodo: o.periodo || '', total: o.total, atendidas: o.atendidas, tmaSec: o.tmaSec, tmeSec: o.tmeSec, extras: o.extras || {} }) });
+    var d = await r.json();
+    if (!d.success) throw new Error(d.error || 'Falha na análise');
+    var html = (d.notice ? '<div style="color:#fbbf24;margin-bottom:6px"><i class="fa-solid fa-triangle-exclamation"></i> ' + esc(d.notice) + '</div>' : '')
+      + '<div style="color:#a78bfa;font-weight:800;margin-bottom:4px">' + esc(d.engine_label || '') + (o.periodo ? ' · ' + esc(o.periodo) : '') + '</div>'
+      + '<ul style="margin:0;padding-left:18px">' + (d.insights || []).map(function (i) { return '<li style="margin:3px 0">' + esc(i) + '</li>'; }).join('') + '</ul>';
+    o.out.innerHTML = html; o.out.style.fontStyle = 'normal';
+    if (o.box) o.box.classList.remove('hidden');
+  } catch (e) {
+    o.out.innerHTML = '<span style="color:#fb7185">Não foi possível analisar agora: ' + esc(e.message) + '</span>';
+    if (o.box) o.box.classList.remove('hidden');
+  } finally { if (btn) { btn.innerHTML = orig; btn.disabled = false; } }
+};
+window.ipbxIaHistory = async function (module, title) {
+  var dlg = document.getElementById('ipbx-ia-hist');
+  if (!dlg) {
+    var st = document.createElement('style');
+    st.textContent = '#ipbx-ia-hist{border:1px solid #334155;border-radius:18px;background:#0f172a;color:#e2e8f0;padding:0;width:min(680px,94vw);max-height:84vh}#ipbx-ia-hist::backdrop{background:rgba(0,0,0,.65);backdrop-filter:blur(4px)}#ipbx-ia-hist .ih-b{padding:18px 20px;overflow:auto;max-height:68vh}#ipbx-ia-hist .ih-i{border:1px solid #1e293b;background:#020617;border-radius:12px;padding:12px 14px;margin-bottom:10px;font-size:12px}#ipbx-ia-hist button{white-space:nowrap !important;flex-shrink:0 !important;width:auto !important;overflow:visible !important;text-overflow:clip !important}';
+    document.head.appendChild(st);
+    dlg = document.createElement('dialog'); dlg.id = 'ipbx-ia-hist';
+    document.body.appendChild(dlg);
+    dlg.addEventListener('click', function (e) { if (e.target === dlg) dlg.close(); });
+  }
+  var esc = function (t) { return String(t == null ? '' : t).replace(/[&<>"]/g, function (c) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); };
+  dlg.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;padding:14px 20px;border-bottom:1px solid #1e293b"><b style="font-size:14px">Histórico de análises — ' + esc(title || module) + '</b><button type="button" id="ipbx-ia-hist-x" style="background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:10px;padding:6px 12px;font-weight:700;cursor:pointer">Fechar</button></div><div class="ih-b">Carregando...</div>';
+  dlg.querySelector('#ipbx-ia-hist-x').onclick = function () { dlg.close(); };
+  if (!dlg.open) dlg.showModal();
+  var body = dlg.querySelector('.ih-b');
+  try {
+    var r = await fetch('index.php?api_action=get_ai_insights_history&module=' + encodeURIComponent(module)); var d = await r.json();
+    if (!d.success || !d.history || !d.history.length) { body.innerHTML = '<div style="color:#94a3b8;text-align:center;padding:24px">Nenhuma análise feita ainda nesta tela.</div>'; return; }
+    body.innerHTML = d.history.map(function (h) {
+      return '<div class="ih-i" data-id="' + h.id + '"><div style="display:flex;justify-content:space-between;gap:8px;color:#94a3b8;margin-bottom:6px"><span>' + esc(h.created_at_fmt) + (h.period ? ' · período ' + esc(h.period) : '') + ' · ' + (h.provider === 'metricas' ? 'métricas reais (sem IA)' : esc(h.provider)) + '</span><a href="#" data-del="' + h.id + '" style="color:#fb7185">excluir</a></div><ul style="margin:0;padding-left:18px">' + (h.insights || []).map(function (i) { return '<li style="margin:3px 0">' + esc(i) + '</li>'; }).join('') + '</ul></div>';
+    }).join('');
+    body.querySelectorAll('[data-del]').forEach(function (a) { a.onclick = async function (e) { e.preventDefault(); await fetch('index.php?api_action=delete_ai_insight&id=' + a.getAttribute('data-del')); a.closest('.ih-i').remove(); }; });
+  } catch (e) { body.innerHTML = '<div style="color:#fb7185">Falha ao carregar o histórico.</div>'; }
+};
+</script>
 <audio id="webphone-remote-audio" autoplay></audio>
 <audio id="webphone-local-audio" autoplay muted></audio>
 </body>

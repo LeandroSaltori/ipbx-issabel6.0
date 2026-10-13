@@ -1171,7 +1171,7 @@ async function triggerAiInsightsAnalysis() {
         const res = await fetch('index.php?api_action=analyze_pabx_insights', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ total, atendidas, tmaSec, tmeSec })
+            body: JSON.stringify({ total, atendidas, tmaSec, tmeSec, module: 'Dashboard', periodo: '<?php echo date('d/m/Y', strtotime($start_date)) . ' a ' . date('d/m/Y', strtotime($end_date)); ?>', extras: { 'Tipo de chamadas': '<?php echo $call_type_filter === 'external' ? 'somente externas (clientes)' : ($call_type_filter === 'internal' ? 'somente internas (ramal a ramal)' : 'todas (externas e internas)'); ?>' } })
         });
         const data = await res.json();
 
@@ -1270,7 +1270,7 @@ async function openAiHistoryModal() {
     modal.classList.remove('hidden');
 
     try {
-        const res = await fetch('index.php?api_action=get_ai_insights_history');
+        const res = await fetch('index.php?api_action=get_ai_insights_history&module=Dashboard');
         const data = await res.json();
 
         if (data.success && data.history) {

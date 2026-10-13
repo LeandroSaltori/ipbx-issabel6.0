@@ -240,9 +240,12 @@ function setPresetFilter(preset) {
             <h3 class="text-sm font-extrabold text-white flex items-center gap-2">
                 <i class="fa-solid fa-wand-magic-sparkles text-purple-400 animate-pulse"></i> Copiloto de IA: Analisar Relatório de Filas
             </h3>
-            <button onclick="runQueueAiAnalysis()" id="btn-run-queue-ai" class="px-4 py-1.5 bg-purple-600 hover:bg-purple-500 text-white font-extrabold rounded-xl text-xs transition shadow-lg shadow-purple-600/30 flex items-center gap-2">
+            <div class="flex items-center gap-2">
+                <button type="button" onclick="ipbxIaHistory('Relatório de Filas','Relatório de Filas')" style="white-space:nowrap !important;flex-shrink:0 !important;width:auto !important;overflow:visible !important;text-overflow:clip !important" class="px-4 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl text-xs border border-slate-700 flex items-center gap-2"><i class="fa-solid fa-clock-rotate-left"></i> Histórico</button>
+                <button onclick="runQueueAiAnalysis()" id="btn-run-queue-ai" class="px-4 py-1.5 bg-purple-600 hover:bg-purple-500 text-white font-extrabold rounded-xl text-xs transition shadow-lg shadow-purple-600/30 flex items-center gap-2">
                 <i class="fa-solid fa-sparkles"></i> Analisar com IA
             </button>
+            </div>
         </div>
         <div id="queue-ai-container" class="bg-slate-950/80 p-4 rounded-xl border border-slate-800 hidden">
             <p id="queue-ai-text" class="text-slate-300 text-xs leading-relaxed italic">--</p>
@@ -251,37 +254,14 @@ function setPresetFilter(preset) {
 
     <script>
     async function runQueueAiAnalysis() {
-        const btn = document.getElementById('btn-run-queue-ai');
-        const container = document.getElementById('queue-ai-container');
-        const txt = document.getElementById('queue-ai-text');
-        if (!btn || !txt) return;
-
-        const orig = btn.innerHTML;
-        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Processando...';
-        btn.disabled = true;
-
-        try {
-            const total = <?php echo (int)$grand_total; ?>;
-            const atend = <?php echo (int)$grand_answered; ?>;
-            const sla = <?php echo (float)$grand_sla; ?>;
-
-            const res = await fetch('index.php?api_action=analyze_pabx_insights', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ total, atendidas: atend, tmaSec: 120, tmeSec: 15 })
-            });
-            const data = await res.json();
-            if (data.success) {
-                txt.innerText = `"Análise das Filas de Atendimento (Período ${'<?php echo $start_date; ?>'} a ${'<?php echo $end_date; ?>'}): SLA global em ${sla}% com ${atend} atendimentos concluídos de um total de ${total} chamadas nas filas."`;
-                container.classList.remove('hidden');
-                if (typeof showIaToast === 'function') showIaToast('Análise de IA concluída para o relatório de filas!');
-            }
-        } catch(e) {
-            if (typeof showIaToast === 'function') showIaToast('Análise de IA concluída.', true);
-        } finally {
-            btn.innerHTML = orig;
-            btn.disabled = false;
-        }
+        // Somente números reais já calculados nesta tela; TMA/TME não existem aqui e por isso não são enviados.
+        ipbxIaRun({
+            module: 'Relatório de Filas', btn: document.getElementById('btn-run-queue-ai'),
+            box: document.getElementById('queue-ai-container'), out: document.getElementById('queue-ai-text'),
+            periodo: '<?php echo date('d/m/Y', strtotime($start_date)); ?> a <?php echo date('d/m/Y', strtotime($end_date)); ?>',
+            total: <?php echo (int)$grand_total; ?>, atendidas: <?php echo (int)$grand_answered; ?>,
+            extras: { 'Abandonadas': '<?php echo (int)$grand_abandoned; ?>', 'Filas monitoradas': '<?php echo count($queue_stats); ?>', 'Taxa de atendimento': '<?php echo (float)$grand_sla; ?>%' }
+        });
     }
     </script>
 

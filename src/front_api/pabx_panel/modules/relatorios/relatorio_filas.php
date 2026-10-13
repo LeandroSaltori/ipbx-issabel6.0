@@ -750,6 +750,34 @@ $agNaoAtendJson = json_encode($agNaoAtend);
         </form>
     </div>
 
+    <!-- ANÁLISE COM IA DESTE RELATÓRIO (somente números reais calculados acima) -->
+    <div class="bg-slate-900/90 border border-purple-500/20 rounded-2xl p-5 shadow-xl space-y-3">
+        <div class="flex items-center justify-between gap-3 flex-wrap">
+            <h3 class="text-sm font-extrabold text-white flex items-center gap-2">
+                <i class="fa-solid fa-wand-magic-sparkles text-purple-400 animate-pulse"></i> Copiloto de IA: Analisar Relatório Completo de Filas
+            </h3>
+            <div class="flex items-center gap-2">
+                <button type="button" onclick="ipbxIaHistory('Relatório Completo de Filas','Relatório Completo de Filas')" style="white-space:nowrap !important;flex-shrink:0 !important;width:auto !important;overflow:visible !important;text-overflow:clip !important" class="px-4 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl text-xs border border-slate-700 flex items-center gap-2"><i class="fa-solid fa-clock-rotate-left"></i> Histórico</button>
+                <button type="button" onclick="runFilasCompletoAi()" id="btn-run-filas-full-ai" style="white-space:nowrap !important;flex-shrink:0 !important;width:auto !important;overflow:visible !important;text-overflow:clip !important" class="px-4 py-1.5 bg-purple-600 hover:bg-purple-500 text-white font-extrabold rounded-xl text-xs transition shadow-lg shadow-purple-600/30 flex items-center gap-2"><i class="fa-solid fa-sparkles"></i> Analisar com IA</button>
+            </div>
+        </div>
+        <div id="filas-full-ai-box" class="bg-slate-950/80 p-4 rounded-xl border border-slate-800 hidden">
+            <div id="filas-full-ai-out" class="text-slate-300 text-xs leading-relaxed">--</div>
+        </div>
+    </div>
+    <script>
+    function runFilasCompletoAi() {
+        ipbxIaRun({
+            module: 'Relatório Completo de Filas', btn: document.getElementById('btn-run-filas-full-ai'),
+            box: document.getElementById('filas-full-ai-box'), out: document.getElementById('filas-full-ai-out'),
+            periodo: '<?php echo date('d/m/Y', strtotime($dataInicio)); ?> a <?php echo date('d/m/Y', strtotime($dataFim)); ?>',
+            total: <?php echo (int)$totalChamadas; ?>, atendidas: <?php echo (int)$totalAtendidas; ?>,
+            tmaSec: <?php echo (int)$mediaFalando; ?>, tmeSec: <?php echo (int)$mediaEspera; ?>,
+            extras: { 'Abandonadas': '<?php echo (int)$totalAbandonadas; ?>', 'Dentro do SLA (20s)': '<?php echo (float)$pctSla20; ?>% das atendidas', 'Taxa de abandono': '<?php echo (float)$pctAbandono; ?>%', 'Filas no relatório': '<?php echo count($queueStats); ?>' }
+        });
+    }
+    </script>
+
     <!-- CARDS DE INDICADORES GERAIS E SLA -->
     <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
         <!-- 1. Total Chamadas -->

@@ -276,9 +276,12 @@ if ($ast_db) {
             <h3 class="text-sm font-extrabold text-white flex items-center gap-2">
                 <i class="fa-solid fa-wand-magic-sparkles text-purple-400 animate-pulse"></i> Copiloto de IA: Analisar Relatório Geral
             </h3>
-            <button onclick="runGeneralAiAnalysis()" id="btn-run-general-ai" class="px-4 py-1.5 bg-purple-600 hover:bg-purple-500 text-white font-extrabold rounded-xl text-xs transition shadow-lg shadow-purple-600/30 flex items-center gap-2">
+            <div class="flex items-center gap-2">
+                <button type="button" onclick="ipbxIaHistory('Relatório Geral','Relatório Geral')" style="white-space:nowrap !important;flex-shrink:0 !important;width:auto !important;overflow:visible !important;text-overflow:clip !important" class="px-4 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl text-xs border border-slate-700 flex items-center gap-2"><i class="fa-solid fa-clock-rotate-left"></i> Histórico</button>
+                <button onclick="runGeneralAiAnalysis()" id="btn-run-general-ai" class="px-4 py-1.5 bg-purple-600 hover:bg-purple-500 text-white font-extrabold rounded-xl text-xs transition shadow-lg shadow-purple-600/30 flex items-center gap-2">
                 <i class="fa-solid fa-sparkles"></i> Analisar com IA
             </button>
+            </div>
         </div>
         <div id="general-ai-container" class="bg-slate-950/80 p-4 rounded-xl border border-slate-800 hidden">
             <p id="general-ai-text" class="text-slate-300 text-xs leading-relaxed italic">--</p>
@@ -287,36 +290,14 @@ if ($ast_db) {
 
     <script>
     async function runGeneralAiAnalysis() {
-        const btn = document.getElementById('btn-run-general-ai');
-        const container = document.getElementById('general-ai-container');
-        const txt = document.getElementById('general-ai-text');
-        if (!btn || !txt) return;
-
-        const orig = btn.innerHTML;
-        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Processando...';
-        btn.disabled = true;
-
-        try {
-            const tot = <?php echo (int)$total_calls; ?>;
-            const inc = <?php echo (int)$inc_calls; ?>;
-            const out = <?php echo (int)$out_calls; ?>;
-            const res = await fetch('index.php?api_action=analyze_pabx_insights', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ total: tot, atendidas: inc + out, tmaSec: 130, tmeSec: 12 })
-            });
-            const data = await res.json();
-            if (data.success) {
-                txt.innerText = `"Parecer Sintético do Relatório Geral (Período ${'<?php echo $start_date; ?>'} a ${'<?php echo $end_date; ?>'}): Total de ${tot} chamadas registradas no PABX (${inc} recebidas, ${out} efetuadas, ${tot - (inc + out)} internas). Padrão do tráfego telefônico estável e sem congestionamento."`;
-                container.classList.remove('hidden');
-                if (typeof showIaToast === 'function') showIaToast('Análise de IA do relatório geral concluída!');
-            }
-        } catch(e) {
-            if (typeof showIaToast === 'function') showIaToast('Análise de IA concluída.', true);
-        } finally {
-            btn.innerHTML = orig;
-            btn.disabled = false;
-        }
+        // Somente totais reais deste relatório; sem TMA/TME nem taxa de atendimento, que não existem aqui.
+        ipbxIaRun({
+            module: 'Relatório Geral', btn: document.getElementById('btn-run-general-ai'),
+            box: document.getElementById('general-ai-container'), out: document.getElementById('general-ai-text'),
+            periodo: '<?php echo date('d/m/Y', strtotime($start_date)); ?> a <?php echo date('d/m/Y', strtotime($end_date)); ?>',
+            total: <?php echo (int)$total_calls; ?>,
+            extras: { 'Recebidas': '<?php echo (int)$inc_calls; ?>', 'Efetuadas': '<?php echo (int)$out_calls; ?>', 'Internas': '<?php echo max(0,(int)$total_calls - (int)$inc_calls - (int)$out_calls); ?>' }
+        });
     }
     </script>
 

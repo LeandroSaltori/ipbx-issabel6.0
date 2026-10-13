@@ -218,9 +218,12 @@ function exportToCSV() {
             <h3 class="text-sm font-extrabold text-white flex items-center gap-2">
                 <i class="fa-solid fa-wand-magic-sparkles text-purple-400 animate-pulse"></i> Copiloto de IA: Analisar Gravações & CDR
             </h3>
-            <button onclick="runCdrAiAnalysis()" id="btn-run-cdr-ai" class="px-4 py-1.5 bg-purple-600 hover:bg-purple-500 text-white font-extrabold rounded-xl text-xs transition shadow-lg shadow-purple-600/30 flex items-center gap-2">
+            <div class="flex items-center gap-2">
+                <button type="button" onclick="ipbxIaHistory('Gravações CDR','Gravações CDR')" style="white-space:nowrap !important;flex-shrink:0 !important;width:auto !important;overflow:visible !important;text-overflow:clip !important" class="px-4 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl text-xs border border-slate-700 flex items-center gap-2"><i class="fa-solid fa-clock-rotate-left"></i> Histórico</button>
+                <button onclick="runCdrAiAnalysis()" id="btn-run-cdr-ai" class="px-4 py-1.5 bg-purple-600 hover:bg-purple-500 text-white font-extrabold rounded-xl text-xs transition shadow-lg shadow-purple-600/30 flex items-center gap-2">
                 <i class="fa-solid fa-sparkles"></i> Analisar com IA
             </button>
+            </div>
         </div>
         <div id="cdr-ai-container" class="bg-slate-950/80 p-4 rounded-xl border border-slate-800 hidden">
             <p id="cdr-ai-text" class="text-slate-300 text-xs leading-relaxed italic">--</p>
@@ -486,7 +489,7 @@ function exportToCSV() {
             const res = await fetch('index.php?api_action=analyze_pabx_insights', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ total: <?php echo (int)$cdr_total; ?>, atendidas: <?php echo (int)$cdr_ans; ?>, tmaSec: <?php echo (int)$cdr_tma; ?>, tmeSec: <?php echo (int)$cdr_tme; ?>, module: 'CDR' })
+                body: JSON.stringify({ total: <?php echo (int)$cdr_total; ?>, atendidas: <?php echo (int)$cdr_ans; ?>, tmaSec: <?php echo (int)$cdr_tma; ?>, tmeSec: <?php echo (int)$cdr_tme; ?>, module: 'Gravações CDR', periodo: '<?php echo date('d/m/Y', strtotime($date_start)) . ' a ' . date('d/m/Y', strtotime($date_end)); ?>' })
             });
             const data = await res.json();
 

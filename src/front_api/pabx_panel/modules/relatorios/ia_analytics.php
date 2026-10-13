@@ -245,6 +245,7 @@ $topic_rules = array_values(array_filter($rules_all, function ($r) { return $r['
 
             <!-- Botões Executivos e Exportação (Somente Ícones) -->
             <div class="flex items-center gap-2 flex-wrap">
+                <button type="button" onclick="ipbxIaHistory('Auditoria de IA','Auditoria de IA')" style="white-space:nowrap !important;flex-shrink:0 !important;width:auto !important;overflow:visible !important;text-overflow:clip !important" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl text-xs border border-slate-700 flex items-center gap-2"><i class="fa-solid fa-clock-rotate-left"></i> Histórico</button>
                 <button onclick="runGlobalAiAnalysis()" id="btn-run-global-ai" class="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white font-extrabold rounded-xl text-xs transition shadow-lg shadow-purple-600/30 flex items-center gap-2">
                     <i class="fa-solid fa-wand-magic-sparkles"></i> Processar Auditoria Global
                 </button>
@@ -782,7 +783,7 @@ async function runGlobalAiAnalysis() {
         const res = await fetch('index.php?api_action=analyze_pabx_insights', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ total, atendidas: atend, tmaSec: tma, tmeSec: tme })
+            body: JSON.stringify({ total, atendidas: atend, tmaSec: tma, tmeSec: tme, module: 'Auditoria de IA' })
         });
         const data = await res.json();
         if (data.success && data.insights) {

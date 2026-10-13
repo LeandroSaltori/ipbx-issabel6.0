@@ -5006,21 +5006,25 @@ function aiTodayMetrics() {
 }
 
 /** Insights factuais (sem IA) calculados somente a partir das métricas. */
-function aiFactInsights($tot, $atend, $tma, $tme) {
+function aiFactInsights($tot, $atend = null, $tma = null, $tme = null) {
     if ($tot <= 0) return ['Nenhuma chamada registrada no período.'];
-    $pct = round(($atend / $tot) * 100, 1);
-    return [
-        "Volume: $tot chamadas, $atend atendidas ($pct%) e " . ($tot - $atend) . " não atendidas.",
-        'TMA (conversa): ' . ($tma > 0 ? gmdate('i\m s\s', $tma) : '0s') . ' | TME (espera): ' . ($tme > 0 ? gmdate('i\m s\s', $tme) : '0s') . '.',
-    ];
+    if ($atend === null) $out = ["Volume: $tot chamadas no período."];
+    else { $pct = round(($atend / $tot) * 100, 1); $out = ["Volume: $tot chamadas, $atend atendidas ($pct%) e " . ($tot - $atend) . " não atendidas."]; }
+    if ($tma !== null || $tme !== null) {
+        $parts = [];
+        if ($tma !== null) $parts[] = 'TMA (conversa): ' . ($tma > 0 ? gmdate('i\m s\s', $tma) : '0s');
+        if ($tme !== null) $parts[] = 'TME (espera): ' . ($tme > 0 ? gmdate('i\m s\s', $tme) : '0s');
+        $out[] = implode(' | ', $parts) . '.';
+    }
+    return $out;
 }
 
-function aiSaveHistory($provider, $model, $insights) {
+function aiSaveHistory($provider, $model, $insights, $module = 'Dashboard', $period = '') {
     global $db;
     if (!$db) return;
     try {
-        $db->prepare("INSERT INTO ai_insights_history (provider, model, insights_json) VALUES (:p, :m, :j)")
-           ->execute([':p' => $provider, ':m' => $model, ':j' => json_encode($insights, JSON_UNESCAPED_UNICODE)]);
+        $db->prepare("INSERT INTO ai_insights_history (provider, model, insights_json, module, period) VALUES (:p, :m, :j, :mo, :pe)")
+           ->execute([':p' => $provider, ':m' => $model, ':j' => json_encode($insights, JSON_UNESCAPED_UNICODE), ':mo' => $module, ':pe' => $period]);
     } catch (Exception $e) {}
 }
 
@@ -5674,7 +5678,7 @@ function aiChatToolDefs() {
             'number' => ['type' => 'string', 'description' => 'Número de telefone'],
             'days'   => ['type' => 'integer', 'description' => 'Últimos N dias (padrão 7, máx. 90)'],
         ], ['number']),
-        $fn('period_summary', 'Totais do período: chamadas, atendidas, não atendidas, TMA (conversa) e TME (espera).', [
+        $fn('period_summary', 'Totais do período separados em externas (clientes), internas (ramal a ramal) e todas, com atendidas, não atendidas, TMA (conversa) e TME (espera).', [
             'days' => ['type' => 'integer', 'description' => 'Últimos N dias (1 = hoje). Padrão 1'],
         ]),
         $fn('extensions_status', 'Status em tempo real dos ramais (Livre, Em Chamada, Tocando, Indisponível) com nomes.', []),
@@ -5738,10 +5742,16 @@ function aiChatExecTool($name, $a) {
         }
         if ($name === 'period_summary') {
             $days = aiChatDays($a['days'] ?? 1, 1);
-            $st = $cdr->prepare("SELECT COUNT(*) t, SUM(disposition='ANSWERED') a, AVG(CASE WHEN disposition='ANSWERED' THEN billsec END) tma, AVG(GREATEST(duration-billsec,0)) tme FROM cdr WHERE calldate >= :s");
-            $st->execute([':s' => $since($days)]); $r = $st->fetch(PDO::FETCH_ASSOC);
-            return ['periodo_dias' => $days, 'total' => (int)$r['t'], 'atendidas' => (int)$r['a'], 'nao_atendidas' => (int)$r['t'] - (int)$r['a'],
-                    'tma_seg' => (int)round((float)$r['tma']), 'tme_seg' => (int)round((float)$r['tme'])];
+            $ext  = "NOT (LENGTH(src) <= 4 AND LENGTH(dst) <= 4)"; // mesma regra do Dashboard: externa = envolve número que não é ramal
+            $q = function ($cond) use ($cdr, $since, $days) {
+                $st = $cdr->prepare("SELECT COUNT(*) t, SUM(disposition='ANSWERED') a, AVG(CASE WHEN disposition='ANSWERED' THEN billsec END) tma, AVG(GREATEST(duration-billsec,0)) tme FROM cdr WHERE calldate >= :s AND $cond");
+                $st->execute([':s' => $since($days)]); $r = $st->fetch(PDO::FETCH_ASSOC);
+                return ['total' => (int)$r['t'], 'atendidas' => (int)$r['a'], 'nao_atendidas' => (int)$r['t'] - (int)$r['a'], 'tma_seg' => (int)round((float)$r['tma']), 'tme_seg' => (int)round((float)$r['tme'])];
+            };
+            $e = $q($ext); $i = $q("NOT ($ext)"); $t = $q('1=1');
+            return ['periodo_dias' => $days, 'externas_clientes' => $e, 'internas_ramal_a_ramal' => $i, 'todas' => $t,
+                    'total' => $e['total'], 'atendidas' => $e['atendidas'], 'nao_atendidas' => $e['nao_atendidas'], 'tma_seg' => $e['tma_seg'], 'tme_seg' => $e['tme_seg'],
+                    'observacao' => 'Os campos total/atendidas/nao_atendidas/tma/tme no nível raiz são das chamadas EXTERNAS (mesmo critério do Dashboard). Sempre diga ao usuário se o número é de externas, internas ou todas.'];
         }
         if ($name === 'extensions_status') {
             $out = []; $live = getAsteriskRealtimeStatuses();
@@ -5946,7 +5956,7 @@ function aiChatRun($history) {
     $cfg = aiGetConfig('chat');
     if ($cfg['key'] === '' || !$cfg['enabled']) return ['ok' => false, 'error' => 'IA não configurada. Configure em Configurações > Inteligência Artificial.'];
     $sys = "Você é o assistente do IPbx Prisma, a central telefônica da Prisma Telecom. Hoje é " . date('d/m/Y H:i') . ". "
-         . "Responda em português, curto e objetivo. Use SOMENTE dados retornados pelas ferramentas; nunca invente números, ramais ou ligações. "
+         . "Responda em português, curto e objetivo. Para QUALQUER pergunta sobre chamadas, ramais, filas, números ou gravações, consulte SEMPRE uma ferramenta antes de responder; nunca responda de memória nem estime. Use SOMENTE dados retornados pelas ferramentas; nunca invente números, ramais ou ligações. Quando falar de quantidade de chamadas, deixe claro se são externas (clientes), internas (ramal a ramal) ou todas: por padrão fale das externas, como o Dashboard, e cite as internas à parte. Se nenhuma ferramenta responder, diga que não encontrou o dado. "
          . "Se faltar informação (ex.: qual ramal), pergunte. Você só consulta; as únicas ações são: send_report (resumo por WhatsApp, só após o usuário confirmar o número) e propose_extension_feature (apenas PROPÕE; o usuário confirma por um botão e você nunca diz que foi feito antes disso). Para tabelas use markdown. Para gravações use recording_link e entregue o link em markdown [Ouvir gravação](url). "
          . "Nunca cite nomes de softwares de terceiros da central telefônica nem do serviço de WhatsApp: o produto se chama IPbx Prisma e o serviço de WhatsApp se chama Prismabot. Se precisar falar da tecnologia, diga apenas \"o sistema\" ou \"a central\". "
          . "NUNCA invente links ou endereços: use somente links devolvidos pelas ferramentas (ex.: recording_link). Se a ferramenta devolver erro, explique o erro ao usuário. "
