@@ -53,6 +53,10 @@ function isGroupActive($modules_array) {
             </div>
         </a>
         <?php endif; ?>
+        <!-- MANUAL DA PLATAFORMA -->
+        <a href="index.php?module=manual&action=view" class="w-full flex items-center px-3 py-2.5 rounded-xl transition-all <?php echo isNavActive('manual') ? 'bg-brand-600/20 text-brand-400 border border-brand-500/30 font-bold' : 'text-slate-300 hover:bg-slate-800/60 hover:text-white'; ?>">
+            <div class="flex items-center gap-2.5 font-bold"><i class="fa-solid fa-book text-sm"></i><span>Manual</span></div>
+        </a>
 
         <!-- GROUP: TELEFONIA & RAMAIS (EXPANSÍVEL) -->
         <?php if (hasUserPermission('mod_dashboard') || hasUserPermission('mod_filas')): ?>

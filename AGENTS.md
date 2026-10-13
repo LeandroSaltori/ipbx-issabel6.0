@@ -100,3 +100,11 @@ Este documento estabelece as regras e padrões arquiteturais obrigatórios para 
 3. Itens de `plan` que forem entregues são removidos de `plan` e passam para `done`. Novos planos acordados com o usuário entram em `plan`.
 4. Entradas com `'novo' => true` com mais de 30 dias devem ter `novo` alterado para `false`.
 5. Não registrar refatorações internas, testes ou ajustes sem efeito para o cliente.
+
+---
+
+## 11. MANUAL DA PLATAFORMA — ATUALIZAÇÃO OBRIGATÓRIA
+1. **Toda correção visível ou nova funcionalidade DEVE ser descrita no manual** `src/front_api/pabx_panel/includes/manual.php` **no mesmo commit** (junto com a entrada do changelog da regra 10), sem que o usuário precise pedir.
+2. Criar o item na seção da tela correspondente (ou nova seção) com `['t' => título, 'd' => texto]`; ajustar o texto de itens existentes quando o comportamento mudar; remover o que deixar de existir.
+3. Texto em português, voltado ao cliente, sem jargão técnico e sem nomes de terceiros (apenas IPbx Prisma e Prismabot).
+4. Nova tela/módulo também entra no manual e no menu lateral. Um commit que entrega função sem atualizar o manual está incompleto.

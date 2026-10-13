@@ -1149,6 +1149,7 @@ $allowed_modules = [
     'relatorios' => ['ia_analytics', 'filas_stats', 'cdr_gravacoes', 'graphic_reports', 'relatorio_geral', 'relatorio_filas'],
     'whatsapp' => ['regras', 'historico', 'disparos', 'contatos'],
     'telefonia' => ['blacklist'],
+    'manual' => ['view'],
     'configuracoes' => ['ami', 'ia', 'api', 'usuarios', 'api_connection', 'smtp', 'logs', 'status', 'seguranca', 'chat_ia']
 ];
 

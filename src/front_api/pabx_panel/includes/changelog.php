@@ -6,6 +6,7 @@
  */
 return [
     'done' => [
+        ['data' => '2026-10-13', 'mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-book', 'titulo' => 'Manual da plataforma', 'desc' => 'Novo menu Manual com a explicação de todas as telas e funções do painel, com busca. Ele é atualizado a cada novidade.'],
         ['data' => '2026-10-13', 'mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-comments', 'titulo' => 'Conversas do Assistente IA para o administrador', 'desc' => 'Veja o que cada usuário conversou com o assistente. Ao iniciar uma nova conversa o histórico continua guardado, e as gravações agora tocam direto dentro do chat.'],
         ['data' => '2026-10-13', 'mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-headphones', 'titulo' => 'Link de gravação no Chat IA funcionando', 'desc' => 'Ao pedir para ouvir uma gravação, o chat entrega o link real e seguro do seu painel, e nunca mais endereços inventados.'],
         ['data' => '2026-10-11', 'mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-phone-slash', 'titulo' => 'Avisos de chamada perdida mais inteligentes', 'desc' => 'O atendente não é mais avisado quando a chamada tocou só alguns segundos ou quando outro ramal atendeu. O tempo mínimo é você quem define.'],

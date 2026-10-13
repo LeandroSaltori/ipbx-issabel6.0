@@ -1,0 +1,62 @@
+<?php
+/**
+ * Manual do IPbx Prisma (mostrado ao cliente em "Manual").
+ * REGRA 11 do AGENTS.md: toda correção ou funcionalidade nova DEVE ser descrita aqui no mesmo commit.
+ * Estrutura: seções com 'id', 'titulo', 'icon' e 'itens' => [['t' => título, 'd' => texto]].
+ * Texto em português, voltado ao cliente, sem jargão técnico e sem nomes de terceiros.
+ */
+return [
+    ['id' => 'inicio', 'titulo' => 'Primeiros passos', 'icon' => 'fa-flag-checkered', 'itens' => [
+        ['t' => 'O que é o IPbx Prisma', 'd' => 'Painel para acompanhar e administrar sua central telefônica: ramais, filas, linhas, relatórios, gravações, WhatsApp e assistente inteligente.'],
+        ['t' => 'Menu lateral', 'd' => 'Todas as telas ficam no menu à esquerda. Você só vê as telas que seu perfil permite (veja Usuários & Permissões).'],
+        ['t' => 'Novidades', 'd' => 'O botão Novidades mostra tudo o que foi entregue recentemente e o que vem a seguir.'],
+        ['t' => 'Modo claro / escuro', 'd' => 'Você pode alternar o visual do painel pelo botão de tema.'],
+    ]],
+    ['id' => 'dashboard', 'titulo' => 'Dashboard', 'icon' => 'fa-chart-pie', 'itens' => [
+        ['t' => 'Visão geral do dia', 'd' => 'Indicadores de chamadas recebidas, atendidas, perdidas e em andamento, com gráficos que atualizam sozinhos.'],
+    ]],
+    ['id' => 'ramais', 'titulo' => 'Telefonia & Ramais', 'icon' => 'fa-phone', 'itens' => [
+        ['t' => 'Painel do Operador', 'd' => 'Mostra todos os ramais em tempo real: livre, em chamada, tocando ou fora do ar, além de linhas, estacionamento e salas de conferência.'],
+        ['t' => 'Ramais & Atendentes', 'd' => 'Em um só lugar: nomes dos ramais, permissões, Não Perturbe e desvios de chamada (autoatendimento do ramal, na aba Desvios).'],
+        ['t' => 'Blacklist (Bloqueios)', 'd' => 'Cadastre números que não devem conseguir ligar para a empresa.'],
+        ['t' => 'Linhas & Troncos', 'd' => 'Mostra se cada linha está registrada. Quando uma linha cai, o painel pode avisar por WhatsApp.'],
+    ]],
+    ['id' => 'filas', 'titulo' => 'Atendimento & Filas', 'icon' => 'fa-headset', 'itens' => [
+        ['t' => 'Filas ao vivo', 'd' => 'Quem está na fila, quanto tempo espera e quais atendentes estão disponíveis.'],
+        ['t' => 'Fluxograma de ligações', 'd' => 'Desenho do caminho que uma chamada percorre dentro da central.'],
+        ['t' => 'Histórico das filas', 'd' => 'O painel lê sozinho o registro real das filas da central, sem precisar de configuração.'],
+    ]],
+    ['id' => 'whatsapp', 'titulo' => 'WhatsApp & Automação', 'icon' => 'fa-brands fa-whatsapp', 'itens' => [
+        ['t' => 'Regras (URA, transbordo e NPS)', 'd' => 'Defina avisos automáticos por WhatsApp, como pesquisa de satisfação e aviso de abandono de fila.'],
+        ['t' => 'Chamadas perdidas: quando avisar', 'd' => 'O atendente só é avisado quando a perda é real: ignora chamadas muito curtas e chamadas atendidas em outro ramal. Os limites são ajustáveis na tela de APIs & Conexões.'],
+        ['t' => 'Histórico de envio', 'd' => 'Lista de tudo o que foi enviado e se chegou ao destino.'],
+        ['t' => 'Disparo rápido', 'd' => 'Envia uma mensagem de teste ou avulsa para um número.'],
+        ['t' => 'Agenda & Contatos', 'd' => 'Cadastro de contatos usado nos envios e na identificação de quem liga.'],
+    ]],
+    ['id' => 'relatorios', 'titulo' => 'Relatórios & Gravações', 'icon' => 'fa-chart-line', 'itens' => [
+        ['t' => 'CDR & Gravações', 'd' => 'Todas as chamadas com filtros por data, número e ramal. Dá para ouvir e baixar a gravação na própria tela.'],
+        ['t' => 'Relatório completo de filas', 'd' => 'Atendidas, abandonadas, tempos de espera e de conversa por fila e por atendente.'],
+        ['t' => 'Relatórios gráficos', 'd' => 'Gráficos de volume de chamadas por período.'],
+        ['t' => 'Relatório geral & mapa de calor', 'd' => 'Mostra os horários de maior movimento.'],
+        ['t' => 'Relatórios de IA', 'd' => 'Resumos e análises das ligações geradas por inteligência artificial.'],
+    ]],
+    ['id' => 'assistente', 'titulo' => 'Assistente inteligente (Chat IA)', 'icon' => 'fa-robot', 'itens' => [
+        ['t' => 'Como usar', 'd' => 'Clique no botão do assistente e escreva em linguagem normal, por exemplo: "quantas chamadas perdidas hoje?" ou "quem ligou do número 11 9999-0000?".'],
+        ['t' => 'O que ele consulta', 'd' => 'Chamadas, resumo do período, situação dos ramais e das filas, tudo com dados reais da sua central.'],
+        ['t' => 'Ouvir gravações', 'd' => 'Peça a gravação de uma chamada e o player aparece dentro do próprio chat, com opção de abrir ou baixar.'],
+        ['t' => 'Enviar relatório por WhatsApp', 'd' => 'Peça "envie o resumo de hoje para o número tal". O assistente mostra o que vai enviar e só envia depois da sua confirmação.'],
+        ['t' => 'Sugerir recursos nos ramais', 'd' => 'O assistente propõe a alteração e você confirma antes de ser aplicada.'],
+        ['t' => 'Histórico e nova conversa', 'd' => 'Sua conversa fica salva. O botão de nova conversa limpa a tela, mas o registro continua guardado para a administração.'],
+        ['t' => 'Privacidade', 'd' => 'Os administradores podem consultar as conversas de cada usuário em Configurações > Conversas do Assistente IA. Cada consulta fica registrada no log de ações.'],
+    ]],
+    ['id' => 'config', 'titulo' => 'Configurações', 'icon' => 'fa-gear', 'itens' => [
+        ['t' => 'APIs & Conexões', 'd' => 'Conexão com a central e com o WhatsApp, além das regras de aviso de chamada perdida.'],
+        ['t' => 'Inteligência Artificial', 'd' => 'Chave e modelo usados pelo assistente e pelos resumos.'],
+        ['t' => 'Usuários & Permissões', 'd' => 'Crie usuários e escolha quais telas e ações cada um pode usar.'],
+        ['t' => 'Servidor SMTP & Disparos', 'd' => 'Configuração do e-mail usado para enviar relatórios.'],
+        ['t' => 'Status da Integração', 'd' => 'Mostra se cada parte do sistema está funcionando.'],
+        ['t' => 'Painel de Segurança', 'd' => 'Tentativas de acesso indevido, endereços bloqueados (com opção de desbloquear) e lista de endereços sempre liberados. A lista é a mesma usada pela proteção da central.'],
+        ['t' => 'Conversas do Assistente IA', 'd' => 'Para administradores: veja o que cada usuário conversou com o assistente.'],
+        ['t' => 'Logs & Diagnósticos', 'd' => 'Registro de quem fez o quê no painel, útil para auditoria e suporte.'],
+    ]],
+];

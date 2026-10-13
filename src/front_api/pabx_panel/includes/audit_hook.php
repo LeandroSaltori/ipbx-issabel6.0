@@ -116,7 +116,7 @@ function auditPostLabels() {
 function auditPageLabels() {
     return [
         'dashboard' => 'Dashboard', 'ramais' => 'Ramais', 'troncos' => 'Troncos', 'filas' => 'Filas',
-        'relatorios' => 'Relatórios', 'whatsapp' => 'WhatsApp', 'telefonia' => 'Telefonia', 'configuracoes' => 'Configurações',
+        'relatorios' => 'Relatórios', 'whatsapp' => 'WhatsApp', 'telefonia' => 'Telefonia', 'manual' => 'Manual', 'configuracoes' => 'Configurações',
         'ia_analytics' => 'Auditoria & Análise de IA', 'filas_stats' => 'Estatísticas de Filas',
         'cdr_gravacoes' => 'CDR e Gravações', 'graphic_reports' => 'Relatórios Gráficos',
         'relatorio_geral' => 'Relatório Geral', 'relatorio_filas' => 'Relatório de Filas', 'autoatendimento' => 'Autoatendimento do Ramal', 'status' => 'Status da Integração', 'seguranca' => 'Painel de Segurança',
