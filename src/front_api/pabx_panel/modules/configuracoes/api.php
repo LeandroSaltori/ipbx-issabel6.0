@@ -695,7 +695,7 @@ if (empty($currentPbxToken) && !empty($currentPbxPass) && $_SERVER['REQUEST_METH
                         <i class="fa-solid fa-link text-cyan-400 text-base"></i>
                         <strong class="text-white text-xs">URL pública do painel (links de gravação)</strong>
                     </div>
-                    <p class="text-[11px] text-slate-400">Endereço pelo qual o atendente alcança o painel fora da rede interna. Usado para montar o link temporário (7 dias, assinado) da gravação enviado por WhatsApp aos ramais com "Enviar Link da Gravação". Sem este campo o link não é enviado.</p>
+                    <p class="text-[11px] text-slate-400">Endereço pelo qual o atendente alcança o painel fora da rede interna. Usado para montar o link temporário (7 dias, assinado) da gravação enviado por WhatsApp aos ramais com "Enviar Link da Gravação". Sem este campo a gravação é enviada como arquivo anexo (até 15 MB), e não como link.</p>
                     <input type="hidden" name="action_save_public_url" value="1">
                     <input type="text" name="public_base_url" value="<?php echo htmlspecialchars((string)getSetting('public_base_url')); ?>" placeholder="https://pbx.seudominio.com.br/front_api" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-[11px] text-cyan-200 font-mono focus:border-cyan-500 focus:outline-none">
                     <button type="submit" style="white-space:nowrap !important;flex-shrink:0 !important;width:auto !important;overflow:visible !important;text-overflow:clip !important" class="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-xl text-xs transition"><i class="fa-solid fa-floppy-disk"></i> Salvar URL</button>

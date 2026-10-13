@@ -5162,10 +5162,21 @@ function processCallSummaryNotifications($cdr) {
             $other = ($ext === $c['dst']) ? $c['src'] : $c['dst'];
             $head = "📞 Chamada " . date('d/m H:i', strtotime($c['calldate'])) . " com $other (" . gmdate('i\m s\s', (int)$c['billsec']) . ")";
 
+            $recFile = null;   // gravação enviada como arquivo quando não há URL pública para o link
             if (!empty($e['send_call_recording'])) {
                 $url = audioSignedUrl($c['uniqueid']);
                 if ($url !== '') $parts[] = "🎧 Gravação (link válido por 7 dias): $url";
-                else $why[] = 'URL pública do painel não configurada (Configurações > API)';
+                else {
+                    $rp = findRecordingPath($c['recordingfile'], $c['calldate']);
+                    if ($rp === '') $why[] = 'URL pública não configurada e arquivo de gravação não encontrado';
+                    elseif (filesize($rp) > 15 * 1024 * 1024) $why[] = 'URL pública não configurada e gravação maior que 15MB';
+                    else {
+                        $x = strtolower(pathinfo($rp, PATHINFO_EXTENSION));
+                        $types = ['wav' => 'audio/wav', 'mp3' => 'audio/mpeg', 'ogg' => 'audio/ogg', 'gsm' => 'audio/x-gsm'];
+                        $recFile = ['name' => 'gravacao_' . preg_replace('/[^0-9.]/', '', (string)$c['uniqueid']) . '.' . $x, 'type' => $types[$x] ?? 'application/octet-stream', 'content' => file_get_contents($rp)];
+                        $parts[] = "🎧 Gravação da chamada em anexo.";
+                    }
+                }
             }
             if (!empty($e['send_ai_summary'])) {
                 $path = findRecordingPath($c['recordingfile'], $c['calldate']);
@@ -5189,6 +5200,7 @@ function processCallSummaryNotifications($cdr) {
             }
             $msg = $head . "\n\n" . implode("\n\n", $parts);
             $ok = sendWhatsAppMessageViaZPro($api_url, $api_token, $e['whatsapp_number'], $msg, $c['uniqueid'], $ext, 'RESUMO_CHAMADA');
+            if ($ok && $recFile) { $fr = sendWhatsAppFile($e['whatsapp_number'], $recFile['name'], $recFile['content'], $recFile['type'], '', $c['uniqueid'], $ext, 'RESUMO_CHAMADA_ARQUIVO'); }
             missedGuardFinish($skey, (string)$e['whatsapp_number'], $ok);
             $ok ? $out['sent']++ : $out['skipped']++;
         }
@@ -6040,7 +6052,7 @@ function integrationStatusChecks() {
     $mon = '/var/spool/asterisk/monitor';
     $add('Gravações', 'Pasta de gravações', is_readable($mon) ? 'ok' : 'warn', is_readable($mon) ? 'Legível pelo painel.' : 'Pasta ausente ou sem permissão de leitura.');
     $pub = trim((string)getSetting('public_base_url'));
-    $add('Gravações', 'URL pública (links de gravação)', $pub !== '' ? 'ok' : 'warn', $pub !== '' ? $pub : 'Não configurada: links de gravação por WhatsApp não serão enviados.');
+    $add('Gravações', 'URL pública (links de gravação)', $pub !== '' ? 'ok' : 'warn', $pub !== '' ? $pub : 'Não configurada: a gravação será enviada como arquivo (sem link).');
 
     // --- WhatsApp
     $prov = waProvider();

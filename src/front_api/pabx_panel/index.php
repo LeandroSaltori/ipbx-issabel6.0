@@ -704,7 +704,7 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
             if (!hasUserPermission('listen_recordings')) { echo json_encode(['success' => false, 'error' => 'Sem permissão para compartilhar gravações.']); exit; }
             $link = audioSignedUrl($uid);
             if ($link !== '') $msg .= "\n\n🎧 Gravação (link válido por 7 dias): " . $link;
-            else $warning = 'Enviado sem o link da gravação: configure a "URL pública do painel" em Configurações > API.';
+            else $warning = 'Enviado sem link: a gravação segue como arquivo anexo. Para incluir também o link, configure a "URL pública do painel" em Configurações > API.';
         }
         $lu  = getLoggedUser();
         $res = sendWhatsAppAPI($phone, $msg, $uid !== '' ? $uid : 'MANUAL', (string)($lu['extension'] ?? 'PAINEL'), 'ENVIO_MANUAL');
@@ -746,7 +746,7 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
             if (!hasUserPermission('listen_recordings')) { echo json_encode(['success' => false, 'error' => 'Sem permissão para compartilhar gravações.']); exit; }
             $link = audioSignedUrl($uid);
             if ($link !== '') $msg .= "\n\nGravação (link válido por 7 dias): " . $link;
-            else $warning = 'Enviado sem o link da gravação: configure a "URL pública do painel" em Configurações > API.';
+            else $warning = 'Enviado sem link: a gravação segue como arquivo anexo. Para incluir também o link, configure a "URL pública do painel" em Configurações > API.';
         }
         list($atts, $file_warns) = buildShareAttachments($body);
         if ($file_warns) $warning = trim($warning . ' ' . implode(' ', $file_warns));
