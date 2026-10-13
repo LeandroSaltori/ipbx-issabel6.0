@@ -2,7 +2,8 @@
 /**
  * Manual do IPbx Prisma (mostrado ao cliente em "Manual").
  * REGRA 11 do AGENTS.md: toda correção ou funcionalidade nova DEVE ser descrita aqui no mesmo commit.
- * Estrutura: seções com 'id', 'titulo', 'icon' e 'itens' => [['t' => título, 'd' => texto]].
+ * Estrutura: seções com 'id', 'titulo', 'icon' e 'itens' => [['t' => título, 'd' => texto, e opcionais:
+ *   'passos' => [..], 'campos' => ['Campo' => 'explicação'], 'dica' => '..', 'aviso' => '..', 'img' => 'manual/arquivo.png' (em assets/)]].
  * Texto em português, voltado ao cliente, sem jargão técnico e sem nomes de terceiros.
  */
 return [
@@ -17,8 +18,13 @@ return [
     ]],
     ['id' => 'ramais', 'titulo' => 'Telefonia & Ramais', 'icon' => 'fa-phone', 'itens' => [
         ['t' => 'Painel do Operador', 'd' => 'Mostra todos os ramais em tempo real: livre, em chamada, tocando ou fora do ar, além de linhas, estacionamento e salas de conferência.'],
-        ['t' => 'Ramais & Atendentes', 'd' => 'Em um só lugar: nomes dos ramais, permissões, Não Perturbe e desvios de chamada (autoatendimento do ramal, na aba Desvios).'],
-        ['t' => 'Blacklist (Bloqueios)', 'd' => 'Cadastre números que não devem conseguir ligar para a empresa.'],
+        ['t' => 'Ramais & Atendentes', 'd' => 'Em um só lugar: nomes dos ramais, permissões, Não Perturbe e desvios de chamada (autoatendimento do ramal, na aba Desvios).',
+            'passos' => ['Abra Telefonia & Ramais > Ramais & Atendentes.', 'Clique no ramal que deseja editar.', 'Altere os campos desejados e salve.', 'Para desvios de chamada, use a aba Desvios.'],
+            'campos' => ['Ramal' => 'Número do ramal (não editável).', 'Nome do Atendente' => 'Nome mostrado nos relatórios, no Painel do Operador e nos avisos.', 'Celular / WhatsApp (Notificações)' => 'Número que recebe os avisos do atendente, como chamadas perdidas.', 'Nova Senha (Opcional)' => 'Preencha somente se quiser trocar a senha do ramal; em branco mantém a atual.'],
+            'dica' => 'Mantenha o celular preenchido com DDD para o atendente receber os avisos por WhatsApp.'],
+        ['t' => 'Blacklist (Bloqueios)', 'd' => 'Cadastre números que não devem conseguir ligar para a empresa.',
+            'passos' => ['Abra Telefonia & Ramais > Blacklist (Bloqueios).', 'Digite o número a bloquear e, se quiser, o motivo.', 'Salve. A partir daí o número deixa de completar ligações.', 'Para liberar, remova o número da lista.'],
+            'campos' => ['Número a Bloquear' => 'Telefone com DDD, somente números.', 'Motivo / Descrição' => 'Anotação interna para saber por que foi bloqueado.']],
         ['t' => 'Linhas & Troncos', 'd' => 'Mostra se cada linha está registrada. Quando uma linha cai, o painel pode avisar por WhatsApp.'],
     ]],
     ['id' => 'filas', 'titulo' => 'Atendimento & Filas', 'icon' => 'fa-headset', 'itens' => [

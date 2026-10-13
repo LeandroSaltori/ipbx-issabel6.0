@@ -25,6 +25,18 @@ $h = function($s) { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); };
             <div class="man-it rounded-xl bg-slate-800/50 p-3">
                 <div class="font-bold text-slate-100 text-sm"><?php echo $h($it['t']); ?></div>
                 <div class="text-slate-400 text-sm mt-0.5"><?php echo $h($it['d']); ?></div>
+                <?php if (!empty($it['img']) && preg_match('#^[A-Za-z0-9_./-]+$#', $it['img']) && strpos($it['img'], '..') === false): ?>
+                <img src="assets/<?php echo $h($it['img']); ?>" alt="<?php echo $h($it['t']); ?>" loading="lazy" class="mt-2 rounded-xl border border-slate-700 max-w-full">
+                <?php endif; ?>
+                <?php if (!empty($it['passos'])): ?>
+                <ol class="list-decimal ml-5 mt-2 text-sm text-slate-300 space-y-1"><?php foreach ($it['passos'] as $p) echo '<li>' . $h($p) . '</li>'; ?></ol>
+                <?php endif; ?>
+                <?php if (!empty($it['campos'])): ?>
+                <div class="mt-2 text-sm"><div class="font-bold text-slate-200 mb-1">Campos</div>
+                <?php foreach ($it['campos'] as $c => $x): ?><div class="text-slate-400"><b class="text-slate-200"><?php echo $h($c); ?>:</b> <?php echo $h($x); ?></div><?php endforeach; ?></div>
+                <?php endif; ?>
+                <?php if (!empty($it['dica'])): ?><div class="mt-2 text-sm rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 p-2"><i class="fa-solid fa-lightbulb mr-1"></i><?php echo $h($it['dica']); ?></div><?php endif; ?>
+                <?php if (!empty($it['aviso'])): ?><div class="mt-2 text-sm rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-300 p-2"><i class="fa-solid fa-triangle-exclamation mr-1"></i><?php echo $h($it['aviso']); ?></div><?php endif; ?>
             </div>
             <?php endforeach; ?>
         </div>
