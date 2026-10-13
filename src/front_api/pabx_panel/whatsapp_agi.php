@@ -154,13 +154,14 @@ if (!empty($called_ext) && ($event_type === 'no_answer' || $event_type === 'miss
 $DEFAULT_TEMPLATES = [
     'no_answer'  => "⚠️ *Notificação IPbx Prisma*\n\nOlá! Vimos que você ligou para o setor *{NOME_FILA}* às *{DATA_HORA}* e a chamada não pôde ser atendida no momento. Em breve entraremos em contato!",
     'transbordo' => "📲 *Atendimento Prisma WhatsApp*\n\nOlá! Recebemos sua solicitação via PABX às *{DATA_HORA}*. Em instantes um de nossos atendentes dará sequência ao seu atendimento por este canal.",
-    'audio'      => "🎙️ *Notificação de Chamada - IPbx Prisma*\n\nInformações da ligação:\n• Cliente: *{CLIENTE}*\n• Atendente: *{ATENDENTE}* (Ramal *{RAMAL}*)\n• Data/Hora: *{DATA_HORA}*\n\nO registro de áudio/gravação da chamada está disponível no sistema.",
+    'missed_extension' => "🎙️ *Notificação de Chamada - IPbx Prisma*\n\nInformações da ligação:\n• Cliente: *{CLIENTE}*\n• Atendente: *{ATENDENTE}* (Ramal *{RAMAL}*)\n• Data/Hora: *{DATA_HORA}*\n\nO registro de áudio/gravação da chamada está disponível no sistema.",
+    'audio'      => "🎙️ *Gravação da sua chamada - IPbx Prisma*\n\nOlá! Segue o registro da sua ligação com *{ATENDENTE}* (Ramal *{RAMAL}*) em *{DATA_HORA}*:\n{LINK_GRAVACAO}",
     'nps'        => "⭐ *Pesquisa de Satisfação - IPbx Prisma*\n\nOlá! Como você avalia o atendimento recebido pelo atendente *{ATENDENTE}* (Ramal *{RAMAL}*) às *{DATA_HORA}*?\n\nResponda com uma nota de 1 (Péssimo) a 5 (Excelente)."
 ];
 
 $template = '';
 if ($event_type === 'missed_extension') {
-    $template = (function_exists('getRule') && getRule('missed_client_msg')) ? getRule('missed_client_msg') : (getSetting('prismabot_msg_audio') ?: $DEFAULT_TEMPLATES['no_answer']);
+    $template = (function_exists('getRule') && getRule('missed_client_msg')) ? getRule('missed_client_msg') : (getSetting('prismabot_msg_audio') ?: $DEFAULT_TEMPLATES['missed_extension']);
 } elseif ($event_type === 'no_answer') {
     $template = (function_exists('getRule') && getRule('queue_abandon_msg_default')) ? getRule('queue_abandon_msg_default') : (getSetting('prismabot_msg_no_answer') ?: $DEFAULT_TEMPLATES['no_answer']);
 } elseif ($event_type === 'nps') {
@@ -199,8 +200,13 @@ if (!empty($template) && !empty($target_number)) {
     );
     if (strpos($msg_cliente, '{LINK_GRAVACAO}') !== false) {
         $uid_call = trim((string)agiGetVariable('UNIQUEID'));
-        $lnk = ($uid_call !== '' && function_exists('audioSignedUrl')) ? audioSignedUrl($uid_call) : '';
-        $msg_cliente = str_replace('{LINK_GRAVACAO}', $lnk, $msg_cliente);
+        $lnk = ($uid_call !== '' && function_exists('audioSignedUrl')) ? audioSignedUrl($uid_call, 604800, true) : '';
+        if ($lnk === '' && $event_type === 'audio') {
+            // Sem "URL pública do painel" não há como montar o link no PABX: não envia mensagem vazia.
+            if (function_exists('pabx_log')) pabx_log('whatsapp', 'WARNING', "Mensagem de gravação não enviada: configure a URL pública do painel (Configurações > API) para gerar o link", ['uniqueid' => $uid_call]);
+            exit(0);
+        }
+        $msg_cliente = trim(str_replace('{LINK_GRAVACAO}', $lnk, $msg_cliente));
     }
 
     $rule_map = ['no_answer' => 'FILA_ABANDONO', 'missed_extension' => 'ATENDENTE_NAO_ATENDEU', 'nps' => 'NPS', 'transbordo' => 'TRANSBORDO', 'audio' => 'AUDIO'];

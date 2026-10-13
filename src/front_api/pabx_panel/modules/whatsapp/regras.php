@@ -370,9 +370,12 @@ document.querySelectorAll('textarea').forEach(ta => {
 
 function insertVariable(varTag) {
     if (!lastActiveTextarea) {
-        lastActiveTextarea = document.getElementById('txt_queue_abandon_msg_default');
+        // Sem campo escolhido: não insere em lugar nenhum (antes caía no início da "Mensagem Abandono de Fila")
+        let t = document.getElementById('ipbx-var-hint');
+        if (!t) { t = document.createElement('div'); t.id = 'ipbx-var-hint'; t.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#7c3aed;color:#fff;padding:10px 18px;border-radius:10px;font-size:12px;z-index:9999;box-shadow:0 8px 24px rgba(0,0,0,.4)'; t.textContent = 'Clique primeiro dentro da mensagem onde quer inserir a variável.'; document.body.appendChild(t); }
+        t.style.display = 'block'; clearTimeout(t._h); t._h = setTimeout(() => { t.style.display = 'none'; }, 3500);
+        return;
     }
-    if (!lastActiveTextarea) return;
 
     const startPos = lastActiveTextarea.selectionStart;
     const endPos   = lastActiveTextarea.selectionEnd;
