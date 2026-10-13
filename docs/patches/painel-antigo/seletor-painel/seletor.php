@@ -24,7 +24,8 @@ function seletorKey() { $k = @file_get_contents('/etc/ipbx/sso.key'); $k = is_st
 function b64u($s) { return rtrim(strtr(base64_encode($s), '+/', '-_'), '='); }
 
 if (($_GET['ir'] ?? '') === 'novo' || ($_GET['ir'] ?? '') === 'classico') {
-    if (!empty($_GET['lembrar'])) setcookie('ipbx_painel', $_GET['ir'], time() + 86400 * 365, '/', '', false, true);
+    // grava a escolha no servidor (não depende do formulário nem de JavaScript)
+    setcookie('ipbx_painel', $_GET['ir'], time() + 86400 * 365, '/', '', false, true);
     if ($_GET['ir'] === 'classico') { header('Location: index.php?classico=1'); exit; }
     $key = seletorKey();
     if ($key === '') { $erro = 'Painel novo indisponível: entrada única não configurada neste servidor.'; }

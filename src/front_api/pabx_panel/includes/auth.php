@@ -250,16 +250,17 @@ function authGate($mode = 'page') {
         header('Location: ' . authClassicLoginUrl());
         exit;
     }
+    // Entrada única vinda do painel clássico (passe assinado de curta duração; sem senha).
+    // Vale também com o login desligado (testes), para a sessão ficar vinculada ao usuário do clássico.
+    if ($mode === 'page' && isset($_GET['sso']) && $_GET['sso'] !== '' && !authIsLoggedIn()) {
+        require_once __DIR__ . '/sso.php';
+        $r = ssoHandle($_GET['sso']);
+        if ($r['ok']) { header('Location: ' . strtok($_SERVER['REQUEST_URI'] ?? 'index.php', '?')); exit; }
+        if (!authDisabled()) authRenderLogin($r['error']);
+    }
     if (authDisabled()) return; // painel aberto (somente para testes em rede confiável)
 
     if ($mode === 'page') {
-        // Entrada única vinda do painel clássico (passe assinado de curta duração; sem senha)
-        if (isset($_GET['sso']) && $_GET['sso'] !== '' && !authIsLoggedIn()) {
-            require_once __DIR__ . '/sso.php';
-            $r = ssoHandle($_GET['sso']);
-            if ($r['ok']) { header('Location: ' . strtok($_SERVER['REQUEST_URI'] ?? 'index.php', '?')); exit; }
-            authRenderLogin($r['error']);
-        }
         if (($_POST['auth_action'] ?? '') === 'login' && $_SERVER['REQUEST_METHOD'] === 'POST') {
             $res = authLogin($_POST['email'] ?? '', $_POST['password'] ?? '');
             if ($res['success']) {
