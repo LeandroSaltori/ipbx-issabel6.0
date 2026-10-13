@@ -4,6 +4,7 @@
  * Arquivo NOVO: copiar para /var/www/html/seletor.php. Não altera nenhum arquivo existente.
  * Usa a sessão e a base de acessos do painel clássico; não lê nem copia senhas.
  */
+header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 ini_set('include_path', dirname($_SERVER['SCRIPT_FILENAME']) . "/libs:" . ini_get('include_path'));
 include_once "libs/misc.lib.php";
 include_once "configs/default.conf.php";

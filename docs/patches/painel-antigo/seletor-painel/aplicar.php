@@ -40,7 +40,7 @@ $html = <<<'H'
 
 H;
 $E1 = '/* IPBX-PAINEL-ENTRADA */'; $E2 = '/* /IPBX-PAINEL-ENTRADA */';
-$entrada = "    $E1\n    if (\$_SERVER['REQUEST_METHOD'] === 'GET' && !isset(\$_GET['menu']) && !isset(\$_GET['classico']) && (\$_COOKIE['ipbx_painel'] ?? '') === 'novo' && is_file(__DIR__ . '/seletor.php')) { header('Location: seletor.php?ir=novo'); exit; }\n    $E2\n";
+$entrada = "    $E1\n    if (\$_SERVER['REQUEST_METHOD'] === 'GET' && !isset(\$_GET['menu'])) {\n        header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0'); header('Pragma: no-cache');\n        if (!isset(\$_GET['classico']) && (\$_COOKIE['ipbx_painel'] ?? '') === 'novo' && is_file(__DIR__ . '/seletor.php')) { header('Location: seletor.php?ir=novo'); exit; }\n    }\n    $E2\n";
 $php = "    $P1\n    if ((\$_POST['painel'] ?? '') === 'novo' && is_file(__DIR__ . '/seletor.php')) return 'seletor.php?ir=novo';\n    $P2\n";
 
 $tpl = file_get_contents($theme); $idx = file_get_contents($index);
@@ -53,6 +53,7 @@ if ($undo) {
         if (!preg_match('#<div class="form-group">\s*<button type="submit"#', $tpl, $m, PREG_OFFSET_CAPTURE)) { fwrite(STDERR, "Ponto de inserção do botão Entrar não encontrado no login.tpl\n"); exit(2); }
         $tpl = substr_replace($tpl, $html . "\t\t\t\t", $m[0][1], 0);
     }
+    $idx = preg_replace('#\n[ \t]*' . preg_quote($E1, '#') . '.*?' . preg_quote($E2, '#') . '[ \t]*\n#s', "\n", $idx, 1);
     if (strpos($idx, $E1) === false) {
         if (!preg_match('#(\$postLogin = get_post_login_redirect\(\$pACL, \$_SESSION\[\'issabel_user\'\]\);\s*if \(\$postLogin !== \'index\.php\'\) \{.*?\n\s*\}\n)#s', $idx, $m2, PREG_OFFSET_CAPTURE)) { fwrite(STDERR, "Ponto de inserção (sessão ativa) não encontrado no index.php\n"); exit(4); }
         $at = $m2[0][1] + strlen($m2[0][0]);
