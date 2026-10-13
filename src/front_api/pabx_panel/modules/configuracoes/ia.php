@@ -71,7 +71,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $__save->execute([':k' => 'ai_custom_prompt',  ':v' => trim($_POST['ai_custom_prompt'] ?? '')]);
             $__save->execute([':k' => 'ai_token_limit',    ':v' => (string)max(64, min(4000, (int)($_POST['ai_token_limit'] ?? 1024) ?: 1024))]);
         }
-        if (!isset($_POST['action_test_ai_key'])) $msg = "Configuração de IA salva! Cada função passa a usar o provedor escolhido (ou o automático).";
+        if (!empty($_POST['ai_provider_page']) && isset(aiProviderDefaults()[$_POST['ai_provider_page']])) {
+            $__tp = (string)$_POST['ai_provider_page'];
+            if (!empty($_POST['ai_key_clear_' . $__tp])) { $msg = ($__provLabelsTop[$__tp] ?? $__tp) . ': chave removida.'; }
+            elseif (aiKeyFor($__tp) === '') { $msg = ($__provLabelsTop[$__tp] ?? $__tp) . ': cole a chave de acesso para salvar.'; $msg_type = 'info'; }
+            else {
+                $__tr = aiTestProviderKey($__tp);
+                $msg = ($__provLabelsTop[$__tp] ?? $__tp) . ': ' . ($__tr['ok'] ? '✅ chave salva e aprovada.' : '❌ chave salva, mas o teste falhou: ' . $__tr['msg'] . '.');
+                if (!$__tr['ok']) $msg_type = 'info';
+            }
+        }
+        if (!isset($_POST['action_test_ai_key']) && empty($_POST['ai_provider_page'])) $msg = "Configuração de IA salva! Cada função passa a usar o provedor escolhido (ou o automático).";
         if (isset($_POST['action_test_ai_roles'])) {
             $__res = [];
             foreach (aiRoles() as $__r => $__lbl) {
@@ -250,7 +260,7 @@ foreach (array_keys(aiProviderDefaults()) as $__pp) if (aiKeyFor($__pp) !== '') 
             <div class="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2 text-xs">
                 <div class="font-extrabold text-white text-sm">Como configurar</div>
                 <?php $__okKey = false; foreach ($__ui as $__p) { $s = aiKeyStatus($__p); if (aiKeyFor($__p) !== '' && $s && !empty($s['ok'])) $__okKey = true; } ?>
-                <div class="flex items-center gap-2"><i class="fa-solid <?php echo $__okKey ? 'fa-circle-check text-emerald-400' : 'fa-circle text-slate-600'; ?>"></i><span class="text-slate-300"><b>1.</b> Em <a class="text-brand-400 underline" href="index.php?module=configuracoes&action=ia&ia_tab=groq">Groq</a>, <a class="text-brand-400 underline" href="index.php?module=configuracoes&action=ia&ia_tab=openai">OpenAI</a> ou <a class="text-brand-400 underline" href="index.php?module=configuracoes&action=ia&ia_tab=gemini">Gemini</a>, cole a chave e clique em Testar.</span></div>
+                <div class="flex items-center gap-2"><i class="fa-solid <?php echo $__okKey ? 'fa-circle-check text-emerald-400' : 'fa-circle text-slate-600'; ?>"></i><span class="text-slate-300"><b>1.</b> Em <a class="text-brand-400 underline" href="index.php?module=configuracoes&action=ia&ia_tab=groq">Groq</a>, <a class="text-brand-400 underline" href="index.php?module=configuracoes&action=ia&ia_tab=openai">OpenAI</a> ou <a class="text-brand-400 underline" href="index.php?module=configuracoes&action=ia&ia_tab=gemini">Gemini</a>, cole a chave e clique em Salvar (ela já é testada).</span></div>
                 <div class="flex items-center gap-2"><i class="fa-solid <?php echo $__anyKey ? 'fa-circle-check text-emerald-400' : 'fa-circle text-slate-600'; ?>"></i><span class="text-slate-300"><b>2.</b> Em <a class="text-brand-400 underline" href="index.php?module=configuracoes&action=ia&ia_tab=tarefas">Tarefas da IA</a>, deixe Automático ou escolha quem faz cada tarefa.</span></div>
                 <div class="flex items-center gap-2"><i class="fa-solid <?php echo $enable_copilot === '1' ? 'fa-circle-check text-emerald-400' : 'fa-circle text-slate-600'; ?>"></i><span class="text-slate-300"><b>3.</b> Deixe a Inteligência Artificial ativa (acima).</span></div>
             </div>
@@ -314,6 +324,7 @@ foreach (array_keys(aiProviderDefaults()) as $__pp) if (aiKeyFor($__pp) !== '') 
         elseif ($__st) { $__bg = 'bg-rose-500/10 text-rose-400 border-rose-500/30'; $__tx = '✗ Falhou'; }
         else { $__bg = 'bg-amber-500/10 text-amber-400 border-amber-500/30'; $__tx = '● Salva, ainda não testada'; } ?>
         <form id="f_prov" method="POST" action="index.php?module=configuracoes&action=ia&ia_tab=<?php echo $__p; ?>" class="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-5 text-xs">
+            <input type="hidden" name="ai_provider_page" value="<?php echo $__p; ?>">
             <button type="submit" name="action_save_ai_roles" value="1" class="hidden" tabindex="-1" aria-hidden="true"></button>
             <div class="flex items-start justify-between gap-3 flex-wrap">
                 <div class="flex items-center gap-3"><i class="fa-solid <?php echo $__pi['icon'] . ' ' . $__pi['cor']; ?> text-2xl"></i>
@@ -324,9 +335,8 @@ foreach (array_keys(aiProviderDefaults()) as $__pp) if (aiKeyFor($__pp) !== '') 
                 <div class="flex items-center justify-between"><span class="font-extrabold text-white text-sm">Chave de acesso (API Key)</span><span class="px-2 py-0.5 rounded text-[10px] font-bold border <?php echo $__bg; ?>"><?php echo $__tx; ?></span></div>
                 <div class="flex items-center gap-2">
                     <input type="password" name="ai_key_<?php echo $__p; ?>" autocomplete="new-password" placeholder="<?php echo $__has ? htmlspecialchars(aiMaskKey(aiKeyFor($__p))) . '  (salva)' : 'Cole a API Key aqui'; ?>" class="flex-1 min-w-0 px-3.5 py-2.5 bg-slate-900 border <?php echo $__has ? 'border-emerald-500/30' : 'border-slate-800'; ?> rounded-xl text-white font-mono placeholder-slate-300 focus:border-brand-500 focus:outline-none">
-                    <button type="submit" name="action_test_ai_key" value="<?php echo $__p; ?>" style="<?php echo $__saveBtnStyle; ?>" class="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl border border-slate-700 flex items-center gap-1.5"><i class="fa-solid fa-flask text-brand-400"></i> Testar</button>
                 </div>
-                <?php if ($__has): ?><div class="text-emerald-400"><i class="fa-solid fa-lock"></i> Chave salva e oculta (<?php echo htmlspecialchars(aiMaskKey(aiKeyFor($__p))); ?>). Para trocar, cole uma nova no campo e clique em Testar ou Salvar.</div><?php endif; ?>
+                <?php if ($__has): ?><div class="text-emerald-400"><i class="fa-solid fa-lock"></i> Chave salva e oculta (<?php echo htmlspecialchars(aiMaskKey(aiKeyFor($__p))); ?>). Para trocar, cole uma nova no campo e clique em Salvar (ela é testada automaticamente).</div><?php endif; ?>
                 <?php if ($__st && empty($__st['ok'])): ?><div class="text-rose-300"><?php echo htmlspecialchars((string)($__st['msg'] ?? '')); ?></div><?php endif; ?>
                 <?php if ($__st && !empty($__st['ok']) && !empty($__st['t'])): ?><div class="text-slate-500">Testada em <?php echo date('d/m/Y H:i', (int)$__st['t']); ?>.</div><?php endif; ?>
                 <div class="flex items-center justify-between flex-wrap gap-2 text-[11px] text-slate-500">
