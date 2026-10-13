@@ -6,6 +6,7 @@
  */
 return [
     'done' => [
+        ['data' => '2026-10-13', 'mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-link', 'titulo' => 'Endereço do webhook da pesquisa já correto na tela', 'desc' => 'Em APIs & Conexões, o endereço para cadastrar no Prismabot agora aparece com o endereço real do seu painel, pronto para copiar.'],
         ['data' => '2026-10-13', 'mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-book', 'titulo' => 'Manual da plataforma', 'desc' => 'Novo menu Manual com a explicação de todas as telas e funções do painel, com busca. Ele é atualizado a cada novidade.'],
         ['data' => '2026-10-13', 'mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-comments', 'titulo' => 'Conversas do Assistente IA para o administrador', 'desc' => 'Veja o que cada usuário conversou com o assistente. Ao iniciar uma nova conversa o histórico continua guardado, e as gravações agora tocam direto dentro do chat.'],
         ['data' => '2026-10-13', 'mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-headphones', 'titulo' => 'Link de gravação no Chat IA funcionando', 'desc' => 'Ao pedir para ouvir uma gravação, o chat entrega o link real e seguro do seu painel, e nunca mais endereços inventados.'],

@@ -35,6 +35,7 @@ return [
     ['id' => 'whatsapp', 'titulo' => 'WhatsApp & Automação', 'icon' => 'fa-brands fa-whatsapp', 'itens' => [
         ['t' => 'Regras (URA, transbordo e NPS)', 'd' => 'Defina avisos automáticos por WhatsApp, como pesquisa de satisfação e aviso de abandono de fila.'],
         ['t' => 'Chamadas perdidas: quando avisar', 'd' => 'O atendente só é avisado quando a perda é real: ignora chamadas muito curtas e chamadas atendidas em outro ramal. Os limites são ajustáveis na tela de APIs & Conexões.'],
+        ['t' => 'Webhook das respostas da pesquisa (NPS)', 'd' => 'Endereço que o Prismabot usa para avisar o painel quando o cliente responde a pesquisa com uma nota de 1 a 5. Copie o endereço mostrado em APIs & Conexões e cadastre-o no Prismabot como webhook de mensagens recebidas.', 'dica' => 'Se você abrir esse endereço direto no navegador, a resposta "ignorado" é normal: significa que o endereço está funcionando e que não havia mensagem para processar.', 'aviso' => 'O endereço contém uma chave de acesso. Não compartilhe em locais públicos.'],
         ['t' => 'Histórico de envio', 'd' => 'Lista de tudo o que foi enviado e se chegou ao destino.'],
         ['t' => 'Disparo rápido', 'd' => 'Envia uma mensagem de teste ou avulsa para um número.'],
         ['t' => 'Agenda & Contatos', 'd' => 'Cadastro de contatos usado nos envios e na identificação de quem liga.'],
