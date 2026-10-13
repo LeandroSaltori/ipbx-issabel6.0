@@ -34,6 +34,7 @@ $first_run = !file_exists($db_file);
 try {
     $db = new PDO("sqlite:" . $db_file);
     $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    try { $db->exec('PRAGMA busy_timeout = 5000'); } catch (Exception $e) {}
     $db->exec("PRAGMA encoding = 'UTF-8';");
 
     // Criar tabelas se não existirem

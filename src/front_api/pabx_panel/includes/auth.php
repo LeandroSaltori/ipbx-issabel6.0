@@ -180,8 +180,17 @@ function authLogout() {
 
 function authIsLoggedIn() {
     if (empty($_SESSION['logged_user_id'])) return false;
-    $u = getSystemUserById($_SESSION['logged_user_id']);
-    if (!$u || ($u['status'] ?? 'Ativo') !== 'Ativo') {
+    global $db;
+    // Falha momentânea do banco (ex.: SQLite ocupado) NÃO pode derrubar o login: só desloga se o
+    // usuário realmente não existe mais ou foi desativado.
+    try {
+        $st = $db->prepare('SELECT status FROM system_users WHERE id = :id');
+        $st->execute([':id' => intval($_SESSION['logged_user_id'])]);
+        $row = $st->fetch(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) {
+        return true;
+    }
+    if (!$row || ($row['status'] ?? 'Ativo') !== 'Ativo') {
         unset($_SESSION['logged_user_id']);
         return false;
     }
