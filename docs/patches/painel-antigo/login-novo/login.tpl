@@ -5,6 +5,8 @@
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>IPbx - Prisma Telecom - {$PAGE_NAME}</title>
+<link rel="icon" type="image/png" href="{$WEBPATH}/themes/{$THEMENAME}/images/login/favicon.png">
+<link rel="shortcut icon" href="{$WEBPATH}/favicon.ico">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Exo+2:wght@500;700;800&family=Noto+Sans:wght@400;600&display=swap">
 {literal}
@@ -101,8 +103,6 @@ body{font-family:'Noto Sans','Segoe UI',system-ui,sans-serif;color:#e6eef7;min-h
 <script>
 (function(){
   try {
-    var m = document.cookie.match(/(?:^|; )ipbx_painel=([^;]+)/);
-    if (m) { var r = document.querySelector('#painel-sel input[value="' + m[1] + '"]'); if (r) r.checked = true; }
   } catch (e) {}
   var f = document.getElementById('form_login'), go = document.getElementById('go');
   f.addEventListener('submit', function(){

@@ -1174,6 +1174,7 @@ if ($__route_perm !== '' && !hasUserPermission($__route_perm)) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>IPbx Prisma x Prismabot - Painel Integrado (NEWFRONT)</title>
+    <link rel="icon" type="image/png" href="favicon.png">
     
     <!-- Google Fonts: Inter -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
