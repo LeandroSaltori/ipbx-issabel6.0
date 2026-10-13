@@ -6,7 +6,7 @@
 
 $msg      = '';
 $msg_type = 'success';
-$__provLabelsTop = ['openai' => 'OpenAI (GPT)', 'groq' => 'Groq', 'gemini' => 'Google Gemini', 'deepseek' => 'DeepSeek'];
+$__provLabelsTop = ['openai' => 'OpenAI (GPT)', 'groq' => 'Groq', 'gemini' => 'Google Gemini'];
 
 // ─── Salvar Copiloto IA ──────────────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -52,11 +52,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             elseif ($__kv !== '') { $__save->execute([':k' => 'ai_key_' . $__p, ':v' => $__kv]); $__save->execute([':k' => 'ai_key_status_' . $__p, ':v' => '']); }
         }
         foreach (array_keys(aiRoles()) as $__r) {
-            $__prov = trim($_POST["ai_role_{$__r}_provider"] ?? '');
-            if ($__prov !== '' && !isset(aiProviderDefaults()[$__prov])) $__prov = '';
-            $__save->execute([':k' => "ai_role_{$__r}_provider", ':v' => $__prov]);
-            $__save->execute([':k' => "ai_role_{$__r}_model", ':v' => trim($_POST["ai_role_{$__r}_model"] ?? '')]);
+            // Cada página salva só o que ela mostra: provedor das tarefas (página Tarefas) e modelo (página Ajustes)
+            if (isset($_POST['ai_roles_present'])) {
+                $__prov = trim($_POST["ai_role_{$__r}_provider"] ?? '');
+                if ($__prov !== '' && !isset(aiProviderDefaults()[$__prov])) $__prov = '';
+                $__save->execute([':k' => "ai_role_{$__r}_provider", ':v' => $__prov]);
+            }
+            if (isset($_POST['ai_adv_present'])) $__save->execute([':k' => "ai_role_{$__r}_model", ':v' => trim($_POST["ai_role_{$__r}_model"] ?? '')]);
         }
+        if (isset($_POST['ai_toggle_present'])) $__save->execute([':k' => 'enable_copilot', ':v' => isset($_POST['enable_copilot']) ? '1' : '0']);
         if (isset($_POST['action_test_ai_key'])) {
             $__tp = (string)$_POST['action_test_ai_key'];
             $__tr = aiTestProviderKey($__tp);
@@ -64,7 +68,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!$__tr['ok']) $msg_type = 'info';
         }
         if (isset($_POST['ai_adv_present'])) {
-            $__save->execute([':k' => 'enable_copilot',    ':v' => isset($_POST['enable_copilot']) ? '1' : '0']);
             $__save->execute([':k' => 'ai_custom_prompt',  ':v' => trim($_POST['ai_custom_prompt'] ?? '')]);
             $__save->execute([':k' => 'ai_token_limit',    ':v' => (string)max(64, min(4000, (int)($_POST['ai_token_limit'] ?? 1024) ?: 1024))]);
         }
@@ -131,7 +134,7 @@ $el_enabled       = getSetting('elevenlabs_enabled')  ?: '0';
 
 $ia_tab = isset($_GET['ia_tab']) ? $_GET['ia_tab'] : 'copiloto';
 
-$__provLabels = ['openai' => 'OpenAI (GPT)', 'groq' => 'Groq', 'gemini' => 'Google Gemini', 'deepseek' => 'DeepSeek'];
+$__provLabels = ['openai' => 'OpenAI (GPT)', 'groq' => 'Groq', 'gemini' => 'Google Gemini'];
 /** O que cada função está usando de fato agora (sem chamar a internet). */
 $__roleSummary = function ($role) use ($__provLabels) {
     $sel = aiRoleChoice($role);
@@ -156,239 +159,217 @@ foreach (array_keys(aiProviderDefaults()) as $__pp) if (aiKeyFor($__pp) !== '') 
     </div>
     <?php endif; ?>
 
-    <!-- Header Principal + Reset -->
-    <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
-        <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-            <div>
-                <h3 class="text-lg font-extrabold text-white flex items-center gap-2.5">
-                    <i class="fa-solid fa-microchip text-purple-400 text-xl"></i> Central Universais de Inteligência Artificial & LLMs
-                </h3>
-                <p class="text-xs text-slate-400 mt-1">Configurações globais para transcrição de áudio, resumos automáticos, análise de qualidade e síntese de voz (ElevenLabs)</p>
-            </div>
-            
-            <form method="POST" onsubmit="return confirm('Resetar TODAS as configurações de IA? Esta ação é irreversível.');">
-                <input type="hidden" name="action_reset_defaults" value="1">
-                <button type="submit" class="px-3.5 py-2 bg-rose-600/10 hover:bg-rose-600/20 text-rose-400 border border-rose-500/30 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow">
-                    <i class="fa-solid fa-rotate-left"></i> Restaurar Padrões
-                </button>
-            </form>
-        </div>
+    <?php
+        $__ui   = ['openai', 'groq', 'gemini'];                       // provedores disponíveis
+        $__defs = aiProviderDefaults();
+        $__hints = [
+            'audio'    => 'Converte a gravação da chamada em texto. Só OpenAI ou Groq fazem isso.',
+            'insights' => 'Resumos de chamada, auditoria e análises do Copiloto. Textos curtos: vale um modelo rápido e barato.',
+            'chat'     => 'Conversa do assistente dentro do painel. Precisa de um modelo que use ferramentas.',
+        ];
+        $__provInfo = [
+            'openai' => ['nome' => 'OpenAI (ChatGPT)', 'icon' => 'fa-brain', 'cor' => 'text-emerald-400', 'url' => 'https://platform.openai.com/api-keys', 'fazem' => 'Transcrição de áudio, resumos e chat.', 'nota' => 'Serviço pago, cobrado por uso. Confira o plano atual no site da OpenAI.'],
+            'groq'   => ['nome' => 'Groq (Llama e Whisper)', 'icon' => 'fa-bolt', 'cor' => 'text-orange-400', 'url' => 'https://console.groq.com/keys', 'fazem' => 'Transcrição de áudio (Whisper), resumos e chat (Llama).', 'nota' => 'Costuma ter plano gratuito com limites diários, e é muito rápido. Não confunda com o Grok, da xAI. Confira os limites atuais no site da Groq.'],
+            'gemini' => ['nome' => 'Google Gemini', 'icon' => 'fa-gem', 'cor' => 'text-sky-400', 'url' => 'https://aistudio.google.com/app/apikey', 'fazem' => 'Resumos e chat. Não transcreve áudio.', 'nota' => 'Costuma ter plano gratuito com limites. Confira o plano atual no Google AI Studio.'],
+        ];
+        $__dot = function ($p) {
+            if (aiKeyFor($p) === '') return 'bg-slate-600';
+            $st = aiKeyStatus($p);
+            if ($st && !empty($st['ok'])) return 'bg-emerald-400';
+            if ($st) return 'bg-rose-400';
+            return 'bg-amber-400';
+        };
+        $__tabs = ['geral', 'tarefas', 'openai', 'groq', 'gemini', 'ajustes', 'elevenlabs'];
+        if ($ia_tab === 'copiloto' || !in_array($ia_tab, $__tabs, true)) $ia_tab = 'geral';
+        $__navBtn = function ($tab, $label, $icon, $dot = '') use ($ia_tab) {
+            $on = $ia_tab === $tab;
+            return '<a href="index.php?module=configuracoes&action=ia&ia_tab=' . $tab . '" class="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-bold transition ' . ($on ? 'bg-brand-600 text-white shadow-lg' : 'text-slate-400 hover:text-white hover:bg-slate-800/60') . '">'
+                 . '<i class="fa-solid ' . $icon . ' w-4 text-center"></i><span class="flex-1">' . $label . '</span>'
+                 . ($dot !== '' ? '<span class="w-2 h-2 rounded-full ' . $dot . '"></span>' : '') . '</a>';
+        };
+        $__saveBtnStyle = 'white-space:nowrap !important;flex-shrink:0 !important;width:auto !important;overflow:visible !important;text-overflow:clip !important';
+    ?>
 
-        <!-- O que cada função da IA está usando agora -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 pt-2">
-            <?php foreach ([['audio','Transcrição de áudio','fa-wave-square','text-cyan-400'], ['insights','Copiloto e resumos','fa-brain','text-purple-400'], ['chat','Chat assistente','fa-comments','text-emerald-400']] as $__c):
-                $__sm = $__roleSummary($__c[0]); ?>
-            <div class="p-3.5 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between gap-2">
-                <div class="min-w-0">
-                    <span class="text-[10px] uppercase font-mono text-slate-500 font-bold block"><?php echo $__c[1]; ?></span>
-                    <strong class="text-xs text-white flex items-center gap-1.5 mt-0.5"><i class="fa-solid <?php echo $__c[2] . ' ' . $__c[3]; ?>"></i> <?php echo $__sm['ok'] ? htmlspecialchars($__sm['prov']) : 'Sem chave'; ?></strong>
-                    <?php if ($__sm['ok'] && $__sm['model'] !== ''): ?><span class="text-[10px] text-slate-500 font-mono block truncate"><?php echo htmlspecialchars($__sm['model']); ?></span><?php endif; ?>
-                </div>
-                <span class="px-2 py-0.5 rounded text-[9px] font-bold font-mono border whitespace-nowrap <?php echo $__sm['ok'] ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border-rose-500/20'; ?>"><?php echo $__sm['ok'] ? '● Pronto' : '○ Falta chave'; ?></span>
-            </div>
-            <?php endforeach; ?>
-            <div class="p-3.5 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between gap-2">
-                <div>
-                    <span class="text-[10px] uppercase font-mono text-slate-500 font-bold block">Voz (ElevenLabs)</span>
-                    <strong class="text-xs text-white flex items-center gap-1.5 mt-0.5"><i class="fa-solid fa-microphone text-amber-400"></i> <?php echo $el_enabled === '1' ? 'Habilitada' : 'Desabilitada'; ?></strong>
-                </div>
-                <span class="px-2 py-0.5 rounded text-[9px] font-bold font-mono border whitespace-nowrap <?php echo ($el_enabled === '1' && !empty($el_api_key)) ? 'bg-amber-500/10 text-amber-300 border-amber-500/20' : 'bg-slate-800 text-slate-500 border-slate-700'; ?>"><?php echo ($el_enabled === '1' && !empty($el_api_key)) ? '● Ativa' : '○ Inativa'; ?></span>
-            </div>
-        </div>
-
-        <!-- Seletor de Tabs -->
-        <div class="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs font-bold w-fit mt-2">
-            <a href="index.php?module=configuracoes&action=ia&ia_tab=copiloto"
-               class="px-4 py-2 rounded-lg transition flex items-center gap-1.5 <?php echo $ia_tab === 'copiloto' ? 'bg-brand-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'; ?>">
-                <i class="fa-solid fa-robot"></i> Copiloto & Análise LLM
-            </a>
-            <a href="index.php?module=configuracoes&action=ia&ia_tab=elevenlabs"
-               class="px-4 py-2 rounded-lg transition flex items-center gap-1.5 <?php echo $ia_tab === 'elevenlabs' ? 'bg-purple-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'; ?>">
-                <i class="fa-solid fa-waveform-lines"></i> ElevenLabs TTS (Vozes)
-            </a>
+    <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-brand-500/20 text-brand-400 border border-brand-500/30 flex items-center justify-center text-lg"><i class="fa-solid fa-robot"></i></div>
+        <div>
+            <h3 class="text-lg font-extrabold text-white">Inteligência Artificial</h3>
+            <p class="text-xs text-slate-400">Chaves dos provedores e quem faz cada tarefa no painel.</p>
         </div>
     </div>
 
-    <!-- ─── TAB: COPILOTO IA ─────────────────────────────────────────────── -->
-    <?php if ($ia_tab === 'copiloto'): ?>
-    <div class="space-y-5">
-        <?php if (!$__anyKey): ?>
-        <div class="p-4 rounded-xl bg-amber-500/10 text-amber-300 border border-amber-500/20 text-xs font-bold flex items-center gap-2">
-            <i class="fa-solid fa-triangle-exclamation text-amber-400"></i>
-            Nenhuma chave de IA guardada. Cole pelo menos uma chave no Passo 1 abaixo; sem ela o Copiloto mostra apenas os números reais do CDR, sem análise.
-        </div>
-        <?php endif; ?>
+    <div class="grid grid-cols-1 lg:grid-cols-[230px_minmax(0,1fr)] gap-5 items-start">
+        <!-- Menu lateral -->
+        <nav class="bg-slate-900/90 border border-slate-800 rounded-2xl p-2.5 space-y-1">
+            <?php echo $__navBtn('geral', 'Visão geral', 'fa-gauge-high'); ?>
+            <?php echo $__navBtn('tarefas', 'Tarefas da IA', 'fa-diagram-project'); ?>
+            <div class="px-3 pt-3 pb-1 text-[10px] uppercase tracking-wider text-slate-500 font-bold">Provedores</div>
+            <?php foreach ($__ui as $__p) echo $__navBtn($__p, htmlspecialchars(explode(' (', $__provInfo[$__p]['nome'])[0]), $__provInfo[$__p]['icon'], $__dot($__p)); ?>
+            <div class="px-3 pt-3 pb-1 text-[10px] uppercase tracking-wider text-slate-500 font-bold">Voz</div>
+            <?php echo $__navBtn('elevenlabs', 'ElevenLabs', 'fa-microphone-lines', ($el_enabled === '1' && !empty($el_api_key)) ? 'bg-emerald-400' : 'bg-slate-600'); ?>
+            <div class="px-3 pt-3 pb-1 text-[10px] uppercase tracking-wider text-slate-500 font-bold">Avançado</div>
+            <?php echo $__navBtn('ajustes', 'Ajustes do assistente', 'fa-sliders'); ?>
+        </nav>
 
-        <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl max-w-4xl space-y-6">
-            <?php
-                $__defs = aiProviderDefaults();
-                $__hints = [
-                    'audio'    => 'Converte a gravação em texto. Só OpenAI ou Groq fazem isso.',
-                    'insights' => 'Resumos de chamada, auditoria e análises do Copiloto. Textos curtos: vale um modelo rápido e barato.',
-                    'chat'     => 'Conversa do assistente dentro do painel. Precisa de um modelo que use ferramentas.',
-                ];
-            ?>
-            <form method="POST" action="index.php?module=configuracoes&action=ia&ia_tab=copiloto" class="space-y-6 text-xs">
-                <input type="hidden" name="ai_adv_present" value="1">
-                <button type="submit" name="action_save_ai_roles" value="1" class="hidden" tabindex="-1" aria-hidden="true"></button><!-- Enter nos campos = Salvar -->
+        <!-- Conteúdo -->
+        <div class="min-w-0">
 
-                <div class="flex items-center justify-between p-4 bg-slate-950 rounded-2xl border border-slate-800">
-                    <div>
-                        <span class="font-extrabold text-white text-sm block">Inteligência Artificial ativa</span>
-                        <span class="text-slate-400">Liga o assistente do painel e os resumos automáticos. Desligada, nada é enviado a provedores de IA.</span>
+    <?php if ($ia_tab === 'geral'): ?>
+        <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-5">
+            <div class="flex items-start justify-between gap-3 flex-wrap">
+                <div><h4 class="text-base font-extrabold text-white">Visão geral</h4><p class="text-xs text-slate-400">O que a IA está usando agora e o que falta para funcionar.</p></div>
+                <button type="submit" form="f_geral" style="<?php echo $__saveBtnStyle; ?>" class="px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white font-extrabold rounded-xl text-xs flex items-center gap-2"><i class="fa-solid fa-floppy-disk"></i> Salvar</button>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <?php foreach ([['audio','Transcrição de áudio','fa-wave-square','text-cyan-400'], ['insights','Copiloto e resumos','fa-brain','text-purple-400'], ['chat','Chat assistente','fa-comments','text-emerald-400']] as $__c):
+                    $__sm = $__roleSummary($__c[0]); ?>
+                <div class="p-3.5 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between gap-2">
+                    <div class="min-w-0">
+                        <span class="text-[10px] uppercase font-mono text-slate-500 font-bold block"><?php echo $__c[1]; ?></span>
+                        <strong class="text-xs text-white flex items-center gap-1.5 mt-0.5"><i class="fa-solid <?php echo $__c[2] . ' ' . $__c[3]; ?>"></i> <?php echo $__sm['ok'] ? htmlspecialchars($__sm['prov']) : 'Sem chave'; ?></strong>
+                        <?php if ($__sm['ok'] && $__sm['model'] !== ''): ?><span class="text-[10px] text-slate-500 font-mono block truncate"><?php echo htmlspecialchars($__sm['model']); ?></span><?php endif; ?>
                     </div>
+                    <span class="px-2 py-0.5 rounded text-[9px] font-bold font-mono border whitespace-nowrap <?php echo $__sm['ok'] ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border-rose-500/20'; ?>"><?php echo $__sm['ok'] ? '● Pronto' : '○ Falta chave'; ?></span>
+                </div>
+                <?php endforeach; ?>
+            </div>
+
+            <form id="f_geral" method="POST" action="index.php?module=configuracoes&action=ia&ia_tab=geral">
+                <input type="hidden" name="ai_toggle_present" value="1">
+                <input type="hidden" name="action_save_ai_roles" value="1">
+                <div class="flex items-center justify-between p-4 bg-slate-950 rounded-2xl border border-slate-800">
+                    <div><span class="font-extrabold text-white text-sm block">Inteligência Artificial ativa</span><span class="text-xs text-slate-400">Liga o assistente do painel e os resumos automáticos. Desligada, nada é enviado a provedores de IA.</span></div>
                     <label class="relative inline-flex items-center cursor-pointer">
                         <input type="checkbox" name="enable_copilot" value="1" class="sr-only peer" <?php echo $enable_copilot === '1' ? 'checked' : ''; ?>>
                         <div class="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-brand-600"></div>
                     </label>
                 </div>
-
-                <!-- PASSO 1 -->
-                <section class="space-y-3">
-                    <div class="flex items-center gap-2"><span class="w-6 h-6 rounded-full bg-brand-600 text-white font-extrabold flex items-center justify-center text-[11px]">1</span>
-                        <h4 class="text-sm font-extrabold text-white">Cole a chave do provedor e clique em Testar</h4></div>
-                    <p class="text-slate-400">Basta uma. Se tiver mais de uma, o painel usa cada uma onde ela é melhor. A chave fica guardada só neste servidor.</p>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <?php foreach ($__defs as $__p => $__d):
-                            $__has = aiKeyFor($__p) !== ''; $__st = $__has ? aiKeyStatus($__p) : null;
-                            if (!$__has) { $__bd = 'border-slate-800'; $__bg = 'text-slate-500'; $__tx = '○ Sem chave'; }
-                            elseif ($__st && !empty($__st['ok'])) { $__bd = 'border-emerald-500/40'; $__bg = 'text-emerald-400'; $__tx = '✓ Aprovada'; }
-                            elseif ($__st) { $__bd = 'border-rose-500/40'; $__bg = 'text-rose-400'; $__tx = '✗ Falhou'; }
-                            else { $__bd = 'border-amber-500/30'; $__bg = 'text-amber-400'; $__tx = '● Salva, ainda não testada'; }
-                        ?>
-                        <div class="p-3 rounded-xl bg-slate-950 border <?php echo $__bd; ?> space-y-1.5">
-                            <label class="font-bold text-slate-300 flex items-center justify-between">
-                                <span><?php echo htmlspecialchars($__provLabels[$__p] ?? $__p); ?></span>
-                                <span class="text-[10px] <?php echo $__bg; ?>"><?php echo $__tx; ?></span>
-                            </label>
-                            <div class="flex items-center gap-2">
-                                <input type="password" name="ai_key_<?php echo $__p; ?>" autocomplete="new-password" placeholder="<?php echo $__has ? 'Em branco = manter a chave atual' : 'Cole a API Key'; ?>"
-                                       class="flex-1 min-w-0 px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white font-mono focus:border-brand-500 focus:outline-none">
-                                <button type="submit" name="action_test_ai_key" value="<?php echo $__p; ?>" style="white-space:nowrap !important;flex-shrink:0 !important;width:auto !important;overflow:visible !important;text-overflow:clip !important" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl border border-slate-700 flex items-center gap-1.5">
-                                    <i class="fa-solid fa-flask text-brand-400"></i> Testar
-                                </button>
-                            </div>
-                            <?php if ($__st && empty($__st['ok'])): ?><div class="text-[10px] text-rose-300"><?php echo htmlspecialchars((string)($__st['msg'] ?? '')); ?></div><?php endif; ?>
-                            <?php if ($__has && getSetting('ai_key_' . $__p) !== ''): ?>
-                            <label class="text-[10px] text-slate-500 flex items-center gap-1"><input type="checkbox" name="ai_key_clear_<?php echo $__p; ?>" value="1"> remover esta chave</label>
-                            <?php endif; ?>
-                        </div>
-                        <?php endforeach; ?>
-                    </div>
-                </section>
-
-                <!-- PASSO 2 -->
-                <section class="space-y-3">
-                    <div class="flex items-center gap-2"><span class="w-6 h-6 rounded-full bg-brand-600 text-white font-extrabold flex items-center justify-center text-[11px]">2</span>
-                        <h4 class="text-sm font-extrabold text-white">Escolha quem faz cada tarefa</h4></div>
-                    <p class="text-slate-400">Os provedores sem chave aprovada ficam apagados. <b class="text-slate-200">Automático</b> deixa o painel escolher sozinho entre as chaves que você colou.</p>
-                    <div class="space-y-3">
-                        <?php foreach (aiRoles() as $__r => $__lbl): $__rp = (string)getSetting("ai_role_{$__r}_provider"); ?>
-                        <div class="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
-                            <div>
-                                <div class="font-bold text-slate-200"><?php echo htmlspecialchars($__lbl); ?></div>
-                                <div class="text-[10px] text-slate-500"><?php echo htmlspecialchars($__hints[$__r]); ?></div>
-                            </div>
-                            <div class="grid grid-cols-2 sm:grid-cols-5 gap-2">
-                                <label class="cursor-pointer">
-                                    <input type="radio" name="ai_role_<?php echo $__r; ?>_provider" value="" class="sr-only peer" <?php echo $__rp === '' ? 'checked' : ''; ?>>
-                                    <div class="p-2.5 text-center rounded-xl bg-slate-900 border-2 border-slate-800 peer-checked:border-brand-500 peer-checked:bg-brand-500/10 hover:border-slate-600 transition">
-                                        <i class="fa-solid fa-wand-magic-sparkles text-brand-400 block mb-0.5"></i><span class="font-bold text-white block">Automático</span><span class="text-[9px] text-slate-500">recomendado</span>
-                                    </div>
-                                </label>
-                                <?php foreach ($__defs as $__p => $__d):
-                                    $__has = aiKeyFor($__p) !== ''; $__st = $__has ? aiKeyStatus($__p) : null;
-                                    $__failed = $__st && empty($__st['ok']);
-                                    $__noaudio = ($__r === 'audio' && !in_array($__p, ['openai', 'groq'], true));
-                                    $__can = $__has && !$__failed && !$__noaudio;
-                                    $__why = $__noaudio ? 'não transcreve' : (!$__has ? 'sem chave' : ($__failed ? 'chave com erro' : (($__st && !empty($__st['ok'])) ? 'aprovada' : 'não testada')));
-                                ?>
-                                <label class="<?php echo $__can ? 'cursor-pointer' : 'cursor-not-allowed opacity-40'; ?>" <?php echo $__can ? '' : 'title="' . htmlspecialchars($__why) . '"'; ?>>
-                                    <input type="radio" name="ai_role_<?php echo $__r; ?>_provider" value="<?php echo $__p; ?>" class="sr-only peer" <?php echo $__rp === $__p ? 'checked' : ''; ?> <?php echo $__can ? '' : 'disabled'; ?>>
-                                    <div class="p-2.5 text-center rounded-xl bg-slate-900 border-2 border-slate-800 <?php echo $__can ? 'peer-checked:border-brand-500 peer-checked:bg-brand-500/10 hover:border-slate-600' : ''; ?> transition">
-                                        <span class="font-bold text-white block"><?php echo htmlspecialchars(preg_replace('/ \(.*\)/', '', $__provLabels[$__p] ?? $__p)); ?></span>
-                                        <span class="text-[9px] <?php echo $__can ? (($__st && !empty($__st['ok'])) ? 'text-emerald-400' : 'text-amber-400') : 'text-slate-500'; ?>"><?php echo htmlspecialchars($__why); ?></span>
-                                    </div>
-                                </label>
-                                <?php endforeach; ?>
-                            </div>
-                        </div>
-                        <?php endforeach; ?>
-                    </div>
-                </section>
-
-                <!-- PASSO 3 -->
-                <section class="space-y-3">
-                    <div class="flex items-center gap-2"><span class="w-6 h-6 rounded-full bg-slate-700 text-white font-extrabold flex items-center justify-center text-[11px]">3</span>
-                        <h4 class="text-sm font-extrabold text-white">Ajustes finos <span class="text-slate-500 font-normal">(opcional)</span></h4></div>
-                    <details class="group">
-                        <summary class="cursor-pointer text-slate-400 hover:text-white font-bold py-1"><i class="fa-solid fa-sliders"></i> Mostrar ajustes</summary>
-                        <div class="space-y-3 pt-3">
-                            <div>
-                                <label class="font-bold text-slate-300 block mb-1">Instrução de tom do assistente <span class="text-slate-500 font-normal">(vazio = padrão do sistema)</span></label>
-                                <textarea name="ai_custom_prompt" rows="3" placeholder="Ex.: Responda sempre de forma curta e cordial."
-                                          class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:border-brand-500 focus:outline-none"><?php echo htmlspecialchars($ai_custom_prompt); ?></textarea>
-                            </div>
-                            <div>
-                                <label class="font-bold text-slate-300 block mb-1">Tamanho máximo das respostas <span class="text-slate-500 font-normal">(tokens)</span></label>
-                                <input type="number" name="ai_token_limit" value="<?php echo htmlspecialchars($ai_token_limit); ?>" min="64" max="4000"
-                                       class="w-full sm:w-48 px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono focus:border-brand-500 focus:outline-none">
-                            </div>
-                            <div>
-                                <label class="font-bold text-slate-300 block mb-1">Modelo específico por tarefa <span class="text-slate-500 font-normal">(vazio = o painel escolhe o melhor disponível)</span></label>
-                                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                                    <?php foreach (aiRoles() as $__r => $__lbl): ?>
-                                    <input type="text" name="ai_role_<?php echo $__r; ?>_model" value="<?php echo htmlspecialchars((string)getSetting("ai_role_{$__r}_model")); ?>" placeholder="<?php echo htmlspecialchars($__lbl); ?>"
-                                           class="px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono focus:border-brand-500 focus:outline-none">
-                                    <?php endforeach; ?>
-                                </div>
-                            </div>
-                        </div>
-                    </details>
-                </section>
-
-                <div class="flex items-center justify-between pt-1 gap-3 flex-wrap">
-                    <p class="text-slate-500 text-[11px] flex items-center gap-1"><i class="fa-solid fa-shield text-brand-400"></i> Chaves guardadas somente no banco local deste servidor.</p>
-                    <div class="flex items-center gap-2">
-                        <button type="submit" name="action_test_ai_roles" value="1" style="white-space:nowrap !important;flex-shrink:0 !important;width:auto !important;overflow:visible !important;text-overflow:clip !important" class="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-extrabold rounded-xl transition border border-slate-700 flex items-center gap-2">
-                            <i class="fa-solid fa-plug-circle-check text-brand-400"></i> Salvar e Testar
-                        </button>
-                        <button type="submit" name="action_save_ai_roles" value="1" style="white-space:nowrap !important;flex-shrink:0 !important;width:auto !important;overflow:visible !important;text-overflow:clip !important" class="px-5 py-2.5 bg-brand-600 hover:bg-brand-500 text-white font-extrabold rounded-xl transition shadow-lg shadow-brand-600/20 flex items-center gap-2">
-                            <i class="fa-solid fa-floppy-disk"></i> Salvar
-                        </button>
-                    </div>
-                </div>
             </form>
 
-            <!-- Card Explicativo: Como a IA Analisa as Ligações -->
+            <div class="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2 text-xs">
+                <div class="font-extrabold text-white text-sm">Como configurar</div>
+                <?php $__okKey = false; foreach ($__ui as $__p) { $s = aiKeyStatus($__p); if (aiKeyFor($__p) !== '' && $s && !empty($s['ok'])) $__okKey = true; } ?>
+                <div class="flex items-center gap-2"><i class="fa-solid <?php echo $__okKey ? 'fa-circle-check text-emerald-400' : 'fa-circle text-slate-600'; ?>"></i><span class="text-slate-300"><b>1.</b> Em <a class="text-brand-400 underline" href="index.php?module=configuracoes&action=ia&ia_tab=groq">Groq</a>, <a class="text-brand-400 underline" href="index.php?module=configuracoes&action=ia&ia_tab=openai">OpenAI</a> ou <a class="text-brand-400 underline" href="index.php?module=configuracoes&action=ia&ia_tab=gemini">Gemini</a>, cole a chave e clique em Testar.</span></div>
+                <div class="flex items-center gap-2"><i class="fa-solid <?php echo $__anyKey ? 'fa-circle-check text-emerald-400' : 'fa-circle text-slate-600'; ?>"></i><span class="text-slate-300"><b>2.</b> Em <a class="text-brand-400 underline" href="index.php?module=configuracoes&action=ia&ia_tab=tarefas">Tarefas da IA</a>, deixe Automático ou escolha quem faz cada tarefa.</span></div>
+                <div class="flex items-center gap-2"><i class="fa-solid <?php echo $enable_copilot === '1' ? 'fa-circle-check text-emerald-400' : 'fa-circle text-slate-600'; ?>"></i><span class="text-slate-300"><b>3.</b> Deixe a Inteligência Artificial ativa (acima).</span></div>
+            </div>
+
             <div class="p-5 rounded-2xl bg-slate-950 border border-purple-500/30 space-y-3">
-                <div class="flex items-center gap-2 text-purple-400 font-bold text-xs uppercase tracking-wider">
-                    <i class="fa-solid fa-brain"></i> Como a IA Analisa as Ligações do PABX Automático?
-                </div>
-                <p class="text-slate-300 text-xs leading-relaxed">
-                    A IA do PABX Prisma lê automaticamente a transcrição dos áudios das chamadas (utilizando o modelo <b>GroqCloud Whisper Turbo</b> ou <b>OpenAI Whisper</b>) e extrai métricas qualitativas sem intervenção manual:
-                </p>
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 text-[11px]">
-                    <div class="p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-300">
-                        <strong class="text-emerald-400 block mb-0.5"><i class="fa-solid fa-comments"></i> Saudações & Cordialidade</strong>
-                        Verifica se o operador utilizou a saudação padrão da empresa e tom profissional.
-                    </div>
-                    <div class="p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-300">
-                        <strong class="text-amber-400 block mb-0.5"><i class="fa-solid fa-shield-cat"></i> Mapeamento de Objeções</strong>
-                        Identifica recusas, dúvidas de preços ou queixas do cliente em tempo real.
-                    </div>
-                    <div class="p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-300">
-                        <strong class="text-purple-400 block mb-0.5"><i class="fa-solid fa-chart-line-up"></i> Rating & Lead Score (0-100)</strong>
-                        Classifica a probabilidade de fechamento ou insatisfação com notas automáticas.
-                    </div>
-                    <div class="p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-300">
-                        <strong class="text-cyan-400 block mb-0.5"><i class="fa-solid fa-clock-rotate-left"></i> Histórico de 50 Análises</strong>
-                        Mantém gravados os relatórios para consulta em auditorias operacionais.
-                    </div>
+                <div class="flex items-center gap-2 text-purple-400 font-bold text-xs uppercase tracking-wider"><i class="fa-solid fa-brain"></i> O que a IA faz com as ligações</div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-[11px]">
+                    <div class="p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-300"><strong class="text-emerald-400 block mb-0.5"><i class="fa-solid fa-comments"></i> Saudações e cordialidade</strong>Verifica se o atendente usou a saudação padrão e um tom profissional.</div>
+                    <div class="p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-300"><strong class="text-amber-400 block mb-0.5"><i class="fa-solid fa-shield-cat"></i> Objeções e reclamações</strong>Identifica recusas, dúvidas de preço ou queixas do cliente.</div>
+                    <div class="p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-300"><strong class="text-purple-400 block mb-0.5"><i class="fa-solid fa-chart-line"></i> Nota de qualidade</strong>Classifica o atendimento com uma nota de 0 a 100.</div>
+                    <div class="p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-300"><strong class="text-cyan-400 block mb-0.5"><i class="fa-solid fa-clock-rotate-left"></i> Histórico</strong>Guarda as análises para consulta em auditorias.</div>
                 </div>
             </div>
         </div>
-    </div>
+
+    <?php elseif ($ia_tab === 'tarefas'): ?>
+        <form id="f_tarefas" method="POST" action="index.php?module=configuracoes&action=ia&ia_tab=tarefas" class="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-5 text-xs">
+            <input type="hidden" name="ai_roles_present" value="1">
+            <button type="submit" name="action_save_ai_roles" value="1" class="hidden" tabindex="-1" aria-hidden="true"></button>
+            <div class="flex items-start justify-between gap-3 flex-wrap">
+                <div><h4 class="text-base font-extrabold text-white">Tarefas da IA</h4><p class="text-slate-400">Escolha quem faz cada tarefa. Provedores sem chave aprovada ficam apagados. <b class="text-slate-200">Automático</b> deixa o painel escolher entre as chaves que você colou.</p></div>
+                <div class="flex items-center gap-2">
+                    <button type="submit" name="action_test_ai_roles" value="1" style="<?php echo $__saveBtnStyle; ?>" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-extrabold rounded-xl border border-slate-700 flex items-center gap-2"><i class="fa-solid fa-plug-circle-check text-brand-400"></i> Salvar e Testar</button>
+                    <button type="submit" name="action_save_ai_roles" value="1" style="<?php echo $__saveBtnStyle; ?>" class="px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white font-extrabold rounded-xl flex items-center gap-2"><i class="fa-solid fa-floppy-disk"></i> Salvar</button>
+                </div>
+            </div>
+            <div class="space-y-3">
+                <?php foreach (aiRoles() as $__r => $__lbl): $__rp = (string)getSetting("ai_role_{$__r}_provider"); ?>
+                <div class="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
+                    <div><div class="font-bold text-slate-200 text-sm"><?php echo htmlspecialchars($__lbl); ?></div><div class="text-[11px] text-slate-500"><?php echo htmlspecialchars($__hints[$__r]); ?></div></div>
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        <label class="cursor-pointer">
+                            <input type="radio" name="ai_role_<?php echo $__r; ?>_provider" value="" class="sr-only peer" <?php echo ($__rp === '' || !in_array($__rp, $__ui, true)) ? 'checked' : ''; ?>>
+                            <div class="p-2.5 text-center rounded-xl bg-slate-900 border-2 border-slate-800 peer-checked:border-brand-500 peer-checked:bg-brand-500/10 hover:border-slate-600 transition"><i class="fa-solid fa-wand-magic-sparkles text-brand-400 block mb-0.5"></i><span class="font-bold text-white block">Automático</span><span class="text-[9px] text-slate-500">recomendado</span></div>
+                        </label>
+                        <?php foreach ($__ui as $__p):
+                            $__has = aiKeyFor($__p) !== ''; $__st = $__has ? aiKeyStatus($__p) : null;
+                            $__failed = $__st && empty($__st['ok']);
+                            $__noaudio = ($__r === 'audio' && !in_array($__p, ['openai', 'groq'], true));
+                            $__can = $__has && !$__failed && !$__noaudio;
+                            $__why = $__noaudio ? 'não transcreve' : (!$__has ? 'sem chave' : ($__failed ? 'chave com erro' : (($__st && !empty($__st['ok'])) ? 'aprovada' : 'não testada')));
+                        ?>
+                        <label class="<?php echo $__can ? 'cursor-pointer' : 'cursor-not-allowed opacity-40'; ?>" <?php echo $__can ? '' : 'title="' . htmlspecialchars($__why) . '"'; ?>>
+                            <input type="radio" name="ai_role_<?php echo $__r; ?>_provider" value="<?php echo $__p; ?>" class="sr-only peer" <?php echo $__rp === $__p ? 'checked' : ''; ?> <?php echo $__can ? '' : 'disabled'; ?>>
+                            <div class="p-2.5 text-center rounded-xl bg-slate-900 border-2 border-slate-800 <?php echo $__can ? 'peer-checked:border-brand-500 peer-checked:bg-brand-500/10 hover:border-slate-600' : ''; ?> transition">
+                                <i class="fa-solid <?php echo $__provInfo[$__p]['icon'] . ' ' . $__provInfo[$__p]['cor']; ?> block mb-0.5"></i>
+                                <span class="font-bold text-white block"><?php echo htmlspecialchars(explode(' (', $__provInfo[$__p]['nome'])[0]); ?></span>
+                                <span class="text-[9px] <?php echo $__can ? (($__st && !empty($__st['ok'])) ? 'text-emerald-400' : 'text-amber-400') : 'text-slate-500'; ?>"><?php echo htmlspecialchars($__why); ?></span>
+                            </div>
+                        </label>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+                <?php endforeach; ?>
+            </div>
+        </form>
+
+    <?php elseif (in_array($ia_tab, $__ui, true)): $__p = $ia_tab; $__pi = $__provInfo[$__p]; $__has = aiKeyFor($__p) !== ''; $__st = $__has ? aiKeyStatus($__p) : null;
+        if (!$__has) { $__bg = 'bg-slate-800 text-slate-400 border-slate-700'; $__tx = '○ Sem chave'; }
+        elseif ($__st && !empty($__st['ok'])) { $__bg = 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'; $__tx = '✓ Chave aprovada'; }
+        elseif ($__st) { $__bg = 'bg-rose-500/10 text-rose-400 border-rose-500/30'; $__tx = '✗ Falhou'; }
+        else { $__bg = 'bg-amber-500/10 text-amber-400 border-amber-500/30'; $__tx = '● Salva, ainda não testada'; } ?>
+        <form id="f_prov" method="POST" action="index.php?module=configuracoes&action=ia&ia_tab=<?php echo $__p; ?>" class="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-5 text-xs">
+            <button type="submit" name="action_save_ai_roles" value="1" class="hidden" tabindex="-1" aria-hidden="true"></button>
+            <div class="flex items-start justify-between gap-3 flex-wrap">
+                <div class="flex items-center gap-3"><i class="fa-solid <?php echo $__pi['icon'] . ' ' . $__pi['cor']; ?> text-2xl"></i>
+                    <div><h4 class="text-base font-extrabold text-white"><?php echo htmlspecialchars($__pi['nome']); ?></h4><p class="text-slate-400">O que ele faz aqui: <?php echo htmlspecialchars($__pi['fazem']); ?></p></div></div>
+                <button type="submit" name="action_save_ai_roles" value="1" style="<?php echo $__saveBtnStyle; ?>" class="px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white font-extrabold rounded-xl flex items-center gap-2"><i class="fa-solid fa-floppy-disk"></i> Salvar</button>
+            </div>
+            <div class="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
+                <div class="flex items-center justify-between"><span class="font-extrabold text-white text-sm">Chave de acesso (API Key)</span><span class="px-2 py-0.5 rounded text-[10px] font-bold border <?php echo $__bg; ?>"><?php echo $__tx; ?></span></div>
+                <div class="flex items-center gap-2">
+                    <input type="password" name="ai_key_<?php echo $__p; ?>" autocomplete="new-password" placeholder="<?php echo $__has ? 'Em branco = manter a chave atual' : 'Cole a API Key aqui'; ?>" class="flex-1 min-w-0 px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-white font-mono focus:border-brand-500 focus:outline-none">
+                    <button type="submit" name="action_test_ai_key" value="<?php echo $__p; ?>" style="<?php echo $__saveBtnStyle; ?>" class="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl border border-slate-700 flex items-center gap-1.5"><i class="fa-solid fa-flask text-brand-400"></i> Testar</button>
+                </div>
+                <?php if ($__st && empty($__st['ok'])): ?><div class="text-rose-300"><?php echo htmlspecialchars((string)($__st['msg'] ?? '')); ?></div><?php endif; ?>
+                <?php if ($__st && !empty($__st['ok']) && !empty($__st['t'])): ?><div class="text-slate-500">Testada em <?php echo date('d/m/Y H:i', (int)$__st['t']); ?>.</div><?php endif; ?>
+                <div class="flex items-center justify-between flex-wrap gap-2 text-[11px] text-slate-500">
+                    <span>Não tem chave? <a href="<?php echo $__pi['url']; ?>" target="_blank" rel="noopener" class="text-brand-400 underline">Gerar chave no site do provedor</a></span>
+                    <?php if ($__has && getSetting('ai_key_' . $__p) !== ''): ?><label class="flex items-center gap-1"><input type="checkbox" name="ai_key_clear_<?php echo $__p; ?>" value="1"> remover esta chave</label><?php endif; ?>
+                </div>
+            </div>
+            <div class="p-4 rounded-2xl bg-slate-950 border border-slate-800 text-slate-300 space-y-1">
+                <div class="font-bold text-white">Sobre este provedor</div>
+                <div><?php echo htmlspecialchars($__pi['nota']); ?></div>
+                <div class="text-slate-500 font-mono text-[10px] pt-1">Modelos padrão: texto <?php echo htmlspecialchars($__defs[$__p]['chat']); ?><?php echo $__defs[$__p]['audio'] !== '' ? ' | áudio ' . htmlspecialchars($__defs[$__p]['audio']) : ''; ?></div>
+            </div>
+        </form>
+
+    <?php elseif ($ia_tab === 'ajustes'): ?>
+        <form id="f_ajustes" method="POST" action="index.php?module=configuracoes&action=ia&ia_tab=ajustes" class="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-5 text-xs">
+            <input type="hidden" name="ai_adv_present" value="1">
+            <button type="submit" name="action_save_ai_roles" value="1" class="hidden" tabindex="-1" aria-hidden="true"></button>
+            <div class="flex items-start justify-between gap-3 flex-wrap">
+                <div><h4 class="text-base font-extrabold text-white">Ajustes do assistente</h4><p class="text-slate-400">Opcional. Só mexa se quiser mudar o jeito que a IA responde.</p></div>
+                <button type="submit" name="action_save_ai_roles" value="1" style="<?php echo $__saveBtnStyle; ?>" class="px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white font-extrabold rounded-xl flex items-center gap-2"><i class="fa-solid fa-floppy-disk"></i> Salvar</button>
+            </div>
+            <div>
+                <label class="font-bold text-slate-300 block mb-1">Instrução de tom do assistente <span class="text-slate-500 font-normal">(vazio = padrão do sistema)</span></label>
+                <textarea name="ai_custom_prompt" rows="3" placeholder="Ex.: Responda sempre de forma curta e cordial." class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:border-brand-500 focus:outline-none"><?php echo htmlspecialchars($ai_custom_prompt); ?></textarea>
+            </div>
+            <div>
+                <label class="font-bold text-slate-300 block mb-1">Tamanho máximo das respostas <span class="text-slate-500 font-normal">(tokens)</span></label>
+                <input type="number" name="ai_token_limit" value="<?php echo htmlspecialchars($ai_token_limit); ?>" min="64" max="4000" class="w-full sm:w-48 px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono focus:border-brand-500 focus:outline-none">
+            </div>
+            <div>
+                <label class="font-bold text-slate-300 block mb-1">Modelo específico por tarefa <span class="text-slate-500 font-normal">(vazio = o painel escolhe o melhor disponível)</span></label>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    <?php foreach (aiRoles() as $__r => $__lbl): ?>
+                    <input type="text" name="ai_role_<?php echo $__r; ?>_model" value="<?php echo htmlspecialchars((string)getSetting("ai_role_{$__r}_model")); ?>" placeholder="<?php echo htmlspecialchars($__lbl); ?>" class="px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono focus:border-brand-500 focus:outline-none">
+                    <?php endforeach; ?>
+                </div>
+            </div>
+        </form>
+        <form method="POST" onsubmit="return confirm('Isto apaga TODAS as configurações do painel (IA, WhatsApp, regras e demais). Continuar?');" class="mt-4 p-4 rounded-2xl border border-rose-500/30 bg-rose-500/5 flex items-center justify-between gap-3 flex-wrap text-xs">
+            <input type="hidden" name="action_reset_defaults" value="1">
+            <div><div class="font-bold text-rose-300">Restaurar padrões de fábrica</div><div class="text-slate-400">Atenção: apaga todas as configurações do painel, não só as de IA.</div></div>
+            <button type="submit" style="<?php echo $__saveBtnStyle; ?>" class="px-3.5 py-2 bg-rose-600/10 hover:bg-rose-600/20 text-rose-400 border border-rose-500/30 rounded-xl font-bold flex items-center gap-1.5"><i class="fa-solid fa-rotate-left"></i> Restaurar padrões</button>
+        </form>
 
     <!-- ─── TAB: ELEVENLABS ─────────────────────────────────────────────────── -->
     <?php elseif ($ia_tab === 'elevenlabs'): ?>
@@ -470,155 +451,12 @@ foreach (array_keys(aiProviderDefaults()) as $__pp) if (aiKeyFor($__pp) !== '') 
         </div>
     </div>
     <?php endif; ?>
+        </div>
+    </div>
 </div>
 
 <script>
-// ─── Provedor: Atualiza URLs e Selects de Modelos Compatíveis ────────────────
-function updateBaseUrlForProvider(pv) {
-    const urls = {
-        openai  : 'https://api.openai.com/v1',
-        groq    : 'https://api.groq.com/openai/v1',
-        gemini  : 'https://generativelanguage.googleapis.com/v1beta/openai',
-        deepseek: 'https://api.deepseek.com/v1'
-    };
-    
-    const chatModels = {
-        openai: [
-            {val: 'gpt-4o-mini', label: 'gpt-4o-mini (Recomendado / Econômico)'},
-            {val: 'gpt-4o', label: 'gpt-4o (Mais Inteligente)'},
-            {val: 'gpt-3.5-turbo', label: 'gpt-3.5-turbo (Clássico)'}
-        ],
-        groq: [
-            {val: 'llama-3.3-70b-versatile', label: 'llama-3.3-70b-versatile (Recomendado / Ultra-rápido)'},
-            {val: 'llama3-8b-8192', label: 'llama3-8b-8192 (Econômico)'},
-            {val: 'mixtral-8x7b-32768', label: 'mixtral-8x7b-32768'}
-        ],
-        gemini: [
-            {val: 'gemini-1.5-flash', label: 'gemini-1.5-flash (Recomendado / Gratuito)'},
-            {val: 'gemini-1.5-pro', label: 'gemini-1.5-pro (Raciocínio Avançado)'}
-        ],
-        deepseek: [
-            {val: 'deepseek-chat', label: 'deepseek-chat (Recomendado V3)'},
-            {val: 'deepseek-coder', label: 'deepseek-coder'}
-        ]
-    };
-
-    const audioModels = {
-        openai: [
-            {val: 'whisper-1', label: 'whisper-1 (Oficial OpenAI STT)'}
-        ],
-        groq: [
-            {val: 'whisper-large-v3', label: 'whisper-large-v3 (Recomendado Groq)'},
-            {val: 'distil-whisper-large-v3-en', label: 'distil-whisper-large-v3-en'}
-        ],
-        gemini: [
-            {val: 'whisper-1', label: 'whisper-1 (Via Proxy / Transcrição)'}
-        ],
-        deepseek: [
-            {val: 'whisper-1', label: 'whisper-1 (Via Proxy / Transcrição)'}
-        ]
-    };
-
-    const inpUrl     = document.getElementById('ai_base_url_input');
-    const selChat    = document.getElementById('ai_model_chat_select');
-    const selAudio   = document.getElementById('ai_model_audio_select');
-
-    if (inpUrl && urls[pv]) inpUrl.value = urls[pv];
-
-    if (selChat && chatModels[pv]) {
-        selChat.innerHTML = '';
-        chatModels[pv].forEach(m => {
-            const opt = document.createElement('option');
-            opt.value = m.val;
-            opt.textContent = m.label;
-            selChat.appendChild(opt);
-        });
-        const customOpt = document.createElement('option');
-        customOpt.value = 'custom';
-        customOpt.textContent = 'Outro modelo (Digitar manualmente...)';
-        selChat.appendChild(customOpt);
-        checkCustomModelInput('chat');
-    }
-
-    if (selAudio && audioModels[pv]) {
-        selAudio.innerHTML = '';
-        audioModels[pv].forEach(m => {
-            const opt = document.createElement('option');
-            opt.value = m.val;
-            opt.textContent = m.label;
-            selAudio.appendChild(opt);
-        });
-        const customAudioOpt = document.createElement('option');
-        customAudioOpt.value = 'custom';
-        customAudioOpt.textContent = 'Outro modelo de áudio...';
-        selAudio.appendChild(customAudioOpt);
-        checkCustomModelInput('audio');
-    }
-}
-
-function checkCustomModelInput(type) {
-    const sel = document.getElementById(`ai_model_${type}_select`);
-    const inp = document.getElementById(`ai_model_${type}_custom`);
-    if (!sel || !inp) return;
-
-    if (sel.value === 'custom') {
-        inp.classList.remove('hidden');
-        inp.focus();
-    } else {
-        inp.classList.add('hidden');
-        inp.value = sel.value;
-    }
-}
-
-// ─── Testar Conexão IA (LLM) ────────────────────────────────────────────────
-async function testLlmConnection() {
-    const btn = document.getElementById('btn-test-llm');
-    if (!btn) return;
-
-    const provider  = document.querySelector('input[name="ai_provider"]:checked')?.value || 'openai';
-    const apiKey    = document.querySelector('input[name="ai_api_key"]')?.value || '';
-    const adv       = document.getElementById('ai_advanced')?.value === '1';
-    const baseUrl   = adv ? (document.getElementById('ai_base_url_input')?.value || '') : '';
-
-    let selChat = adv ? document.getElementById('ai_model_chat_select')?.value : '';
-    if (selChat === 'custom') selChat = document.getElementById('ai_model_chat_custom')?.value;
-
-    if (!apiKey.trim()) {
-        alert('⚠️ Por favor, cole a API Key no campo indicado antes de testar.');
-        return;
-    }
-
-    const origHTML = btn.innerHTML;
-    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-brand-400"></i> Testando...';
-    btn.disabled  = true;
-
-    try {
-        const res = await fetch('index.php?api_action=test_llm_connection', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({
-                provider  : provider,
-                api_key   : apiKey,
-                base_url  : baseUrl,
-                model_chat: selChat
-            })
-        });
-
-        const data = await res.json();
-        if (data.success) {
-            alert('✅ ' + data.message);
-        } else {
-            alert('❌ Erro na integração: ' + data.error);
-        }
-    } catch(e) {
-        alert('❌ Falha de comunicação com o servidor: ' + e.message);
-    } finally {
-        btn.innerHTML = origHTML;
-        btn.disabled  = false;
-    }
-}
-
-// ─── Testar ElevenLabs TTS ───────────────────────────────────────────────────
+// ─── ElevenLabs: teste de voz ────────────────────────────────────────────
 async function testElevenLabsTTS() {
     const text  = document.getElementById('el-test-text')?.value;
     const audio = document.getElementById('el-test-audio');

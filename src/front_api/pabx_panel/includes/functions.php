@@ -4746,7 +4746,6 @@ function aiProviderDefaults() {
         'openai'   => ['url' => 'https://api.openai.com/v1',                            'chat' => 'gpt-4o-mini',            'audio' => 'whisper-1'],
         'groq'     => ['url' => 'https://api.groq.com/openai/v1',                       'chat' => 'llama-3.3-70b-versatile', 'audio' => 'whisper-large-v3'],
         'gemini'   => ['url' => 'https://generativelanguage.googleapis.com/v1beta/openai', 'chat' => 'gemini-1.5-flash',     'audio' => ''],
-        'deepseek' => ['url' => 'https://api.deepseek.com/v1',                          'chat' => 'deepseek-chat',          'audio' => ''],
     ];
 }
 
@@ -4783,7 +4782,7 @@ function aiPickModel($ids, $kind, $preferred = '') {
         foreach ($ids as $id) if (stripos($id, 'whisper') !== false) return $id;
         return '';
     }
-    foreach (['llama-3.3-70b-versatile', 'llama-3.1-8b-instant', 'openai/gpt-oss-120b', 'openai/gpt-oss-20b', 'gpt-4o-mini', 'gpt-4.1-mini', 'gpt-4o', 'gemini-2.0-flash', 'gemini-1.5-flash', 'deepseek-chat'] as $m) {
+    foreach (['llama-3.3-70b-versatile', 'llama-3.1-8b-instant', 'openai/gpt-oss-120b', 'openai/gpt-oss-20b', 'gpt-4o-mini', 'gpt-4.1-mini', 'gpt-4o', 'gemini-2.0-flash', 'gemini-1.5-flash'] as $m) {
         if (in_array($m, $ids, true)) return $m;
     }
     foreach ($ids as $id) {
@@ -4845,7 +4844,7 @@ function aiTestProviderKey($provider) {
 
 /** Provedor automático de uma função: o primeiro que tiver chave guardada (transcrição só com Groq/OpenAI). */
 function aiAutoProvider($role) {
-    $order = $role === 'audio' ? ['groq', 'openai'] : ['groq', 'openai', 'gemini', 'deepseek'];
+    $order = $role === 'audio' ? ['groq', 'openai'] : ['groq', 'openai', 'gemini'];
     foreach ($order as $p) if (aiKeyFor($p) !== '') return $p;
     return '';
 }
@@ -4867,6 +4866,7 @@ function aiRoleChoice($role) {
 function aiGetConfig($role = '') {
     $defs     = aiProviderDefaults();
     $provider = getSetting('ai_provider') ?: 'openai';
+    if (!isset($defs[$provider])) $provider = 'openai';   // provedor que não existe mais
     $key      = trim((string)getSetting('ai_api_key'));
     $mChat    = getSetting('ai_model_chat');
     $mAudio   = getSetting('ai_model_audio');
@@ -4892,9 +4892,9 @@ function aiGetConfig($role = '') {
     // Modelo salvo de outro provedor (ex.: whisper-1/gpt-* com chave Groq) é ignorado
     if ($provider === 'groq') {
         if ($mAudio !== '' && !preg_match('/whisper/i', $mAudio) || $mAudio === 'whisper-1') $mAudio = '';
-        if ($mChat !== '' && preg_match('/^(gpt-|o1|o3|gemini|deepseek|claude)/i', $mChat)) $mChat = '';
+        if ($mChat !== '' && preg_match('/^(gpt-|o1|o3|gemini|claude)/i', $mChat)) $mChat = '';
     } elseif ($provider === 'openai') {
-        if ($mChat !== '' && preg_match('/^(llama|mixtral|gemma|gemini|deepseek|qwen)/i', $mChat)) $mChat = '';
+        if ($mChat !== '' && preg_match('/^(llama|mixtral|gemma|gemini|qwen)/i', $mChat)) $mChat = '';
         if ($mAudio !== '' && preg_match('/large-v3/i', $mAudio)) $mAudio = '';
     }
     $limit    = (int)(getSetting('ai_token_limit') ?: 1024);

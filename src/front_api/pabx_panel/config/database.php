@@ -36,6 +36,9 @@ try {
     $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
     try { $db->exec('PRAGMA busy_timeout = 5000'); } catch (Exception $e) {}
     $db->exec("PRAGMA encoding = 'UTF-8';");
+    // DeepSeek foi removido do painel: apaga chave/estado salvos e volta funções que o usavam para Automático
+    try { $db->exec("DELETE FROM settings WHERE key_name IN ('ai_key_deepseek','ai_key_status_deepseek') OR (key_name='ai_provider' AND value_val='deepseek')"); $db->exec("UPDATE settings SET value_val='' WHERE key_name LIKE 'ai_role_%_provider' AND value_val='deepseek'"); } catch (Exception $e) {}
+
 
     // Criar tabelas se não existirem
     $db->exec("CREATE TABLE IF NOT EXISTS settings (key_name TEXT PRIMARY KEY, value_val TEXT)");

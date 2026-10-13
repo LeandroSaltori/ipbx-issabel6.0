@@ -847,8 +847,7 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
         $providerDefaults = [
             'openai'   => ['url' => 'https://api.openai.com/v1',                           'model' => 'gpt-4o-mini'],
             'groq'     => ['url' => 'https://api.groq.com/openai/v1',                      'model' => 'llama-3.3-70b-versatile'],
-            'gemini'   => ['url' => 'https://generativelanguage.googleapis.com/v1beta/openai', 'model' => 'gemini-1.5-flash'],
-            'deepseek' => ['url' => 'https://api.deepseek.com/v1',                         'model' => 'deepseek-chat']
+            'gemini'   => ['url' => 'https://generativelanguage.googleapis.com/v1beta/openai', 'model' => 'gemini-1.5-flash']
         ];
 
         // A chave identifica o provedor; ajustes de outro provedor são descartados
