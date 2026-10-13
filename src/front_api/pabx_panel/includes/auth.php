@@ -164,9 +164,11 @@ function authLogout() {
         // Encerra também a sessão do painel clássico, para voltar realmente ao login inicial
         $cur = session_name(); $curId = session_id();
         @session_write_close();
+        $__own = session_save_path(); if (!empty($GLOBALS['__sess_default_path'])) session_save_path($GLOBALS['__sess_default_path']);
         session_name('issabelSession'); session_id($_COOKIE['issabelSession']); @session_start();
         $_SESSION = []; @session_destroy();
         setcookie('issabelSession', '', time() - 42000, '/');
+        session_save_path($__own);
         session_name($cur); if ($curId !== '') session_id($curId); @session_start(); $_SESSION = [];
     }
     if (ini_get('session.use_cookies')) {

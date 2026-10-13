@@ -34,4 +34,7 @@ if [ "$1" = "--ativar" ]; then
 else
   echo "[ok] tema instalado em $HTML/themes/prisma_v6 (não ativado). Para ativar: bash aplicar-tema.sh --ativar"
 fi
+echo "--- verificação ---"
+for f in _common/index.tpl _common/_menu.tpl _common/login.tpl css/prisma-v6.css css/prisma-v6-modulos.css; do [ -f "$HTML/themes/prisma_v6/$f" ] && echo "ok  $f" || echo "FALTA $f"; done
+echo "Temas em $HTML/themes: $(ls "$HTML/themes" | tr '\n' ' ')"
 echo "Snapshot em $SNAP"

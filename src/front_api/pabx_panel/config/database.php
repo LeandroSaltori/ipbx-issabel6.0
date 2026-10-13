@@ -14,6 +14,17 @@ if (session_status() === PHP_SESSION_NONE) {
             'samesite' => 'Strict',
         ]);
     }
+    // Sessão própria do painel: pasta privada e validade longa (8 h). Evita que a limpeza
+    // automática de sessões do painel clássico (24 min) derrube o login do painel novo.
+    $__sessDir = __DIR__ . '/../logs/sessions';
+    $GLOBALS['__sess_default_path'] = session_save_path();
+    if (PHP_SAPI !== 'cli' && !is_dir($__sessDir)) @mkdir($__sessDir, 0700, true);
+    if (PHP_SAPI !== 'cli' && is_dir($__sessDir) && is_writable($__sessDir)) {
+        @file_put_contents($__sessDir . '/.htaccess', "Require all denied\n");
+        session_save_path($__sessDir);
+        ini_set('session.gc_maxlifetime', '28800');
+        ini_set('session.gc_probability', '1'); ini_set('session.gc_divisor', '100');
+    }
     session_start();
 }
 
