@@ -23,15 +23,9 @@ function isGroupActive($modules_array) {
     <!-- Logo Header & Collapse Button -->
     <div class="p-4 border-b border-slate-800 flex items-center justify-between">
         <div class="flex items-center gap-3 sidebar-text">
-            <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-brand-600 to-indigo-500 flex items-center justify-center text-white shadow-lg shadow-brand-500/20 font-black text-lg">
-                P
-            </div>
             <div>
-                <h1 class="text-sm font-black tracking-wider text-white flex items-center gap-1.5">
-                    PRISMA
-                    <span class="px-1.5 py-0.5 text-[9px] bg-brand-500/20 text-brand-400 border border-brand-500/30 rounded font-bold uppercase">TELECOM</span>
-                </h1>
-                <span class="text-[10px] text-slate-400 block font-mono">v6.1 • PABX IP</span>
+                <img src="assets/brand/logo_branco.png" alt="Prisma Telecom" class="h-8 w-auto block">
+                <span class="text-[10px] text-slate-400 block font-mono mt-1">v6.1 • Central Telefônica</span>
             </div>
         </div>
 

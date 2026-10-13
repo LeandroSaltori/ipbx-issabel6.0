@@ -31,7 +31,8 @@ Este documento estabelece as regras e padrões arquiteturais obrigatórios para 
 
 ## 3. PADRÃO DE DESIGN E LAYOUT VALIDADO
 1. **Preservação da Identidade Visual e Paleta Dark:**
-   - Preservar a paleta escura homologada (`#1c1b2f`, `#252440`, `#0f172a`, gradientes violeta/azul `#7c3aed` / `#6366f1` e acabamentos em glassmorphism).
+   - Preservar a paleta escura homologada (`#1c1b2f`, `#252440`, `#0f172a`, gradientes violeta/azul `#7c3aed` / `#6366f1` e acabamentos em glassmorphism) **no painel clássico (tema `prisma_v5`)**.
+   - **Painel novo (`front_api`) e login:** desde 2026-10-13, por decisão do usuário, seguem a identidade da marca Prisma Telecom (azul `#0079ad`, verde-água `#2a9d8f`, verde `#9ccc3c`, fundo azul-marinho). As cores ficam centralizadas na configuração do Tailwind em `index.php` (`brand`, `indigo`, `violet`, `purple`, `slate`); não espalhar cores fixas pelos módulos.
 2. **Proteção Contra Truncamento e Quebra de Botões:**
    - Todo botão de ação contendo ícone/texto (como *"Baixar Gravação"*, *"Ouvir"*, *"Filtrar"*, *"Salvar"*) deve conter obrigatoriamente:
      ```css
