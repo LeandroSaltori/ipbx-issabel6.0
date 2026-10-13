@@ -344,11 +344,6 @@ foreach (array_keys(aiProviderDefaults()) as $__pp) if (aiKeyFor($__pp) !== '') 
                     <?php if ($__has && getSetting('ai_key_' . $__p) !== ''): ?><label class="flex items-center gap-1"><input type="checkbox" name="ai_key_clear_<?php echo $__p; ?>" value="1"> remover esta chave</label><?php endif; ?>
                 </div>
             </div>
-            <div class="p-4 rounded-2xl bg-slate-950 border border-slate-800 text-slate-300 space-y-1">
-                <div class="font-bold text-white">Sobre este provedor</div>
-                <div><?php echo htmlspecialchars($__pi['nota']); ?></div>
-                <div class="text-slate-500 font-mono text-[10px] pt-1">Modelos padrão: texto <?php echo htmlspecialchars($__defs[$__p]['chat']); ?><?php echo $__defs[$__p]['audio'] !== '' ? ' | áudio ' . htmlspecialchars($__defs[$__p]['audio']) : ''; ?></div>
-            </div>
         </form>
 
     <?php elseif ($ia_tab === 'ajustes'): ?>
