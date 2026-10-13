@@ -17,7 +17,6 @@ return [
             'aviso' => 'Quem for desativado no painel novo perde o acesso mesmo entrando pelo clássico.'],
         ['t' => 'Sair do painel', 'd' => 'O botão Sair, no rodapé do menu lateral, encerra sua sessão e leva de volta à tela de login inicial.'],
         ['t' => 'Tela de login', 'd' => 'A tela de login tem a identidade da Prisma Telecom e já traz a escolha entre o Painel Novo 6.0 e o Painel Clássico. Funciona também no celular.', 'passos' => ['Digite usuário e senha.', 'Em Abrir em, escolha Painel Novo 6.0 ou Painel Clássico.', 'Clique em Entrar. O olho no campo de senha mostra ou esconde o que você digitou.']],
-        ['t' => 'Visual do painel', 'd' => 'O painel segue a identidade da Prisma Telecom (azul e verde), igual à tela de login, com a logo no topo do menu lateral.'],
         ['t' => 'Modo claro / escuro', 'd' => 'Você pode alternar o visual do painel pelo botão de tema.'],
     ]],
     ['id' => 'dashboard', 'titulo' => 'Dashboard', 'icon' => 'fa-chart-pie', 'itens' => [
