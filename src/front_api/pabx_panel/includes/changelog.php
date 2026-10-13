@@ -6,6 +6,7 @@
  */
 return [
     'done' => [
+        ['data' => '2026-10-13', 'mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-hourglass-half', 'titulo' => 'Assistente espera e tenta de novo quando a IA está no limite', 'desc' => 'Quando o provedor de IA atinge o limite de uso por minuto, o assistente aguarda alguns segundos e tenta sozinho. Se continuar no limite, mostra um aviso claro em português.'],
         ['data' => '2026-10-13', 'mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-arrow-rotate-left', 'titulo' => 'Voltar do navegador sem cair no painel antigo', 'desc' => 'Quem entra pelo Painel Novo e clica em Voltar não é mais levado ao painel clássico. Um atalho no menu permite abrir o clássico quando precisar.'],
         ['data' => '2026-10-13', 'mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-robot', 'titulo' => 'Nova tela de Inteligência Artificial', 'desc' => 'Menu lateral com cada provedor, botão Testar na chave e escolha de quem faz cada tarefa, com os provedores sem chave apagados. O DeepSeek foi removido.'],
         ['data' => '2026-10-13', 'mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-wand-magic-sparkles', 'titulo' => 'Mensagens do WhatsApp mais seguras de editar', 'desc' => 'Ao clicar numa variável sem escolher a mensagem, nada é inserido por engano. Também corrigimos a mensagem de gravação, que podia sair sem o link.'],

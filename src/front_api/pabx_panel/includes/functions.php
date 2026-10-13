@@ -5812,8 +5812,18 @@ function aiChatRaw($messages, $cfg) {
     };
     $r = $send('max_tokens'); $j = json_decode((string)$r['body'], true);
     if ($r['http'] === 400 && stripos((string)($j['error']['message'] ?? ''), 'max_completion_tokens') !== false) { $r = $send('max_completion_tokens'); $j = json_decode((string)$r['body'], true); }
+    // Limite de uso do provedor (429): espera o tempo indicado (até 15s) e tenta de novo uma vez
+    if ($r['http'] === 429) {
+        $wait = 8;
+        if (preg_match('/try again in\s+([\d.]+)\s*(ms|s)/i', (string)($j['error']['message'] ?? ''), $__w)) $wait = (float)$__w[1] / (strtolower($__w[2]) === 'ms' ? 1000 : 1);
+        if ($wait <= 15) {
+            usleep((int)(($wait + 1) * 1000000));
+            $r = $send('max_tokens'); $j = json_decode((string)$r['body'], true);
+        }
+    }
     if ($r['err'] !== '') return ['ok' => false, 'error' => 'Erro de conexão: ' . $r['err']];
     if ($r['http'] === 200 && isset($j['choices'][0]['message'])) return ['ok' => true, 'message' => $j['choices'][0]['message']];
+    if ($r['http'] === 429) return ['ok' => false, 'error' => 'O provedor de IA atingiu o limite de uso por minuto. Aguarde alguns segundos e tente de novo (planos gratuitos têm limite menor).'];
     return ['ok' => false, 'error' => $j['error']['message'] ?? ('HTTP ' . $r['http'])];
 }
 
@@ -5962,7 +5972,7 @@ function aiChatRun($history) {
             $used[] = $nm;
             $res = aiChatExecTool($nm, $args);
             if (is_array($res) && !empty($res['link'])) $allowed[] = $res['link'];
-            $msgs[] = ['role' => 'tool', 'tool_call_id' => $tc['id'] ?? '', 'content' => mb_substr(json_encode($res, JSON_UNESCAPED_UNICODE), 0, 12000)];
+            $msgs[] = ['role' => 'tool', 'tool_call_id' => $tc['id'] ?? '', 'content' => mb_substr(json_encode($res, JSON_UNESCAPED_UNICODE), 0, 6000)];
         }
     }
     return ['ok' => false, 'error' => 'A consulta ficou longa demais; tente reformular a pergunta.', 'tools' => $used];
