@@ -49,9 +49,11 @@ if ($undo) {
     $idx = preg_replace('#\n[ \t]*' . preg_quote($E1, '#') . '.*?' . preg_quote($E2, '#') . '[ \t]*\n#s', "\n", $idx, 1);
     $idx = preg_replace('#\n[ \t]*' . preg_quote($P1, '#') . '.*?' . preg_quote($P2, '#') . '[ \t]*\n#s', "\n", $idx, 1);
 } else {
-    if (strpos($tpl, $M1) === false) {
-        if (!preg_match('#<div class="form-group">\s*<button type="submit"#', $tpl, $m, PREG_OFFSET_CAPTURE)) { fwrite(STDERR, "Ponto de inserção do botão Entrar não encontrado no login.tpl\n"); exit(2); }
-        $tpl = substr_replace($tpl, $html . "\t\t\t\t", $m[0][1], 0);
+    /* Login novo já traz a escolha de painel (name="painel"); só o tema antigo recebe o bloco. */
+    if (strpos($tpl, $M1) === false && strpos($tpl, 'name="painel"') === false) {
+        if (preg_match('#<div class="form-group">\s*<button type="submit"#', $tpl, $m, PREG_OFFSET_CAPTURE)) {
+            $tpl = substr_replace($tpl, $html . "\t\t\t\t", $m[0][1], 0);
+        } else { fwrite(STDERR, "Aviso: ponto de inserção no login.tpl não encontrado; seguindo só com o index.php.\n"); }
     }
     $idx = preg_replace('#\n[ \t]*' . preg_quote($E1, '#') . '.*?' . preg_quote($E2, '#') . '[ \t]*\n#s', "\n", $idx, 1);
     if (strpos($idx, $E1) === false) {
