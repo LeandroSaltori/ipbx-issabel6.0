@@ -5000,9 +5000,9 @@ function audioSigValid($uid, $exp, $sig) {
 }
 
 /** Retorna '' se "URL pública do painel" não estiver configurada. */
-function audioSignedUrl($uid, $ttl = 604800) {
+function audioSignedUrl($uid, $ttl = 604800, $onlyConfigured = false) {
     $base = rtrim((string)getSetting('public_base_url'), '/');
-    if ($base === '' && PHP_SAPI !== 'cli' && !empty($_SERVER['HTTP_HOST'])) {
+    if ($base === '' && !$onlyConfigured && PHP_SAPI !== 'cli' && !empty($_SERVER['HTTP_HOST'])) {
         // Sem URL pública cadastrada: usa o endereço pelo qual o usuário acessou o painel agora
         $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
         $dir = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/front_api/index.php')), '/');
@@ -5162,20 +5162,19 @@ function processCallSummaryNotifications($cdr) {
             $other = ($ext === $c['dst']) ? $c['src'] : $c['dst'];
             $head = "📞 Chamada " . date('d/m H:i', strtotime($c['calldate'])) . " com $other (" . gmdate('i\m s\s', (int)$c['billsec']) . ")";
 
-            $recFile = null;   // gravação enviada como arquivo quando não há URL pública para o link
+            $recFile = null;   // por padrão a gravação vai como ARQUIVO (funciona com IP interno, IP externo, DDNS...)
             if (!empty($e['send_call_recording'])) {
-                $url = audioSignedUrl($c['uniqueid']);
-                if ($url !== '') $parts[] = "🎧 Gravação (link válido por 7 dias): $url";
-                else {
-                    $rp = findRecordingPath($c['recordingfile'], $c['calldate']);
-                    if ($rp === '') $why[] = 'URL pública não configurada e arquivo de gravação não encontrado';
-                    elseif (filesize($rp) > 15 * 1024 * 1024) $why[] = 'URL pública não configurada e gravação maior que 15MB';
-                    else {
-                        $x = strtolower(pathinfo($rp, PATHINFO_EXTENSION));
-                        $types = ['wav' => 'audio/wav', 'mp3' => 'audio/mpeg', 'ogg' => 'audio/ogg', 'gsm' => 'audio/x-gsm'];
-                        $recFile = ['name' => 'gravacao_' . preg_replace('/[^0-9.]/', '', (string)$c['uniqueid']) . '.' . $x, 'type' => $types[$x] ?? 'application/octet-stream', 'content' => file_get_contents($rp)];
-                        $parts[] = "🎧 Gravação da chamada em anexo.";
-                    }
+                $rp = findRecordingPath($c['recordingfile'], $c['calldate']);
+                if ($rp !== '' && filesize($rp) <= 15 * 1024 * 1024) {
+                    $x = strtolower(pathinfo($rp, PATHINFO_EXTENSION));
+                    $types = ['wav' => 'audio/wav', 'mp3' => 'audio/mpeg', 'ogg' => 'audio/ogg', 'gsm' => 'audio/x-gsm'];
+                    $recFile = ['name' => 'gravacao_' . preg_replace('/[^0-9.]/', '', (string)$c['uniqueid']) . '.' . $x, 'type' => $types[$x] ?? 'application/octet-stream', 'content' => file_get_contents($rp)];
+                    $parts[] = "🎧 Gravação da chamada em anexo.";
+                } else {
+                    // arquivo ausente ou grande demais: tenta o link, só se a URL pública estiver cadastrada
+                    $url = audioSignedUrl($c['uniqueid'], 604800, true);
+                    if ($url !== '') $parts[] = "🎧 Gravação (link válido por 7 dias): $url";
+                    else $why[] = $rp === '' ? 'arquivo de gravação não encontrado' : 'gravação maior que 15MB e URL pública não configurada (Configurações > API)';
                 }
             }
             if (!empty($e['send_ai_summary'])) {
@@ -6052,7 +6051,7 @@ function integrationStatusChecks() {
     $mon = '/var/spool/asterisk/monitor';
     $add('Gravações', 'Pasta de gravações', is_readable($mon) ? 'ok' : 'warn', is_readable($mon) ? 'Legível pelo painel.' : 'Pasta ausente ou sem permissão de leitura.');
     $pub = trim((string)getSetting('public_base_url'));
-    $add('Gravações', 'URL pública (links de gravação)', $pub !== '' ? 'ok' : 'warn', $pub !== '' ? $pub : 'Não configurada: a gravação será enviada como arquivo (sem link).');
+    $add('Gravações', 'URL pública (links de gravação)', $pub !== '' ? 'ok' : 'warn', $pub !== '' ? $pub : 'Não configurada (opcional): a gravação segue como arquivo anexo; o link só é usado para gravações acima de 15 MB.');
 
     // --- WhatsApp
     $prov = waProvider();
