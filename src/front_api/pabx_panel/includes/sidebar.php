@@ -271,6 +271,9 @@ function isGroupActive($modules_array) {
             </div>
             <i class="fa-solid fa-gear text-[10px] text-slate-500"></i>
         </div>
+        <?php if (!empty($_SESSION['via_sso'])): ?>
+        <a href="../seletor.php?ir=classico&lembrar=1" class="flex items-center justify-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold text-slate-300 bg-slate-800/60 border border-slate-700 hover:bg-slate-800 transition sidebar-text" style="white-space:nowrap" title="Abrir o painel clássico"><i class="fa-solid fa-right-left"></i> Painel clássico</a>
+        <?php endif; ?>
         <a href="index.php?auth=logout" class="flex items-center justify-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold text-rose-300 bg-rose-500/10 border border-rose-500/20 hover:bg-rose-500/20 transition sidebar-text" style="white-space:nowrap"><i class="fa-solid fa-right-from-bracket"></i> Sair</a>
     </div>
     </nav>

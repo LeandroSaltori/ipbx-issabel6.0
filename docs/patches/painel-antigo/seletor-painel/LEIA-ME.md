@@ -22,3 +22,6 @@ Na própria tela de login do painel clássico aparecem duas opções, **Painel N
 ## Observações
 - `seletor.php?ir=novo` também pode ser usado como atalho "Trocar para o painel novo" dentro do painel clássico.
 - Um segundo login por 2FA não é afetado; a escolha vale apenas para o login por usuário e senha.
+
+## Botão Voltar do navegador
+O `aplicar.sh` também faz o painel clássico, quando aberto sem destino (sem `menu=`) por quem escolheu **Painel Novo** no login, encaminhar de volta ao painel novo. Assim, ao clicar em Voltar depois de entrar, a pessoa não cai no painel antigo. Para usar o clássico, há o link **Painel clássico** no rodapé do menu do painel novo (ele grava a escolha como clássico).
