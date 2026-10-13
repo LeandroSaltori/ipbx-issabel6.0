@@ -11,6 +11,10 @@ return [
         ['t' => 'O que é o IPbx Prisma', 'd' => 'Painel para acompanhar e administrar sua central telefônica: ramais, filas, linhas, relatórios, gravações, WhatsApp e assistente inteligente.'],
         ['t' => 'Menu lateral', 'd' => 'Todas as telas ficam no menu à esquerda. Você só vê as telas que seu perfil permite (veja Usuários & Permissões).'],
         ['t' => 'Novidades', 'd' => 'O botão Novidades mostra tudo o que foi entregue recentemente e o que vem a seguir.'],
+        ['t' => 'Entrar pelo painel clássico', 'd' => 'Depois de entrar no painel clássico, você escolhe abrir o Painel Novo 6.0 ou continuar no clássico, sem digitar senha de novo. Na primeira entrada o usuário é criado no painel novo com o menor acesso do grupo dele (Administrador, Supervisor ou Usuário).',
+            'passos' => ['Entre normalmente no painel clássico.', 'Na tela de escolha, clique em Painel Novo 6.0 (marque "Lembrar minha escolha" se quiser).', 'Para ajustar o que cada pessoa vê, use Configurações > Usuários & Permissões no painel novo.'],
+            'dica' => 'Os usuários continuam sendo criados no painel clássico. O painel novo só guarda as permissões e o WhatsApp de cada um.',
+            'aviso' => 'Quem for desativado no painel novo perde o acesso mesmo entrando pelo clássico.'],
         ['t' => 'Modo claro / escuro', 'd' => 'Você pode alternar o visual do painel pelo botão de tema.'],
     ]],
     ['id' => 'dashboard', 'titulo' => 'Dashboard', 'icon' => 'fa-chart-pie', 'itens' => [

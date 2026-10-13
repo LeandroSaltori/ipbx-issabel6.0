@@ -107,6 +107,15 @@ done
 [ -d "$KEEP_DIR/pabx_panel/logs" ] && /bin/cp -rpf "$KEEP_DIR/pabx_panel/logs/." "$DEST_DIR/pabx_panel/logs/"
 rm -rf "$KEEP_DIR"
 
+# Entrada única (painel clássico -> painel novo): segredo compartilhado, criado uma vez e nunca sobrescrito
+if [ ! -s /etc/ipbx/sso.key ]; then
+  mkdir -p /etc/ipbx
+  head -c 48 /dev/urandom | base64 | tr -d '\n' > /etc/ipbx/sso.key
+  echo "[+] Chave de entrada única criada em /etc/ipbx/sso.key"
+fi
+chown root:asterisk /etc/ipbx/sso.key 2>/dev/null || true
+chmod 640 /etc/ipbx/sso.key 2>/dev/null || true
+
 # 4. Ajuste estrito de permissões e proprietário do PABX
 echo "[+] Ajustando permissões de sistema..."
 chown -R asterisk:asterisk "$DEST_DIR"
