@@ -4815,6 +4815,34 @@ function aiKeyFor($provider) {
 }
 
 /** Provedor/modelo escolhidos para uma função, ou null se a função usa a configuração geral. */
+/** Estado da última verificação da chave de um provedor: ['ok'=>bool,'t'=>ts,'msg'=>string] ou null. */
+function aiKeyStatus($provider) {
+    $j = json_decode((string)getSetting('ai_key_status_' . $provider), true);
+    return is_array($j) ? $j : null;
+}
+
+/** Verifica a chave de um provedor consultando a lista de modelos dele (não gasta tokens) e guarda o resultado. */
+function aiTestProviderKey($provider) {
+    $defs = aiProviderDefaults();
+    if (!isset($defs[$provider])) return ['ok' => false, 'msg' => 'Provedor desconhecido'];
+    $key = aiKeyFor($provider);
+    if ($key === '') return ['ok' => false, 'msg' => 'Sem chave'];
+    $ch = curl_init(rtrim($defs[$provider]['url'], '/') . '/models');
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 10,
+        CURLOPT_HTTPHEADER     => ['Authorization: Bearer ' . $key],
+        CURLOPT_SSL_VERIFYPEER => getSetting('ai_ssl_insecure') !== '1',
+        CURLOPT_SSL_VERIFYHOST => getSetting('ai_ssl_insecure') !== '1' ? 2 : 0,
+    ]);
+    $resp = curl_exec($ch); $http = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE); $err = curl_error($ch); curl_close($ch);
+    if ($http === 200) { $r = ['ok' => true, 'msg' => 'Chave aprovada']; }
+    elseif ($http === 401 || $http === 403) { $r = ['ok' => false, 'msg' => 'Chave recusada pelo provedor (confira se foi colada inteira)']; }
+    elseif ($http === 0) { $r = ['ok' => false, 'msg' => 'Sem conexão com o provedor' . ($err !== '' ? ': ' . $err : '')]; }
+    else { $r = ['ok' => false, 'msg' => 'Provedor respondeu HTTP ' . $http]; }
+    saveSetting('ai_key_status_' . $provider, json_encode(['ok' => $r['ok'], 't' => time(), 'msg' => $r['msg']]));
+    return $r;
+}
+
 /** Provedor automático de uma função: o primeiro que tiver chave guardada (transcrição só com Groq/OpenAI). */
 function aiAutoProvider($role) {
     $order = $role === 'audio' ? ['groq', 'openai'] : ['groq', 'openai', 'gemini', 'deepseek'];

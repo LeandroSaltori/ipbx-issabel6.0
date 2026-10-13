@@ -6,6 +6,7 @@
 
 $msg      = '';
 $msg_type = 'success';
+$__provLabelsTop = ['openai' => 'OpenAI (GPT)', 'groq' => 'Groq', 'gemini' => 'Google Gemini', 'deepseek' => 'DeepSeek'];
 
 // ─── Salvar Copiloto IA ──────────────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -43,12 +44,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     // ─── Salvar / testar "Quem faz o quê" (provedor e modelo por função da IA) ───
-    if (isset($_POST['action_save_ai_roles']) || isset($_POST['action_test_ai_roles'])) {
+    if (isset($_POST['action_save_ai_roles']) || isset($_POST['action_test_ai_roles']) || isset($_POST['action_test_ai_key'])) {
         $__save = $db->prepare("INSERT OR REPLACE INTO settings (key_name, value_val) VALUES (:k, :v)");
         foreach (array_keys(aiProviderDefaults()) as $__p) {
             $__kv = trim($_POST['ai_key_' . $__p] ?? '');
-            if (!empty($_POST['ai_key_clear_' . $__p])) $__save->execute([':k' => 'ai_key_' . $__p, ':v' => '']);
-            elseif ($__kv !== '') $__save->execute([':k' => 'ai_key_' . $__p, ':v' => $__kv]);
+            if (!empty($_POST['ai_key_clear_' . $__p])) { $__save->execute([':k' => 'ai_key_' . $__p, ':v' => '']); $__save->execute([':k' => 'ai_key_status_' . $__p, ':v' => '']); }
+            elseif ($__kv !== '') { $__save->execute([':k' => 'ai_key_' . $__p, ':v' => $__kv]); $__save->execute([':k' => 'ai_key_status_' . $__p, ':v' => '']); }
         }
         foreach (array_keys(aiRoles()) as $__r) {
             $__prov = trim($_POST["ai_role_{$__r}_provider"] ?? '');
@@ -56,12 +57,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $__save->execute([':k' => "ai_role_{$__r}_provider", ':v' => $__prov]);
             $__save->execute([':k' => "ai_role_{$__r}_model", ':v' => trim($_POST["ai_role_{$__r}_model"] ?? '')]);
         }
+        if (isset($_POST['action_test_ai_key'])) {
+            $__tp = (string)$_POST['action_test_ai_key'];
+            $__tr = aiTestProviderKey($__tp);
+            $msg = ($__provLabelsTop[$__tp] ?? $__tp) . ': ' . ($__tr['ok'] ? '✅ chave aprovada.' : '❌ ' . $__tr['msg'] . '.');
+            if (!$__tr['ok']) $msg_type = 'info';
+        }
         if (isset($_POST['ai_adv_present'])) {
             $__save->execute([':k' => 'enable_copilot',    ':v' => isset($_POST['enable_copilot']) ? '1' : '0']);
             $__save->execute([':k' => 'ai_custom_prompt',  ':v' => trim($_POST['ai_custom_prompt'] ?? '')]);
             $__save->execute([':k' => 'ai_token_limit',    ':v' => (string)max(64, min(4000, (int)($_POST['ai_token_limit'] ?? 1024) ?: 1024))]);
         }
-        $msg = "Configuração de IA salva! Cada função passa a usar o provedor escolhido (ou o automático).";
+        if (!isset($_POST['action_test_ai_key'])) $msg = "Configuração de IA salva! Cada função passa a usar o provedor escolhido (ou o automático).";
         if (isset($_POST['action_test_ai_roles'])) {
             $__res = [];
             foreach (aiRoles() as $__r => $__lbl) {
@@ -223,6 +230,7 @@ foreach (array_keys(aiProviderDefaults()) as $__pp) if (aiKeyFor($__pp) !== '') 
             ?>
             <form method="POST" action="index.php?module=configuracoes&action=ia&ia_tab=copiloto" class="space-y-6 text-xs">
                 <input type="hidden" name="ai_adv_present" value="1">
+                <button type="submit" name="action_save_ai_roles" value="1" class="hidden" tabindex="-1" aria-hidden="true"></button><!-- Enter nos campos = Salvar -->
 
                 <div class="flex items-center justify-between p-4 bg-slate-950 rounded-2xl border border-slate-800">
                     <div>
@@ -238,17 +246,29 @@ foreach (array_keys(aiProviderDefaults()) as $__pp) if (aiKeyFor($__pp) !== '') 
                 <!-- PASSO 1 -->
                 <section class="space-y-3">
                     <div class="flex items-center gap-2"><span class="w-6 h-6 rounded-full bg-brand-600 text-white font-extrabold flex items-center justify-center text-[11px]">1</span>
-                        <h4 class="text-sm font-extrabold text-white">Cole a chave do provedor que você usa</h4></div>
+                        <h4 class="text-sm font-extrabold text-white">Cole a chave do provedor e clique em Testar</h4></div>
                     <p class="text-slate-400">Basta uma. Se tiver mais de uma, o painel usa cada uma onde ela é melhor. A chave fica guardada só neste servidor.</p>
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <?php foreach ($__defs as $__p => $__d): $__has = aiKeyFor($__p) !== ''; ?>
-                        <div class="p-3 rounded-xl bg-slate-950 border <?php echo $__has ? 'border-emerald-500/30' : 'border-slate-800'; ?> space-y-1.5">
+                        <?php foreach ($__defs as $__p => $__d):
+                            $__has = aiKeyFor($__p) !== ''; $__st = $__has ? aiKeyStatus($__p) : null;
+                            if (!$__has) { $__bd = 'border-slate-800'; $__bg = 'text-slate-500'; $__tx = '○ Sem chave'; }
+                            elseif ($__st && !empty($__st['ok'])) { $__bd = 'border-emerald-500/40'; $__bg = 'text-emerald-400'; $__tx = '✓ Aprovada'; }
+                            elseif ($__st) { $__bd = 'border-rose-500/40'; $__bg = 'text-rose-400'; $__tx = '✗ Falhou'; }
+                            else { $__bd = 'border-amber-500/30'; $__bg = 'text-amber-400'; $__tx = '● Salva, ainda não testada'; }
+                        ?>
+                        <div class="p-3 rounded-xl bg-slate-950 border <?php echo $__bd; ?> space-y-1.5">
                             <label class="font-bold text-slate-300 flex items-center justify-between">
                                 <span><?php echo htmlspecialchars($__provLabels[$__p] ?? $__p); ?></span>
-                                <span class="text-[10px] <?php echo $__has ? 'text-emerald-400' : 'text-slate-500'; ?>"><?php echo $__has ? '● chave salva' : '○ sem chave'; ?></span>
+                                <span class="text-[10px] <?php echo $__bg; ?>"><?php echo $__tx; ?></span>
                             </label>
-                            <input type="password" name="ai_key_<?php echo $__p; ?>" autocomplete="new-password" placeholder="<?php echo $__has ? 'Em branco = manter a chave atual' : 'Cole a API Key'; ?>"
-                                   class="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white font-mono focus:border-brand-500 focus:outline-none">
+                            <div class="flex items-center gap-2">
+                                <input type="password" name="ai_key_<?php echo $__p; ?>" autocomplete="new-password" placeholder="<?php echo $__has ? 'Em branco = manter a chave atual' : 'Cole a API Key'; ?>"
+                                       class="flex-1 min-w-0 px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white font-mono focus:border-brand-500 focus:outline-none">
+                                <button type="submit" name="action_test_ai_key" value="<?php echo $__p; ?>" style="white-space:nowrap !important;flex-shrink:0 !important;width:auto !important;overflow:visible !important;text-overflow:clip !important" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl border border-slate-700 flex items-center gap-1.5">
+                                    <i class="fa-solid fa-flask text-brand-400"></i> Testar
+                                </button>
+                            </div>
+                            <?php if ($__st && empty($__st['ok'])): ?><div class="text-[10px] text-rose-300"><?php echo htmlspecialchars((string)($__st['msg'] ?? '')); ?></div><?php endif; ?>
                             <?php if ($__has && getSetting('ai_key_' . $__p) !== ''): ?>
                             <label class="text-[10px] text-slate-500 flex items-center gap-1"><input type="checkbox" name="ai_key_clear_<?php echo $__p; ?>" value="1"> remover esta chave</label>
                             <?php endif; ?>
@@ -261,22 +281,37 @@ foreach (array_keys(aiProviderDefaults()) as $__pp) if (aiKeyFor($__pp) !== '') 
                 <section class="space-y-3">
                     <div class="flex items-center gap-2"><span class="w-6 h-6 rounded-full bg-brand-600 text-white font-extrabold flex items-center justify-center text-[11px]">2</span>
                         <h4 class="text-sm font-extrabold text-white">Escolha quem faz cada tarefa</h4></div>
-                    <p class="text-slate-400">Deixe em <b class="text-slate-200">Automático</b> e o painel escolhe sozinho entre as chaves que você colou. Só mude se quiser, por exemplo, usar um provedor mais barato para os resumos.</p>
-                    <div class="space-y-2">
+                    <p class="text-slate-400">Os provedores sem chave aprovada ficam apagados. <b class="text-slate-200">Automático</b> deixa o painel escolher sozinho entre as chaves que você colou.</p>
+                    <div class="space-y-3">
                         <?php foreach (aiRoles() as $__r => $__lbl): $__rp = (string)getSetting("ai_role_{$__r}_provider"); ?>
-                        <div class="p-3 rounded-xl bg-slate-950 border border-slate-800 grid grid-cols-1 sm:grid-cols-2 gap-2 items-center">
+                        <div class="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
                             <div>
                                 <div class="font-bold text-slate-200"><?php echo htmlspecialchars($__lbl); ?></div>
                                 <div class="text-[10px] text-slate-500"><?php echo htmlspecialchars($__hints[$__r]); ?></div>
                             </div>
-                            <select name="ai_role_<?php echo $__r; ?>_provider" class="px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white focus:border-brand-500 focus:outline-none">
-                                <option value="">Automático (recomendado)</option>
+                            <div class="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                                <label class="cursor-pointer">
+                                    <input type="radio" name="ai_role_<?php echo $__r; ?>_provider" value="" class="sr-only peer" <?php echo $__rp === '' ? 'checked' : ''; ?>>
+                                    <div class="p-2.5 text-center rounded-xl bg-slate-900 border-2 border-slate-800 peer-checked:border-brand-500 peer-checked:bg-brand-500/10 hover:border-slate-600 transition">
+                                        <i class="fa-solid fa-wand-magic-sparkles text-brand-400 block mb-0.5"></i><span class="font-bold text-white block">Automático</span><span class="text-[9px] text-slate-500">recomendado</span>
+                                    </div>
+                                </label>
                                 <?php foreach ($__defs as $__p => $__d):
-                                    if ($__r === 'audio' && !in_array($__p, ['openai', 'groq'], true)) continue;
-                                    $__hk = aiKeyFor($__p) !== ''; ?>
-                                <option value="<?php echo $__p; ?>" <?php echo $__rp === $__p ? 'selected' : ''; ?>><?php echo htmlspecialchars(($__provLabels[$__p] ?? $__p) . ($__hk ? '' : ' (sem chave)')); ?></option>
+                                    $__has = aiKeyFor($__p) !== ''; $__st = $__has ? aiKeyStatus($__p) : null;
+                                    $__failed = $__st && empty($__st['ok']);
+                                    $__noaudio = ($__r === 'audio' && !in_array($__p, ['openai', 'groq'], true));
+                                    $__can = $__has && !$__failed && !$__noaudio;
+                                    $__why = $__noaudio ? 'não transcreve' : (!$__has ? 'sem chave' : ($__failed ? 'chave com erro' : (($__st && !empty($__st['ok'])) ? 'aprovada' : 'não testada')));
+                                ?>
+                                <label class="<?php echo $__can ? 'cursor-pointer' : 'cursor-not-allowed opacity-40'; ?>" <?php echo $__can ? '' : 'title="' . htmlspecialchars($__why) . '"'; ?>>
+                                    <input type="radio" name="ai_role_<?php echo $__r; ?>_provider" value="<?php echo $__p; ?>" class="sr-only peer" <?php echo $__rp === $__p ? 'checked' : ''; ?> <?php echo $__can ? '' : 'disabled'; ?>>
+                                    <div class="p-2.5 text-center rounded-xl bg-slate-900 border-2 border-slate-800 <?php echo $__can ? 'peer-checked:border-brand-500 peer-checked:bg-brand-500/10 hover:border-slate-600' : ''; ?> transition">
+                                        <span class="font-bold text-white block"><?php echo htmlspecialchars(preg_replace('/ \(.*\)/', '', $__provLabels[$__p] ?? $__p)); ?></span>
+                                        <span class="text-[9px] <?php echo $__can ? (($__st && !empty($__st['ok'])) ? 'text-emerald-400' : 'text-amber-400') : 'text-slate-500'; ?>"><?php echo htmlspecialchars($__why); ?></span>
+                                    </div>
+                                </label>
                                 <?php endforeach; ?>
-                            </select>
+                            </div>
                         </div>
                         <?php endforeach; ?>
                     </div>
