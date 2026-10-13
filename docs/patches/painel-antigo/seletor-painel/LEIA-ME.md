@@ -1,24 +1,24 @@
-# Seletor de painel (Painel Novo 6.0 / Painel Clássico)
+# Escolha do painel na tela de login (Painel Novo 6.0 / Painel Clássico)
 
-Patch para o painel clássico. **Não altera nenhum arquivo existente da central até você executar o passo 3.**
+Na própria tela de login do painel clássico aparecem duas opções, **Painel Novo 6.0** e **Painel Clássico**. O usuário escolhe, digita usuário e senha e já entra no painel escolhido. A escolha fica lembrada no navegador.
 
 ## Como funciona
-1. Depois do login no painel clássico, o usuário vê dois cartões: **Painel Novo 6.0** e **Painel Clássico**.
-2. Ao escolher o novo, o servidor gera um passe assinado (válido por 45 segundos, uso único) com usuário, grupos e ramal e abre `front_api/index.php?sso=...`.
-3. O painel novo confere a assinatura e cria/abre o usuário vinculado. **Nenhuma senha é lida, copiada ou guardada.**
-4. Perfis na primeira entrada: `administrator` → Administrador, `Supervisor` → Supervisor, `Ramal` e qualquer grupo desconhecido → Usuário (menor acesso). Depois, ajuste as permissões em Configurações > Usuários & Permissões do painel novo; a entrada seguinte não sobrescreve seus ajustes.
+1. O formulário de login envia a escolha junto com usuário e senha.
+2. Se a escolha for "Painel Novo", depois de validar a senha o painel clássico gera um passe assinado (45 segundos, uso único) e abre `front_api/index.php?sso=...`.
+3. O painel novo confere a assinatura e entra. **Nenhuma senha é lida, copiada ou guardada.** Na primeira entrada o usuário é criado com o menor acesso do grupo (`administrator` → Administrador, `Supervisor` → Supervisor, demais → Usuário).
+4. Quem é do grupo Webphone continua indo direto para `/phone`.
 
 ## Instalação (no servidor, como root)
-1. Atualize o painel novo com o comando de sempre (o instalador cria a chave compartilhada `/etc/ipbx/sso.key`).
-2. Copie `seletor.php` para `/var/www/html/seletor.php` (`chown asterisk:asterisk`, `chmod 644`).
-3. (Opcional) para abrir o seletor logo após o login, em `/var/www/html/index.php` altere o final da função `get_post_login_redirect` de `return 'index.php';` para:
-   ```php
-   if (empty($_COOKIE['ipbx_painel'])) return 'seletor.php';
-   if ($_COOKIE['ipbx_painel'] === 'novo') return 'seletor.php?ir=novo';
-   return 'index.php';
-   ```
-   Faça o snapshot antes (política de backup do projeto). Para desfazer, volte a linha original.
-4. Teste: entre no painel clássico, abra `https://SEU-SERVIDOR/seletor.php` e escolha o painel novo.
+1. Atualize o painel novo com o comando de sempre (o instalador cria a chave `/etc/ipbx/sso.key`).
+2. `bash /root/ipbx-test/docs/patches/painel-antigo/seletor-painel/aplicar.sh`
+   - cria o snapshot em `/var/backup/ipbx/backup_AAAA-MM-DD_HHMMSS` (com manifesto e link `latest`);
+   - copia `seletor.php` para `/var/www/html/`;
+   - acrescenta as duas opções ao `login.tpl` do tema `prisma_v5` e uma linha em `get_post_login_redirect` do `index.php`. O trecho é marcado com `IPBX-PAINEL-SELETOR` e pode ser aplicado mais de uma vez sem duplicar.
+3. Teste: abra a tela de login, escolha "Painel Novo 6.0" e entre.
 
-## Observação
-O botão "Trocar de painel" pode ser um link para `seletor.php` no menu do tema `prisma_v5`.
+## Desfazer
+`bash aplicar.sh --desfazer` remove os trechos (ou restaure o snapshot: `cp -rpf /var/backup/ipbx/latest/html/. /var/www/html/`).
+
+## Observações
+- `seletor.php?ir=novo` também pode ser usado como atalho "Trocar para o painel novo" dentro do painel clássico.
+- Um segundo login por 2FA não é afetado; a escolha vale apenas para o login por usuário e senha.
