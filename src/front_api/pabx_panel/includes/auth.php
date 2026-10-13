@@ -148,9 +148,27 @@ function authLogin($email, $password) {
     return ['success' => true, 'error' => ''];
 }
 
+/** Tela de login inicial (painel clássico): pasta acima do painel novo; configurável em 'login_url'. */
+function authClassicLoginUrl() {
+    $c = function_exists('getSetting') ? trim((string)getSetting('login_url')) : '';
+    if ($c !== '' && preg_match('#^(https?://|/)[^\s]*$#', $c)) return $c;
+    $up = dirname(dirname($_SERVER['SCRIPT_NAME'] ?? '/front_api/index.php'));
+    return ($up === '' || $up === '.' || $up === '\\') ? '/' : rtrim($up, '/') . '/';
+}
+
 function authLogout() {
     if (function_exists('pabx_log')) { $__u = $_SESSION['logged_user_id'] ?? 0; pabx_log('user_actions', 'INFO', '[AUTH] Saiu do painel (logout)', ['user_id' => $__u]); }
+    $viaSso = !empty($_SESSION['via_sso']) || isset($_COOKIE['issabelSession']);
     $_SESSION = [];
+    if ($viaSso && isset($_COOKIE['issabelSession'])) {
+        // Encerra também a sessão do painel clássico, para voltar realmente ao login inicial
+        $cur = session_name(); $curId = session_id();
+        @session_write_close();
+        session_name('issabelSession'); session_id($_COOKIE['issabelSession']); @session_start();
+        $_SESSION = []; @session_destroy();
+        setcookie('issabelSession', '', time() - 42000, '/');
+        session_name($cur); if ($curId !== '') session_id($curId); @session_start(); $_SESSION = [];
+    }
     if (ini_get('session.use_cookies')) {
         $p = session_get_cookie_params();
         setcookie(session_name(), '', time() - 42000, $p['path'], $p['domain'], $p['secure'], $p['httponly']);
@@ -226,6 +244,12 @@ function authDisabled() {
 
 function authGate($mode = 'page') {
     if (authIsCli()) return;
+    // "Sair": vale também com o login desligado (modo de testes) e leva de volta ao login inicial
+    if ($mode === 'page' && ($_GET['auth'] ?? '') === 'logout') {
+        authLogout();
+        header('Location: ' . authClassicLoginUrl());
+        exit;
+    }
     if (authDisabled()) return; // painel aberto (somente para testes em rede confiável)
 
     if ($mode === 'page') {
@@ -243,11 +267,6 @@ function authGate($mode = 'page') {
                 exit;
             }
             authRenderLogin($res['error']);
-        }
-        if (($_GET['auth'] ?? '') === 'logout') {
-            authLogout();
-            header('Location: index.php');
-            exit;
         }
     }
 

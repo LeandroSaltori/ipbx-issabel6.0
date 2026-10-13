@@ -106,6 +106,7 @@ function ssoHandle($token) {
     session_regenerate_id(true);
     $_SESSION['logged_user_id'] = (int)$u['id'];
     $_SESSION['auth_time'] = time();
+    $_SESSION['via_sso'] = 1;
     if (function_exists('pabx_log')) pabx_log('security', 'INFO', 'Login por entrada única', ['issabel_user' => $d['u'], 'ip' => function_exists('authClientIp') ? authClientIp() : '']);
     return ['ok' => true, 'error' => ''];
 }

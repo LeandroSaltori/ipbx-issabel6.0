@@ -15,6 +15,7 @@ return [
             'passos' => ['Abra a tela de login do IPbx.', 'Marque Painel Novo 6.0 (ou Painel Clássico), digite usuário e senha e clique em Entrar. A escolha fica lembrada neste navegador.', 'Para ajustar o que cada pessoa vê, use Configurações > Usuários & Permissões no painel novo.'],
             'dica' => 'Os usuários continuam sendo criados no painel clássico. O painel novo só guarda as permissões e o WhatsApp de cada um.',
             'aviso' => 'Quem for desativado no painel novo perde o acesso mesmo entrando pelo clássico.'],
+        ['t' => 'Sair do painel', 'd' => 'O botão Sair, no rodapé do menu lateral, encerra sua sessão e leva de volta à tela de login inicial.'],
         ['t' => 'Modo claro / escuro', 'd' => 'Você pode alternar o visual do painel pelo botão de tema.'],
     ]],
     ['id' => 'dashboard', 'titulo' => 'Dashboard', 'icon' => 'fa-chart-pie', 'itens' => [
