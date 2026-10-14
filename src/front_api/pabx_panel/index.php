@@ -16,6 +16,7 @@ register_shutdown_function(function () use (&$__perf_t0, &$__perf_marks) {
     $partes = []; $ant = 0.0;
     foreach ($__perf_marks as $nome => $t) { $partes[] = $nome . ' ' . number_format($t - $ant, 2) . 's'; $ant = $t; }
     $partes[] = 'tela/consultas ' . number_format($d - $ant, 2) . 's';
+    if (!empty($GLOBALS['__perf_ami'])) $partes[] = '(AMI ' . number_format($GLOBALS['__perf_ami'], 2) . 's dentro da tela)';
     @pabx_log('desempenho', 'WARNING', 'Requisição lenta ' . number_format($d, 2) . 's | ' . $tela . ' | ' . implode(' | ', $partes));
 });
 

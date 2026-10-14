@@ -199,6 +199,13 @@ function executeClickToCall($from_ext, $destination_num) {
  * Executa qualquer comando/Ação via REST API em socket TCP puro (Suporta comandos CLI via Command)
  */
 function executeAsteriskAMICommand($action, $params = []) {
+    // Mede o tempo gasto no AMI (aparece em Logs > Desempenho quando a requisição é lenta)
+    $__t = microtime(true);
+    try { return executeAsteriskAMICommandRaw($action, $params); }
+    finally { $GLOBALS['__perf_ami'] = ($GLOBALS['__perf_ami'] ?? 0) + (microtime(true) - $__t); }
+}
+
+function executeAsteriskAMICommandRaw($action, $params = []) {
     $host = getSetting('ami_host') ?: '127.0.0.1';
     $port = (int)(getSetting('ami_port') ?: 5038);
 

@@ -36,7 +36,17 @@ try {
     $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
     try { $db->exec('PRAGMA busy_timeout = 15000'); } catch (Exception $e) {}
     // WAL: leitores (páginas, FOP, crons) não bloqueiam quem grava; evita "database is locked" com acessos simultâneos
-    try { if (is_writable($db_file)) { $db->exec('PRAGMA journal_mode = WAL'); $db->exec('PRAGMA synchronous = NORMAL'); } } catch (Exception $e) {}
+    // A conversão exige que nenhuma outra conexão esteja aberta: tenta SEM esperar (espera 0) e só quando o banco ainda não está em WAL,
+    // senão cada acesso ficaria parado no bloqueio. Se não der agora, tenta de novo no próximo acesso.
+    try {
+        if (strtolower((string)$db->query('PRAGMA journal_mode')->fetchColumn()) !== 'wal' && is_writable($db_file)) {
+            $db->exec('PRAGMA busy_timeout = 0');
+            try { $db->exec('PRAGMA journal_mode = WAL'); } catch (Exception $e) {}
+            $db->exec('PRAGMA busy_timeout = 15000');
+        }
+        $db->exec('PRAGMA synchronous = NORMAL');
+    } catch (Exception $e) { try { $db->exec('PRAGMA busy_timeout = 15000'); } catch (Exception $e2) {} }
+    if (isset($__perf_t0, $__perf_marks)) $__perf_marks['sqlite (abrir/modo WAL)'] = microtime(true) - $__perf_t0;
     $db->exec("PRAGMA encoding = 'UTF-8';");
     // DeepSeek foi removido do painel: apaga chave/estado salvos e volta funções que o usavam para Automático
     // (só grava quando ainda existe algo de DeepSeek: evita escrita a cada acesso, que causava "database is locked")
