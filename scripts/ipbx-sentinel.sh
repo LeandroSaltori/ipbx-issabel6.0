@@ -27,7 +27,7 @@
 #   ipbx-sentinel --scan           varredura completa (padrao; roda na instalacao e sob demanda)
 #   ipbx-sentinel --incremental    so arquivos alterados recentemente (cron)
 #   ipbx-sentinel --update-framework  corrige issabel-framework vulneravel (snapshot + yum)
-#   ipbx-sentinel --audit [DIAS]   auditoria forense somente-leitura (contas, SSH, cron, processos, portas, rootkit, origem do ataque)
+#   ipbx-sentinel --audit [DIAS] [full]   auditoria forense somente-leitura (contas, SSH, cron, processos, portas, rootkit, origem do ataque)
 #   ipbx-sentinel --status         mostra se a vigilancia de contas consegue ler painel/MySQL/arquivos
 #   ipbx-sentinel --host           so checks de host: firewall, dialplan, cron (cron, 1 min)
 #   ipbx-sentinel --install        instala comando, config e cron (/etc/cron.d)
@@ -311,7 +311,7 @@ identity_status() {
 # dos arquivos web. Nao altera nada. Relatorio tambem em /var/log/ipbx-sentinel-audit-*.txt
 # ------------------------------------------------------------------------------
 cmd_audit() {
-  local days="${1:-30}" AF=0 out ts; ts="$(date '+%Y%m%d_%H%M%S')"
+  local days="${1:-30}" mode="${2:-quick}" AF=0 out ts; ts="$(date '+%Y%m%d_%H%M%S')"
   out="${SENTINEL_AUDIT_OUT:-/var/log/ipbx-sentinel-audit-${ts}.txt}"
   { 
   sec()  { echo; echo "== $* =="; }
@@ -369,12 +369,28 @@ cmd_audit() {
   for f in /etc/passwd /etc/shadow /etc/group /etc/gshadow /etc/sudoers /etc/rc.local /etc/rc.d/rc.local /etc/crontab /var/spool/cron/root /var/spool/cron/asterisk; do
     [ -e "$f" ] && lsattr -d "$f" 2>/dev/null | awk '{print $1}' | grep -qE 'i|a' && warn "atributo imutavel/append-only em $f (invasor impede remocao): chattr -i -a $f"
   done
-  find /etc/systemd/system /usr/lib/systemd/system -type f -name '*.service' -mtime "-${days}" 2>/dev/null | head -10 | while read -r l; do warn "servico systemd criado/alterado recentemente: $l"; done
+  find /etc/systemd/system /usr/lib/systemd/system -type f -name '*.service' -mtime "-${days}" 2>/dev/null | head -10 | while read -r l; do
+    if own="$(rpm -qf "$l" 2>/dev/null | head -1)" && [ -n "$own" ] && ! echo "$own" | grep -qiE 'not owned|nenhum pacote'; then own="pacote: $own"; else own="NENHUM PACOTE: nao veio de instalacao oficial"; fi
+    warn "servico systemd criado/alterado recentemente: $l  ($own)"
+    grep -E '^(ExecStart|ExecStartPre|ExecStartPost)=' "$l" 2>/dev/null | cut -c1-140 | sed 's/^/        /'
+  done
   find /tmp /var/tmp /dev/shm -type f \( -name '*.php' -o -name '*.sh' -o -perm -u+x \) 2>/dev/null | head -15 | while read -r l; do warn "arquivo suspeito em area temporaria: $l"; done
 
   sec "6. Binarios do sistema alterados (rpm -V)"
   if command -v rpm >/dev/null 2>&1; then
-    timeout 300 rpm -Va --noconfig 2>/dev/null | awk '$1 ~ /^..5/ && $2!="c" {print $NF}' | grep -E '^/(usr/)?(s?bin)/|^/usr/lib64?/lib' | head -20 | while read -r l; do warn "binario/biblioteca diferente do pacote original: $l"; done
+    local pk pkgs=""
+    for pk in coreutils procps-ng iproute net-tools openssh openssh-server openssh-clients util-linux e2fsprogs shadow-utils sudo bash systemd glibc findutils grep sed cronie curl wget openssl pam passwd lsof psmisc httpd php mysql-server mariadb-server mariadb; do
+      rpm -q --quiet "$pk" 2>/dev/null && pkgs="$pkgs $pk"
+    done
+    if [ "$mode" = "full" ]; then
+      info "modo COMPLETO: verificando TODOS os pacotes (pode levar varios minutos)..."
+      timeout 1800 rpm -Va --noconfig 2>/dev/null | awk '$1 ~ /^..5/ && $2!="c" {print $NF}' | grep -E '^/(usr/)?(s?bin)/|^/usr/lib64?/' | head -40 | while read -r l; do warn "arquivo diferente do pacote original: $l"; done
+    else
+      info "verificando ${pkgs# } (rapido; para TODOS os pacotes: ipbx-sentinel --audit ${days} full)..."
+      # shellcheck disable=SC2086
+      timeout 600 rpm -V --noconfig $pkgs 2>/dev/null | awk '$1 ~ /^..5/ && $2!="c" {print $NF}' | head -40 | while read -r l; do warn "arquivo diferente do pacote original (possivel binario trocado): $l"; done
+    fi
+    info "verificacao de pacotes concluida"
   else info "rpm nao disponivel"; fi
 
   sec "7. Arquivos alterados nos ultimos ${days} dias (fora do esperado)"
@@ -716,10 +732,10 @@ case "${1:-}" in
   --incremental) do_scan inc ;;
   --host)        host_checks ;;
   --status)      identity_status ;;
-  --audit)       cmd_audit "$2" ;;
+  --audit)       cmd_audit "$2" "$3" ;;
   --update-framework) cmd_update_framework ;;
   --alert-restored) send_telegram "ALERTA: o IPbx Sentinel (ou seu agendamento) foi APAGADO em ${HOSTNAME_S} e foi restaurado automaticamente - $(date '+%d/%m/%Y %H:%M:%S'). Investigue quem tem acesso root." ;;
   --scan|"")     do_scan full ;;
-  *) echo "Uso: $0 [--scan|--incremental|--host|--status|--audit [DIAS]|--update-framework|--install|--uninstall|--list|--restore ARQ|--baseline|--test-alert|--selftest]"; exit 1 ;;
+  *) echo "Uso: $0 [--scan|--incremental|--host|--status|--audit [DIAS] [full]|--update-framework|--install|--uninstall|--list|--restore ARQ|--baseline|--test-alert|--selftest]"; exit 1 ;;
 esac
 exit 0
