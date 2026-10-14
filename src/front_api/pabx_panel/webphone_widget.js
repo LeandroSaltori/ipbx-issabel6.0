@@ -304,6 +304,8 @@ h4{margin:0 0 6px;font-size:10.5px;text-transform:uppercase;letter-spacing:.6px;
   }
 
   // Navegar no painel recarrega a página: durante uma chamada, avisa antes de sair (o áudio cairia)
+  // Ao sair da página, desregistra (Expires: 0) para o PABX não ficar testando conexões antigas já fechadas
+  window.addEventListener('pagehide', () => { try { if (ua && !inCall) ua.stop(); } catch (e) {} });
   window.addEventListener('beforeunload', e => { if (inCall) { e.preventDefault(); e.returnValue = ''; return ''; } });
 
   // O botão verde "WebPhone" do topo é o gatilho e a bolinha dele mostra o estado (não existe botão flutuante: não cobre nada na tela)
