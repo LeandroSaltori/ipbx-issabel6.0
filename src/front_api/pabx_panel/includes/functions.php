@@ -462,7 +462,7 @@ function syncPrismaAssets() {
                 $ename = trim($eRow['name'] ?? '');
                 $etech = strtoupper(trim($eRow['tech'] ?? 'PJSIP'));
                 if (!empty($enum)) {
-                    $db->prepare("INSERT INTO extensions_config (extension, agent_name, tech, updated_at) VALUES (:e, :n, :t, CURRENT_TIMESTAMP) ON CONFLICT(extension) DO UPDATE SET agent_name = :n, tech = :t, updated_at = CURRENT_TIMESTAMP")
+                    $db->prepare("INSERT INTO extensions_config (extension, agent_name, tech, updated_at) VALUES (:e, :n, :t, CURRENT_TIMESTAMP) ON CONFLICT(extension) DO UPDATE SET agent_name = excluded.agent_name, tech = excluded.tech, updated_at = CURRENT_TIMESTAMP WHERE extensions_config.agent_name IS NOT excluded.agent_name OR extensions_config.tech IS NOT excluded.tech")
                        ->execute([':e' => $enum, ':n' => $ename ?: "Ramal $enum", ':t' => $etech]);
                     $extCount++;
                 }
@@ -479,7 +479,7 @@ function syncPrismaAssets() {
                 $qname = trim($qRow['descr'] ?? $qRow['description'] ?? $qRow['name'] ?? '');
                 if (!empty($qnum)) {
                     $displayName = !empty($qname) ? "Fila $qnum - $qname" : "Fila $qnum";
-                    $db->prepare("INSERT OR REPLACE INTO queues_config (queue_number, queue_name, abandon_enabled, abandon_msg, updated_at) VALUES (:num, :name, 1, 'Atendimento encerrado.', CURRENT_TIMESTAMP)")
+                    $db->prepare("INSERT INTO queues_config (queue_number, queue_name, abandon_enabled, abandon_msg, updated_at) VALUES (:num, :name, 1, 'Atendimento encerrado.', CURRENT_TIMESTAMP) ON CONFLICT(queue_number) DO UPDATE SET queue_name = excluded.queue_name, updated_at = CURRENT_TIMESTAMP WHERE queues_config.queue_name IS NOT excluded.queue_name")
                        ->execute([':num' => $qnum, ':name' => $displayName]);
                     $qCount++;
                 }
@@ -582,7 +582,8 @@ function syncPrismaAssets() {
         if (!empty($extensions_found)) {
             $stmt = $db->prepare("INSERT INTO extensions_config (extension, agent_name, tech, whatsapp_number, updated_at) 
                 VALUES (:ext, :name, :tech, '', CURRENT_TIMESTAMP)
-                ON CONFLICT(extension) DO UPDATE SET agent_name = :name, tech = :tech, updated_at = CURRENT_TIMESTAMP");
+                ON CONFLICT(extension) DO UPDATE SET agent_name = excluded.agent_name, tech = excluded.tech, updated_at = CURRENT_TIMESTAMP
+                WHERE extensions_config.agent_name IS NOT excluded.agent_name OR extensions_config.tech IS NOT excluded.tech");
 
             foreach ($extensions_found as $ext => $data) {
                 $stmt->execute([':ext' => $ext, ':name' => $data['name'], ':tech' => $data['tech']]);
@@ -666,7 +667,8 @@ function syncPrismaAssets() {
         if (!empty($queues_found)) {
             $stmt_q = $db->prepare("INSERT INTO queues_config (queue_number, queue_name, abandon_enabled, abandon_msg, updated_at) 
                 VALUES (:num, :name, 1, :default_msg, CURRENT_TIMESTAMP)
-                ON CONFLICT(queue_number) DO UPDATE SET queue_name = :name, updated_at = CURRENT_TIMESTAMP");
+                ON CONFLICT(queue_number) DO UPDATE SET queue_name = excluded.queue_name, updated_at = CURRENT_TIMESTAMP
+                WHERE queues_config.queue_name IS NOT excluded.queue_name");
 
             $default_q_msg = function_exists('getRule') ? getRule('queue_abandon_msg_default') : 'Atendimento encerrado.';
             foreach ($queues_found as $qnum => $qname) {
