@@ -221,10 +221,15 @@ function executeAsteriskAMICommandRaw($action, $params = []) {
     // e antes isso se repetia em TODA consulta ao AMI. Guarda só o NOME do usuário (nunca a senha).
     $__ami_ok_file = __DIR__ . '/../logs/.ami_user_ok';
     $__ami_ok = $GLOBALS['__ami_user_ok'] ?? (is_readable($__ami_ok_file) ? trim((string)@file_get_contents($__ami_ok_file)) : '');
+    // Identifica a credencial por usuário + impressão curta (não reversível) da senha: o mesmo usuário (ex.: admin) pode aparecer
+    // com senhas diferentes em vários arquivos, e só uma delas vale; guardar só o nome deixava as erradas na frente.
+    $__ami_tag = function ($c) { return ($c['user'] ?? '') . '|' . substr(hash('sha256', ($c['user'] ?? '') . "\0" . ($c['secret'] ?? '')), 0, 16); };
     if ($__ami_ok !== '') {
-        usort($credentials_to_try, function ($x, $y) use ($__ami_ok) {
-            return (int)(($y['user'] ?? '') === $__ami_ok) - (int)(($x['user'] ?? '') === $__ami_ok);
-        });
+        $__ami_ok_user = explode('|', $__ami_ok)[0];
+        $__ami_score = function ($c) use ($__ami_ok, $__ami_ok_user, $__ami_tag) {
+            return ($__ami_tag($c) === $__ami_ok ? 2 : 0) + ((($c['user'] ?? '') === $__ami_ok_user) ? 1 : 0);
+        };
+        usort($credentials_to_try, function ($x, $y) use ($__ami_score) { return $__ami_score($y) - $__ami_score($x); });
     }
     $socket = null;
     $authenticated = false;
@@ -256,9 +261,10 @@ function executeAsteriskAMICommandRaw($action, $params = []) {
         if (stripos($login_response, 'Response: Success') !== false) {
             $authenticated = true;
             $socket = $s;
-            if (($cred['user'] ?? '') !== $__ami_ok) {
-                $GLOBALS['__ami_user_ok'] = (string)$cred['user'];
-                @file_put_contents($__ami_ok_file, (string)$cred['user'], LOCK_EX);
+            $__tag_now = $__ami_tag($cred);
+            if ($__tag_now !== $__ami_ok) {
+                $GLOBALS['__ami_user_ok'] = $__tag_now;
+                @file_put_contents($__ami_ok_file, $__tag_now, LOCK_EX);
             }
             break;
         }

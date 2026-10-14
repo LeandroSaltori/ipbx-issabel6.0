@@ -229,6 +229,7 @@ function authRenderLogin($error = '', $notice = '') {
     header('Content-Type: text/html; charset=utf-8');
     header('Cache-Control: no-store');
     echo '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script>if(window.top!==window.self){try{window.top.location.replace(window.self.location.href);}catch(e){}}</script>
 <title>Entrar - IPbx Prisma</title><link rel="icon" type="image/png" href="favicon.png"><style>
 *{box-sizing:border-box}body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#0f172a;font-family:"Segoe UI",system-ui,sans-serif;color:#e2e8f0}
 .card{width:100%;max-width:380px;background:#1c1b2f;border:1px solid #334155;border-radius:20px;padding:32px;box-shadow:0 20px 50px rgba(0,0,0,.45)}

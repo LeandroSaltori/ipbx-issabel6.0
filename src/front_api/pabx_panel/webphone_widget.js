@@ -311,10 +311,14 @@ h4{margin:0 0 6px;font-size:10.5px;text-transform:uppercase;letter-spacing:.6px;
   window.addEventListener('beforeunload', e => { if (inCall) { e.preventDefault(); e.returnValue = ''; return ''; } });
 
   // O botão verde "WebPhone" do topo é o gatilho e a bolinha dele mostra o estado (não existe botão flutuante: não cobre nada na tela)
-  const pillEl = () => document.getElementById('webphone-pill');
+  // Com a casca do painel, o topo (e o botão do telefone) está dentro de um quadro de mesma origem: o widget enxerga o botão dele
+  const frameDoc = () => { try { const f = document.getElementById('prisma-shell-frame'); return (f && f.contentDocument) || document; } catch (e) { return document; } };
+  const pillEl = () => frameDoc().getElementById('webphone-pill');
+  let lastCls = '';
   const PILL = {ok: '#10b981', warn: '#fbbf24', bad: '#ef4444', '': '#94a3b8'};
   function pillState(cls) {
-    const d = document.getElementById('webphone-pill-dot'); if (!d) return;
+    lastCls = cls;
+    const d = frameDoc().getElementById('webphone-pill-dot'); if (!d) return;
     d.style.background = PILL[cls] || PILL['']; d.classList.toggle('animate-pulse', cls === 'warn' || !cls);
     const p = pillEl(); if (p) p.title = 'Webphone: ' + ({ok: 'registrado', warn: 'conectando...', bad: 'com falha'}[cls] || 'desconectado');
   }
@@ -335,6 +339,6 @@ h4{margin:0 0 6px;font-size:10.5px;text-transform:uppercase;letter-spacing:.6px;
     });
     if (ss.get('prisma_wp_open') === '1') open();
   }
-  window.PrismaWebphone = {open, close, toggle, dial, ready: () => reg};
+  window.PrismaWebphone = {open, close, toggle, dial, ready: () => reg, refreshPill: () => { pillState(lastCls); if (isOpen()) placePanel(); }};
   if (document.body) boot(); else document.addEventListener('DOMContentLoaded', boot);
 })();

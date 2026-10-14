@@ -1231,6 +1231,29 @@ $__route_perm = authRoutePermission($module, $action);
 if ($__route_perm !== '' && !hasUserPermission($__route_perm)) {
     $__route_denied = true;
 }
+
+// Casca do painel: com o Webphone habilitado, a tela (menu, topo e conteúdo) roda dentro de um quadro e o telefone fica FORA dele.
+// Assim, trocar de tela não recarrega o telefone: o registro e a chamada em andamento continuam. Só vale para abertura de página
+// (nunca para API, exportação ou download, que já encerraram antes deste ponto) e só em navegador que informa o destino da requisição.
+$__wp_u = function_exists('getLoggedUser') ? getLoggedUser() : null;
+if ($__wp_u && !empty($__wp_u['webphone']) && !empty($__wp_u['extension'])
+    && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET'
+    && ($_SERVER['HTTP_SEC_FETCH_DEST'] ?? '') === 'document' && ($_GET['noshell'] ?? '') === '') {
+    while (ob_get_level()) ob_end_clean();
+    header('Content-Type: text/html; charset=utf-8');
+    header('Cache-Control: no-store');
+    $__src = htmlspecialchars($_SERVER['REQUEST_URI'] ?? 'index.php', ENT_QUOTES, 'UTF-8');
+    echo '<!DOCTYPE html><html lang="pt-BR" class="dark"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">'
+       . '<title>IPbx Prisma x Prismabot - Painel Integrado</title><link rel="icon" type="image/png" href="favicon.png">'
+       . '<style>html,body{margin:0;height:100%;background:#0f172a;overflow:hidden}#prisma-shell-frame{display:block;width:100%;height:100vh;height:100dvh;border:0;background:#0f172a}</style></head><body>'
+       . '<iframe id="prisma-shell-frame" src="' . $__src . '" allow="microphone; autoplay; clipboard-write; fullscreen"></iframe>'
+       . '<script>(function(){var f=document.getElementById("prisma-shell-frame");f.addEventListener("load",function(){try{var w=f.contentWindow;'
+       . 'history.replaceState(null,"",w.location.pathname+w.location.search+w.location.hash);if(w.document.title)document.title=w.document.title;'
+       . '}catch(e){}'
+       . 'if(window.PrismaWebphone&&window.PrismaWebphone.refreshPill)window.PrismaWebphone.refreshPill();});})();</script>'
+       . '<script src="webphone.php?js=1"></script></body></html>';
+    exit;
+}
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR" class="dark">
@@ -2005,17 +2028,19 @@ if ($__route_perm !== '' && !hasUserPermission($__route_perm)) {
         }
 
         // Webphone: widget flutuante (webphone_widget.js, carregado só para quem tem o Webphone habilitado)
+        // Com a casca do painel, o telefone mora na página de fora (parent): é ele que mantém o registro entre as telas
+        function WPH() { try { if (window.parent && window.parent !== window && window.parent.PrismaWebphone) return window.parent.PrismaWebphone; } catch (e) {} return window.PrismaWebphone || null; }
         function toggleWebPhone() {
-            if (window.PrismaWebphone) { window.PrismaWebphone.toggle(); return; }
+            if (WPH()) { WPH().toggle(); return; }
             alert('O Webphone não está habilitado para o seu usuário. Peça ao administrador em Configurações > Usuários.');
         }
-        function connectWebPhoneSip() { if (window.PrismaWebphone) window.PrismaWebphone.open(); }
-        function disconnectWebPhoneSip() { if (window.PrismaWebphone) window.PrismaWebphone.close(); }
+        function connectWebPhoneSip() { if (WPH()) WPH().open(); }
+        function disconnectWebPhoneSip() { if (WPH()) WPH().close(); }
         // Liga para um número usando o Webphone (espera o registro, se preciso)
         function makeWebPhoneCall(numero) {
             const num = String(numero || '').replace(/[^0-9*#+]/g, '');
             if (!num) { alert('Digite um número para discar.'); return; }
-            if (window.PrismaWebphone) window.PrismaWebphone.dial(num);
+            if (WPH()) WPH().dial(num);
         }
         function hangupWebPhoneCall() { /* o desligar fica no widget do Webphone */ }
 
@@ -2106,7 +2131,7 @@ if ($__route_perm !== '' && !hasUserPermission($__route_perm)) {
             }
 
             // Webphone registrado: disca por ele (usa o ramal do próprio usuário); senão segue pelo PABX (AMI Originate)
-            if (window.PrismaWebphone && window.PrismaWebphone.ready()) {
+            if (WPH() && WPH().ready()) {
                 makeWebPhoneCall(to);
                 return;
             }
@@ -3444,7 +3469,7 @@ window.ipbxIaHistory = async function (module, title) {
 })();
 </script>
 <?php endif; ?>
-<?php $__u_wp = function_exists('getLoggedUser') ? getLoggedUser() : null; if ($__u_wp && !empty($__u_wp['webphone']) && !empty($__u_wp['extension'])): ?>
+<?php $__u_wp = function_exists('getLoggedUser') ? getLoggedUser() : null; if ($__u_wp && !empty($__u_wp['webphone']) && !empty($__u_wp['extension']) && ($_SERVER['HTTP_SEC_FETCH_DEST'] ?? '') !== 'iframe'): ?>
 <script src="webphone.php?js=1"></script>
 <?php endif; ?>
 </body>
