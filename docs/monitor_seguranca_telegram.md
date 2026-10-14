@@ -27,6 +27,23 @@ O **IPbx Sentinel** (`scripts/ipbx-sentinel.sh`) é o monitor único de seguran�
 
 ---
 
+## 🏢 Identificação do cliente nos alertas (padrão)
+
+Como o mesmo monitor roda em vários clientes, **todo alerta sai com o mesmo cabeçalho**: ícone de gravidade, nome do cliente (também na primeira linha, que aparece na prévia do celular), servidor, IP e data/hora. Exemplo:
+
+```
+🚨 [Helpnet Matriz] ALERTA: FIREWALL SEM PROTECAO
+🏢 Cliente: Helpnet Matriz
+🖥 Servidor: ipbx.helpnet (192.168.0.251)
+🔗 Acesso: helpnet.ddns.net:5444
+🕒 14/10/2026 08:38:39
+```
+
+- Defina na instalação: `ipbx-sentinel.sh --install --cliente "Nome do cliente"` (sem o parâmetro, pergunta no terminal).
+- Ou depois: `ipbx-sentinel --set-cliente "Nome do cliente" [host:porta]` (grava em `/etc/ipbx/cliente.conf`, modo 600).
+- Sem nome definido o alerta sai como **CLIENTE NAO DEFINIDO (hostname)** com o comando para corrigir: nenhum alerta sai anônimo.
+- Servidores ainda com o monitor antigo (`monitor_prisma.sh`, alertas como "FIREWALL IPTABLES DOWN") não têm esse padrão: rode `ipbx-sentinel --install` neles para migrar.
+
 ## 🚀 Como instalar e usar
 
 ### Via menu interativo

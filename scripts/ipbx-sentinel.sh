@@ -36,6 +36,8 @@
 #   ipbx-sentinel --restore ARQ    restaura um arquivo da quarentena
 #   ipbx-sentinel --baseline       refaz a "foto" de contas/senhas (rode so com o servidor limpo)
 #   ipbx-sentinel --test-alert     envia mensagem de teste ao Telegram
+#   ipbx-sentinel --set-cliente "Nome" [host:porta]   define o cliente que aparece em TODOS os alertas
+#   ipbx-sentinel --install --cliente "Nome"          instala ja identificando o cliente
 #   ipbx-sentinel --selftest       testa o detector em pasta temporaria
 #
 # CONFIGURACAO (opcional) em /etc/ipbx/sentinel.conf (root, modo 600):
@@ -43,6 +45,7 @@
 #   SENTINEL_HEAL_PERMS=0          # 1 = remove escrita de "outros" em arquivos web
 #   SENTINEL_FIREWALL_HEAL=0       # 0 = so avisa (padrao; o firewall e gerido pela tela do Issabel) | 1 = tenta reiniciar o servico
 #   SENTINEL_AUTO_UPDATE_FRAMEWORK=1  # 1 = ao instalar, atualiza issabel-framework vulneravel (snapshot antes)
+# Cliente nos alertas: /etc/ipbx/cliente.conf -> CLIENTE_NOME="..."  CLIENTE_ACESSO="host:porta" (opcional)
 # Telegram: /etc/ipbx/telegram.conf  ->  TELEGRAM_BOT_TOKEN=...  TELEGRAM_CHAT_ID=...
 # Excecoes (falsos positivos): /etc/ipbx/sentinel.allow (um caminho/glob por linha)
 # ==============================================================================
@@ -51,6 +54,7 @@ WEB_DIR="${WEB_DIR:-/var/www/html}"
 CONF_FILE="${SENTINEL_CONF:-/etc/ipbx/sentinel.conf}"
 TG_CONF="${SENTINEL_TG_CONF:-/etc/ipbx/telegram.conf}"
 ALLOW_FILE="${SENTINEL_ALLOW:-/etc/ipbx/sentinel.allow}"
+CLIENTE_CONF="${SENTINEL_CLIENTE_CONF:-/etc/ipbx/cliente.conf}"
 QUAR_ROOT="${SENTINEL_QUAR:-/var/backup/ipbx/quarantine}"
 LOG_FILE="${SENTINEL_LOG:-/var/log/ipbx-sentinel.log}"
 LOCK_FILE="/var/run/ipbx-sentinel.lock"
@@ -65,6 +69,10 @@ SENTINEL_ACTION="${SENTINEL_ACTION:-quarantine}"
 SENTINEL_HEAL_PERMS="${SENTINEL_HEAL_PERMS:-0}"
 SENTINEL_FIREWALL_HEAL="${SENTINEL_FIREWALL_HEAL:-0}"
 [ -r "$CONF_FILE" ] && . "$CONF_FILE" 2>/dev/null
+# Identificacao do cliente nos alertas (/etc/ipbx/cliente.conf: CLIENTE_NOME, CLIENTE_ACESSO opcional)
+CLIENTE_NOME=""; CLIENTE_ACESSO=""
+[ -r "$CLIENTE_CONF" ] && . "$CLIENTE_CONF" 2>/dev/null
+[ -n "${SENTINEL_CLIENTE:-}" ] && CLIENTE_NOME="$SENTINEL_CLIENTE"
 SEND_ALERTS="${SENTINEL_NO_ALERT:+0}"
 SEND_ALERTS="${SEND_ALERTS:-1}"
 
@@ -105,12 +113,42 @@ load_telegram() {
   fi
 }
 
+# Padrao de notificacao: toda mensagem sai com cliente, servidor, IP e data.
+# O chamador passa "TITULO" ou "TITULO\ndetalhes"; o cabecalho e montado aqui.
 send_telegram() {
   [ "$SEND_ALERTS" = "1" ] || return 0
   load_telegram
   [ -n "$TELEGRAM_BOT_TOKEN" ] && [ -n "$TELEGRAM_CHAT_ID" ] || { log "Telegram nao configurado; alerta nao enviado."; return 0; }
+  local body="$1" icon="" nome="${CLIENTE_NOME:-}" ip title rest msg
+  case "$body" in
+    ALERTA*|FALHA*) icon="🚨 " ;;
+    Firewall\ restabelecido*|*sucesso*) icon="✅ " ;;
+    Teste*) icon="🔔 " ;;
+  esac
+  ip="$(hostname -I 2>/dev/null | awk '{print $1}')"
+  [ -n "$nome" ] || nome="CLIENTE NAO DEFINIDO (${HOSTNAME_S})"
+  title="${body%%$'\n'*}"; rest=""
+  case "$body" in *$'\n'*) rest="${body#*$'\n'}" ;; esac
+  msg="${icon}[${nome}] ${title}"$'\n'"🏢 Cliente: ${nome}"$'\n'"🖥 Servidor: ${HOSTNAME_S}${ip:+ ($ip)}"
+  [ -n "$CLIENTE_ACESSO" ] && msg+=$'\n'"🔗 Acesso: ${CLIENTE_ACESSO}"
+  msg+=$'\n'"🕒 $(date '+%d/%m/%Y %H:%M:%S')"
+  [ -n "${CLIENTE_NOME:-}" ] || msg+=$'\n'"⚠ Defina o cliente: ipbx-sentinel --set-cliente \"Nome do cliente\""
+  [ -n "$rest" ] && msg+=$'\n\n'"${rest}"
   curl -s -m 15 -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
-       --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" --data-urlencode "text=$1" >/dev/null 2>&1 || log "Falha ao enviar Telegram."
+       --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" --data-urlencode "text=${msg}" >/dev/null 2>&1 || log "Falha ao enviar Telegram."
+}
+
+# Grava o nome do cliente (usado em todos os alertas). Sem aspas/cifrao/crase para nao quebrar o .conf.
+set_cliente() {
+  local nome acesso="${2:-}"
+  nome="$(printf '%s' "$1" | tr -d '"`$\\\r\n' | sed 's/^ *//;s/ *$//' | cut -c1-60)"
+  [ -n "$nome" ] || { echo "Informe o nome do cliente: ipbx-sentinel --set-cliente \"Nome do cliente\""; return 1; }
+  acesso="$(printf '%s' "$acesso" | tr -d '"`$\\\r\n ' | cut -c1-120)"
+  mkdir -p "$(dirname "$CLIENTE_CONF")"
+  ( umask 077; printf '# Identificacao do cliente nos alertas do Telegram\nCLIENTE_NOME="%s"\nCLIENTE_ACESSO="%s"\n' "$nome" "$acesso" > "$CLIENTE_CONF" )
+  chmod 600 "$CLIENTE_CONF" 2>/dev/null
+  CLIENTE_NOME="$nome"; CLIENTE_ACESSO="$acesso"
+  echo "Cliente definido: ${nome} ($CLIENTE_CONF)"
 }
 
 is_allowed() {  # $1 = caminho
@@ -445,7 +483,7 @@ cmd_audit() {
 report_identity() {
   [ "${#IDENT_CHANGES[@]}" -gt 0 ] || return 0
   local msg c i=0
-  msg="ALERTA DE CONTAS - ${HOSTNAME_S}"$'\n'"$(date '+%d/%m/%Y %H:%M:%S')"$'\n'"Mudancas em usuarios/senhas desde a ultima verificacao:"$'\n'
+  msg="ALERTA DE CONTAS"$'\n'"Mudancas em usuarios/senhas desde a ultima verificacao:"$'\n'
   for c in "${IDENT_CHANGES[@]}"; do i=$((i+1)); [ $i -gt 12 ] && { msg+=$'\n'"... e mais $(( ${#IDENT_CHANGES[@]} - 12 ))"; break; }; msg+=$'\n'"- ${c}"; log "CONTAS: ${c}"; done
   msg+=$'\n\n'"Se voce NAO fez essa mudanca: troque as senhas agora, revise acessos recentes e rode ipbx-sentinel --scan."
   send_telegram "$msg"
@@ -454,7 +492,7 @@ report_identity() {
 report() {
   [ "${#FOUND[@]}" -gt 0 ] || return 0
   local msg line
-  msg="ALERTA DE SEGURANCA - ${HOSTNAME_S}"$'\n'"$(date '+%d/%m/%Y %H:%M:%S')"$'\n'
+  msg="ALERTA DE SEGURANCA"$'\n'
   [ "$SENTINEL_ACTION" = "quarantine" ] && msg+="Acao: item(ns) movido(s) para quarentena (reversivel)."$'\n' || msg+="Acao: apenas alerta (nada foi movido)."$'\n'
   local i=0
   for line in "${FOUND[@]}"; do
@@ -502,12 +540,12 @@ check_firewall() {
     if [ ! -f "$flag" ]; then
       : > "$flag"
       log "FIREWALL: ${svc} ${why}."
-      send_telegram "ALERTA: FIREWALL SEM PROTECAO - ${HOSTNAME_S}"$'\n'"$(date '+%d/%m/%Y %H:%M:%S')"$'\n'"Servico: ${svc} - ${why}"$'\n'"Acao: $([ "$SENTINEL_FIREWALL_HEAL" = "1" ] && echo "reativando o firewall." || echo "apenas alerta.")"
+      send_telegram "ALERTA: FIREWALL SEM PROTECAO"$'\n'"Servico: ${svc} - ${why}"$'\n'"Acao: $([ "$SENTINEL_FIREWALL_HEAL" = "1" ] && echo "reativando o firewall." || echo "apenas alerta.")"
     fi
     [ "$SENTINEL_FIREWALL_HEAL" = "1" ] && systemctl restart "$svc" >/dev/null 2>&1
   elif [ -f "$flag" ]; then
     rm -f "$flag"; log "FIREWALL: ${svc} restabelecido."
-    send_telegram "Firewall restabelecido - ${HOSTNAME_S} - $(date '+%d/%m/%Y %H:%M:%S')"
+    send_telegram "Firewall restabelecido"
   fi
 }
 
@@ -518,7 +556,7 @@ check_dialplan() {
   [ -n "$hit" ] || return 0
   seen_once "dialplan|$hit" || return 0
   log "DIALPLAN malicioso: $hit"
-  send_telegram "ALERTA: DIALPLAN MALICIOSO - ${HOSTNAME_S}"$'\n'"$(date '+%d/%m/%Y %H:%M:%S')"$'\n'"Rotas piratas (thanku-outcall) encontradas no Asterisk:"$'\n'"${hit}"$'\n\n'"Nada foi alterado. Rode ipbx-security para limpar."
+  send_telegram "ALERTA: DIALPLAN MALICIOSO"$'\n'"Rotas piratas (thanku-outcall) encontradas no Asterisk:"$'\n'"${hit}"$'\n\n'"Nada foi alterado. Rode ipbx-security para limpar."
 }
 
 cron_of() {  # $1 = usuario
@@ -534,7 +572,7 @@ check_cron() {
   [ -n "$a" ] && msg+=$'\n'"usuario asterisk: ${a}"
   [ -n "$r" ] && msg+=$'\n'"usuario root: ${r}"
   log "CRON suspeito:${msg//$'\n'/ | }"
-  send_telegram "ALERTA: CRONTAB SUSPEITO - ${HOSTNAME_S}"$'\n'"$(date '+%d/%m/%Y %H:%M:%S')${msg}"$'\n\n'"Nada foi alterado. Revise com: crontab -l -u asterisk"
+  send_telegram "ALERTA: CRONTAB SUSPEITO${msg}"$'\n\n'"Nada foi alterado. Revise com: crontab -l -u asterisk"
 }
 
 # Aviso oficial Issabel (02/08/2026): issabel-framework <= 4.0.0-12 (Issabel 4) ou <= 5.0.0-3
@@ -562,7 +600,7 @@ check_framework() {  # so alerta (cron de 1 min); a correcao e feita por --updat
   framework_vulnerable || return 0
   seen_once "framework|$FW_VER" || return 0
   log "FRAMEWORK vulneravel: issabel-framework ${FW_VER}"
-  send_telegram "ALERTA: ATUALIZACAO DE SEGURANCA PENDENTE - ${HOSTNAME_S}"$'\n'"$(date '+%d/%m/%Y %H:%M:%S')"$'\n'"issabel-framework ${FW_VER} tem falha critica (aviso oficial de 02/08/2026) que permite controle remoto do servidor."$'\n\n'"Corrija com: ipbx-sentinel --update-framework (faz snapshot antes)."$'\n'"A atualizacao NAO remove malware ja instalado: rode ipbx-sentinel --scan."
+  send_telegram "ALERTA: ATUALIZACAO DE SEGURANCA PENDENTE"$'\n'"issabel-framework ${FW_VER} tem falha critica (aviso oficial de 02/08/2026) que permite controle remoto do servidor."$'\n\n'"Corrija com: ipbx-sentinel --update-framework (faz snapshot antes)."$'\n'"A atualizacao NAO remove malware ja instalado: rode ipbx-sentinel --scan."
 }
 
 snapshot_pre_update() {  # $1 = descricao (regra de snapshot pre-atualizacao)
@@ -605,7 +643,7 @@ cmd_update_framework() {
 persist_alert() {  # $1 = chave de deduplicacao, $2 = mensagem
   seen_once "persist|$1" || return 0
   log "PERSISTENCIA: $2"
-  send_telegram "ALERTA: PERSISTENCIA DE INVASOR - ${HOSTNAME_S}"$'\n'"$(date '+%d/%m/%Y %H:%M:%S')"$'\n'"$2"$'\n\n'"Nada foi alterado. Rode: ipbx-sentinel --audit  (com root comprometido, o caminho mais seguro e reinstalar a partir de backup limpo)."
+  send_telegram "ALERTA: PERSISTENCIA DE INVASOR"$'\n'"$2"$'\n\n'"Nada foi alterado. Rode: ipbx-sentinel --audit  (com root comprometido, o caminho mais seguro e reinstalar a partir de backup limpo)."
 }
 
 check_persistence() {
@@ -691,6 +729,8 @@ migrate_old_monitor() {
 }
 
 cmd_install() {
+  local a prev="" cli="" noupd=0
+  for a in "$@"; do [ "$prev" = "--cliente" ] && cli="$a"; [ "$a" = "--no-update" ] && noupd=1; prev="$a"; done
   mkdir -p /etc/ipbx "$QUAR_ROOT" /var/backup/ipbx
   chmod 700 "$QUAR_ROOT" 2>/dev/null
   local self; self="$(readlink -f "$0" 2>/dev/null || echo "$0")"
@@ -713,10 +753,20 @@ CRON
 WD
   chmod 644 /etc/cron.d/ipbx-watchdog
   migrate_old_monitor
+  # Nome do cliente nos alertas: --cliente "Nome" > ja configurado > pergunta (se houver terminal)
+  if [ -n "$cli" ]; then set_cliente "$cli"
+  elif [ -z "$CLIENTE_NOME" ]; then
+    if [ -t 1 ] && [ -r /dev/tty ] && [ -w /dev/tty ]; then
+      printf 'Nome do cliente para identificar os alertas do Telegram (ex.: Helpnet): ' > /dev/tty
+      read -r cli < /dev/tty 2>/dev/null
+      [ -n "$cli" ] && set_cliente "$cli"
+    fi
+    [ -n "$CLIENTE_NOME" ] || echo "AVISO: cliente nao definido; os alertas sairao como CLIENTE NAO DEFINIDO. Defina: ipbx-sentinel --set-cliente \"Nome do cliente\""
+  fi
   echo "Sentinel instalado: /usr/local/bin/ipbx-sentinel + /etc/cron.d/ipbx-sentinel (host a cada 1 min, arquivos alterados a cada 5 min; sem varredura noturna)."
   echo "Telegram: $TG_CONF (TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID). Teste: ipbx-sentinel --test-alert"
   identity_status
-  if [ "$1" != "--no-update" ] && [ "${SENTINEL_AUTO_UPDATE_FRAMEWORK:-1}" = "1" ]; then cmd_update_framework; fi
+  if [ "$noupd" != "1" ] && [ "${SENTINEL_AUTO_UPDATE_FRAMEWORK:-1}" = "1" ]; then cmd_update_framework; fi
   echo "Varredura completa inicial (uma vez; depois so quando voce pedir: ipbx-sentinel --scan)..."
   do_scan full
 }
@@ -765,19 +815,20 @@ cmd_selftest() {
 }
 
 case "${1:-}" in
-  --install)     cmd_install "$2" ;;
+  --install)     shift; cmd_install "$@" ;;
+  --set-cliente) set_cliente "$2" "$3" ;;
   --uninstall)   rm -f /etc/cron.d/ipbx-sentinel; echo "Cron do Sentinel removido." ;;
   --list)        cmd_list ;;
   --restore)     cmd_restore "$2" ;;
   --baseline)    mkdir -p "$STATE_DIR"; rm -f "$STATE_DIR/identity.baseline"; identity_check; echo "Foto de contas/senhas refeita ($(wc -l < "$STATE_DIR/identity.baseline" 2>/dev/null || echo 0) itens)." ;;
   --selftest)    cmd_selftest ;;
-  --test-alert)  send_telegram "Teste do IPbx Sentinel em ${HOSTNAME_S} - $(date '+%d/%m/%Y %H:%M:%S'). Se esta mensagem chegou, o alerta esta funcionando." ; echo "Enviado (se o Telegram estiver configurado)." ;;
+  --test-alert)  send_telegram "Teste do IPbx Sentinel"$'\n'"Se esta mensagem chegou, o alerta esta funcionando e identifica o cliente acima." ; echo "Enviado (se o Telegram estiver configurado)." ;;
   --incremental) do_scan inc ;;
   --host)        host_checks ;;
   --status)      identity_status ;;
   --audit)       cmd_audit "$2" "$3" ;;
   --update-framework) cmd_update_framework ;;
-  --alert-restored) send_telegram "ALERTA: o IPbx Sentinel (ou seu agendamento) foi APAGADO em ${HOSTNAME_S} e foi restaurado automaticamente - $(date '+%d/%m/%Y %H:%M:%S'). Investigue quem tem acesso root." ;;
+  --alert-restored) send_telegram "ALERTA: IPBX SENTINEL APAGADO E RESTAURADO"$'\n'"O Sentinel (ou seu agendamento) foi apagado e restaurado automaticamente. Investigue quem tem acesso root." ;;
   --scan|"")     do_scan full ;;
   *) echo "Uso: $0 [--scan|--incremental|--host|--status|--audit [DIAS] [full]|--update-framework|--install|--uninstall|--list|--restore ARQ|--baseline|--test-alert|--selftest]"; exit 1 ;;
 esac
