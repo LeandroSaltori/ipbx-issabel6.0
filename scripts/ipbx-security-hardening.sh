@@ -69,9 +69,32 @@ pkill -9 -f "asterisk.php" 2>/dev/null || true
 pkill -9 -f "monitor.php" 2>/dev/null || true
 pkill -9 -f "postroot" 2>/dev/null || true
 pkill -9 -f "212.83.160.70" 2>/dev/null || true
+pkill -9 -f "104.194.143.156" 2>/dev/null || true
+pkill -9 -f "51.91.234.105" 2>/dev/null || true
+pkill -9 -f "sipsentinel/agent.py" 2>/dev/null || true
+pkill -9 -f "svmap_legacy" 2>/dev/null || true
 pkill -9 -f "/tmp/.*\.php" 2>/dev/null || true
 pkill -9 -f "/dev/shm/.*\.php" 2>/dev/null || true
 log_success "Varredura de processos concluida."
+
+# 1.1 Agente de botnet de ataque SIP ("SIP Sentinel", /opt/sipsentinel): varre redes de terceiros com
+# SIPVicious e tenta chamadas fraudulentas; autoatualizavel (servidor de comando 51.91.234.105).
+# So remove se o servico apontar para /opt/sipsentinel (guarda copia em quarentena).
+for unit in /etc/systemd/system/sipsentinel.service /usr/lib/systemd/system/sipsentinel.service; do
+    if [ -f "$unit" ] && grep -q "/opt/sipsentinel" "$unit" 2>/dev/null; then
+        log_info "1.1 Agente de botnet SIP encontrado ($unit): parando e removendo..."
+        systemctl stop sipsentinel 2>/dev/null || true
+        systemctl disable sipsentinel 2>/dev/null || true
+        QDIR="/var/backup/ipbx/quarantine/botnet-sip-$(date '+%Y-%m-%d_%H%M%S')"
+        mkdir -p "$QDIR" 2>/dev/null && chmod 700 "$QDIR" 2>/dev/null || true
+        [ -d /opt/sipsentinel ] && mv -f /opt/sipsentinel "$QDIR/" 2>/dev/null || true
+        [ -d /etc/sipsentinel ] && mv -f /etc/sipsentinel "$QDIR/etc-sipsentinel" 2>/dev/null || true
+        mv -f "$unit" "$QDIR/" 2>/dev/null || true
+        systemctl daemon-reload 2>/dev/null || true
+        rm -rf /tmp/.sipvicious-home 2>/dev/null || true
+        log_success "Agente de botnet SIP removido (copia em $QDIR)."
+    fi
+done
 
 # ==============================================================================
 # 2. LIMPEZA DE AGENDAMENTOS CRON MALICIOSOS
@@ -284,7 +307,7 @@ log_success "Servico SSH saneado e verificado."
 
 # 6.1 Bloqueio de IPs maliciosos e botnets conhecidas no Firewall
 log_info "6.1 Bloqueando IPs de botnets e atacantes conhecidos no Firewall..."
-MALICIOUS_IPS=("212.83.160.70")
+MALICIOUS_IPS=("212.83.160.70" "104.194.143.156" "51.91.234.105")
 for ip in "${MALICIOUS_IPS[@]}"; do
     iptables -C INPUT -s "$ip" -j DROP 2>/dev/null || iptables -I INPUT -s "$ip" -j DROP 2>/dev/null || true
     iptables -C OUTPUT -d "$ip" -j DROP 2>/dev/null || iptables -I OUTPUT -d "$ip" -j DROP 2>/dev/null || true
