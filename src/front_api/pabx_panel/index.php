@@ -1815,7 +1815,7 @@ if ($__wp_u && !empty($__wp_u['webphone']) && !empty($__wp_u['extension'])
 
     <!-- Frontend Controller Script -->
     <script>
-        let currentFopTechFilter = 'ALL';
+        var currentFopTechFilter = 'ALL';
         let jsSipUa = null;
         let activeSipSession = null;
 

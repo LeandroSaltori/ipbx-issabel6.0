@@ -6,6 +6,7 @@
  */
 return [
     'done' => [
+        ['data' => '2026-10-14', 'mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-screwdriver-wrench', 'titulo' => 'Painel de Operador: botões voltam a funcionar', 'desc' => 'Corrigimos um erro que deixava vários botões da tela do Painel de Operador sem resposta, como o ícone do telefone e o de enviar WhatsApp no topo.'],
         ['data' => '2026-10-14', 'mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-arrows-rotate', 'titulo' => 'Webphone não cai ao trocar de tela', 'desc' => 'O telefone agora fica fixo enquanto você navega pelo painel: o registro do ramal e a chamada em andamento continuam ao abrir outras telas, e o ícone do telefone está disponível em todas elas. Também reduzimos tentativas desnecessárias de conexão com a central, deixando as telas mais rápidas.'],
         ['data' => '2026-10-14', 'mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-phone-volume', 'titulo' => 'Webphone: chamadas completam com mais compatibilidade', 'desc' => 'Atualizamos o motor do telefone do navegador e ajustamos a negociação de áudio, corrigindo chamadas que eram atendidas pelo outro lado mas caíam logo em seguida com a mensagem "Chamada não completada".'],
         ['data' => '2026-10-14', 'mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-table-cells', 'titulo' => 'Webphone mais limpo, com abas de ícones', 'desc' => 'O Webphone agora tem três ícones clicáveis (teclado, agenda e últimas chamadas) no lugar dos textos, e o histórico ganhou tela própria, deixando o teclado mais compacto.'],

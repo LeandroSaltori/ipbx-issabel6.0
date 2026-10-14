@@ -651,7 +651,7 @@ async function updateIntegratedQueues() {
 } catch(e) { console.error('Integrated queue error:', e); }
 }
 
-let currentFopTechFilter = 'ALL';
+var currentFopTechFilter = 'ALL';
 
 function fopSetTechFilter(tech) {
     currentFopTechFilter = tech.toUpperCase();
