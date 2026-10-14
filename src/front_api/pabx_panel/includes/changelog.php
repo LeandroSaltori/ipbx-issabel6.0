@@ -6,6 +6,7 @@
  */
 return [
     'done' => [
+        ['data' => '2026-10-14', 'mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-phone-volume', 'titulo' => 'Webphone: chamadas completam com mais compatibilidade', 'desc' => 'Atualizamos o motor do telefone do navegador e ajustamos a negociação de áudio, corrigindo chamadas que eram atendidas pelo outro lado mas caíam logo em seguida com a mensagem "Chamada não completada".'],
         ['data' => '2026-10-14', 'mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-table-cells', 'titulo' => 'Webphone mais limpo, com abas de ícones', 'desc' => 'O Webphone agora tem três ícones clicáveis (teclado, agenda e últimas chamadas) no lugar dos textos, e o histórico ganhou tela própria, deixando o teclado mais compacto.'],
         ['data' => '2026-10-14', 'mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-user-gear', 'titulo' => 'WhatsApp do usuário opcional e Webphone no Perfil', 'desc' => 'O número de WhatsApp para notificações deixou de ser obrigatório no cadastro de usuários. No Meu Perfil você vê o estado do Webphone e pode reconectar o ramal com um clique.'],
         ['data' => '2026-10-14', 'mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-circle-check', 'titulo' => 'Agenda com status real e ramais WebRTC destacados', 'desc' => 'Na Agenda do Webphone, ramais online aparecem em verde e os offline em vermelho e apagados. Ao habilitar o Webphone para um usuário, os ramais que não são WebRTC aparecem apagados na lista, com aviso.'],

@@ -275,7 +275,8 @@ h4{margin:0 0 6px;font-size:10.5px;text-transform:uppercase;letter-spacing:.6px;
 
   // ---- registro no PABX ----
   function start(c) {
-    cfg = {host: c.host, pc: {iceServers: c.stun ? [{urls: c.stun}] : []}};
+    // rtcpMuxPolicy 'negotiate': o Asterisk (chan_sip) pode responder sem rtcp-mux e o Chrome, por padrão, rejeitaria a resposta ("Bad Media Description")
+    cfg = {host: c.host, pc: {iceServers: c.stun ? [{urls: c.stun}] : [], rtcpMuxPolicy: 'negotiate'}};
     if (!c.webrtc) showWarn('O ramal ' + c.ext + ' não parece estar configurado como WebRTC no PABX. Se o registro falhar, peça ao administrador para ativar WebRTC neste ramal.');
     const sock = new JsSIP.WebSocketInterface(c.wss);
     ua = new JsSIP.UA({sockets: [sock], uri: 'sip:' + c.ext + '@' + c.host, password: c.secret, register: true, register_expires: 300, user_agent: 'IPbx-Prisma-Webphone', connection_recovery_min_interval: 2, connection_recovery_max_interval: 20});
