@@ -83,6 +83,8 @@ O monitor manual acima foi substituído pelo **IPbx Sentinel** (`scripts/ipbx-se
 
 **Vigilância de contas e senhas (o invasor entrou como `admin` e alterou o usuário do banco):** na primeira execução o Sentinel tira uma "foto" (só impressões digitais, nunca senhas) de: usuários e permissões do painel (`/var/www/db/acl.db`), usuários do FreePBX (`ampusers`), usuários do MySQL e os arquivos `/etc/issabel.conf`, `/etc/amportal.conf`, `/etc/freepbx.conf`. A cada execução compara e avisa no Telegram: **NOVO**, **ALTERADO** (senha/permissões) ou **REMOVIDO**. Só alerta, não desfaz: uma troca de senha pode ser legítima. Fonte que não puder ser lida (ex.: banco fora do ar) é ignorada, sem alarme falso. A foto deve nascer com o servidor limpo; para refazer depois de uma mudança legítima/limpeza: `ipbx-sentinel --baseline`.
 
+**Nomes suspeitos (caso real: usuário `atmin` no MySQL, sósia de `admin`):** independente da foto, o Sentinel avisa uma única vez se encontrar no painel, FreePBX ou MySQL contas como `atmin`, `admln`, `adm1n`, `admim`, `4dmin`, `emad`, `supportpbx`. Assim, um servidor que já estava invadido na hora da instalação também é sinalizado. Na limpeza, remova o usuário (`DROP USER 'atmin'@'%';`), troque as senhas do banco e atualize `/etc/issabel.conf`, `/etc/amportal.conf` e `/etc/freepbx.conf`; depois rode `ipbx-sentinel --baseline`.
+
 **O que faz ao achar:** move para **quarentena** (`/var/backup/ipbx/quarantine/AAAA-MM-DD_HHMMSS/`, reversível), registra em `/var/log/ipbx-sentinel.log` e avisa no Telegram com data/hora, arquivo, motivo e IP de origem (quando aparece no log do Apache).
 
 **Agenda:** `/etc/cron.d/ipbx-sentinel`: a cada 5 min (arquivos recentes) + varredura completa às 03:30.

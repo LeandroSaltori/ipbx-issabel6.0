@@ -220,6 +220,17 @@ identity_check() {
   mkdir -p "$STATE_DIR" 2>/dev/null && chmod 700 "$STATE_DIR" 2>/dev/null
   local base="$STATE_DIR/identity.baseline" now="$STATE_DIR/identity.now"
   identity_snapshot | sort > "$now"
+  # Nomes suspeitos (caso real: usuario "atmin" no MySQL, sosia de "admin"). Independe da
+  # foto: pega ate servidor ja invadido. Avisa uma unica vez por conta.
+  local flagged="$STATE_DIR/identity.flagged" t0 k0 h0 n0
+  while IFS='|' read -r t0 k0 h0; do
+    [ "$t0" = "ok" ] && continue
+    n0="${k0%%@*}"; n0="$(printf '%s' "$n0" | tr 'A-Z' 'a-z')"
+    case "$n0" in
+      emad|supportpbx|atmin|admln|adm1n|admim|admn|4dmin|hacker|backdoor|webadmin1|sqladmin)
+        grep -qxF "$t0|$k0" "$flagged" 2>/dev/null || { echo "$t0|$k0" >> "$flagged"; chmod 600 "$flagged" 2>/dev/null; IDENT_CHANGES+=("NOME SUSPEITO ($t0): $k0 (parecido com admin / usado em invasoes)"); } ;;
+    esac
+  done < "$now"
   if [ ! -s "$base" ]; then
     if [ -s "$now" ]; then cp -f "$now" "$base"; chmod 600 "$base" "$now"; log "Foto inicial de contas/senhas criada ($(wc -l < "$base") itens). Garanta que o servidor estava limpo neste momento."; fi
     return 0
