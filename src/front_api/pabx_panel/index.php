@@ -23,6 +23,7 @@ register_shutdown_function(function () use (&$__perf_t0, &$__perf_marks) {
 require_once __DIR__ . '/config/database.php';
 require_once __DIR__ . '/includes/functions.php';
 require_once __DIR__ . '/includes/address_book_sync.php';
+require_once __DIR__ . '/includes/console_central.php';
 $__perf_marks['abertura (banco+código)'] = microtime(true) - $__perf_t0;
 
 // Auto-sincronizar ramais na primeira inicialização se a tabela estiver vazia
@@ -48,7 +49,7 @@ try {
 // =========================================================================
 // AUTENTICAÇÃO (portão único do painel)
 // =========================================================================
-$__api_action_names = ['get_logs', 'get_fop_extensions', 'get_trunks_status', 'get_queues_realtime', 'get_parking_lots', 'fop_action', 'originate_call', 'save_contact', 'test_llm_connection', 'analyze_pabx_insights', 'generate_ai_insights', 'get_ai_insights_history', 'delete_ai_insight', 'transcribe_audio', 'get_kpi_calls_detail', 'get_active_calls', 'get_time_groups', 'get_time_group_rules', 'save_time_group_rule', 'delete_time_group_rule', 'get_announcements_list', 'update_announcement_audio', 'sync_assets', 'ai_chat', 'ai_chat_info', 'ai_chat_history', 'ai_chat_clear', 'ai_chat_confirm', 'ext_features_get', 'ext_features_set'];
+$__api_action_names = ['get_logs', 'get_fop_extensions', 'get_trunks_status', 'get_queues_realtime', 'get_parking_lots', 'fop_action', 'originate_call', 'save_contact', 'test_llm_connection', 'analyze_pabx_insights', 'generate_ai_insights', 'get_ai_insights_history', 'delete_ai_insight', 'transcribe_audio', 'get_kpi_calls_detail', 'get_active_calls', 'get_time_groups', 'get_time_group_rules', 'save_time_group_rule', 'delete_time_group_rule', 'get_announcements_list', 'update_announcement_audio', 'sync_assets', 'ai_chat', 'ai_chat_info', 'ai_chat_history', 'ai_chat_clear', 'ai_chat_confirm', 'ext_features_get', 'ext_features_set', 'console_exec'];
 if (($_GET['api_action'] ?? '') === 'whatsapp_webhook') {
     // Webhook do Z-PRO: autenticado por token próprio, sem sessão
 } elseif (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['action'], $__api_action_names, true))) {
@@ -62,7 +63,7 @@ $__perf_marks['login/permissões'] = microtime(true) - $__perf_t0;
 // =========================================================================
 // HANDLER DE ENDPOINTS DE API (JSON)
 // =========================================================================
-if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['action'], ['get_logs', 'get_fop_extensions', 'get_trunks_status', 'get_queues_realtime', 'get_parking_lots', 'fop_action', 'originate_call', 'save_contact', 'test_llm_connection', 'analyze_pabx_insights', 'generate_ai_insights', 'get_ai_insights_history', 'delete_ai_insight', 'transcribe_audio', 'get_kpi_calls_detail', 'get_active_calls', 'get_time_groups', 'get_time_group_rules', 'save_time_group_rule', 'delete_time_group_rule', 'get_announcements_list', 'update_announcement_audio', 'sync_assets', 'ai_chat', 'ai_chat_info', 'ai_chat_history', 'ai_chat_clear', 'ai_chat_confirm', 'ext_features_get', 'ext_features_set', 'whatsapp_webhook']))) {
+if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['action'], ['get_logs', 'get_fop_extensions', 'get_trunks_status', 'get_queues_realtime', 'get_parking_lots', 'fop_action', 'originate_call', 'save_contact', 'test_llm_connection', 'analyze_pabx_insights', 'generate_ai_insights', 'get_ai_insights_history', 'delete_ai_insight', 'transcribe_audio', 'get_kpi_calls_detail', 'get_active_calls', 'get_time_groups', 'get_time_group_rules', 'save_time_group_rule', 'delete_time_group_rule', 'get_announcements_list', 'update_announcement_audio', 'sync_assets', 'ai_chat', 'ai_chat_info', 'ai_chat_history', 'ai_chat_clear', 'ai_chat_confirm', 'ext_features_get', 'ext_features_set', 'console_exec', 'whatsapp_webhook']))) {
     $action = $_GET['api_action'] ?? $_GET['action'];
     if (function_exists('auditRequest')) auditRequest('', '', true, (string)$action);
     // Consultas de atualização automática (só leitura) soltam a sessão já: o PHP trava o arquivo de sessão durante a requisição inteira,
@@ -85,6 +86,16 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
         } catch (Exception $e) {
             echo json_encode(['success' => false, 'error' => 'Falha na sincronização com o PABX: ' . $e->getMessage()]);
         }
+        exit;
+    }
+
+    // Console da central (somente administradores): comandos de consulta e recargas suaves; cada comando fica na trilha de auditoria
+    if ($action === 'console_exec') {
+        if (!hasUserPermission('manage_settings')) { echo json_encode(['success' => false, 'error' => 'Sem permissão.']); exit; }
+        $body = json_decode(file_get_contents('php://input'), true) ?: [];
+        $cmd = (string)($body['cmd'] ?? '');
+        if (trim($cmd) !== '') logUserAction('Console da central', substr(trim($cmd), 0, 120), 'CONFIG');
+        echo json_encode(consoleCentralExec($cmd), JSON_UNESCAPED_UNICODE);
         exit;
     }
 
@@ -1214,7 +1225,7 @@ $allowed_modules = [
     'whatsapp' => ['regras', 'historico', 'disparos', 'contatos'],
     'telefonia' => ['blacklist'],
     'manual' => ['view'],
-    'configuracoes' => ['ami', 'ia', 'api', 'usuarios', 'api_connection', 'smtp', 'logs', 'status', 'seguranca', 'chat_ia']
+    'configuracoes' => ['ami', 'ia', 'api', 'usuarios', 'api_connection', 'smtp', 'logs', 'status', 'seguranca', 'chat_ia', 'console']
 ];
 
 if (!isset($allowed_modules[$module]) || !in_array($action, $allowed_modules[$module])) {

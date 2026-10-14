@@ -85,5 +85,6 @@ return [
         ['t' => 'Painel de Segurança', 'd' => 'Tentativas de acesso indevido, endereços bloqueados (com opção de desbloquear) e lista de endereços sempre liberados. A lista é a mesma usada pela proteção da central.'],
         ['t' => 'Conversas do Assistente IA', 'd' => 'Para administradores: veja o que cada usuário conversou com o assistente.'],
         ['t' => 'Logs & Diagnósticos', 'd' => 'Registro de quem fez o quê no painel, útil para auditoria e suporte.'],
+        ['t' => 'Console da central', 'd' => 'Em Configurações > Console da central (só administradores) você consulta a central como em um terminal: chamadas ativas, ramais, registros e transportes, e lê o log filtrando por ramal. Os botões prontos cobrem o dia a dia; para um ramal, informe o número e use Detalhes, Log do ramal ou Ligar captura. Digite help para ver todos os comandos. Só há comandos de consulta e recargas suaves, as senhas nunca aparecem e cada comando fica registrado em Logs & Diagnósticos.'],
     ]],
 ];

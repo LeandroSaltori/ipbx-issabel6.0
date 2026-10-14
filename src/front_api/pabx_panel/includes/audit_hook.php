@@ -120,7 +120,7 @@ function auditPageLabels() {
         'ia_analytics' => 'Auditoria & Análise de IA', 'filas_stats' => 'Estatísticas de Filas',
         'cdr_gravacoes' => 'CDR e Gravações', 'graphic_reports' => 'Relatórios Gráficos',
         'relatorio_geral' => 'Relatório Geral', 'relatorio_filas' => 'Relatório de Filas', 'autoatendimento' => 'Autoatendimento do Ramal', 'status' => 'Status da Integração', 'seguranca' => 'Painel de Segurança',
-        'logs' => 'Logs', 'usuarios' => 'Usuários', 'ia' => 'Configuração de IA', 'smtp' => 'SMTP',
+        'logs' => 'Logs', 'console' => 'Console da central', 'usuarios' => 'Usuários', 'ia' => 'Configuração de IA', 'smtp' => 'SMTP',
         'ami' => 'AMI', 'api' => 'API', 'api_connection' => 'Conexão API',
     ];
 }

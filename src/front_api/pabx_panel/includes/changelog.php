@@ -6,6 +6,7 @@
  */
 return [
     'done' => [
+        ['data' => '2026-10-14', 'mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-code', 'titulo' => 'Console da central dentro do painel', 'desc' => 'Administradores agora consultam ramais, registros e chamadas e leem o log por ramal direto no painel, sem precisar de acesso por terminal. Só consultas e recargas suaves, com tudo registrado.'],
         ['data' => '2026-10-14', 'mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-cookie-bite', 'titulo' => 'Limpar cookies no menu da conta e login sempre pergunta o painel', 'desc' => 'Nova opção Limpar cookies no menu da conta. E a tela de login não guarda mais o painel escolhido: a cada acesso você seleciona o Novo ou o Clássico.'],
         ['data' => '2026-10-14', 'mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-right-to-bracket', 'titulo' => 'Login: escolher Painel Clássico agora funciona sempre', 'desc' => 'Quem marca Painel Clássico na tela de login entra no clássico, mesmo depois de já ter usado o Painel Novo naquele navegador.'],
         ['data' => '2026-10-14', 'mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-phone-volume', 'titulo' => 'Ramais com telefone de navegador agem no canal certo', 'desc' => 'No Painel de Operador, ações como espiar, sussurrar e transferir agora usam o tipo de ramal correto também para o telefone de navegador (webphone).'],

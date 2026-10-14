@@ -236,6 +236,12 @@ function isGroupActive($modules_array) {
                     <span>Logs & Diagnósticos</span>
                     <span class="ml-auto text-[9px] px-1.5 py-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded font-black uppercase">LOGS</span>
                 </a>
+                <?php if (hasUserPermission('manage_settings')): ?>
+                <a href="index.php?module=configuracoes&action=console" class="flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all <?php echo isNavActive('configuracoes', 'console') ? 'bg-brand-500/20 text-brand-400 border border-brand-500/30 font-bold' : 'text-slate-300 hover:bg-slate-800/60 hover:text-white'; ?>">
+                    <i class="fa-solid fa-code w-4 text-center text-violet-400"></i>
+                    <span>Console da central</span>
+                </a>
+                <?php endif; ?>
             </div>
         </div>
         <?php endif; ?>
