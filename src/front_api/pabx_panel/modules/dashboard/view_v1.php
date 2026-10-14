@@ -572,7 +572,7 @@ if ($ast_db) {
     </div>
 
     <!-- BLOCO 1: CARDS DE KPIS DE TELEFONIA & DEMANDAS (DADOS REAIS E CLICÁVEIS) -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 auto-rows-fr gap-3">
 
         <!-- Card 1: Total de Atendimentos -->
         <div onclick="openKpiDetailModal('total')" title="Clique para ver a lista de todos os atendimentos no período" class="bg-slate-900/90 border border-slate-800 p-4 rounded-2xl shadow-xl flex flex-col justify-between space-y-2 hover:border-brand-500/50 hover:shadow-2xl hover:bg-slate-900 transition group cursor-pointer relative overflow-hidden transform hover:-translate-y-0.5">
