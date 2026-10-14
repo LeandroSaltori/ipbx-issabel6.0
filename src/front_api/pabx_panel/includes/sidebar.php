@@ -242,44 +242,60 @@ function isGroupActive($modules_array) {
         </div>
         <?php endif; ?>
 
-    <!-- Footer System Status, Theme Toggle & User Profile -->
-    <div class="mt-4 p-2 bg-slate-950/80 border border-slate-800 rounded-xl space-y-1">
+    <!-- Rodapé: Novidades, Tema e Conta (menu do usuário abre para cima) -->
+    <div class="mt-4 pt-3 border-t border-slate-800/80 space-y-0.5">
         <!-- Novidades do sistema (histórico de entregas) -->
-        <button type="button" onclick="openRoadmapModal()" class="w-full px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 border border-amber-500/30 text-slate-300 hover:text-white text-[11px] font-bold transition flex items-center justify-between">
-            <span class="flex items-center gap-2"><i class="fa-solid fa-rocket text-amber-400"></i><span>Novidades</span></span>
+        <button type="button" onclick="openRoadmapModal()" class="w-full px-2.5 py-1.5 rounded-lg hover:bg-slate-800/70 text-slate-300 hover:text-white text-[12px] font-semibold transition flex items-center justify-between" style="white-space:nowrap">
+            <span class="flex items-center gap-2.5"><i class="fa-solid fa-rocket w-4 text-center text-amber-400"></i><span class="sidebar-text">Novidades</span></span>
             <span class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
         </button>
 
         <!-- Botão Modo Claro / Modo Escuro -->
-        <button id="btn-theme-toggle" onclick="toggleThemeMode()" class="w-full px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white text-[11px] font-bold transition flex items-center justify-between shadow">
-            <span class="flex items-center gap-2">
-                <i id="theme-icon" class="fa-solid fa-sun text-amber-400"></i>
+        <button id="btn-theme-toggle" onclick="toggleThemeMode()" class="w-full px-2.5 py-1.5 rounded-lg hover:bg-slate-800/70 text-slate-300 hover:text-white text-[12px] font-semibold transition flex items-center" style="white-space:nowrap">
+            <span class="flex items-center gap-2.5">
+                <i id="theme-icon" class="fa-solid fa-sun w-4 text-center text-amber-400"></i>
                 <span id="theme-label-text">Modo Claro</span>
             </span>
-            
         </button>
 
-        <?php $logged_user = getLoggedUser(); ?>
-        <!-- Perfil do Usuário Logado Clicável -->
-        <div onclick="openUserProfileModal()" class="flex items-center gap-2 px-2 py-1 rounded-lg bg-slate-900/60 border border-slate-800/60 hover:bg-slate-800/80 hover:border-slate-700 transition cursor-pointer sidebar-text" title="Clique para abrir as configurações do perfil">
-            <div class="w-6 h-6 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-300 font-bold text-[10px]">
-                <i class="fa-solid fa-user text-brand-400"></i>
+        <?php $logged_user = getLoggedUser(); $__nome_rod = (string)($logged_user['name'] ?? 'Usuário'); ?>
+        <!-- Conta do usuário logado: clique abre o menu (Perfil, Painel clássico, Sair) -->
+        <div id="user-menu-wrap" class="relative pt-1.5">
+            <div id="user-menu-pop" class="hidden absolute bottom-full left-0 right-0 mb-1 p-1 rounded-xl bg-slate-900 border border-slate-700 shadow-2xl z-30 space-y-0.5">
+                <button type="button" onclick="toggleUserMenu(false); openUserProfileModal();" class="w-full px-2.5 py-2 rounded-lg hover:bg-slate-800 text-slate-200 text-[12px] font-semibold transition flex items-center gap-2.5" style="white-space:nowrap"><i class="fa-regular fa-user w-4 text-center text-brand-400"></i> Perfil</button>
+                <?php if (!empty($_SESSION['via_sso'])): ?>
+                <a href="../seletor.php?ir=classico&lembrar=1" class="w-full px-2.5 py-2 rounded-lg hover:bg-slate-800 text-slate-200 text-[12px] font-semibold transition flex items-center gap-2.5" style="white-space:nowrap" title="Abrir o painel clássico"><i class="fa-solid fa-right-left w-4 text-center text-slate-400"></i> Painel clássico</a>
+                <?php endif; ?>
+                <a href="index.php?auth=logout" class="w-full px-2.5 py-2 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 text-[12px] font-bold transition flex items-center gap-2.5" style="white-space:nowrap"><i class="fa-solid fa-right-from-bracket w-4 text-center"></i> Sair</a>
             </div>
-            <div class="overflow-hidden flex-1">
-                <span class="text-[11px] font-extrabold text-white block truncate leading-tight"><?php echo htmlspecialchars($logged_user['name'] ?? 'Usuário'); ?></span>
-                <span class="text-[9px] text-slate-400 block font-mono leading-tight truncate"><?php echo htmlspecialchars($logged_user['role'] ?? 'Administrador PABX'); ?></span>
-            </div>
-            <i class="fa-solid fa-gear text-[10px] text-slate-500"></i>
+            <button type="button" id="user-menu-btn" onclick="toggleUserMenu()" aria-haspopup="true" aria-expanded="false" class="w-full flex items-center gap-2.5 px-2 py-1.5 rounded-xl hover:bg-slate-800/70 transition text-left" title="Conta: perfil, painel clássico e sair">
+                <span class="w-8 h-8 shrink-0 rounded-full bg-gradient-to-br from-violet-600 to-indigo-500 flex items-center justify-center text-white font-black text-[13px] shadow"><?php echo htmlspecialchars(mb_strtoupper(mb_substr($__nome_rod, 0, 1, 'UTF-8'), 'UTF-8')); ?></span>
+                <span class="overflow-hidden flex-1 sidebar-text">
+                    <span class="text-[12px] font-extrabold text-white block truncate leading-tight"><?php echo htmlspecialchars($__nome_rod); ?></span>
+                    <span class="text-[10px] text-slate-400 block leading-tight truncate"><?php echo htmlspecialchars($logged_user['role'] ?? 'Administrador PABX'); ?></span>
+                </span>
+                <i class="fa-solid fa-chevron-up text-[10px] text-slate-500 sidebar-text"></i>
+            </button>
         </div>
-        <?php if (!empty($_SESSION['via_sso'])): ?>
-        <a href="../seletor.php?ir=classico&lembrar=1" class="flex items-center justify-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold text-slate-300 bg-slate-800/60 border border-slate-700 hover:bg-slate-800 transition sidebar-text" style="white-space:nowrap" title="Abrir o painel clássico"><i class="fa-solid fa-right-left"></i> Painel clássico</a>
-        <?php endif; ?>
-        <a href="index.php?auth=logout" class="flex items-center justify-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold text-rose-300 bg-rose-500/10 border border-rose-500/20 hover:bg-rose-500/20 transition sidebar-text" style="white-space:nowrap"><i class="fa-solid fa-right-from-bracket"></i> Sair</a>
     </div>
     </nav>
 </aside>
 
 <script>
+    function toggleUserMenu(force) {
+        const pop = document.getElementById('user-menu-pop');
+        const btn = document.getElementById('user-menu-btn');
+        if (!pop) return;
+        const abrir = (typeof force === 'boolean') ? force : pop.classList.contains('hidden');
+        pop.classList.toggle('hidden', !abrir);
+        if (btn) btn.setAttribute('aria-expanded', abrir ? 'true' : 'false');
+    }
+    document.addEventListener('click', function (e) {
+        const wrap = document.getElementById('user-menu-wrap');
+        if (wrap && !wrap.contains(e.target)) toggleUserMenu(false);
+    });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') toggleUserMenu(false); });
+
     function toggleSidebarGroup(grpId) {
         const el = document.getElementById(grpId);
         const icon = document.getElementById('icon-' + grpId);
