@@ -376,21 +376,29 @@ cmd_audit() {
   done
   find /tmp /var/tmp /dev/shm -type f \( -name '*.php' -o -name '*.sh' -o -perm -u+x \) 2>/dev/null | head -15 | while read -r l; do warn "arquivo suspeito em area temporaria: $l"; done
 
-  sec "6. Binarios do sistema alterados (rpm -V)"
+  sec "6. Binarios do sistema alterados"
   if command -v rpm >/dev/null 2>&1; then
-    local pk pkgs=""
-    for pk in coreutils procps-ng iproute net-tools openssh openssh-server openssh-clients util-linux e2fsprogs shadow-utils sudo bash systemd glibc findutils grep sed cronie curl wget openssl pam passwd lsof psmisc httpd php mysql-server mariadb-server mariadb; do
-      rpm -q --quiet "$pk" 2>/dev/null && pkgs="$pkgs $pk"
-    done
     if [ "$mode" = "full" ]; then
-      info "modo COMPLETO: verificando TODOS os pacotes (pode levar varios minutos)..."
-      timeout 1800 rpm -Va --noconfig 2>/dev/null | awk '$1 ~ /^..5/ && $2!="c" {print $NF}' | grep -E '^/(usr/)?(s?bin)/|^/usr/lib64?/' | head -40 | while read -r l; do warn "arquivo diferente do pacote original: $l"; done
+      info "modo COMPLETO: verificando TODOS os pacotes (pode levar muitos minutos)..."
+      timeout 3600 rpm -Va --noconfig 2>/dev/null | awk '$1 ~ /^..5/ && $2!="c" {print $NF}' | grep -E '^/(usr/)?(s?bin)/|^/usr/lib64?/' | head -40 | while read -r l; do warn "arquivo diferente do pacote original: $l"; done
     else
-      info "verificando ${pkgs# } (rapido; para TODOS os pacotes: ipbx-sentinel --audit ${days} full)..."
-      # shellcheck disable=SC2086
-      timeout 600 rpm -V --noconfig $pkgs 2>/dev/null | awk '$1 ~ /^..5/ && $2!="c" {print $NF}' | head -40 | while read -r l; do warn "arquivo diferente do pacote original (possivel binario trocado): $l"; done
+      # Rapido (segundos): compara o hash de cada ferramenta critica com o do pacote que a instalou
+      local crit="ls ps ss netstat ifconfig ip lsof top pgrep pkill killall who w last lastlog id stat find grep sed bash login passwd su sudo ssh sshd scp crontab crond curl wget chattr lsattr systemctl service iptables rpm yum useradd userdel usermod md5sum sha256sum readlink dmesg lsmod" b f real line dg calc n=0 bad=0 seen=" "
+      for b in $crit; do
+        for f in /usr/bin/$b /usr/sbin/$b /bin/$b /sbin/$b; do
+          [ -f "$f" ] || continue
+          real="$(readlink -f "$f" 2>/dev/null)"; [ -f "$real" ] || continue
+          case "$seen" in *" $real "*) continue ;; esac; seen="$seen$real "
+          n=$((n+1))
+          line="$(rpm -q --dump -f "$real" 2>/dev/null | awk -v p="$real" '$1==p{print; exit}')"
+          if [ -z "$line" ]; then warn "ferramenta critica SEM pacote de origem (pode ser trocada/plantada): $real"; bad=$((bad+1)); continue; fi
+          dg="$(echo "$line" | awk '{print $4}')"
+          case "${#dg}" in 32) calc="$(md5sum "$real" 2>/dev/null | awk '{print $1}')" ;; 64) calc="$(sha256sum "$real" 2>/dev/null | awk '{print $1}')" ;; *) continue ;; esac
+          [ "$calc" = "$dg" ] || { warn "ferramenta critica DIFERENTE do pacote original (possivel binario trocado): $real"; bad=$((bad+1)); }
+        done
+      done
+      info "${n} ferramentas criticas conferidas com o hash do pacote; ${bad} divergencia(s). (Todos os pacotes: ipbx-sentinel --audit ${days} full)"
     fi
-    info "verificacao de pacotes concluida"
   else info "rpm nao disponivel"; fi
 
   sec "7. Arquivos alterados nos ultimos ${days} dias (fora do esperado)"

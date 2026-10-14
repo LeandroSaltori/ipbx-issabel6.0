@@ -96,7 +96,7 @@ Somente leitura (não altera nada). Cobre o que um invasor costuma deixar além 
 3. Processos rodando de `/tmp`, `/dev/shm` ou binário apagado; maiores consumidores de CPU.
 4. Portas abertas e portas sensíveis expostas (3306, 5038, 6379...).
 5. Persistência/rootkit: `/etc/ld.so.preload`, `rc.local`, serviços systemd novos, arquivos suspeitos em áreas temporárias.
-6. Binários do sistema diferentes do pacote original: verificação **rápida** (pacotes que invasores costumam trocar: `coreutils`, `procps-ng`, `iproute`, `openssh`, `sudo`, `e2fsprogs`, `systemd`...), em segundos. Para verificar **todos** os pacotes (minutos): `ipbx-sentinel --audit 60 full`.
+6. **Ferramentas críticas trocadas** (`ls`, `ps`, `ss`, `netstat`, `ssh`, `sshd`, `sudo`, `chattr`, `lsattr`, `crontab`, `curl`...): compara o hash de cada uma com o do pacote que a instalou (segundos) e avisa se divergir ou se não tiver pacote de origem. Para verificar **todos** os pacotes (muitos minutos): `ipbx-sentinel --audit 60 full`.
 7. Arquivos alterados nos últimos N dias (padrão 30) em `/etc`, `/usr/local`, `/opt`, `/root`, cron e AGI.
 8. **Origem do ataque**: data de modificação mais antiga dos arquivos em quarentena (quando o invasor entrou, no máximo) e IPs que acessaram esses arquivos nos logs do Apache.
 9. Asterisk: AMI aberto para qualquer origem e dialplan suspeito.
