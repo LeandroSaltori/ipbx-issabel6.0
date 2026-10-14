@@ -1174,7 +1174,11 @@ fi
 # ==============================================================================
 # PAINEL INTEGRADO FRONT_API (COM BACKUP AUTOMATICO front_api_OLD)
 # ==============================================================================
-if [ -d "$REPO_DIR/src/front_api" ]; then
+if [ -f "$REPO_DIR/src/front_api/instalar-front-api.sh" ]; then
+    # Instalador oficial do painel: preserva a base SQLite/logs de produção, cria crons, fail2ban, chave SSO, etc.
+    log_info "Instalando front_api (Painel Integrado PABX) pelo instalador oficial..."
+    bash "$REPO_DIR/src/front_api/instalar-front-api.sh" && log_success "front_api instalado." || log_warn "front_api: instalador terminou com aviso/erro (veja acima)."
+elif [ -d "$REPO_DIR/src/front_api" ]; then
     log_info "Instalando front_api (Painel Integrado PABX)..."
     FRONT_DEST="/var/www/html/front_api"
     BACKUP_OLD="/var/www/html/front_api_OLD"

@@ -65,6 +65,7 @@ O menu interativo permite escolher exatamente o que deseja atualizar, recarrega 
 ║   [25] Web Developer               [26] Configurar Domínio e SSL     ║
 ║   [27] Limpeza de Logs e Disco     [28] Servidor OpenVPN (EasyVPN)   ║
 ║   [29] Rollback (Restauro/Instalar)[30] Data/Hora e NTP (São Paulo)  ║
+║   [31] Áudios e Sons PT-BR         [32] front_api (Painel PABX)      ║
 ║                                                                      ║
 ╠══════════════════════════════════════════════════════════════════════╣
 ║   [A]  INSTALAR TUDO (igual ao install.sh completo)                  ║
@@ -108,6 +109,8 @@ O menu interativo permite escolher exatamente o que deseja atualizar, recarrega 
 | **`[28]`** | **Servidor OpenVPN (EasyVPN)** | Instala o servidor OpenVPN corporativo com Easy-RSA 3.0.8, painel web `ovpn2`, rotas e regras NAT para ramais remotos. | `scripts/ipbx-openvpn.sh`, `scripts/ipbx-openvpn-sync.sh` |
 | **`[29]`** | **Rollback (Restauro/Instalar)** | Abre o assistente de restauração por data/hora para reverter qualquer alteração com zero perda de dados. | `rollback.sh` ➔ `/usr/local/bin/ipbx-rollback` |
 | **`[30]`** | **Data/Hora e NTP (São Paulo)** | Ajusta timezone oficial `America/Sao_Paulo` (Brasília) no Linux, PHP e Asterisk, sincronizando com servidores NTP. | `scripts/ipbx-timezone.sh` |
+| **`[31]`** | **Áudios e Sons PT-BR** | Instala os áudios e sons em português do Asterisk. | ver `docs/audios_ptbr_asterisk.md` |
+| **`[32]`** | **front_api (Painel PABX)** | Instala/atualiza o painel novo (Prisma) com o instalador oficial `src/front_api/instalar-front-api.sh`: preserva a base SQLite e os logs de produção, faz backup `front_api_OLD`, cria os crons (abandono de fila, resumos, chamadas perdidas, alerta de tronco), jail do fail2ban e chave de entrada única. Inclui o Webphone do painel (WebRTC/JsSIP, widget no topo, Agenda e Nova Conversa de WhatsApp). Exige PHP 7+ (Issabel 5). | `src/front_api/` ➔ `/var/www/html/front_api/` |
 | **`[A]`** | **INSTALAR TUDO** | Executa a suíte completa de atualização com criação prévia de snapshot, igual ao `install.sh`. | Aplica todas as opções [1] a [30] em lote |
 | **`[0]`** | **Sair** | Encerra o menu interativo com segurança. | N/A |
 

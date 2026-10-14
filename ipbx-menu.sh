@@ -1474,7 +1474,10 @@ update_front_api() {
     log_info "Instalando/Atualizando front_api (Painel Integrado PABX)..."
     FRONT_DEST="/var/www/html/front_api"
     BACKUP_OLD="/var/www/html/front_api_OLD"
-    if [ -d "$REPO_DIR/src/front_api" ]; then
+    if [ -f "$REPO_DIR/src/front_api/instalar-front-api.sh" ]; then
+        # Instalador oficial: preserva a base SQLite/logs de produção, cria crons, fail2ban, chave SSO, etc.
+        bash "$REPO_DIR/src/front_api/instalar-front-api.sh" && log_success "front_api instalado." || log_warn "front_api: instalador terminou com aviso/erro (veja acima)."
+    elif [ -d "$REPO_DIR/src/front_api" ]; then
         if [ -d "$FRONT_DEST" ]; then
             if [ ! -d "$BACKUP_OLD" ]; then
                 log_info "Criando backup seguro da pasta original: $FRONT_DEST -> $BACKUP_OLD..."
