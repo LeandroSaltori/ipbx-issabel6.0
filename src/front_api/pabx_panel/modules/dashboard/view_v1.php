@@ -370,20 +370,20 @@ if ($ast_db) {
 <div class="space-y-6">
 
     <!-- BARRA SUPERIOR: Saudação, Filtro de Período e Ações -->
-    <div class="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 bg-slate-900/90 border border-slate-800 p-5 rounded-2xl shadow-xl">
+    <div class="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3 bg-slate-900/90 border border-slate-800 p-4 rounded-2xl shadow-xl">
         <div>
             <div class="flex items-center gap-2 text-xs font-semibold text-slate-400 mb-1">
                 <span>Central Telefônica PABX IP</span>
                 <i class="fa-solid fa-chevron-right text-[10px]"></i>
                 <span class="text-brand-400 font-bold">Dashboard Principal</span>
             </div>
-            <h1 class="text-2xl font-black text-white flex items-center gap-2">
-                Painel Operacional de Voz <span class="text-xl">📞</span>
+            <h1 class="text-xl font-black text-white flex items-center gap-2 whitespace-nowrap">
+                Painel Operacional de Voz <span class="text-lg">📞</span>
             </h1>
         </div>
 
         <!-- Seletor de Período, Tipo de Chamada e Personalização -->
-        <form method="GET" action="index.php" class="flex flex-wrap items-center gap-2.5">
+        <form method="GET" action="index.php" class="flex flex-wrap items-center gap-2">
             <input type="hidden" name="module" value="dashboard">
             <input type="hidden" name="action" value="view_v1">
             <input type="hidden" name="period" value="personalizado">
@@ -391,25 +391,25 @@ if ($ast_db) {
 
             <!-- Filtro de Período -->
             <div class="bg-slate-950/80 border border-slate-800 p-1 rounded-xl flex items-center gap-1 text-xs font-bold">
-                <a href="index.php?module=dashboard&action=view_v1&period=hoje&call_type=<?php echo $call_type_filter; ?>" class="px-3 py-1.5 rounded-lg transition <?php echo $period === 'hoje' ? 'bg-brand-600 text-white shadow' : 'text-slate-400 hover:text-white'; ?>">Hoje</a>
-                <a href="index.php?module=dashboard&action=view_v1&period=7dias&call_type=<?php echo $call_type_filter; ?>" class="px-3 py-1.5 rounded-lg transition <?php echo $period === '7dias' ? 'bg-brand-600 text-white shadow' : 'text-slate-400 hover:text-white'; ?>">7 dias</a>
-                <a href="index.php?module=dashboard&action=view_v1&period=30dias&call_type=<?php echo $call_type_filter; ?>" class="px-3 py-1.5 rounded-lg transition <?php echo $period === '30dias' ? 'bg-brand-600 text-white shadow' : 'text-slate-400 hover:text-white'; ?>">30 dias</a>
+                <a href="index.php?module=dashboard&action=view_v1&period=hoje&call_type=<?php echo $call_type_filter; ?>" class="px-2.5 py-1 rounded-lg transition <?php echo $period === 'hoje' ? 'bg-brand-600 text-white shadow' : 'text-slate-400 hover:text-white'; ?>">Hoje</a>
+                <a href="index.php?module=dashboard&action=view_v1&period=7dias&call_type=<?php echo $call_type_filter; ?>" class="px-2.5 py-1 rounded-lg transition <?php echo $period === '7dias' ? 'bg-brand-600 text-white shadow' : 'text-slate-400 hover:text-white'; ?>">7 dias</a>
+                <a href="index.php?module=dashboard&action=view_v1&period=30dias&call_type=<?php echo $call_type_filter; ?>" class="px-2.5 py-1 rounded-lg transition <?php echo $period === '30dias' ? 'bg-brand-600 text-white shadow' : 'text-slate-400 hover:text-white'; ?>">30 dias</a>
             </div>
 
             <!-- Filtro de Tipo de Chamada (Externas vs Internas vs Todas) -->
             <div class="bg-slate-950/80 border border-slate-800 p-1 rounded-xl flex items-center gap-1 text-xs font-bold" title="Filtro do Dashboard: Separe chamadas externas para não poluir as métricas com ligações ramal-a-ramal">
                 <a href="index.php?module=dashboard&action=view_v1&period=<?php echo $period; ?>&start_date=<?php echo $start_date; ?>&end_date=<?php echo $end_date; ?>&call_type=external" 
-                   class="px-2.5 py-1.5 rounded-lg transition flex items-center gap-1.5 <?php echo $call_type_filter === 'external' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'; ?>"
+                   class="px-2 py-1 rounded-lg transition flex items-center gap-1.5 <?php echo $call_type_filter === 'external' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'; ?>"
                    title="Exibir apenas chamadas externas (clientes/troncos), ignorando ligações ramal a ramal">
                    <i class="fa-solid fa-globe text-[11px]"></i> Externas
                 </a>
                 <a href="index.php?module=dashboard&action=view_v1&period=<?php echo $period; ?>&start_date=<?php echo $start_date; ?>&end_date=<?php echo $end_date; ?>&call_type=internal" 
-                   class="px-2.5 py-1.5 rounded-lg transition flex items-center gap-1.5 <?php echo $call_type_filter === 'internal' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'; ?>"
+                   class="px-2 py-1 rounded-lg transition flex items-center gap-1.5 <?php echo $call_type_filter === 'internal' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'; ?>"
                    title="Exibir apenas chamadas internas (ramal a ramal)">
                    <i class="fa-solid fa-network-wired text-[11px]"></i> Internas
                 </a>
                 <a href="index.php?module=dashboard&action=view_v1&period=<?php echo $period; ?>&start_date=<?php echo $start_date; ?>&end_date=<?php echo $end_date; ?>&call_type=all" 
-                   class="px-2.5 py-1.5 rounded-lg transition flex items-center gap-1 <?php echo $call_type_filter === 'all' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'; ?>"
+                   class="px-2 py-1 rounded-lg transition flex items-center gap-1 <?php echo $call_type_filter === 'all' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'; ?>"
                    title="Exibir todas as chamadas (internas + externas)">
                    Todas
                 </a>
@@ -417,17 +417,17 @@ if ($ast_db) {
 
             <!-- Intervalo de Datas (Agenda Visual com Seleção Direta ao Clicar) -->
             <div class="flex items-center gap-2 text-xs font-bold text-slate-400">
-                <div onclick="try{this.querySelector('input').showPicker();}catch(e){}" class="flex items-center gap-1.5 bg-slate-950/90 border border-slate-800 hover:border-brand-500/50 px-3 py-1.5 rounded-xl cursor-pointer transition">
+                <div onclick="try{this.querySelector('input').showPicker();}catch(e){}" class="flex items-center gap-1.5 bg-slate-950/90 border border-slate-800 hover:border-brand-500/50 px-2.5 py-1 rounded-xl cursor-pointer transition">
                     <i class="fa-solid fa-calendar-days text-brand-400 text-xs"></i>
                     <span class="text-[10px] text-slate-400 font-extrabold uppercase">DE</span>
                     <input type="date" name="start_date" value="<?php echo htmlspecialchars($start_date); ?>" onclick="try{this.showPicker();}catch(e){}" class="bg-transparent text-white focus:outline-none text-xs font-mono font-bold cursor-pointer">
                 </div>
-                <div onclick="try{this.querySelector('input').showPicker();}catch(e){}" class="flex items-center gap-1.5 bg-slate-950/90 border border-slate-800 hover:border-brand-500/50 px-3 py-1.5 rounded-xl cursor-pointer transition">
+                <div onclick="try{this.querySelector('input').showPicker();}catch(e){}" class="flex items-center gap-1.5 bg-slate-950/90 border border-slate-800 hover:border-brand-500/50 px-2.5 py-1 rounded-xl cursor-pointer transition">
                     <i class="fa-solid fa-calendar-days text-brand-400 text-xs"></i>
                     <span class="text-[10px] text-slate-400 font-extrabold uppercase">ATÉ</span>
                     <input type="date" name="end_date" value="<?php echo htmlspecialchars($end_date); ?>" onclick="try{this.showPicker();}catch(e){}" class="bg-transparent text-white focus:outline-none text-xs font-mono font-bold cursor-pointer">
                 </div>
-                <button type="submit" class="px-3.5 py-2 bg-brand-600 hover:bg-brand-500 text-white rounded-xl font-extrabold text-xs transition shadow-lg shadow-brand-600/30 flex items-center gap-1.5">
+                <button type="submit" class="px-3 py-1.5 bg-brand-600 hover:bg-brand-500 text-white rounded-xl font-extrabold text-xs transition shadow-lg shadow-brand-600/30 flex items-center gap-1.5">
                     <i class="fa-solid fa-filter"></i> Filtrar
                 </button>
             </div>
@@ -572,10 +572,10 @@ if ($ast_db) {
     </div>
 
     <!-- BLOCO 1: CARDS DE KPIS DE TELEFONIA & DEMANDAS (DADOS REAIS E CLICÁVEIS) -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
 
         <!-- Card 1: Total de Atendimentos -->
-        <div onclick="openKpiDetailModal('total')" title="Clique para ver a lista de todos os atendimentos no período" class="bg-slate-900/90 border border-slate-800 p-5 rounded-2xl shadow-xl flex flex-col justify-between space-y-3 hover:border-brand-500/50 hover:shadow-2xl hover:bg-slate-900 transition group cursor-pointer relative overflow-hidden transform hover:-translate-y-0.5">
+        <div onclick="openKpiDetailModal('total')" title="Clique para ver a lista de todos os atendimentos no período" class="bg-slate-900/90 border border-slate-800 p-4 rounded-2xl shadow-xl flex flex-col justify-between space-y-2 hover:border-brand-500/50 hover:shadow-2xl hover:bg-slate-900 transition group cursor-pointer relative overflow-hidden transform hover:-translate-y-0.5">
             <div class="flex items-center justify-between">
                 <div class="flex items-center gap-1.5 text-xs font-bold text-slate-300">
                     <span>Total de Atendimentos</span>
@@ -586,7 +586,7 @@ if ($ast_db) {
                 </div>
             </div>
             <div>
-                <span class="text-3xl font-black text-white tracking-tight font-mono"><?php echo number_format($total_atendidas_real, 0, ',', '.'); ?></span>
+                <span class="text-2xl font-black text-white tracking-tight font-mono"><?php echo number_format($total_atendidas_real, 0, ',', '.'); ?></span>
                 <div class="text-xs font-bold mt-1 flex items-center justify-between">
                     <div><?php echo calcTrendBadge($total_atendidas_real, $prev_atendidas); ?></div>
                     <span class="text-[10px] text-brand-400 font-extrabold opacity-0 group-hover:opacity-100 transition flex items-center gap-1">Ver chamadas <i class="fa-solid fa-chevron-right text-[8px]"></i></span>
@@ -607,7 +607,7 @@ if ($ast_db) {
         </div>
 
         <!-- Card 2: Demanda Ativa -->
-        <div onclick="openKpiDetailModal('ativa')" title="Clique para ver a lista de chamadas efetuadas (ativas)" class="bg-slate-900/90 border border-slate-800 p-5 rounded-2xl shadow-xl flex flex-col justify-between space-y-3 hover:border-emerald-500/50 hover:shadow-2xl hover:bg-slate-900 transition group cursor-pointer relative overflow-hidden transform hover:-translate-y-0.5">
+        <div onclick="openKpiDetailModal('ativa')" title="Clique para ver a lista de chamadas efetuadas (ativas)" class="bg-slate-900/90 border border-slate-800 p-4 rounded-2xl shadow-xl flex flex-col justify-between space-y-2 hover:border-emerald-500/50 hover:shadow-2xl hover:bg-slate-900 transition group cursor-pointer relative overflow-hidden transform hover:-translate-y-0.5">
             <div class="flex items-center justify-between">
                 <div class="flex items-center gap-1.5 text-xs font-bold text-slate-300">
                     <span>Demanda Ativa</span>
@@ -618,7 +618,7 @@ if ($ast_db) {
                 </div>
             </div>
             <div>
-                <span class="text-3xl font-black text-white tracking-tight font-mono"><?php echo number_format($demanda_ativa_real, 0, ',', '.'); ?></span>
+                <span class="text-2xl font-black text-white tracking-tight font-mono"><?php echo number_format($demanda_ativa_real, 0, ',', '.'); ?></span>
                 <div class="text-xs font-bold mt-1 flex items-center justify-between">
                     <div><?php echo calcTrendBadge($demanda_ativa_real, $prev_ativa); ?></div>
                     <span class="text-[10px] text-emerald-400 font-extrabold opacity-0 group-hover:opacity-100 transition flex items-center gap-1">Ver chamadas <i class="fa-solid fa-chevron-right text-[8px]"></i></span>
@@ -639,7 +639,7 @@ if ($ast_db) {
         </div>
 
         <!-- Card 3: Demanda Receptiva -->
-        <div onclick="openKpiDetailModal('receptiva')" title="Clique para ver a lista de chamadas recebidas (receptivas)" class="bg-slate-900/90 border border-slate-800 p-5 rounded-2xl shadow-xl flex flex-col justify-between space-y-3 hover:border-purple-500/50 hover:shadow-2xl hover:bg-slate-900 transition group cursor-pointer relative overflow-hidden transform hover:-translate-y-0.5">
+        <div onclick="openKpiDetailModal('receptiva')" title="Clique para ver a lista de chamadas recebidas (receptivas)" class="bg-slate-900/90 border border-slate-800 p-4 rounded-2xl shadow-xl flex flex-col justify-between space-y-2 hover:border-purple-500/50 hover:shadow-2xl hover:bg-slate-900 transition group cursor-pointer relative overflow-hidden transform hover:-translate-y-0.5">
             <div class="flex items-center justify-between">
                 <div class="flex items-center gap-1.5 text-xs font-bold text-slate-300">
                     <span>Demanda Receptiva</span>
@@ -650,7 +650,7 @@ if ($ast_db) {
                 </div>
             </div>
             <div>
-                <span class="text-3xl font-black text-white tracking-tight font-mono"><?php echo number_format($demanda_receptiva_real, 0, ',', '.'); ?></span>
+                <span class="text-2xl font-black text-white tracking-tight font-mono"><?php echo number_format($demanda_receptiva_real, 0, ',', '.'); ?></span>
                 <div class="text-xs font-bold mt-1 flex items-center justify-between">
                     <div><?php echo calcTrendBadge($demanda_receptiva_real, $prev_receptiva); ?></div>
                     <span class="text-[10px] text-purple-400 font-extrabold opacity-0 group-hover:opacity-100 transition flex items-center gap-1">Ver chamadas <i class="fa-solid fa-chevron-right text-[8px]"></i></span>
@@ -671,7 +671,7 @@ if ($ast_db) {
         </div>
 
         <!-- Card 4: TMA -->
-        <div onclick="openKpiDetailModal('tma')" title="Clique para ver o extrato de chamadas do cálculo do Tempo Médio de Atendimento" class="bg-slate-900/90 border border-slate-800 p-5 rounded-2xl shadow-xl flex flex-col justify-between space-y-3 hover:border-amber-500/50 hover:shadow-2xl hover:bg-slate-900 transition group cursor-pointer relative overflow-hidden transform hover:-translate-y-0.5">
+        <div onclick="openKpiDetailModal('tma')" title="Clique para ver o extrato de chamadas do cálculo do Tempo Médio de Atendimento" class="bg-slate-900/90 border border-slate-800 p-4 rounded-2xl shadow-xl flex flex-col justify-between space-y-2 hover:border-amber-500/50 hover:shadow-2xl hover:bg-slate-900 transition group cursor-pointer relative overflow-hidden transform hover:-translate-y-0.5">
             <div class="flex items-center justify-between">
                 <div class="flex items-center gap-1.5 text-xs font-bold text-slate-300">
                     <span>TMA</span>
@@ -682,7 +682,7 @@ if ($ast_db) {
                 </div>
             </div>
             <div>
-                <span class="text-3xl font-black text-white tracking-tight font-mono"><?php echo formatSecondsToHuman($tma_medio_geral); ?></span>
+                <span class="text-2xl font-black text-white tracking-tight font-mono"><?php echo formatSecondsToHuman($tma_medio_geral); ?></span>
                 <div class="text-xs font-bold mt-1 flex items-center justify-between">
                     <div><?php echo calcTrendBadge($tma_medio_geral, $prev_tma); ?></div>
                     <span class="text-[10px] text-amber-400 font-extrabold opacity-0 group-hover:opacity-100 transition flex items-center gap-1">Ver chamadas <i class="fa-solid fa-chevron-right text-[8px]"></i></span>
@@ -692,7 +692,7 @@ if ($ast_db) {
         </div>
 
         <!-- Card 5: TME -->
-        <div onclick="openKpiDetailModal('tme')" title="Clique para ver o extrato de chamadas com Tempo Médio de Espera" class="bg-slate-900/90 border border-slate-800 p-5 rounded-2xl shadow-xl flex flex-col justify-between space-y-3 hover:border-cyan-500/50 hover:shadow-2xl hover:bg-slate-900 transition group cursor-pointer relative overflow-hidden transform hover:-translate-y-0.5">
+        <div onclick="openKpiDetailModal('tme')" title="Clique para ver o extrato de chamadas com Tempo Médio de Espera" class="bg-slate-900/90 border border-slate-800 p-4 rounded-2xl shadow-xl flex flex-col justify-between space-y-2 hover:border-cyan-500/50 hover:shadow-2xl hover:bg-slate-900 transition group cursor-pointer relative overflow-hidden transform hover:-translate-y-0.5">
             <div class="flex items-center justify-between">
                 <div class="flex items-center gap-1.5 text-xs font-bold text-slate-300">
                     <span>TME</span>
@@ -703,7 +703,7 @@ if ($ast_db) {
                 </div>
             </div>
             <div>
-                <span class="text-3xl font-black text-white tracking-tight font-mono"><?php echo formatSecondsToHuman($tme_medio_geral); ?></span>
+                <span class="text-2xl font-black text-white tracking-tight font-mono"><?php echo formatSecondsToHuman($tme_medio_geral); ?></span>
                 <div class="text-xs font-bold mt-1 flex items-center justify-between">
                     <div><?php echo calcTrendBadge($tme_medio_geral, $prev_tme); ?></div>
                     <span class="text-[10px] text-cyan-400 font-extrabold opacity-0 group-hover:opacity-100 transition flex items-center gap-1">Ver chamadas <i class="fa-solid fa-chevron-right text-[8px]"></i></span>
@@ -713,7 +713,7 @@ if ($ast_db) {
         </div>
 
         <!-- Card 6: TPR -->
-        <div onclick="openKpiDetailModal('tpr')" title="Clique para ver a lista de chamadas com o Tempo de Primeira Resposta" class="bg-slate-900/90 border border-slate-800 p-5 rounded-2xl shadow-xl flex flex-col justify-between space-y-3 hover:border-indigo-500/50 hover:shadow-2xl hover:bg-slate-900 transition group cursor-pointer relative overflow-hidden transform hover:-translate-y-0.5">
+        <div onclick="openKpiDetailModal('tpr')" title="Clique para ver a lista de chamadas com o Tempo de Primeira Resposta" class="bg-slate-900/90 border border-slate-800 p-4 rounded-2xl shadow-xl flex flex-col justify-between space-y-2 hover:border-indigo-500/50 hover:shadow-2xl hover:bg-slate-900 transition group cursor-pointer relative overflow-hidden transform hover:-translate-y-0.5">
             <div class="flex items-center justify-between">
                 <div class="flex items-center gap-1.5 text-xs font-bold text-slate-300">
                     <span>TPR</span>
@@ -724,7 +724,7 @@ if ($ast_db) {
                 </div>
             </div>
             <div>
-                <span class="text-3xl font-black text-white tracking-tight font-mono"><?php echo formatSecondsToHuman($tpr_medio_geral); ?></span>
+                <span class="text-2xl font-black text-white tracking-tight font-mono"><?php echo formatSecondsToHuman($tpr_medio_geral); ?></span>
                 <div class="text-xs font-bold mt-1 flex items-center justify-between">
                     <div><?php echo calcTrendBadge($tpr_medio_geral, $prev_tpr); ?></div>
                     <span class="text-[10px] text-indigo-400 font-extrabold opacity-0 group-hover:opacity-100 transition flex items-center gap-1">Ver chamadas <i class="fa-solid fa-chevron-right text-[8px]"></i></span>
