@@ -10,13 +10,13 @@ O **IPbx Sentinel** (`scripts/ipbx-sentinel.sh`) é o monitor único de seguran�
 
 | Frequência | Verificação | Ação |
 |---|---|---|
-| 1 min | **Firewall** (`iptables`/`firewalld` parado ou com poucas regras) | Avisa uma vez, **reativa** o firewall e avisa quando voltar |
+| 1 min | **Firewall** (`iptables`/`firewalld` parado, ou ativo mas praticamente sem regras, o que deixa o servidor aberto) | Avisa uma vez, **reativa** o firewall e avisa quando voltar |
 | 1 min | **Dialplan malicioso** (`thanku-outcall`, `custom-get-extensions`) | Só alerta |
 | 1 min | **Crontab suspeito** (`asterisk` e `root`) | Só alerta |
 | 1 min | **Versão vulnerável do painel** (aviso oficial Issabel de 02/08/2026: `issabel-framework` ≤ 4.0.0-12 no Issabel 4 ou ≤ 5.0.0-3 no Issabel 5 permite controle remoto) | Alerta uma vez por versão. A correção é automática na instalação (opção [20]/`install.sh`) ou com `ipbx-sentinel --update-framework` |
 | 5 min | **Web shells e invasões** em `/var/www/html` (assinaturas `Emad__Was__Here`, `eval` ofuscado em cadeia, `eval(base64_decode`, `c99shell`, `r57shell`...) | Quarentena reversível + alerta com data, arquivo e IP de origem |
 | 5 min | **Módulos falsos** (`phones`, `h`, `_cache`, `tinfo`, `fpbxphones`) e **PHP em pastas de imagem** | Quarentena + alerta |
-| 5 min | **Contas e senhas**: usuário novo, senha/permissão alterada ou removido (painel `acl.db`, FreePBX, MySQL, `/etc/issabel.conf`, `/etc/amportal.conf`, `/etc/freepbx.conf`) e **nomes suspeitos** (`atmin`, `emad`...) | Só alerta (nunca desfaz) |
+| 5 min | **Contas e senhas**: usuário novo, senha/permissão alterada ou removido (painel `acl.db`, FreePBX, MySQL, `/etc/issabel.conf`, `/etc/amportal.conf`, `/etc/freepbx.conf`) **nomes suspeitos** (`atmin`, `emad`...) e **`root` do MySQL liberado para qualquer origem** (`root@%`, acesso remoto total ao banco) | Só alerta (nunca desfaz) |
 
 - Não há varredura noturna (sem alertas de madrugada). A varredura completa roda **uma vez na instalação** e **sob demanda** (`ipbx-sentinel --scan`).
 - Se o Sentinel não conseguir ler uma fonte de contas (sem `sqlite3`, sem `mysql` ou senha do root diferente de `/etc/issabel.conf`), ele registra um AVISO no log (`/var/log/ipbx-sentinel.log`) e `ipbx-sentinel --status` mostra qual está cega.

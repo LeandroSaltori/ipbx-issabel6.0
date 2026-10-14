@@ -243,6 +243,10 @@ identity_check() {
   while IFS='|' read -r t0 k0 h0; do
     [ "$t0" = "ok" ] && continue
     n0="${k0%%@*}"; n0="$(printf '%s' "$n0" | tr 'A-Z' 'a-z')"
+    # root do MySQL liberado para qualquer origem (host %): acesso remoto total ao banco
+    if [ "$t0" = "mysql" ] && [ "$n0" = "root" ]; then
+      case "${k0#*@}" in *%*) grep -qxF "$t0|$k0" "$flagged" 2>/dev/null || { echo "$t0|$k0" >> "$flagged"; chmod 600 "$flagged" 2>/dev/null; IDENT_CHANGES+=("ROOT REMOTO ($t0): $k0 (root do MySQL aceita conexao de qualquer lugar)"); } ;; esac
+    fi
     case "$n0" in
       emad|supportpbx|atmin|admln|adm1n|admim|admn|4dmin|hacker|backdoor|webadmin1|sqladmin)
         grep -qxF "$t0|$k0" "$flagged" 2>/dev/null || { echo "$t0|$k0" >> "$flagged"; chmod 600 "$flagged" 2>/dev/null; IDENT_CHANGES+=("NOME SUSPEITO ($t0): $k0 (parecido com admin / usado em invasoes)"); } ;;
@@ -345,15 +349,17 @@ check_firewall() {
   elif systemctl is-enabled firewalld >/dev/null 2>&1 || systemctl is-active firewalld >/dev/null 2>&1; then svc=firewalld; fi
   [ -n "$svc" ] || return 0
   st="$(systemctl is-active "$svc" 2>/dev/null)"; [ -n "$st" ] || st=inactive
+  local why="parado (estado: ${st})"
   if [ "$st" != "active" ]; then bad=1
   elif [ "$svc" = "iptables" ]; then
-    rules="$(iptables -L -n 2>/dev/null | wc -l)"; [ "${rules:-0}" -lt 10 ] && bad=1
+    rules="$(iptables -L -n 2>/dev/null | wc -l)"
+    if [ "${rules:-0}" -lt 10 ]; then bad=1; why="ativo, mas praticamente SEM REGRAS (${rules} linhas): o servidor esta aberto"; fi
   fi
   if [ "$bad" = "1" ]; then
     if [ ! -f "$flag" ]; then
       : > "$flag"
-      log "FIREWALL: ${svc} fora do ar (estado: ${st})."
-      send_telegram "ALERTA: FIREWALL FORA DO AR - ${HOSTNAME_S}"$'\n'"$(date '+%d/%m/%Y %H:%M:%S')"$'\n'"Servico: ${svc} (estado: ${st})"$'\n'"Acao: $([ "$SENTINEL_FIREWALL_HEAL" = "1" ] && echo "reativando o firewall." || echo "apenas alerta.")"
+      log "FIREWALL: ${svc} ${why}."
+      send_telegram "ALERTA: FIREWALL SEM PROTECAO - ${HOSTNAME_S}"$'\n'"$(date '+%d/%m/%Y %H:%M:%S')"$'\n'"Servico: ${svc} - ${why}"$'\n'"Acao: $([ "$SENTINEL_FIREWALL_HEAL" = "1" ] && echo "reativando o firewall." || echo "apenas alerta.")"
     fi
     [ "$SENTINEL_FIREWALL_HEAL" = "1" ] && systemctl restart "$svc" >/dev/null 2>&1
   elif [ -f "$flag" ]; then
@@ -550,7 +556,7 @@ cmd_selftest() {
   chk "$T/web/modules/a_emad.php" gone;  chk "$T/web/modules/b_chain.php" gone;  chk "$T/web/modules/c_decode.php" gone
   chk "$T/web/images/d_static.php" gone; chk "$T/web/admin/modules/phones" gone
   chk "$T/web/modules/legitimo.php" kept; chk "$T/web/admin/libraries/php-upgrade/compat.php" kept; chk "$T/web/admin/modules/core/XML_Unserializer.php" kept
-  for k in "FIREWALL: iptables fora do ar" "DIALPLAN malicioso" "CRON suspeito" "FRAMEWORK vulneravel"; do
+  for k in "FIREWALL: iptables parado" "DIALPLAN malicioso" "CRON suspeito" "FRAMEWORK vulneravel"; do
     if grep -qF "$k" "$T/log"; then ok=$((ok+1)); else bad=$((bad+1)); echo "FALHA: alerta '$k' nao gerado"; fi
   done
   rm -rf "$T"
