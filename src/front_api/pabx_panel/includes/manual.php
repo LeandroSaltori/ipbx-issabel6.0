@@ -31,7 +31,7 @@ return [
         ['t' => 'Desempenho (telas lentas)', 'd' => 'Em Configurações > Logs & Diagnósticos, a aba Desempenho lista as telas e chamadas que demoraram mais de 1,5 segundo, com o tempo de cada etapa (abertura, login e tela). As atualizações automáticas (ramais, filas, troncos) não seguram mais a abertura das outras telas. Se alguma tela estiver lenta, abra essa aba e envie os registros ao suporte.'],
     ]],
     ['id' => 'ramais', 'titulo' => 'Telefonia & Ramais', 'icon' => 'fa-phone', 'itens' => [
-        ['t' => 'Painel do Operador', 'd' => 'Mostra todos os ramais em tempo real: livre, em chamada, tocando ou fora do ar, além de linhas, estacionamento e salas de conferência.'],
+        ['t' => 'Painel do Operador', 'd' => 'Mostra todos os ramais em tempo real: livre, em chamada, tocando ou fora do ar, além de linhas, estacionamento e salas de conferência. As ações (espiar, sussurrar, transferir) funcionam também nos ramais que usam o telefone de navegador.'],
         ['t' => 'Ramais & Atendentes', 'd' => 'Em um só lugar: nomes dos ramais, permissões, Não Perturbe e desvios de chamada (autoatendimento do ramal, na aba Desvios).',
             'passos' => ['Abra Telefonia & Ramais > Ramais & Atendentes.', 'Clique no ramal que deseja editar.', 'Altere os campos desejados e salve.', 'Para desvios de chamada, use a aba Desvios.'],
             'campos' => ['Ramal' => 'Número do ramal (não editável).', 'Nome do Atendente' => 'Nome mostrado nos relatórios, no Painel do Operador e nos avisos.', 'Celular / WhatsApp (Notificações)' => 'Número que recebe os avisos do atendente, como chamadas perdidas.', 'Nova Senha (Opcional)' => 'Preencha somente se quiser trocar a senha do ramal; em branco mantém a atual.'],

@@ -326,7 +326,7 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
                 'tech' => strtoupper($e['tech'] ?: 'PJSIP'),
                 'whatsapp' => $e['whatsapp_number'],
                 'status' => $st,
-                'channel' => $lv ? $lv['channel'] : "PJSIP/{$num}",
+                'channel' => $lv ? $lv['channel'] : (strtoupper($e['tech'] ?: 'PJSIP') === 'SIP' ? "SIP/{$num}" : "PJSIP/{$num}"),
                 'partner' => ($lv && $lv['partner'] !== '') ? formatEndpointName($lv['partner']) : '',
                 'kind' => $lv ? $lv['kind'] : '',
                 'secs' => $lv ? (int)$lv['secs'] : 0
