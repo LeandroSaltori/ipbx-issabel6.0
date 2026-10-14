@@ -50,6 +50,11 @@ try {
     } catch (Exception $e) {}
 
 
+    // Estrutura do banco: só roda quando a versão mudou (PRAGMA user_version). No dia a dia o acesso NÃO grava nada aqui,
+    // então páginas, FOP, crons e AGI nunca disputam o bloqueio de escrita na abertura (causa do "database is locked").
+    // Ao criar/alterar tabelas ou colunas abaixo, aumente $__schema_ver para o banco ser atualizado uma única vez.
+    $__schema_ver = 2;
+    if ((int)$db->query('PRAGMA user_version')->fetchColumn() < $__schema_ver) {
     // Criar tabelas se não existirem
     $db->exec("CREATE TABLE IF NOT EXISTS settings (key_name TEXT PRIMARY KEY, value_val TEXT)");
     $db->exec("CREATE TABLE IF NOT EXISTS sent_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, phone TEXT, call_id TEXT, extension TEXT, rule_type TEXT, message TEXT, status TEXT, response_raw TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)");
@@ -127,6 +132,8 @@ try {
     foreach ($default_rules as $rk => $rv) {
         $rule_stmt->execute([':key' => $rk, ':val' => $rv]);
     }
+        $db->exec('PRAGMA user_version = ' . $__schema_ver);
+    }
 } catch (PDOException $e) {
     if (strpos($e->getMessage(), 'readonly') !== false || strpos($e->getMessage(), 'PERM') !== false || strpos($e->getMessage(), 'attempt to write') !== false) {
         die('<div style="font-family:sans-serif; background:#0f172a; color:#f8fafc; padding:30px; border-radius:12px; max-width:650px; margin:50px auto; border:1px solid #334155;">
@@ -136,5 +143,10 @@ try {
 chmod -R 775 /var/www/html/front_api</pre>
         </div>');
     }
-    die("Erro ao iniciar banco de dados interno (SQLite): " . $e->getMessage());
+    // Banco ocupado na abertura: se o arquivo já existia (estrutura pronta), segue em frente em vez de derrubar a tela
+    if (!$first_run && isset($db) && $db instanceof PDO && (stripos($e->getMessage(), 'locked') !== false || stripos($e->getMessage(), 'busy') !== false)) {
+        @error_log('[IPbx Prisma] SQLite ocupado na abertura (seguindo sem rodar a verificação de estrutura): ' . $e->getMessage());
+    } else {
+        die("Erro ao iniciar banco de dados interno (SQLite): " . $e->getMessage());
+    }
 }
