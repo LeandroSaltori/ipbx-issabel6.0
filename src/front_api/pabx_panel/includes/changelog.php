@@ -6,6 +6,7 @@
  */
 return [
     'done' => [
+        ['data' => '2026-10-14', 'mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-database', 'titulo' => 'Fim do erro "banco de dados bloqueado"', 'desc' => 'Corrigimos o erro que às vezes aparecia ao abrir uma tela quando várias coisas acessavam o painel ao mesmo tempo (tela aberta, rotinas automáticas, WhatsApp). O painel agora aguarda e atende todos sem travar.'],
         ['data' => '2026-10-14', 'mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-gem', 'titulo' => 'Logo da Prisma no topo do menu', 'desc' => 'O topo do menu lateral agora mostra a logo oficial da Prisma Telecom. Ao clicar nela você volta ao Dashboard e todos os grupos do menu se recolhem, deixando a navegação limpa.'],
         ['data' => '2026-10-14', 'mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-circle-user', 'titulo' => 'Rodapé do menu mais limpo', 'desc' => 'No rodapé do menu lateral, Novidades e Modo Claro viraram itens simples e a sua conta aparece com a inicial do nome. Ao clicar nela abre um menu com Perfil, Painel clássico e Sair.'],
         ['data' => '2026-10-14', 'mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-compress', 'titulo' => 'Dashboard mais compacto', 'desc' => 'O topo do Dashboard (título e filtros de período) e os cards de indicadores ficaram um pouco menores, e agora cabem em uma só linha na tela em tamanho normal. Os seis cards também ficaram com a mesma altura.'],

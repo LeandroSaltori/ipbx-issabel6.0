@@ -148,6 +148,8 @@ if command -v php &>/dev/null && [ -f "$DEST_DIR/pabx_panel/set_password.php" ];
   php "$DEST_DIR/pabx_panel/set_password.php" || true
   chown -R asterisk:asterisk "$DEST_DIR"
   [ -f "$DEST_DIR/pabx_panel/.ht_whatsapp_config.sqlite" ] && chmod 666 "$DEST_DIR/pabx_panel/.ht_whatsapp_config.sqlite" 2>/dev/null || true
+# Banco em modo WAL: arquivos auxiliares (-wal/-shm) precisam ser gravaveis pelo Apache/cron (usuario asterisk)
+for f in "$DEST_DIR"/pabx_panel/.ht_whatsapp_config.sqlite-wal "$DEST_DIR"/pabx_panel/.ht_whatsapp_config.sqlite-shm; do [ -f "$f" ] && chmod 666 "$f" 2>/dev/null; done; true
 fi
 
 # Cron de abandono de fila (WhatsApp para cliente/supervisor) - idempotente

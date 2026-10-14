@@ -34,10 +34,20 @@ $first_run = !file_exists($db_file);
 try {
     $db = new PDO("sqlite:" . $db_file);
     $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-    try { $db->exec('PRAGMA busy_timeout = 5000'); } catch (Exception $e) {}
+    try { $db->exec('PRAGMA busy_timeout = 15000'); } catch (Exception $e) {}
+    // WAL: leitores (páginas, FOP, crons) não bloqueiam quem grava; evita "database is locked" com acessos simultâneos
+    try { if (is_writable($db_file)) { $db->exec('PRAGMA journal_mode = WAL'); $db->exec('PRAGMA synchronous = NORMAL'); } } catch (Exception $e) {}
     $db->exec("PRAGMA encoding = 'UTF-8';");
     // DeepSeek foi removido do painel: apaga chave/estado salvos e volta funções que o usavam para Automático
-    try { $db->exec("DELETE FROM settings WHERE key_name IN ('ai_key_deepseek','ai_key_status_deepseek') OR (key_name='ai_provider' AND value_val='deepseek')"); $db->exec("UPDATE settings SET value_val='' WHERE key_name LIKE 'ai_role_%_provider' AND value_val='deepseek'"); } catch (Exception $e) {}
+    // (só grava quando ainda existe algo de DeepSeek: evita escrita a cada acesso, que causava "database is locked")
+    try {
+        if ($db->query("SELECT 1 FROM settings WHERE key_name IN ('ai_key_deepseek','ai_key_status_deepseek') OR (key_name='ai_provider' AND value_val='deepseek') LIMIT 1")->fetchColumn()) {
+            $db->exec("DELETE FROM settings WHERE key_name IN ('ai_key_deepseek','ai_key_status_deepseek') OR (key_name='ai_provider' AND value_val='deepseek')");
+        }
+        if ($db->query("SELECT 1 FROM settings WHERE key_name LIKE 'ai_role_%_provider' AND value_val='deepseek' LIMIT 1")->fetchColumn()) {
+            $db->exec("UPDATE settings SET value_val='' WHERE key_name LIKE 'ai_role_%_provider' AND value_val='deepseek'");
+        }
+    } catch (Exception $e) {}
 
 
     // Criar tabelas se não existirem
