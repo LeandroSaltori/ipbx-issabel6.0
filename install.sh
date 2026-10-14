@@ -423,20 +423,11 @@ fi
 # 12. NOTIFICAÇÕES TELEGRAM & MONITOR DE SEGURANÇA
 # ==============================================================================
 log_info "12/20 - Configurando Monitor de Segurança e Notificações Telegram..."
-TELEGRAM_SRC="$REPO_DIR/scripts/monitor_prisma.sh"
-[ ! -f "$TELEGRAM_SRC" ] && TELEGRAM_SRC="$REPO_DIR/scripts/monitor_issabel_users.sh"
-
-if [ -f "$TELEGRAM_SRC" ]; then
-    cp -f "$TELEGRAM_SRC" /usr/local/bin/monitor_issabel_users.sh
-    cp -f "$TELEGRAM_SRC" /usr/local/bin/monitor_prisma.sh
-    chmod +x /usr/local/bin/monitor_issabel_users.sh /usr/local/bin/monitor_prisma.sh
-    
-    if ! crontab -l 2>/dev/null | grep -q "monitor_issabel_users.sh"; then
-        (crontab -l 2>/dev/null; echo "* * * * * /usr/local/bin/monitor_issabel_users.sh") | crontab -
-        log_success "Monitor de segurança ativo no crontab (Firewall, Invasão e Usuários)."
-    else
-        log_info "Monitor de segurança já configurado no crontab."
-    fi
+if [ -f "$REPO_DIR/scripts/ipbx-sentinel.sh" ]; then
+    # Monitor unico (IPbx Sentinel): webshells, firewall, dialplan, cron, contas e Telegram
+    bash "$REPO_DIR/scripts/ipbx-sentinel.sh" --install && log_success "Monitor de segurança (IPbx Sentinel) ativo."
+else
+    log_warn "scripts/ipbx-sentinel.sh não encontrado no repositório."
 fi
 
 # ==============================================================================
@@ -1424,15 +1415,8 @@ if [ -f "$REPO_DIR/scripts/ipbx-security-hardening.sh" ]; then
     bash "$REPO_DIR/scripts/ipbx-security-hardening.sh" || true
 fi
 
-if [ -f "$REPO_DIR/scripts/monitor_prisma.sh" ]; then
-    /bin/cp -f "$REPO_DIR/scripts/monitor_prisma.sh" /usr/local/bin/monitor_issabel_users.sh
-    /bin/cp -f "$REPO_DIR/scripts/monitor_prisma.sh" /usr/local/bin/monitor_prisma.sh
-    chmod +x /usr/local/bin/monitor_issabel_users.sh /usr/local/bin/monitor_prisma.sh
-
-    if ! crontab -l 2>/dev/null | grep -q "monitor_issabel_users.sh"; then
-        (crontab -l 2>/dev/null; echo "* * * * * /usr/local/bin/monitor_issabel_users.sh") | crontab -
-        log_success "Monitor de segurança ativo no crontab (a cada minuto)."
-    fi
+if [ -f "$REPO_DIR/scripts/ipbx-sentinel.sh" ]; then
+    bash "$REPO_DIR/scripts/ipbx-sentinel.sh" --install && log_success "Monitor de segurança (IPbx Sentinel) ativo."
 fi
 
 # ==============================================================================

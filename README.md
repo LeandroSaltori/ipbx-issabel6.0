@@ -97,7 +97,7 @@ O menu interativo permite escolher exatamente o que deseja atualizar, recarrega 
 | **`[17]`** | **Mensagens Texto (PJSIP)** | Habilita o roteamento de mensagens de texto instantâneas (SIP MESSAGE) entre ramais PJSIP e softphones. | `src/dialplan/textmessages.conf` ➔ `/etc/asterisk/textmessages.conf` |
 | **`[18]`** | **Servidor LDAP** | Instala o servidor `issabel-ldap` nativo na porta 10389 com credenciais padronizadas (`Prisma@500`) e regras de firewall/iptables. | `src/ldap/issabel-ldap`, `/etc/sysconfig/issabel-ldap` |
 | **`[19]`** | **Música de Espera (MOH)** | Instala a coleção de músicas de espera em alta fidelidade e áudios padronizados para o Asterisk. | `src/sounds/moh/` ➔ `/var/lib/asterisk/moh/` |
-| **`[20]`** | **Monitor Segurança Telegram** | Configura o bot de monitoramento no Telegram para alertas em tempo real de web shells (Emad), firewall e novos usuários. | `scripts/monitor_prisma.sh` ➔ `/etc/cron.d/monitor_prisma` |
+| **`[20]`** | **Monitor Segurança Telegram** | Configura o bot de monitoramento no Telegram para alertas em tempo real de web shells (Emad), firewall e novos usuários. | `scripts/ipbx-sentinel.sh` ➔ `/etc/cron.d/ipbx-sentinel` (monitor único: web shells, firewall, dialplan, cron, contas) |
 | **`[21]`** | **Ferramentas Diagnóstico** | Instala utilitários essenciais de terminal (`tcpdump`, `sngrep`, `nmtui`) e a API de diagnóstico AMI de ramais. | `src/ramais/` ➔ `/var/www/html/ramais/` |
 | **`[22]`** | **Features Asterisk** | Ajusta os timeouts de transferência para 7s / 30s e ativa os BIPs de confirmação (`courtesytone=beep`). | `src/dialplan/features_general_custom.conf` |
 | **`[23]`** | **PJSIP User-Agent** | Padroniza o cabeçalho `User-Agent: IPBX PRISMA` no transporte SIP/PJSIP para maior segurança contra scanners. | `/etc/asterisk/pjsip.transports_custom.conf` |
@@ -245,7 +245,7 @@ ipbx-issabel6.0/
 ├── scripts/                     # Scripts de automação e utilitários
 │   ├── auto_dominio.sh          # Assistente de Domínio e Certificado SSL Let's Encrypt + WebRTC
 │   ├── limpa_logs.sh            # Otimização de disco e limpeza segura de logs (preserva CDRs)
-│   ├── monitor_prisma.sh        # Monitor de segurança (Web shells/Emad, Firewall e Usuários WEB)
+│   ├── monitor_prisma.sh        # Atalho de compatibilidade (o monitor foi unificado no ipbx-sentinel.sh)
 │   ├── ipbx-autoupdate.sh       # Script de atualização semanal automática e registro de logs
 │   ├── motd.sh                  # Banner de boas-vindas do terminal SSH
 │   └── update-addressbook       # Utilitário de sincronização da agenda
@@ -284,7 +284,7 @@ ipbx-issabel6.0/
 5. 🔔 **BIP de Transferência:** Tom de cortesia e BIP emitidos ao completar transferências (`courtesytone = beep` / `xfersound = beep`).
 6. 🔒 **Domínio e SSL Automático (`auto_dominio.sh`):** Emite certificado SSL Let's Encrypt com 1 comando e sincroniza chaves WSS com o Webphone.
 7. 🧹 **Limpeza de Logs e Otimização de Disco (`limpa_logs.sh`):** Esvazia logs >50MB e limpa temporários sem apagar histórico CDR de ligações.
-8. 🚨 **Monitor de Segurança Telegram (`monitor_prisma.sh`):** Alertas em tempo real de web shells, queda de Firewall e novos usuários WEB.
+8. 🚨 **Monitor de Segurança Telegram (IPbx Sentinel, `ipbx-sentinel.sh`):** monitor único com alertas de web shells, módulos falsos, queda de Firewall, dialplan/cron maliciosos e alterações de contas/senhas.
 9. 🔄 **Atualização Automática Semanal (Auto Update):** Rotina semanal (`scripts/ipbx-autoupdate.sh`) via cron (`/etc/cron.weekly/ipbx-autoupdate`).
 10. ⏱️ **Resumo Flutuante com Retenção (2s Hover):** Os cards de resumo nos relatórios do sistema possuem um atraso de 2 segundos mantendo o mouse parado na linha antes de abrir, evitando popups acidentais durante a navegação.
 
@@ -322,7 +322,7 @@ Para instruções detalhadas de configuração de cada recurso, acesse os manuai
 - ☎️ [Provisionamento LDAP Fanvil (Série X/V)](./docs/ldap_fanvil.md)
 - 🔒 [Configuração de Domínio e SSL Let's Encrypt (`auto_dominio.sh`)](./docs/auto_dominio_ssl.md)
 - 🧹 [Limpeza de Logs e Otimização de Disco (`limpa_logs.sh`)](./docs/limpa_logs.md)
-- 🚨 [Monitor de Segurança & Alertas Telegram (`monitor_prisma.sh`)](./docs/monitor_seguranca_telegram.md)
+- 🚨 [Monitor de Segurança & Alertas Telegram (IPbx Sentinel)](./docs/monitor_seguranca_telegram.md)
 - 🕵️ [Detecção e Remoção do Invasor Emad (`invador_emad.md`)](./docs/invador_emad.md)
 - 🔄 [Atualização Automática Semanal (Auto Update & Logs)](./docs/autoupdate.md)
 - 📊 [Asternic CDR - Relatórios de Chamadas](./docs/asternic_cdr.md)

@@ -1,4 +1,6 @@
-# 🚨 Monitor de Segurança & Alertas Telegram (`monitor_prisma.sh`)
+# 🚨 Monitor de Segurança & Alertas Telegram (IPbx Sentinel)
+
+> **Monitor único.** O antigo `monitor_prisma.sh` foi unificado no **IPbx Sentinel** (`scripts/ipbx-sentinel.sh`). Ao rodar a opção **[20]** do menu (ou o `install.sh`), o Sentinel é instalado, as credenciais do Telegram do monitor antigo são copiadas para `/etc/ipbx/telegram.conf` (modo 600) e o cron/arquivos antigos são removidos. O token **não fica mais dentro de scripts**: edite `/etc/ipbx/telegram.conf` (`TELEGRAM_BOT_TOKEN=` / `TELEGRAM_CHAT_ID=`) e teste com `ipbx-sentinel --test-alert`. Detalhes completos em [invador_emad.md](./invador_emad.md).
 
 Este script realiza o monitoramento contínuo de segurança do servidor Issabel PBX e envia **notificações instantâneas via Telegram** em caso de anomalias ou ameaças.
 

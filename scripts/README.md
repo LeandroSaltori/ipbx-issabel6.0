@@ -12,7 +12,7 @@ A maioria destes scripts pode ser executada de forma independente ou através da
 | :--- | :---: | :--- |
 | **`motd.sh`** | **[1]** | Banner personalizado de boas-vindas do terminal SSH (MOTD) exibindo status, logo e links de suporte. |
 | **`update-addressbook`** | **[6]** | Sincronizador de contatos da agenda SQLite (`address_book.db`) e geração de listas de discagem rápida. |
-| **`monitor_prisma.sh`** | **[20]** | Monitor de integridade e segurança com notificações via Telegram (detecta web shells Emad, monitora firewall e novos usuários web). |
+| **`ipbx-sentinel.sh`** | **[20]** | **Monitor único de segurança** com Telegram: web shells, módulos falsos, firewall, dialplan/cron maliciosos e contas/senhas. (`monitor_prisma.sh` é só um atalho de compatibilidade.) |
 | **`ipbx-autoupdate.sh`** | **[24]** | Rotina de atualização semanal automática do PBX instalada no cron (`/etc/cron.weekly/ipbx-autoupdate`). |
 | **`auto_dominio.sh`** | **[26]** | Assistente para configuração de domínio FQDN, emissão de certificado SSL Let's Encrypt e sincronização de chaves WSS WebRTC. |
 | **`limpa_logs.sh`** | **[27]** | Limpeza segura de disco e otimização de logs (trunca logs >50MB, limpa cache Smarty e preserva histórico CDR/gravações). |
@@ -45,7 +45,7 @@ bash scripts/limpa_logs.sh
 
 ### 4. Monitor de Segurança com Alertas no Telegram:
 ```bash
-bash scripts/monitor_prisma.sh
+bash scripts/ipbx-sentinel.sh --install
 ```
 
 ### 5. Configurar Servidor OpenVPN (EasyVPN):

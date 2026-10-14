@@ -1211,21 +1211,11 @@ update_moh() {
 # --- 20. TELEGRAM (NOTIFICAÇÕES) ---
 update_telegram() {
     log_info "Configurando Notificações via Telegram..."
-    TELEGRAM_SRC="$REPO_DIR/scripts/monitor_prisma.sh"
-    [ ! -f "$TELEGRAM_SRC" ] && TELEGRAM_SRC="$REPO_DIR/scripts/monitor_issabel_users.sh"
-    if [ -f "$TELEGRAM_SRC" ]; then
-        cp -f "$TELEGRAM_SRC" /usr/local/bin/monitor_issabel_users.sh
-        cp -f "$TELEGRAM_SRC" /usr/local/bin/monitor_prisma.sh
-        chmod +x /usr/local/bin/monitor_issabel_users.sh /usr/local/bin/monitor_prisma.sh
-
-        if ! crontab -l 2>/dev/null | grep -q "monitor_issabel_users.sh"; then
-            (crontab -l 2>/dev/null; echo "* * * * * /usr/local/bin/monitor_issabel_users.sh") | crontab -
-            log_success "Agendamento de notificação Telegram criado no crontab."
-        else
-            log_info "Agendamento Telegram já existe no crontab."
-        fi
+    if [ -f "$REPO_DIR/scripts/ipbx-sentinel.sh" ]; then
+        bash "$REPO_DIR/scripts/ipbx-sentinel.sh" --install
+        log_success "Monitor de segurança unificado (IPbx Sentinel) ativo. Teste: ipbx-sentinel --test-alert"
     else
-        log_error "Script monitor_prisma.sh / monitor_issabel_users.sh não encontrado no repositório."
+        log_error "Script scripts/ipbx-sentinel.sh não encontrado no repositório."
     fi
 }
 
@@ -1386,17 +1376,10 @@ update_monitor_prisma() {
         bash "$REPO_DIR/scripts/ipbx-security-hardening.sh"
     fi
 
-    if [ -f "$REPO_DIR/scripts/monitor_prisma.sh" ]; then
-        /bin/cp -f "$REPO_DIR/scripts/monitor_prisma.sh" /usr/local/bin/monitor_issabel_users.sh
-        /bin/cp -f "$REPO_DIR/scripts/monitor_prisma.sh" /usr/local/bin/monitor_prisma.sh
-        chmod +x /usr/local/bin/monitor_issabel_users.sh /usr/local/bin/monitor_prisma.sh
-
-        if ! crontab -l 2>/dev/null | grep -q "monitor_issabel_users.sh"; then
-            (crontab -l 2>/dev/null; echo "* * * * * /usr/local/bin/monitor_issabel_users.sh") | crontab -
-            log_success "Monitor de segurança ativo no crontab (a cada minuto)."
-        else
-            log_info "Monitor de segurança já configurado no crontab."
-        fi
+    # O hardening já instala o Sentinel (monitor unico); garante também fora dele (idempotente)
+    if [ -f "$REPO_DIR/scripts/ipbx-sentinel.sh" ]; then
+        bash "$REPO_DIR/scripts/ipbx-sentinel.sh" --install
+        log_success "Monitor de segurança unificado (IPbx Sentinel) ativo."
     fi
 }
 

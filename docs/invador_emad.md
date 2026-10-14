@@ -100,3 +100,19 @@ O monitor manual acima foi substituído pelo **IPbx Sentinel** (`scripts/ipbx-se
 - Sem `chown/chmod -R` no site inteiro: afrouxaria bancos e sessões do painel novo. Opcional: `SENTINEL_HEAL_PERMS=1` apenas remove escrita de "outros".
 - Sem `chattr +i` na raiz: impede atualizações e o instalador.
 - **Após o incidente:** trocar senhas, revisar rotas internacionais, restringir 80/443 no firewall e **gerar novo token do bot** (o token antigo apareceu no repositório e deve ser considerado exposto).
+
+### 5.1 Monitor único (Sentinel absorveu o monitor_prisma.sh)
+
+O Sentinel agora também faz o que o antigo `monitor_prisma.sh` fazia, em um só agendador (`/etc/cron.d/ipbx-sentinel`):
+
+| Frequência | O que roda | Detalhe |
+|---|---|---|
+| 1 min (`--host`, leve) | Firewall | Se `iptables`/`firewalld` cair (ou ficar com poucas regras), avisa **uma vez** e reativa (`SENTINEL_FIREWALL_HEAL=0` = só avisa). Avisa de novo quando voltar. |
+| 1 min | Dialplan malicioso | `thanku-outcall` / `custom-get-extensions` em `/etc/asterisk/extensions*.conf`. Só alerta, uma vez por achado. |
+| 1 min | Crontab suspeito | `asterisk` e `root` com `curl`/`wget`/`php`... Só alerta, uma vez por achado. |
+| 5 min / 03:30 | Arquivos e contas | Web shells, módulos falsos, PHP em pastas estáticas, contas/senhas e nomes suspeitos (`atmin`, etc.). |
+
+- **Watchdog sem token:** `/etc/cron.d/ipbx-watchdog` restaura o Sentinel e o cron se alguém apagar e avisa no Telegram. Substitui o watchdog antigo, que tinha o token fixo.
+- **Migração automática** (`ipbx-sentinel --install`): copia as credenciais do monitor antigo para `/etc/ipbx/telegram.conf`, remove a linha do crontab e os arquivos `monitor_prisma.sh` / `monitor_issabel_users.sh`.
+- Nunca reinicia o Asterisk; o único serviço reativado é o firewall.
+
