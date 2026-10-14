@@ -19,6 +19,7 @@ O **IPbx Sentinel** (`scripts/ipbx-sentinel.sh`) é o monitor único de seguran�
 | 5 min | **Contas e senhas**: usuário novo, senha/permissão alterada ou removido (painel `acl.db`, FreePBX, MySQL, `/etc/issabel.conf`, `/etc/amportal.conf`, `/etc/freepbx.conf`) e **nomes suspeitos** (`atmin`, `emad`...) | Só alerta (nunca desfaz) |
 
 - Não há varredura noturna (sem alertas de madrugada). A varredura completa roda **uma vez na instalação** e **sob demanda** (`ipbx-sentinel --scan`).
+- Se o Sentinel não conseguir ler uma fonte de contas (sem `sqlite3`, sem `mysql` ou senha do root diferente de `/etc/issabel.conf`), ele registra um AVISO no log (`/var/log/ipbx-sentinel.log`) e `ipbx-sentinel --status` mostra qual está cega.
 - Cada achado é avisado **uma única vez** (sem repetir a cada minuto).
 - O Sentinel nunca reinicia o Asterisk; o único serviço reativado é o firewall.
 - **Watchdog:** se alguém apagar o Sentinel ou o agendamento, ele é restaurado automaticamente e o Telegram avisa.
@@ -41,6 +42,7 @@ ipbx-sentinel --test-alert    # teste do Telegram
 ipbx-sentinel --list          # itens em quarentena
 ipbx-sentinel --restore ARQ   # restaura um arquivo da quarentena
 ipbx-sentinel --baseline      # refaz a foto de contas/senhas (servidor limpo)
+ipbx-sentinel --status        # mostra se a vigilancia de contas consegue ler painel, MySQL e arquivos
 ipbx-sentinel --selftest      # autoteste do detector
 ```
 

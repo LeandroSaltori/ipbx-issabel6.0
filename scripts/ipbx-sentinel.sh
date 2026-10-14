@@ -232,6 +232,11 @@ identity_check() {
   mkdir -p "$STATE_DIR" 2>/dev/null && chmod 700 "$STATE_DIR" 2>/dev/null
   local base="$STATE_DIR/identity.baseline" now="$STATE_DIR/identity.now"
   identity_snapshot | sort > "$now"
+  # Fonte ilegivel = vigilancia cega naquela parte: avisa no log (uma vez por fonte)
+  local fs
+  for fs in painel freepbx mysql; do
+    grep -qF "ok|$fs|" "$now" || { seen_once "cega|$fs" && log "AVISO: vigilancia de contas SEM leitura da fonte '$fs'. Diagnostico: ipbx-sentinel --status"; }
+  done
   # Nomes suspeitos (caso real: usuario "atmin" no MySQL, sosia de "admin"). Independe da
   # foto: pega ate servidor ja invadido. Avisa uma unica vez por conta.
   local flagged="$STATE_DIR/identity.flagged" t0 k0 h0 n0
