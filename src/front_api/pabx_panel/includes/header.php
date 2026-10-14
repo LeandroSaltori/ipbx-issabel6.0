@@ -39,8 +39,8 @@
     <div class="flex items-center gap-3">
         <?php $__u_wp = function_exists('getLoggedUser') ? getLoggedUser() : null; if ($__u_wp && !empty($__u_wp['webphone']) && !empty($__u_wp['extension'])): ?>
         <!-- Floating WebPhone Trigger (Estilo Pílula Verde do Print) -->
-        <button onclick="toggleWebPhone()" class="px-4 py-2 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs flex items-center gap-2 shadow-lg shadow-emerald-600/30 transition-all hover:scale-105">
-            <span class="w-2.5 h-2.5 rounded-full bg-white animate-pulse"></span>
+        <button id="webphone-pill" onclick="toggleWebPhone()" title="Webphone" class="px-4 py-2 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs flex items-center gap-2 shadow-lg shadow-emerald-600/30 transition-all hover:scale-105">
+            <span id="webphone-pill-dot" class="w-2.5 h-2.5 rounded-full bg-white animate-pulse" style="box-shadow:0 0 0 2px rgba(255,255,255,.85)"></span>
             <i class="fa-solid fa-phone"></i>
             <span>WebPhone</span>
         </button>
