@@ -316,9 +316,9 @@ try {
 
             <!-- WhatsApp do Usuário (Notificações) -->
             <div class="space-y-1">
-                <label class="text-xs font-bold text-cyan-400 block">Número do WhatsApp do Usuário (Notificações):</label>
-                <input type="text" id="form-user-whatsapp" name="user_whatsapp" required placeholder="5511999998888" class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-cyan-300 focus:border-cyan-500 focus:outline-none font-mono font-bold">
-                <span class="text-[10px] text-slate-400 block">Número de WhatsApp do usuário com DDD para onde o sistema enviará relatórios em PDF, relatórios periódicos e notificações.</span>
+                <label class="text-xs font-bold text-cyan-400 block">Número do WhatsApp do Usuário (Notificações) <span class="text-slate-400 font-normal">— opcional</span>:</label>
+                <input type="text" id="form-user-whatsapp" name="user_whatsapp" placeholder="5511999998888" class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-cyan-300 focus:border-cyan-500 focus:outline-none font-mono font-bold">
+                <span class="text-[10px] text-slate-400 block">Número de WhatsApp do usuário com DDD para onde o sistema enviará relatórios em PDF, relatórios periódicos e notificações. Pode ficar em branco: o usuário só não recebe esses envios por WhatsApp.</span>
             </div>
 
             <!-- Senha de acesso ao painel -->

@@ -2773,10 +2773,12 @@ if ($__route_perm !== '' && !hasUserPermission($__route_perm)) {
                 <div class="flex items-center justify-between gap-3 p-3 rounded-xl bg-slate-950 border border-slate-800">
                     <div>
                         <span class="font-bold text-slate-300 block"><i class="fa-solid fa-headset text-emerald-400 mr-1"></i> Webphone</span>
+                        <span id="user-profile-wp-st" class="text-[11px] text-emerald-300 block"></span>
                         <span class="text-[11px] text-slate-400"><?php echo (!empty($__pu['webphone']) && !empty($__pu['extension'])) ? 'Habilitado para o seu usuário (ramal ' . htmlspecialchars((string)$__pu['extension']) . ').' : 'Não habilitado. Peça ao administrador em Configurações > Usuários.'; ?></span>
                     </div>
                     <?php if (!empty($__pu['webphone']) && !empty($__pu['extension'])): ?>
                     <button type="button" onclick="closeModal('modal-user-profile'); toggleWebPhone();" style="white-space:nowrap !important;flex-shrink:0 !important;width:auto !important;overflow:visible !important;text-overflow:clip !important;" class="px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs transition flex items-center gap-2"><i class="fa-solid fa-phone"></i> Abrir Webphone</button>
+                    <button type="button" onclick="location.reload();" title="Registra o ramal de novo (use depois de mudar o ramal ou o WebRTC no PABX)" style="white-space:nowrap !important;flex-shrink:0 !important;width:auto !important;overflow:visible !important;text-overflow:clip !important;" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl text-xs transition flex items-center gap-2"><i class="fa-solid fa-rotate"></i> Reconectar</button>
                     <?php endif; ?>
                 </div>
 
@@ -2861,6 +2863,8 @@ if ($__route_perm !== '' && !hasUserPermission($__route_perm)) {
         function openUserProfileModal() {
             const modal = document.getElementById('modal-user-profile');
             if (modal) modal.classList.remove('hidden');
+            const st = document.getElementById('user-profile-wp-st'), pill = document.getElementById('webphone-pill');
+            if (st && pill) st.textContent = 'Estado: ' + (pill.title || 'desconectado');
         }
 
         function openRoadmapModal() {
