@@ -39,9 +39,8 @@ Como o mesmo monitor roda em vários clientes, **todo alerta sai com o mesmo cab
 🕒 14/10/2026 08:38:39
 ```
 
-- Defina na instalação: `ipbx-sentinel.sh --install --cliente "Nome do cliente"` (sem o parâmetro, pergunta no terminal).
-- Ou depois: `ipbx-sentinel --set-cliente "Nome do cliente" [host:porta]` (grava em `/etc/ipbx/cliente.conf`, modo 600).
-- Sem nome definido o alerta sai como **CLIENTE NAO DEFINIDO (hostname)** com o comando para corrigir: nenhum alerta sai anônimo.
+- **Automático:** o nome do cliente é o nome do host do servidor (sem o prefixo/sufixo `ipbx`), então não precisa digitar nada na instalação.
+- Para sobrescrever (opcional): `ipbx-sentinel --set-cliente "Nome do cliente" [host:porta]` ou `--install --cliente "Nome"` (grava em `/etc/ipbx/cliente.conf`, modo 600).
 - Servidores ainda com o monitor antigo (`monitor_prisma.sh`, alertas como "FIREWALL IPTABLES DOWN") não têm esse padrão: rode `ipbx-sentinel --install` neles para migrar.
 
 ## 🚀 Como instalar e usar

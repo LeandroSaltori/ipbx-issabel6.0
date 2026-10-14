@@ -37,7 +37,7 @@
 #   ipbx-sentinel --baseline       refaz a "foto" de contas/senhas (rode so com o servidor limpo)
 #   ipbx-sentinel --test-alert     envia mensagem de teste ao Telegram
 #   ipbx-sentinel --set-cliente "Nome" [host:porta]   define o cliente que aparece em TODOS os alertas
-#   ipbx-sentinel --install --cliente "Nome"          instala ja identificando o cliente
+#   ipbx-sentinel --install [--cliente "Nome"]        o cliente nos alertas e o nome do host; --cliente e opcional (sobrescreve)
 #   ipbx-sentinel --selftest       testa o detector em pasta temporaria
 #
 # CONFIGURACAO (opcional) em /etc/ipbx/sentinel.conf (root, modo 600):
@@ -45,7 +45,7 @@
 #   SENTINEL_HEAL_PERMS=0          # 1 = remove escrita de "outros" em arquivos web
 #   SENTINEL_FIREWALL_HEAL=0       # 0 = so avisa (padrao; o firewall e gerido pela tela do Issabel) | 1 = tenta reiniciar o servico
 #   SENTINEL_AUTO_UPDATE_FRAMEWORK=1  # 1 = ao instalar, atualiza issabel-framework vulneravel (snapshot antes)
-# Cliente nos alertas: /etc/ipbx/cliente.conf -> CLIENTE_NOME="..."  CLIENTE_ACESSO="host:porta" (opcional)
+# Cliente nos alertas: automatico (nome do host); para sobrescrever, /etc/ipbx/cliente.conf -> CLIENTE_NOME="..."  CLIENTE_ACESSO="host:porta" (opcional)
 # Telegram: /etc/ipbx/telegram.conf  ->  TELEGRAM_BOT_TOKEN=...  TELEGRAM_CHAT_ID=...
 # Excecoes (falsos positivos): /etc/ipbx/sentinel.allow (um caminho/glob por linha)
 # ==============================================================================
@@ -73,6 +73,11 @@ SENTINEL_FIREWALL_HEAL="${SENTINEL_FIREWALL_HEAL:-0}"
 CLIENTE_NOME=""; CLIENTE_ACESSO=""
 [ -r "$CLIENTE_CONF" ] && . "$CLIENTE_CONF" 2>/dev/null
 [ -n "${SENTINEL_CLIENTE:-}" ] && CLIENTE_NOME="$SENTINEL_CLIENTE"
+# Sem nome configurado: usa o nome do host (tira o prefixo/sufixo "ipbx" para ficar so o nome do cliente)
+if [ -z "$CLIENTE_NOME" ]; then
+  CLIENTE_NOME="$(printf '%s' "$HOSTNAME_S" | sed -E 's/^[Ii][Pp][Bb][Xx][-.]//; s/[.-][Ii][Pp][Bb][Xx]$//')"
+  [ -n "$CLIENTE_NOME" ] || CLIENTE_NOME="$HOSTNAME_S"
+fi
 SEND_ALERTS="${SENTINEL_NO_ALERT:+0}"
 SEND_ALERTS="${SEND_ALERTS:-1}"
 
@@ -126,13 +131,11 @@ send_telegram() {
     Teste*) icon="🔔 " ;;
   esac
   ip="$(hostname -I 2>/dev/null | awk '{print $1}')"
-  [ -n "$nome" ] || nome="CLIENTE NAO DEFINIDO (${HOSTNAME_S})"
   title="${body%%$'\n'*}"; rest=""
   case "$body" in *$'\n'*) rest="${body#*$'\n'}" ;; esac
   msg="${icon}[${nome}] ${title}"$'\n'"🏢 Cliente: ${nome}"$'\n'"🖥 Servidor: ${HOSTNAME_S}${ip:+ ($ip)}"
   [ -n "$CLIENTE_ACESSO" ] && msg+=$'\n'"🔗 Acesso: ${CLIENTE_ACESSO}"
   msg+=$'\n'"🕒 $(date '+%d/%m/%Y %H:%M:%S')"
-  [ -n "${CLIENTE_NOME:-}" ] || msg+=$'\n'"⚠ Defina o cliente: ipbx-sentinel --set-cliente \"Nome do cliente\""
   [ -n "$rest" ] && msg+=$'\n\n'"${rest}"
   curl -s -m 15 -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
        --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" --data-urlencode "text=${msg}" >/dev/null 2>&1 || log "Falha ao enviar Telegram."
@@ -753,16 +756,8 @@ CRON
 WD
   chmod 644 /etc/cron.d/ipbx-watchdog
   migrate_old_monitor
-  # Nome do cliente nos alertas: --cliente "Nome" > ja configurado > pergunta (se houver terminal)
-  if [ -n "$cli" ]; then set_cliente "$cli"
-  elif [ -z "$CLIENTE_NOME" ]; then
-    if [ -t 1 ] && [ -r /dev/tty ] && [ -w /dev/tty ]; then
-      printf 'Nome do cliente para identificar os alertas do Telegram (ex.: Helpnet): ' > /dev/tty
-      read -r cli < /dev/tty 2>/dev/null
-      [ -n "$cli" ] && set_cliente "$cli"
-    fi
-    [ -n "$CLIENTE_NOME" ] || echo "AVISO: cliente nao definido; os alertas sairao como CLIENTE NAO DEFINIDO. Defina: ipbx-sentinel --set-cliente \"Nome do cliente\""
-  fi
+  # Nome do cliente nos alertas: automatico (nome do host). --cliente "Nome" so se quiser sobrescrever.
+  if [ -n "$cli" ]; then set_cliente "$cli"; else echo "Cliente nos alertas: ${CLIENTE_NOME} (automatico, do nome do host; para mudar: ipbx-sentinel --set-cliente \"Nome\")"; fi
   echo "Sentinel instalado: /usr/local/bin/ipbx-sentinel + /etc/cron.d/ipbx-sentinel (host a cada 1 min, arquivos alterados a cada 5 min; sem varredura noturna)."
   echo "Telegram: $TG_CONF (TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID). Teste: ipbx-sentinel --test-alert"
   identity_status
