@@ -2803,7 +2803,7 @@ if ($__wp_u && !empty($__wp_u['webphone']) && !empty($__wp_u['extension'])
                     </div>
                     <?php if (!empty($__pu['webphone']) && !empty($__pu['extension'])): ?>
                     <button type="button" onclick="closeModal('modal-user-profile'); toggleWebPhone();" style="white-space:nowrap !important;flex-shrink:0 !important;width:auto !important;overflow:visible !important;text-overflow:clip !important;" class="px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs transition flex items-center gap-2"><i class="fa-solid fa-phone"></i> Abrir Webphone</button>
-                    <button type="button" onclick="location.reload();" title="Registra o ramal de novo (use depois de mudar o ramal ou o WebRTC no PABX)" style="white-space:nowrap !important;flex-shrink:0 !important;width:auto !important;overflow:visible !important;text-overflow:clip !important;" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl text-xs transition flex items-center gap-2"><i class="fa-solid fa-rotate"></i> Reconectar</button>
+                    <button type="button" onclick="(window.top || window).location.reload();" title="Registra o ramal de novo (use depois de mudar o ramal ou o WebRTC no PABX)" style="white-space:nowrap !important;flex-shrink:0 !important;width:auto !important;overflow:visible !important;text-overflow:clip !important;" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl text-xs transition flex items-center gap-2"><i class="fa-solid fa-rotate"></i> Reconectar</button>
                     <?php endif; ?>
                 </div>
 
