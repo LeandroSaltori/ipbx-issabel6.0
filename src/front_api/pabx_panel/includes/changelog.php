@@ -6,6 +6,7 @@
  */
 return [
     'done' => [
+        ['data' => '2026-10-14', 'mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-right-to-bracket', 'titulo' => 'Login: escolher Painel Clássico agora funciona sempre', 'desc' => 'Quem marca Painel Clássico na tela de login entra no clássico, mesmo depois de já ter usado o Painel Novo naquele navegador.'],
         ['data' => '2026-10-14', 'mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-phone-volume', 'titulo' => 'Ramais com telefone de navegador agem no canal certo', 'desc' => 'No Painel de Operador, ações como espiar, sussurrar e transferir agora usam o tipo de ramal correto também para o telefone de navegador (webphone).'],
         ['data' => '2026-10-14', 'mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-screwdriver-wrench', 'titulo' => 'Painel de Operador: botões voltam a funcionar', 'desc' => 'Corrigimos um erro que deixava vários botões da tela do Painel de Operador sem resposta, como o ícone do telefone e o de enviar WhatsApp no topo.'],
         ['data' => '2026-10-14', 'mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-arrows-rotate', 'titulo' => 'Webphone não cai ao trocar de tela', 'desc' => 'O telefone agora fica fixo enquanto você navega pelo painel: o registro do ramal e a chamada em andamento continuam ao abrir outras telas, e o ícone do telefone está disponível em todas elas. Também reduzimos tentativas desnecessárias de conexão com a central, deixando as telas mais rápidas.'],

@@ -41,7 +41,7 @@ $html = <<<'H'
 H;
 $E1 = '/* IPBX-PAINEL-ENTRADA */'; $E2 = '/* /IPBX-PAINEL-ENTRADA */';
 $entrada = "    $E1\n    if (\$_SERVER['REQUEST_METHOD'] === 'GET' && !isset(\$_GET['menu'])) {\n        header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0'); header('Pragma: no-cache');\n        if (!isset(\$_GET['classico']) && (\$_COOKIE['ipbx_painel'] ?? '') === 'novo' && is_file(__DIR__ . '/seletor.php')) { header('Location: seletor.php?ir=novo'); exit; }\n    }\n    $E2\n";
-$php = "    $P1\n    if ((\$_POST['painel'] ?? '') === 'novo' && is_file(__DIR__ . '/seletor.php')) return 'seletor.php?ir=novo';\n    $P2\n";
+$php = "    $P1\n    if (in_array((\$_POST['painel'] ?? ''), ['novo', 'classico'], true) && !headers_sent()) setcookie('ipbx_painel', \$_POST['painel'], time() + 86400 * 365, '/', '', false, true);\n    if ((\$_POST['painel'] ?? '') === 'novo' && is_file(__DIR__ . '/seletor.php')) return 'seletor.php?ir=novo';\n    $P2\n";
 
 $tpl = file_get_contents($theme); $idx = file_get_contents($index);
 if ($undo) {
@@ -61,6 +61,8 @@ if ($undo) {
         $at = $m2[0][1] + strlen($m2[0][0]);
         $idx = substr_replace($idx, $entrada, $at, 0);
     }
+    /* reaplica o bloco de pós-login a cada execução, para levar correções a servidores que já tinham o patch */
+    $idx = preg_replace('#\n[ \t]*' . preg_quote($P1, '#') . '.*?' . preg_quote($P2, '#') . '[ \t]*\n#s', "\n", $idx, 1);
     if (strpos($idx, $P1) === false) {
         if (!preg_match('#function get_post_login_redirect\(.*?\n(\s*)return \'index\.php\';\s*\n\}#s', $idx, $m, PREG_OFFSET_CAPTURE)) { fwrite(STDERR, "Ponto de inserção não encontrado no index.php\n"); exit(3); }
         $pos = strrpos(substr($idx, 0, $m[0][1] + strlen($m[0][0])), "    return 'index.php';");
