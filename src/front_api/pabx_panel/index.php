@@ -753,6 +753,37 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
     }
 
     // ---------------------------------------------------------------------
+    // Busca de contatos para a janela "Nova Conversa" (cadastro do painel + agenda do PABX)
+    // ---------------------------------------------------------------------
+    if ($action === 'search_contacts') {
+        header('Content-Type: application/json; charset=utf-8');
+        if (!hasUserPermission('send_whatsapp')) { echo json_encode(['success' => false, 'contacts' => []]); exit; }
+        $q  = trim((string)($_GET['q'] ?? ''));
+        $qd = preg_replace('/\D/', '', $q);
+        $out = [];
+        if (mb_strlen($q) >= 2) {
+            try {
+                $st = $db->prepare("SELECT name, phone FROM crm_contacts WHERE name LIKE :q OR (:qd != '' AND REPLACE(REPLACE(REPLACE(REPLACE(phone,' ',''),'-',''),'(',''),')','') LIKE :qdl) ORDER BY name LIMIT 8");
+                $st->execute([':q' => '%' . $q . '%', ':qd' => $qd, ':qdl' => '%' . $qd . '%']);
+                while ($r = $st->fetch(PDO::FETCH_ASSOC)) $out[] = ['name' => (string)$r['name'], 'phone' => (string)$r['phone'], 'src' => 'Contatos'];
+            } catch (Exception $e) {}
+            if (count($out) < 8 && is_readable('/var/www/db/address_book.db')) {
+                try {
+                    $ab = new PDO('sqlite:/var/www/db/address_book.db'); $ab->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+                    $st = $ab->prepare("SELECT name, last_name, telefono FROM contact WHERE (name || ' ' || IFNULL(last_name,'')) LIKE :q OR (:qd != '' AND telefono LIKE :qdl) LIMIT 8");
+                    $st->execute([':q' => '%' . $q . '%', ':qd' => $qd, ':qdl' => '%' . $qd . '%']);
+                    while ($r = $st->fetch(PDO::FETCH_ASSOC)) {
+                        if (count($out) >= 8) break;
+                        $out[] = ['name' => trim($r['name'] . ' ' . $r['last_name']), 'phone' => (string)$r['telefono'], 'src' => 'Agenda do PABX'];
+                    }
+                } catch (Exception $e) {}
+            }
+        }
+        echo json_encode(['success' => true, 'contacts' => $out], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    // ---------------------------------------------------------------------
     // Envio manual de e-mail (SMTP configurado em Configurações > SMTP)
     // ---------------------------------------------------------------------
     if ($action === 'send_email_report') {
@@ -3313,6 +3344,102 @@ window.ipbxIaHistory = async function (module, title) {
 </script>
 <audio id="webphone-remote-audio" autoplay></audio>
 <audio id="webphone-local-audio" autoplay muted></audio>
+<?php if (hasUserPermission('send_whatsapp')): $__wa_ok = whatsappProviderConfigured(); $__wa_nome = (waProvider() === 'uazapi') ? 'UAZAPI' : 'Prisma API'; $__nc_user = getLoggedUser(); ?>
+<!-- Nova Conversa: envio de mensagem de WhatsApp (dialog nativo na Top Layer) -->
+<style>
+#dlg-nova-conversa{box-sizing:border-box;border:1px solid #334155;border-radius:20px;padding:0;background:#0f172a;color:#e2e8f0;width:min(460px,calc(100vw - 24px));max-height:calc(100vh - 32px);overflow:auto;box-shadow:0 30px 80px rgba(0,0,0,.6)}
+#dlg-nova-conversa::backdrop{background:rgba(0,0,0,.65);backdrop-filter:blur(4px)}
+#dlg-nova-conversa .nc-in{box-sizing:border-box;width:100%;background:#0b1220;border:1px solid #334155;border-radius:12px;color:#fff;padding:10px 12px;font-size:13px}
+#dlg-nova-conversa .nc-in:focus{outline:none;border-color:#6366f1}
+#dlg-nova-conversa .nc-btn{white-space:nowrap!important;flex-shrink:0!important;width:auto!important;overflow:visible!important;text-overflow:clip!important;padding:10px 18px;border-radius:12px;font-weight:800;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;gap:8px;border:1px solid #334155;color:#e2e8f0;background:#1c1b2f}
+#dlg-nova-conversa .nc-send{background:linear-gradient(135deg,#7c3aed,#6366f1);border-color:#6366f1;color:#fff}
+#dlg-nova-conversa .nc-send:disabled{opacity:.5;cursor:not-allowed}
+#nc-results{display:none;margin-top:6px;border:1px solid #334155;border-radius:12px;background:#0b1220;overflow:hidden}
+#nc-results button{display:flex;width:100%;justify-content:space-between;gap:10px;padding:8px 12px;background:none;border:0;border-bottom:1px solid #1f2937;color:#e2e8f0;cursor:pointer;text-align:left;font-size:12px}
+#nc-results button:hover{background:#252440}#nc-results button:last-child{border-bottom:0}
+</style>
+<dialog id="dlg-nova-conversa">
+  <form method="dialog" onsubmit="return false;" style="padding:22px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+      <h3 style="margin:0;font-size:17px;font-weight:800;color:#fff"><i class="fa-regular fa-paper-plane" style="margin-right:8px"></i>Nova Conversa</h3>
+      <button type="button" onclick="closeNovaConversa()" style="background:none;border:0;color:#94a3b8;cursor:pointer;font-size:16px" title="Fechar"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <p style="margin:0 0 14px;color:#94a3b8;font-size:12px">Envie uma mensagem de WhatsApp para um número específico.</p>
+    <div style="margin-bottom:14px;padding:8px 12px;border-radius:12px;font-size:12px;<?php echo $__wa_ok ? 'background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.35);color:#6ee7b7' : 'background:rgba(244,63,94,.1);border:1px solid rgba(244,63,94,.35);color:#fda4af'; ?>">
+      <?php echo $__wa_ok ? 'Envio por: <b>' . htmlspecialchars($__wa_nome) . '</b>' : 'O envio por <b>' . htmlspecialchars($__wa_nome) . '</b> não está configurado. Ajuste em Configurações &gt; API.'; ?>
+    </div>
+    <label style="font-size:12px;font-weight:700;color:#cbd5e1;display:block;margin-bottom:6px">Número *</label>
+    <input id="nc-search" class="nc-in" type="search" autocomplete="off" placeholder="Buscar contato no sistema..." oninput="ncSearch(this.value)">
+    <div id="nc-results"></div>
+    <input id="nc-phone" class="nc-in" type="tel" inputmode="tel" autocomplete="off" placeholder="+5511999999999" style="margin-top:8px">
+    <span style="font-size:11px;color:#94a3b8;display:block;margin-top:4px">Inclua o código do país (ex: 55 para Brasil). Sem ele, o 55 é adicionado.</span>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin:14px 0 6px">
+      <label for="nc-msg" style="font-size:12px;font-weight:700;color:#cbd5e1">Mensagem *</label>
+      <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:#94a3b8;cursor:pointer"><input type="checkbox" id="nc-sign" checked style="accent-color:#10b981"> Assinado</label>
+    </div>
+    <textarea id="nc-msg" class="nc-in" rows="5" maxlength="4000" placeholder="Digite sua mensagem..." style="resize:vertical"></textarea>
+    <div id="nc-err" style="display:none;margin-top:10px;padding:8px 12px;border-radius:10px;font-size:12px;background:rgba(244,63,94,.1);border:1px solid rgba(244,63,94,.35);color:#fda4af"></div>
+    <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:16px">
+      <button type="button" class="nc-btn" onclick="closeNovaConversa()">Cancelar</button>
+      <button type="button" class="nc-btn nc-send" id="nc-send" onclick="sendNovaConversa()" <?php echo $__wa_ok ? '' : 'disabled'; ?>><i class="fa-regular fa-paper-plane"></i> Enviar</button>
+    </div>
+  </form>
+</dialog>
+<script>
+(function () {
+  const NC_USER = <?php echo json_encode((string)($__nc_user['name'] ?? ''), JSON_UNESCAPED_UNICODE); ?>;
+  const $ = id => document.getElementById(id);
+  let tmr = null;
+  window.openNovaConversa = function () {
+    const d = $('dlg-nova-conversa'); if (!d) return;
+    $('nc-err').style.display = 'none';
+    if (!d.open) { if (d.showModal) d.showModal(); else d.setAttribute('open', ''); }
+    setTimeout(() => { const i = $('nc-search'); if (i) i.focus(); }, 50);
+  };
+  window.closeNovaConversa = function () { const d = $('dlg-nova-conversa'); if (d && d.open) d.close(); };
+  function erro(m) { const e = $('nc-err'); e.textContent = m || ''; e.style.display = m ? 'block' : 'none'; }
+  window.ncSearch = function (q) {
+    clearTimeout(tmr); const box = $('nc-results');
+    q = String(q || '').trim();
+    if (q.length < 2) { box.style.display = 'none'; box.textContent = ''; return; }
+    tmr = setTimeout(async () => {
+      try {
+        const r = await fetch('index.php?api_action=search_contacts&q=' + encodeURIComponent(q), {credentials: 'same-origin'});
+        const j = await r.json(); box.textContent = '';
+        if (!j.contacts || !j.contacts.length) { box.style.display = 'block'; const s = document.createElement('div'); s.style.cssText = 'padding:8px 12px;color:#94a3b8;font-size:12px'; s.textContent = 'Nenhum contato encontrado. Digite o número abaixo.'; box.appendChild(s); return; }
+        j.contacts.forEach(c => {
+          const b = document.createElement('button'); b.type = 'button';
+          const n = document.createElement('span'); n.textContent = c.name || c.phone;
+          const p = document.createElement('span'); p.style.color = '#94a3b8'; p.textContent = c.phone + ' · ' + c.src;
+          b.append(n, p);
+          b.addEventListener('click', () => { $('nc-phone').value = c.phone; $('nc-search').value = c.name || ''; box.style.display = 'none'; $('nc-msg').focus(); });
+          box.appendChild(b);
+        });
+        box.style.display = 'block';
+      } catch (e) { box.style.display = 'none'; }
+    }, 250);
+  };
+  window.sendNovaConversa = async function () {
+    erro('');
+    let phone = $('nc-phone').value.replace(/\D/g, ''), msg = $('nc-msg').value.trim();
+    if (phone.length < 10) { erro('Informe o número com DDD (e o código do país, se for fora do Brasil).'); return; }
+    if (phone.length <= 11) phone = '55' + phone;
+    if (!msg) { erro('Digite a mensagem.'); return; }
+    if ($('nc-sign').checked && NC_USER) msg = '*' + NC_USER + '*\n' + msg;
+    const btn = $('nc-send'), orig = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Enviando...';
+    try {
+      const r = await fetch('index.php?api_action=send_whatsapp_message', {method: 'POST', credentials: 'same-origin', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({phone: phone, message: msg})});
+      const j = await r.json();
+      if (j.success) {
+        closeNovaConversa(); $('nc-msg').value = ''; $('nc-phone').value = ''; $('nc-search').value = ''; $('nc-results').style.display = 'none';
+        if (typeof showToastNotification === 'function') showToastNotification('WhatsApp enviado', 'Mensagem enviada para +' + phone + '.', 'success');
+      } else { erro(j.error || 'Não foi possível enviar a mensagem.'); }
+    } catch (e) { erro('Falha de comunicação com o painel: ' + e.message); }
+    finally { btn.disabled = false; btn.innerHTML = orig; }
+  };
+})();
+</script>
+<?php endif; ?>
 <?php $__u_wp = function_exists('getLoggedUser') ? getLoggedUser() : null; if ($__u_wp && !empty($__u_wp['webphone']) && !empty($__u_wp['extension'])): ?>
 <script src="webphone.php?js=1"></script>
 <?php endif; ?>

@@ -239,7 +239,7 @@ h4{margin:0 0 6px;font-size:10.5px;text-transform:uppercase;letter-spacing:.6px;
 
   // O botão verde "WebPhone" do topo é o gatilho e a bolinha dele mostra o estado (não existe botão flutuante: não cobre nada na tela)
   const pillEl = () => document.getElementById('webphone-pill');
-  const PILL = {ok: '#ffffff', warn: '#fbbf24', bad: '#ef4444', '': '#94a3b8'};
+  const PILL = {ok: '#10b981', warn: '#fbbf24', bad: '#ef4444', '': '#94a3b8'};
   function pillState(cls) {
     const d = document.getElementById('webphone-pill-dot'); if (!d) return;
     d.style.background = PILL[cls] || PILL['']; d.classList.toggle('animate-pulse', cls === 'warn' || !cls);

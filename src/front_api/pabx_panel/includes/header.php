@@ -37,12 +37,18 @@
 
     <!-- Header Actions -->
     <div class="flex items-center gap-3">
+        <?php if (function_exists('hasUserPermission') && hasUserPermission('send_whatsapp')): ?>
+        <!-- Enviar mensagem de WhatsApp (Prisma API ou UAZAPI, conforme Configurações > API) -->
+        <button type="button" id="btn-nova-conversa" onclick="openNovaConversa()" title="Enviar mensagem de WhatsApp" class="w-9 h-9 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition flex items-center justify-center">
+            <i class="fa-regular fa-paper-plane text-[15px]"></i>
+        </button>
+        <?php endif; ?>
+
         <?php $__u_wp = function_exists('getLoggedUser') ? getLoggedUser() : null; if ($__u_wp && !empty($__u_wp['webphone']) && !empty($__u_wp['extension'])): ?>
-        <!-- Floating WebPhone Trigger (Estilo Pílula Verde do Print) -->
-        <button id="webphone-pill" onclick="toggleWebPhone()" title="Webphone" class="px-4 py-2 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs flex items-center gap-2 shadow-lg shadow-emerald-600/30 transition-all hover:scale-105">
-            <span id="webphone-pill-dot" class="w-2.5 h-2.5 rounded-full bg-white animate-pulse" style="box-shadow:0 0 0 2px rgba(255,255,255,.85)"></span>
-            <i class="fa-solid fa-phone"></i>
-            <span>WebPhone</span>
+        <!-- Webphone: ícone de telefone; a bolinha mostra o estado do ramal (verde = registrado) -->
+        <button type="button" id="webphone-pill" onclick="toggleWebPhone()" title="Webphone" class="relative w-9 h-9 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition flex items-center justify-center">
+            <i class="fa-solid fa-phone text-[15px]"></i>
+            <span id="webphone-pill-dot" class="absolute top-1 right-1 w-2.5 h-2.5 rounded-full animate-pulse" style="background:#94a3b8;box-shadow:0 0 0 2px #0f172a"></span>
         </button>
         <?php endif; ?>
 
