@@ -478,6 +478,12 @@ seen_once() {  # $1 = chave; devolve 0 so na primeira vez (evita alerta repetido
   return 0
 }
 
+seen_forget() {  # $1 = chave: esquece o alerta (a condicao sumiu; se voltar, avisa de novo)
+  local h; h="$(printf '%s' "$1" | sha256sum | awk '{print $1}')"
+  [ -f "$STATE_DIR/host.seen" ] && { grep -vxF "$h" "$STATE_DIR/host.seen" > "$STATE_DIR/host.seen.tmp" 2>/dev/null; mv -f "$STATE_DIR/host.seen.tmp" "$STATE_DIR/host.seen" 2>/dev/null; }
+  return 0
+}
+
 check_firewall() {
   command -v systemctl >/dev/null 2>&1 || return 0
   local svc="" st rules bad=0 flag="$STATE_DIR/fw.down"
@@ -603,9 +609,14 @@ persist_alert() {  # $1 = chave de deduplicacao, $2 = mensagem
 }
 
 check_persistence() {
-  local u l f
-  while read -r u; do [ -n "$u" ] && persist_alert "uid0|$u" "usuario com poderes de root alem do root: $u (UID 0)"; done \
-    < <(awk -F: '$3==0 && $1!="root"{print $1}' "${SENTINEL_PASSWD:-/etc/passwd}" 2>/dev/null)
+  local u l f cur known="$STATE_DIR/uid0.known"
+  cur="$(awk -F: '$3==0 && $1!="root"{print $1}' "${SENTINEL_PASSWD:-/etc/passwd}" 2>/dev/null)"
+  # Conta UID 0 que foi apagada e voltou (o invasor recria) tem de alertar de novo: esquece as que sumiram.
+  if [ -f "$known" ]; then
+    while read -r u; do [ -n "$u" ] && ! printf '%s\n' "$cur" | grep -qxF "$u" && seen_forget "persist|uid0|$u"; done < "$known"
+  fi
+  mkdir -p "$STATE_DIR" 2>/dev/null; printf '%s\n' "$cur" | sed '/^$/d' > "$known" 2>/dev/null
+  while read -r u; do [ -n "$u" ] && persist_alert "uid0|$u" "usuario com poderes de root alem do root: $u (UID 0)"; done <<< "$cur"
   for f in ${SENTINEL_RCLOCAL:-/etc/rc.local /etc/rc.d/rc.local}; do
     [ -r "$f" ] || continue
     while read -r l; do [ -n "$l" ] && persist_alert "rc|$f|$l" "$f baixa e executa script remoto a cada boot: $l"; done \

@@ -119,3 +119,7 @@ No mesmo servidor havia o serviço `sipsentinel.service` (`/usr/bin/python3 /opt
 - **Secao 8:** o invasor pode falsificar datas de arquivos; compare com a data de `/opt/sipsentinel` e de `/var/log/cron`.
 - **Secao 9:** alem de `permit=0.0.0.0`, avisa `bindaddr=0.0.0.0` no AMI e `allowguest=yes` no SIP.
 - IP `80.94.93.9` (acessou arquivos maliciosos nos logs do Apache) entrou na base global de bloqueio.
+
+### Conta de root recriada pelo invasor (caso real)
+
+No `/var/log/secure` do servidor invadido apareciam, em varias datas (25/09, 26/09 duas vezes e 13/10), a sequencia `userdel abort` -> `useradd abort` (UID 0, home `/dev/null`, shell bash) e `useradd yum` com o mesmo perfil: um script do invasor recriava as contas de root. Por isso o Sentinel agora esquece o alerta de uma conta UID 0 quando ela some e **avisa de novo se ela voltar**. Para descobrir quem executou: `grep -E '23:14' /var/log/cron /var/log/secure` (ajuste a hora). Ao apagar essas contas use `userdel NOME` (nunca `-f`: o home delas e `/dev/null`).
