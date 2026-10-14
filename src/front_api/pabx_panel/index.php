@@ -1973,27 +1973,20 @@ if ($__route_perm !== '' && !hasUserPermission($__route_perm)) {
             if (sb) sb.classList.toggle('hidden');
         }
 
-        // Webphone: janela própria (webphone.php). Fica registrada no PABX enquanto aberta, mesmo navegando no painel.
-        let __wpWin = null;
+        // Webphone: widget flutuante (webphone_widget.js, carregado só para quem tem o Webphone habilitado)
         function toggleWebPhone() {
-            if (__wpWin && !__wpWin.closed) { __wpWin.focus(); return __wpWin; }
-            __wpWin = window.open('webphone.php', 'prisma_webphone', 'width=400,height=780,menubar=no,toolbar=no,location=no,status=no,resizable=yes');
-            if (!__wpWin) alert('O navegador bloqueou a janela do Webphone. Permita pop-ups para este endereço e tente de novo.');
-            return __wpWin;
+            if (window.PrismaWebphone) { window.PrismaWebphone.toggle(); return; }
+            alert('O Webphone não está habilitado para o seu usuário. Peça ao administrador em Configurações > Usuários.');
         }
-        function connectWebPhoneSip() { toggleWebPhone(); }
-        function disconnectWebPhoneSip() { if (__wpWin && !__wpWin.closed) __wpWin.close(); __wpWin = null; }
-        // Liga para um número usando o Webphone (abre a janela se preciso; ela disca assim que registrar)
+        function connectWebPhoneSip() { if (window.PrismaWebphone) window.PrismaWebphone.open(); }
+        function disconnectWebPhoneSip() { if (window.PrismaWebphone) window.PrismaWebphone.close(); }
+        // Liga para um número usando o Webphone (espera o registro, se preciso)
         function makeWebPhoneCall(numero) {
             const num = String(numero || '').replace(/[^0-9*#+]/g, '');
             if (!num) { alert('Digite um número para discar.'); return; }
-            const aberta = __wpWin && !__wpWin.closed;
-            const w = toggleWebPhone();
-            if (!w) return;
-            const enviar = () => { try { w.postMessage({type: 'webphone-dial', number: num}, location.origin); } catch (e) {} };
-            if (aberta) enviar(); else setTimeout(enviar, 4000);
+            if (window.PrismaWebphone) window.PrismaWebphone.dial(num);
         }
-        function hangupWebPhoneCall() { /* o desligar fica na janela do Webphone */ }
+        function hangupWebPhoneCall() { /* o desligar fica no widget do Webphone */ }
 
         // GLOBAL AUDIO MANAGER: Intercepta reprodução em qualquer <audio> do sistema
         // Garante que APENAS 1 áudio toque por vez! Ao iniciar um, pausa automaticamente todos os outros.
@@ -2081,8 +2074,8 @@ if ($__route_perm !== '' && !hasUserPermission($__route_perm)) {
                 return;
             }
 
-            // Webphone aberto: disca por ele (usa o ramal do próprio usuário); senão segue pelo PABX (AMI Originate)
-            if (__wpWin && !__wpWin.closed) {
+            // Webphone registrado: disca por ele (usa o ramal do próprio usuário); senão segue pelo PABX (AMI Originate)
+            if (window.PrismaWebphone && window.PrismaWebphone.ready()) {
                 makeWebPhoneCall(to);
                 return;
             }
@@ -3320,6 +3313,9 @@ window.ipbxIaHistory = async function (module, title) {
 </script>
 <audio id="webphone-remote-audio" autoplay></audio>
 <audio id="webphone-local-audio" autoplay muted></audio>
+<?php $__u_wp = function_exists('getLoggedUser') ? getLoggedUser() : null; if ($__u_wp && !empty($__u_wp['webphone']) && !empty($__u_wp['extension'])): ?>
+<script src="webphone.php?js=1"></script>
+<?php endif; ?>
 </body>
 </html>
 
