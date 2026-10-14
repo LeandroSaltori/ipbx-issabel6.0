@@ -14,15 +14,7 @@
   const CSS = `
 :host{all:initial}
 *{box-sizing:border-box;font-family:'Segoe UI',Inter,system-ui,sans-serif}
-.fab{display:none;position:fixed;right:20px;bottom:20px;z-index:2147482000;width:52px;height:52px;border-radius:50%;border:2px solid rgba(16,185,129,.55);background:#1c1b2f;color:#10b981;font-size:20px;cursor:pointer;box-shadow:0 10px 30px rgba(0,0,0,.45);align-items:center;justify-content:center;transition:transform .15s}
-.fab:hover{transform:scale(1.07)}
-.fab.reserva{display:flex}
-:host([data-reserva]) #panel{inset:auto 20px 84px auto}
-.fab.ring{animation:ring 1s infinite;background:linear-gradient(135deg,#059669,#10b981);color:#fff}
-@keyframes ring{0%,100%{transform:rotate(0)}20%{transform:rotate(-14deg)}40%{transform:rotate(14deg)}60%{transform:rotate(-10deg)}80%{transform:rotate(10deg)}}
-.fdot{position:absolute;top:2px;right:2px;width:13px;height:13px;border-radius:50%;background:#94a3b8;border:2px solid #0f172a}
-.fdot.ok{background:#10b981}.fdot.warn{background:#f59e0b}.fdot.bad{background:#f43f5e}
-#panel{position:fixed;inset:var(--wp-top,72px) 24px auto auto;margin:0;padding:0;border:1px solid #334155;width:340px;max-width:calc(100vw - 24px);max-height:calc(100vh - 90px);overflow:auto;border-radius:22px;background:rgba(15,23,42,.97);backdrop-filter:blur(14px);color:#e2e8f0;font-size:13px;box-shadow:0 25px 60px rgba(0,0,0,.55)}
+#panel{position:fixed;inset:var(--wp-top,72px) 24px auto auto;margin:0;padding:0;border:1px solid #334155;width:340px;max-width:calc(100vw - 24px);max-height:calc(100vh - var(--wp-top,72px) - 84px);overflow:auto;border-radius:22px;background:rgba(15,23,42,.97);backdrop-filter:blur(14px);color:#e2e8f0;font-size:13px;box-shadow:0 25px 60px rgba(0,0,0,.55)}
 header{padding:12px 14px;background:linear-gradient(135deg,#1c1b2f,#252440);border-bottom:1px solid #334155;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:2}
 header .ic{width:34px;height:34px;border-radius:50%;background:rgba(16,185,129,.15);color:#10b981;display:flex;align-items:center;justify-content:center;border:1px solid rgba(16,185,129,.35)}
 header .t{flex:1;min-width:0}header b{display:block;font-size:14px;color:#fff}
@@ -57,7 +49,6 @@ h4{margin:0 0 6px;font-size:10.5px;text-transform:uppercase;letter-spacing:.6px;
   const KEYS = ['1','2','3','4','5','6','7','8','9','*','0','#'];
   const HTML = `
 <style>${CSS}</style><link rel="stylesheet" href="${FA}">
-<button class="fab" id="fab" title="Webphone"><i class="fa-solid fa-headset"></i><span class="fdot" id="fdot"></span></button>
 <div id="panel" popover="manual">
   <header><div class="ic"><i class="fa-solid fa-headset"></i></div><div class="t"><b>Webphone</b><span id="st">Desconectado</span></div><button class="x" data-act="close" title="Minimizar"><i class="fa-solid fa-minus"></i></button></header>
   <main>
@@ -90,11 +81,11 @@ h4{margin:0 0 6px;font-size:10.5px;text-transform:uppercase;letter-spacing:.6px;
 
   // ---- abrir / fechar (Top Layer: fica por cima de qualquer tela do painel) ----
   function isOpen() { try { return panel.matches(':popover-open'); } catch (e) { return panel.dataset.open === '1'; } }
-  function open() { if (isOpen()) return; try { panel.showPopover(); } catch (e) { panel.style.display = 'block'; panel.dataset.open = '1'; } ss.set('prisma_wp_open', '1'); }
+  function open() { if (isOpen()) return; placePanel(); try { panel.showPopover(); } catch (e) { panel.style.display = 'block'; panel.dataset.open = '1'; } ss.set('prisma_wp_open', '1'); }
   function close() { try { panel.hidePopover(); } catch (e) { panel.style.display = 'none'; panel.dataset.open = '0'; } ss.set('prisma_wp_open', '0'); }
   function toggle() { isOpen() ? close() : open(); }
 
-  function status(txt, cls) { const s = $('st'); s.textContent = txt; s.className = cls || ''; const f = $('fdot'); f.className = 'fdot ' + (cls || ''); pillState(cls || ''); }
+  function status(txt, cls) { const s = $('st'); s.textContent = txt; s.className = cls || ''; pillState(cls || ''); }
   function showErr(m) { const a = $('al-err'); a.textContent = m || ''; a.classList.toggle('show', !!m); }
   function showWarn(m) { const a = $('al-warn'); a.textContent = m || ''; a.classList.toggle('show', !!m); }
 
@@ -116,7 +107,7 @@ h4{margin:0 0 6px;font-size:10.5px;text-transform:uppercase;letter-spacing:.6px;
 
   // ---- toque (sem arquivo de áudio) ----
   function ring(on) {
-    clearInterval(ringT); ringT = null; $('fab').classList.toggle('ring', !!on); const pl = pillEl(); if (pl) pl.classList.toggle('animate-bounce', !!on);
+    clearInterval(ringT); ringT = null; const pl = pillEl(); if (pl) pl.classList.toggle('animate-bounce', !!on);
     if (!on) return;
     const beep = () => { try {
       actx = actx || new (window.AudioContext || window.webkitAudioContext)(); if (actx.state === 'suspended') actx.resume();
@@ -209,7 +200,6 @@ h4{margin:0 0 6px;font-size:10.5px;text-transform:uppercase;letter-spacing:.6px;
     reject: () => { if (!pend) return; ring(false); const s = pend; pend = null; try { s.terminate({status_code: 486, reason_phrase: 'Busy Here'}); } catch (e) {} ui(); },
   };
   root.addEventListener('click', e => { const b = e.target.closest && e.target.closest('[data-act]'); if (b && actions[b.dataset.act]) actions[b.dataset.act](b.dataset.k); });
-  $('fab').addEventListener('click', toggle);
   $('disp').addEventListener('keydown', e => { if (e.key === 'Enter') dial(); });
   $('disp').addEventListener('input', () => ss.set('prisma_wp_num', $('disp').value));
 
@@ -247,7 +237,7 @@ h4{margin:0 0 6px;font-size:10.5px;text-transform:uppercase;letter-spacing:.6px;
   // Navegar no painel recarrega a página: durante uma chamada, avisa antes de sair (o áudio cairia)
   window.addEventListener('beforeunload', e => { if (inCall) { e.preventDefault(); e.returnValue = ''; return ''; } });
 
-  // O botão verde "WebPhone" do topo é o gatilho e a bolinha dele mostra o estado; sem ele na tela, usa o botão flutuante de reserva
+  // O botão verde "WebPhone" do topo é o gatilho e a bolinha dele mostra o estado (não existe botão flutuante: não cobre nada na tela)
   const pillEl = () => document.getElementById('webphone-pill');
   const PILL = {ok: '#ffffff', warn: '#fbbf24', bad: '#ef4444', '': '#94a3b8'};
   function pillState(cls) {
@@ -257,11 +247,10 @@ h4{margin:0 0 6px;font-size:10.5px;text-transform:uppercase;letter-spacing:.6px;
   }
   function placePanel() {
     const p = pillEl();
-    if (p) { host.style.setProperty('--wp-top', Math.round(p.getBoundingClientRect().bottom + 10) + 'px'); host.removeAttribute('data-reserva'); $('fab').classList.remove('reserva'); }
-    else { host.setAttribute('data-reserva', '1'); $('fab').classList.add('reserva'); }
+    host.style.setProperty('--wp-top', (p ? Math.round(p.getBoundingClientRect().bottom + 10) : 72) + 'px');
   }
   function boot() {
-    document.body.appendChild(host); placePanel(); window.addEventListener('load', placePanel); window.addEventListener('resize', placePanel); setTimeout(placePanel, 1500);
+    document.body.appendChild(host); window.addEventListener('resize', placePanel);
     hist(); const d = ss.get('prisma_wp_num'); if (d) $('disp').value = d;
     status('Buscando credenciais...', 'warn');
     try { if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission(); } catch (e) {}
