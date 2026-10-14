@@ -12,7 +12,9 @@
 #  2. Modulos falsos: diretorios de botnet em /admin/modules (phones, h, _cache,
 #     tinfo, fpbxphones).
 #  3. PHP em pastas estaticas (images/, img/): nunca deveria existir.
-#  4. Para cada achado: move para QUARENTENA (reversivel), avisa no Telegram com
+#  4. Contas e senhas: avisa se surgir usuario novo, senha alterada ou removido no
+#     painel (acl.db), FreePBX (ampusers), MySQL e arquivos /etc/*.conf de credenciais.
+#  5. Para cada achado: move para QUARENTENA (reversivel), avisa no Telegram com
 #     data/hora, arquivo e IP de origem (quando aparece no log do Apache).
 #
 # USO
@@ -22,6 +24,7 @@
 #   ipbx-sentinel --uninstall      remove o cron
 #   ipbx-sentinel --list           lista itens em quarentena
 #   ipbx-sentinel --restore ARQ    restaura um arquivo da quarentena
+#   ipbx-sentinel --baseline       refaz a "foto" de contas/senhas (rode so com o servidor limpo)
 #   ipbx-sentinel --test-alert     envia mensagem de teste ao Telegram
 #   ipbx-sentinel --selftest       testa o detector em pasta temporaria
 #
@@ -40,6 +43,10 @@ QUAR_ROOT="${SENTINEL_QUAR:-/var/backup/ipbx/quarantine}"
 LOG_FILE="${SENTINEL_LOG:-/var/log/ipbx-sentinel.log}"
 LOCK_FILE="/var/run/ipbx-sentinel.lock"
 INTERVAL_MIN=5
+STATE_DIR="${SENTINEL_STATE:-/var/lib/ipbx-sentinel}"
+ACL_DB="${SENTINEL_ACL_DB:-/var/www/db/acl.db}"
+ISSABEL_CONF="${SENTINEL_ISSABEL_CONF:-/etc/issabel.conf}"
+CRED_FILES="${SENTINEL_CRED_FILES:-/etc/issabel.conf /etc/amportal.conf /etc/freepbx.conf}"
 HOSTNAME_S="$(hostname 2>/dev/null || echo pbx)"
 
 SENTINEL_ACTION="${SENTINEL_ACTION:-quarantine}"
@@ -173,6 +180,88 @@ heal_perms() {
   log "Permissoes: escrita de 'outros' removida de $n arquivo(s)."
 }
 
+
+# ------------------------------------------------------------------------------
+# VIGILANCIA DE CONTAS E SENHAS (caso Emad: invasor entrou como admin e alterou
+# usuario do banco). Compara com uma "foto" da instalacao limpa. So ALERTA: nunca
+# desfaz sozinho, pois uma troca de senha pode ser legitima. Hashes nao vao ao alerta.
+# ------------------------------------------------------------------------------
+IDENT_CHANGES=()
+
+mysql_cmd() {  # $1 = SQL
+  command -v mysql >/dev/null 2>&1 || return 1
+  local pw=""
+  [ -r "$ISSABEL_CONF" ] && pw="$(sed -n 's/^mysqlrootpwd=//p' "$ISSABEL_CONF" | head -1)"
+  MYSQL_PWD="$pw" mysql -uroot -N -B -e "$1" 2>/dev/null
+}
+
+hash_line() { printf '%s' "$1" | sha256sum | awk '{print $1}'; }
+
+identity_snapshot() {
+  local out rc
+  # Cada fonte so entra na comparacao se foi lida com sucesso (marca "ok|fonte"),
+  # para uma leitura que falhou (ex.: banco fora do ar) nunca virar falso "removido".
+  if command -v sqlite3 >/dev/null 2>&1 && [ -r "$ACL_DB" ]; then
+    out="$(sqlite3 -separator '|' "$ACL_DB" "SELECT u.name, u.md5_password, IFNULL(group_concat(m.id_group),'') FROM acl_user u LEFT JOIN acl_membership m ON m.id_user=u.id GROUP BY u.id ORDER BY u.name;" 2>/dev/null)"; rc=$?
+    if [ $rc -eq 0 ]; then echo "ok|painel|1"; echo "$out" | while IFS='|' read -r a b c; do [ -n "$a" ] && echo "painel|$a|$(hash_line "$b|$c")"; done; fi
+  fi
+  out="$(mysql_cmd "SELECT username, IFNULL(password_sha1,''), IFNULL(sections,'') FROM asterisk.ampusers ORDER BY username;")"; rc=$?
+  if [ $rc -eq 0 ]; then echo "ok|freepbx|1"; echo "$out" | while IFS=$'\t' read -r a b c; do [ -n "$a" ] && echo "freepbx|$a|$(hash_line "$b|$c")"; done; fi
+  out="$(mysql_cmd "SELECT CONCAT(User,'@',Host), IFNULL(Password,'') FROM mysql.user ORDER BY User,Host;")"; rc=$?
+  [ $rc -ne 0 ] && { out="$(mysql_cmd "SELECT CONCAT(User,'@',Host), IFNULL(authentication_string,'') FROM mysql.user ORDER BY User,Host;")"; rc=$?; }
+  if [ $rc -eq 0 ]; then echo "ok|mysql|1"; echo "$out" | while IFS=$'\t' read -r a b; do [ -n "$a" ] && echo "mysql|$a|$(hash_line "$b")"; done; fi
+  local f
+  for f in $CRED_FILES; do [ -r "$f" ] && echo "arquivo|$f|$(sha256sum "$f" | awk '{print $1}')"; done
+  [ -n "$CRED_FILES" ] && echo "ok|arquivo|1"
+  return 0
+}
+
+identity_check() {
+  mkdir -p "$STATE_DIR" 2>/dev/null && chmod 700 "$STATE_DIR" 2>/dev/null
+  local base="$STATE_DIR/identity.baseline" now="$STATE_DIR/identity.now"
+  identity_snapshot | sort > "$now"
+  if [ ! -s "$base" ]; then
+    if [ -s "$now" ]; then cp -f "$now" "$base"; chmod 600 "$base" "$now"; log "Foto inicial de contas/senhas criada ($(wc -l < "$base") itens). Garanta que o servidor estava limpo neste momento."; fi
+    return 0
+  fi
+  [ -s "$now" ] || return 0   # sem leitura (ex.: banco fora do ar): nao conclui nada
+  # Fonte lida pela 1a vez (ex.: MySQL ficou acessivel agora): entra na foto sem alarme
+  local src
+  for src in painel freepbx mysql arquivo; do
+    if grep -qF "ok|$src|" "$now" && ! grep -qF "ok|$src|" "$base"; then
+      grep -E "^(ok\|)?$src\|" "$now" >> "$base"; sort -u -o "$base" "$base"; log "Fonte '$src' adicionada a foto de contas."
+    fi
+  done
+  local k t
+  # novos ou alterados
+  while IFS='|' read -r t k h; do
+    [ "$t" = "ok" ] && continue
+    local old; old="$(grep -F "$t|$k|" "$base" | head -1 | cut -d'|' -f3)"
+    if [ -z "$old" ]; then grep -qF "ok|$t|" "$base" && IDENT_CHANGES+=("NOVO ($t): $k")
+    elif [ "$old" != "$h" ]; then IDENT_CHANGES+=("ALTERADO ($t): $k (senha/permissoes mudaram)"); fi
+  done < "$now"
+  # removidos
+  while IFS='|' read -r t k h; do
+    [ "$t" = "ok" ] && continue
+    grep -qF "ok|$t|" "$now" || continue            # fonte nao lida agora: nao conclui
+    grep -qF "$t|$k|" "$now" || IDENT_CHANGES+=("REMOVIDO ($t): $k")
+  done < "$base"
+  if [ "${#IDENT_CHANGES[@]}" -gt 0 ]; then
+    cp -f "$base" "$base.prev" 2>/dev/null
+    { cat "$now"; while IFS='|' read -r t k h; do [ "$t" = "ok" ] || grep -qF "ok|$t|" "$now" || echo "$t|$k|$h"; done < "$base"; grep -F 'ok|' "$base" | while read -r l; do grep -qF "$l" "$now" || echo "$l"; done; } | sort -u > "$base.new" && mv -f "$base.new" "$base"
+    chmod 600 "$base" "$base.prev" "$now" 2>/dev/null   # alerta uma vez; nova foto passa a valer (fontes nao lidas ficam como estavam)
+  fi
+}
+
+report_identity() {
+  [ "${#IDENT_CHANGES[@]}" -gt 0 ] || return 0
+  local msg c i=0
+  msg="ALERTA DE CONTAS - ${HOSTNAME_S}"$'\n'"$(date '+%d/%m/%Y %H:%M:%S')"$'\n'"Mudancas em usuarios/senhas desde a ultima verificacao:"$'\n'
+  for c in "${IDENT_CHANGES[@]}"; do i=$((i+1)); [ $i -gt 12 ] && { msg+=$'\n'"... e mais $(( ${#IDENT_CHANGES[@]} - 12 ))"; break; }; msg+=$'\n'"- ${c}"; log "CONTAS: ${c}"; done
+  msg+=$'\n\n'"Se voce NAO fez essa mudanca: troque as senhas agora, revise acessos recentes e rode ipbx-sentinel --scan."
+  send_telegram "$msg"
+}
+
 report() {
   [ "${#FOUND[@]}" -gt 0 ] || return 0
   local msg line
@@ -197,7 +286,9 @@ do_scan() {
   scan_signatures "$mode"
   [ "$mode" = "full" ] && heal_perms
   report
-  [ "${#FOUND[@]}" -eq 0 ] && log "Varredura ($mode) concluida: nada suspeito."
+  identity_check
+  report_identity
+  [ "${#FOUND[@]}" -eq 0 ] && [ "${#IDENT_CHANGES[@]}" -eq 0 ] && log "Varredura ($mode) concluida: nada suspeito."
   return 0
 }
 
@@ -243,7 +334,7 @@ cmd_selftest() {
   echo '<?php eval($x($y("z"))); ?>'                          > "$T/web/admin/libraries/php-upgrade/compat.php"
   echo '<?php $v = doubleval($a); ?>'                          > "$T/web/admin/modules/core/XML_Unserializer.php"
   echo 'x' > "$T/web/admin/modules/phones/index.php"
-  ( WEB_DIR="$T/web" SENTINEL_QUAR="$T/quar" SENTINEL_LOG="$T/log" SENTINEL_NO_ALERT=1 SENTINEL_CONF=/nonexistent SENTINEL_ALLOW=/nonexistent "$0" --scan >/dev/null 2>&1 )
+  ( WEB_DIR="$T/web" SENTINEL_QUAR="$T/quar" SENTINEL_LOG="$T/log" SENTINEL_NO_ALERT=1 SENTINEL_CONF=/nonexistent SENTINEL_ALLOW=/nonexistent SENTINEL_STATE="$T/state" SENTINEL_ACL_DB=/nonexistent SENTINEL_CRED_FILES="" "$0" --scan >/dev/null 2>&1 )
   chk() { if [ "$2" = "gone" ] && [ ! -e "$1" ]; then ok=$((ok+1)); elif [ "$2" = "kept" ] && [ -e "$1" ]; then ok=$((ok+1)); else bad=$((bad+1)); echo "FALHA: $1 deveria estar '$2'"; fi; }
   chk "$T/web/modules/a_emad.php" gone;  chk "$T/web/modules/b_chain.php" gone;  chk "$T/web/modules/c_decode.php" gone
   chk "$T/web/images/d_static.php" gone; chk "$T/web/admin/modules/phones" gone
@@ -257,10 +348,11 @@ case "${1:-}" in
   --uninstall)   rm -f /etc/cron.d/ipbx-sentinel; echo "Cron do Sentinel removido." ;;
   --list)        cmd_list ;;
   --restore)     cmd_restore "$2" ;;
+  --baseline)    mkdir -p "$STATE_DIR"; rm -f "$STATE_DIR/identity.baseline"; identity_check; echo "Foto de contas/senhas refeita ($(wc -l < "$STATE_DIR/identity.baseline" 2>/dev/null || echo 0) itens)." ;;
   --selftest)    cmd_selftest ;;
   --test-alert)  send_telegram "Teste do IPbx Sentinel em ${HOSTNAME_S} - $(date '+%d/%m/%Y %H:%M:%S'). Se esta mensagem chegou, o alerta esta funcionando." ; echo "Enviado (se o Telegram estiver configurado)." ;;
   --incremental) do_scan inc ;;
   --scan|"")     do_scan full ;;
-  *) echo "Uso: $0 [--scan|--incremental|--install|--uninstall|--list|--restore ARQ|--test-alert|--selftest]"; exit 1 ;;
+  *) echo "Uso: $0 [--scan|--incremental|--install|--uninstall|--list|--restore ARQ|--baseline|--test-alert|--selftest]"; exit 1 ;;
 esac
 exit 0

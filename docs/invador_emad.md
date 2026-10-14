@@ -81,11 +81,13 @@ O monitor manual acima foi substituído pelo **IPbx Sentinel** (`scripts/ipbx-se
 
 **Legítimos ignorados (falsos positivos):** `admin/libraries/php-upgrade/*`, `XML_Unserializer.php`, arquivos `.js`, `var/templates_c`.
 
+**Vigilância de contas e senhas (o invasor entrou como `admin` e alterou o usuário do banco):** na primeira execução o Sentinel tira uma "foto" (só impressões digitais, nunca senhas) de: usuários e permissões do painel (`/var/www/db/acl.db`), usuários do FreePBX (`ampusers`), usuários do MySQL e os arquivos `/etc/issabel.conf`, `/etc/amportal.conf`, `/etc/freepbx.conf`. A cada execução compara e avisa no Telegram: **NOVO**, **ALTERADO** (senha/permissões) ou **REMOVIDO**. Só alerta, não desfaz: uma troca de senha pode ser legítima. Fonte que não puder ser lida (ex.: banco fora do ar) é ignorada, sem alarme falso. A foto deve nascer com o servidor limpo; para refazer depois de uma mudança legítima/limpeza: `ipbx-sentinel --baseline`.
+
 **O que faz ao achar:** move para **quarentena** (`/var/backup/ipbx/quarantine/AAAA-MM-DD_HHMMSS/`, reversível), registra em `/var/log/ipbx-sentinel.log` e avisa no Telegram com data/hora, arquivo, motivo e IP de origem (quando aparece no log do Apache).
 
 **Agenda:** `/etc/cron.d/ipbx-sentinel`: a cada 5 min (arquivos recentes) + varredura completa às 03:30.
 
-**Comandos:** `ipbx-sentinel --scan | --list | --restore ARQUIVO | --test-alert | --selftest | --uninstall`
+**Comandos:** `ipbx-sentinel --scan | --list | --restore ARQUIVO | --baseline | --test-alert | --selftest | --uninstall`
 
 **Telegram:** crie `/etc/ipbx/telegram.conf` (modo 600) com `TELEGRAM_BOT_TOKEN=` e `TELEGRAM_CHAT_ID=`. Segredos **nunca** vão para o repositório. Sem esse arquivo, o Sentinel reaproveita as credenciais do monitor já instalado.
 
