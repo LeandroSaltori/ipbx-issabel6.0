@@ -3116,6 +3116,26 @@ function astOptionsValueCol($ast, $table) {
     return $cache[$table] = $col;
 }
 
+/** Conjunto (ramal => true) dos ramais configurados como WebRTC no PABX (lê as tabelas sip/pjsip do IssabelPBX). */
+function getWebrtcExtensionSet() {
+    $set = [];
+    $ast = getAsteriskDBConnection();
+    if (!$ast) return $set;
+    foreach (['sip', 'pjsip'] as $tbl) {
+        $col = astOptionsValueCol($ast, $tbl);
+        if ($col === '') continue;
+        try {
+            $st = $ast->query("SELECT id, keyword, LOWER(TRIM(`$col`)) AS v FROM `$tbl` WHERE keyword IN ('webrtc','transport','media_encryption','dtlsenable')");
+            if ($st) while ($r = $st->fetch(PDO::FETCH_ASSOC)) {
+                $k = $r['keyword']; $v = (string)$r['v'];
+                if (($k === 'webrtc' && $v === 'yes') || ($k === 'transport' && strpos($v, 'ws') !== false)
+                    || ($k === 'media_encryption' && $v === 'dtls') || ($k === 'dtlsenable' && $v === 'yes')) $set[(string)$r['id']] = true;
+            }
+        } catch (Exception $e) {}
+    }
+    return $set;
+}
+
 function getAsteriskDBConnection() {
     static $conn = null;
     if ($conn !== null) return $conn;

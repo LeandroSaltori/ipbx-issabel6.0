@@ -55,6 +55,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_delete_user'])
 // Buscar usuários reais do SQLite
 $system_users = getAllSystemUsers();
 
+// Ramais configurados como WebRTC no PABX (só esses registram no Webphone)
+$webrtc_set = function_exists('getWebrtcExtensionSet') ? getWebrtcExtensionSet() : [];
+
 // Carregar lista real de ramais cadastrados
 $available_extensions = [];
 try {
@@ -294,7 +297,8 @@ try {
                     <select id="form-user-extension" name="user_extension" class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-emerald-300 focus:border-emerald-500 focus:outline-none font-mono font-bold cursor-pointer">
                         <option value="">-- Sem Ramal Vinculado --</option>
                         <?php foreach ($available_extensions as $e_code => $e_label): ?>
-                            <option value="<?php echo $e_code; ?>"><?php echo $e_label; ?></option>
+                            <?php $__is_wr = isset($webrtc_set[(string)$e_code]); ?>
+                            <option value="<?php echo $e_code; ?>" data-webrtc="<?php echo $__is_wr ? '1' : '0'; ?>"><?php echo $e_label . ($__is_wr ? ' · WebRTC' : ' · sem WebRTC'); ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
@@ -305,7 +309,8 @@ try {
                 <input type="checkbox" id="form-user-webphone" name="user_webphone" value="1" class="mt-0.5 rounded border-slate-700 bg-slate-900 text-emerald-500 focus:ring-emerald-500">
                 <span>
                     <span class="text-xs font-bold text-emerald-400 block"><i class="fa-solid fa-headset mr-1"></i> Habilitar Webphone (atender e ligar pelo navegador)</span>
-                    <span class="text-[10px] text-slate-400 block">Usa o ramal vinculado acima, sem digitar senha. O ramal precisa estar configurado como WebRTC no PABX; se não estiver, o próprio Webphone avisa ao abrir.</span>
+                    <span class="text-[10px] text-slate-400 block">Usa o ramal vinculado acima, sem digitar senha. O ramal precisa estar configurado como WebRTC no PABX; com esta opção marcada, os ramais sem WebRTC ficam apagados na lista.</span>
+                    <span id="form-user-webphone-warn" class="text-[11px] font-bold text-amber-300 block mt-1" style="display:none"></span>
                 </span>
             </label>
 
@@ -439,6 +444,28 @@ function updatePermissionsByRole(roleName) {
     });
 }
 
+// Webphone só registra ramal WebRTC: com a opção marcada, os demais ficam "apagadinhos" e o usuário é avisado
+function applyWebrtcDim() {
+    const on = document.getElementById('form-user-webphone').checked;
+    const sel = document.getElementById('form-user-extension');
+    Array.prototype.forEach.call(sel.options, function (o) {
+        const nao = o.getAttribute('data-webrtc') === '0';
+        o.style.color = (on && nao) ? '#64748b' : '';
+    });
+    const w = document.getElementById('form-user-webphone-warn');
+    const cur = sel.options[sel.selectedIndex];
+    if (on && cur && cur.value && cur.getAttribute('data-webrtc') === '0') {
+        w.textContent = 'O ramal ' + cur.value + ' não está como WebRTC no PABX: o Webphone não vai registrar. Ative WebRTC nesse ramal ou escolha outro (os apagados não são WebRTC).';
+        w.style.display = 'block';
+    } else if (on && !cur.value) {
+        w.textContent = 'Escolha o ramal acima: o Webphone usa o ramal vinculado.'; w.style.display = 'block';
+    } else { w.style.display = 'none'; }
+}
+document.addEventListener('DOMContentLoaded', function () {
+    document.getElementById('form-user-webphone').addEventListener('change', applyWebrtcDim);
+    document.getElementById('form-user-extension').addEventListener('change', applyWebrtcDim);
+});
+
 function openAddUserModal() {
     document.getElementById('user-modal-title').innerText = 'Criar Novo Usuário';
     document.getElementById('form-user-id').value = '0';
@@ -448,6 +475,7 @@ function openAddUserModal() {
     document.getElementById('form-user-role').value = 'Administrador';
     document.getElementById('form-user-extension').value = '';
     document.getElementById('form-user-webphone').checked = false;
+    applyWebrtcDim();
     document.getElementById('form-user-whatsapp').value = '';
     
     updatePermissionsByRole('Administrador');
@@ -464,6 +492,7 @@ function openEditUserModal(u) {
     document.getElementById('form-user-extension').value = u.extension || '';
     document.getElementById('form-user-whatsapp').value = u.whatsapp || '';
     document.getElementById('form-user-webphone').checked = parseInt(u.webphone || 0, 10) === 1;
+    applyWebrtcDim();
 
     // Marcar checkboxes salva no banco
     const checks = document.querySelectorAll('.perm-check');

@@ -48,7 +48,7 @@ main{padding:12px;display:flex;flex-direction:column;gap:10px}
 #ag-list{margin-top:8px;max-height:330px;overflow:auto}
 .ag-h{margin:8px 2px 4px;font-size:10.5px;text-transform:uppercase;letter-spacing:.6px;color:#94a3b8}
 .ag{display:flex;align-items:center;gap:9px;padding:7px 6px;border-radius:10px;cursor:pointer}.ag:hover{background:#252440}
-.ag .p{width:9px;height:9px;border-radius:50%;background:#64748b;flex-shrink:0}.ag .p.on{background:#10b981}
+.ag .p{width:9px;height:9px;border-radius:50%;background:#64748b;flex-shrink:0}.ag .p.on{background:#10b981}.ag .p.off{background:#ef4444}.ag.offl{opacity:.5}
 .ag .nm{flex:1;min-width:0;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ag .nu{color:#94a3b8;font-size:11px}
 .ag .go{background:#059669;border:0;color:#fff;border-radius:50%;width:28px;height:28px;cursor:pointer;flex-shrink:0}
 h4{margin:0 0 6px;font-size:10.5px;text-transform:uppercase;letter-spacing:.6px;color:#94a3b8}
@@ -202,8 +202,8 @@ h4{margin:0 0 6px;font-size:10.5px;text-transform:uppercase;letter-spacing:.6px;
       if (!lista.length) return; total += lista.length;
       const h = document.createElement('div'); h.className = 'ag-h'; h.textContent = titulo + ' (' + lista.length + ')'; box.appendChild(h);
       lista.forEach(it => {
-        const r = document.createElement('div'); r.className = 'ag'; r.title = it.info || '';
-        const p = document.createElement('span'); p.className = 'p' + (it.starred && it.presence ? ' on' : '');
+        const r = document.createElement('div'); r.className = 'ag' + (it.starred && !it.presence ? ' offl' : ''); r.title = (it.info || '') + (it.starred ? (it.presence ? ' · online' : ' · offline') : '');
+        const p = document.createElement('span'); p.className = 'p' + (it.starred ? (it.presence ? ' on' : ' off') : '');
         const nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = it.name;
         const nu = document.createElement('span'); nu.className = 'nu'; nu.textContent = it.number;
         const g = document.createElement('button'); g.className = 'go'; g.title = 'Ligar'; const gi = document.createElement('i'); gi.className = 'fa-solid fa-phone'; g.appendChild(gi);
@@ -222,6 +222,15 @@ h4{margin:0 0 6px;font-size:10.5px;text-transform:uppercase;letter-spacing:.6px;
       const j = await r.json();
       if (j.error) throw new Error(j.error);
       agItems = (j.items || []).map(i => ({name: String(i.name || i.number || ''), number: String(i.number || ''), presence: parseInt(i.presence || 0, 10), starred: parseInt(i.starred || 0, 10), info: String(i.info || '')})).filter(i => i.number);
+      // Presença real do PABX (hints do Asterisk) sobrepõe a do agenda.php, que assume "online" quando não sabe
+      try {
+        const rs = await fetch('index.php?api_action=get_fop_extensions', {cache: 'no-store', credentials: 'same-origin'});
+        const ls = rs.ok ? await rs.json() : null;
+        if (Array.isArray(ls)) {
+          const m = {}; ls.forEach(x => { m[String(x.id)] = !/indispon|offline|unavailable/i.test(String(x.status || '')); });
+          agItems.forEach(i => { if (i.starred && Object.prototype.hasOwnProperty.call(m, i.number)) i.presence = m[i.number] ? 1 : 0; });
+        }
+      } catch (e2) {}
       agLoaded = Date.now(); $('ag-st').textContent = agItems.filter(i => i.starred && i.presence).length + ' ramal(is) online de ' + agItems.filter(i => i.starred).length + ' · atualizado ' + new Date().toLocaleTimeString('pt-BR');
       renderAgenda();
       agTimer = setTimeout(() => { if (tabAtual === 'agenda' && isOpen()) loadAgenda(); }, Math.max(30, parseInt(j.refresh || 60, 10)) * 1000);
