@@ -1247,7 +1247,7 @@ if ($__route_perm !== '' && !hasUserPermission($__route_perm)) {
 // Assim, trocar de tela não recarrega o telefone: o registro e a chamada em andamento continuam. Só vale para abertura de página
 // (nunca para API, exportação ou download, que já encerraram antes deste ponto) e só em navegador que informa o destino da requisição.
 $__wp_u = function_exists('getLoggedUser') ? getLoggedUser() : null;
-if ($__wp_u && !empty($__wp_u['webphone']) && !empty($__wp_u['extension'])
+if ($__wp_u && userHasWebphone($__wp_u)
     && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET'
     && ($_SERVER['HTTP_SEC_FETCH_DEST'] ?? '') === 'document' && ($_GET['noshell'] ?? '') === '') {
     while (ob_get_level()) ob_end_clean();
@@ -2810,9 +2810,9 @@ if ($__wp_u && !empty($__wp_u['webphone']) && !empty($__wp_u['extension'])
                     <div>
                         <span class="font-bold text-slate-300 block"><i class="fa-solid fa-headset text-emerald-400 mr-1"></i> Webphone</span>
                         <span id="user-profile-wp-st" class="text-[11px] text-emerald-300 block"></span>
-                        <span class="text-[11px] text-slate-400"><?php echo (!empty($__pu['webphone']) && !empty($__pu['extension'])) ? 'Habilitado para o seu usuário (ramal ' . htmlspecialchars((string)$__pu['extension']) . ').' : 'Não habilitado. Peça ao administrador em Configurações > Usuários.'; ?></span>
+                        <span class="text-[11px] text-slate-400"><?php echo userHasWebphone($__pu) ? 'Habilitado para o seu usuário (' . (!empty($__pu['wp_custom']) ? 'conta personalizada' : 'ramal ' . htmlspecialchars((string)$__pu['extension'])) . ').' : 'Não habilitado. Peça ao administrador em Configurações > Usuários.'; ?></span>
                     </div>
-                    <?php if (!empty($__pu['webphone']) && !empty($__pu['extension'])): ?>
+                    <?php if (userHasWebphone($__pu)): ?>
                     <button type="button" onclick="closeModal('modal-user-profile'); toggleWebPhone();" style="white-space:nowrap !important;flex-shrink:0 !important;width:auto !important;overflow:visible !important;text-overflow:clip !important;" class="px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs transition flex items-center gap-2"><i class="fa-solid fa-phone"></i> Abrir Webphone</button>
                     <button type="button" onclick="(window.top || window).location.reload();" title="Registra o ramal de novo (use depois de mudar o ramal ou o WebRTC no PABX)" style="white-space:nowrap !important;flex-shrink:0 !important;width:auto !important;overflow:visible !important;text-overflow:clip !important;" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl text-xs transition flex items-center gap-2"><i class="fa-solid fa-rotate"></i> Reconectar</button>
                     <?php endif; ?>
@@ -3480,7 +3480,7 @@ window.ipbxIaHistory = async function (module, title) {
 })();
 </script>
 <?php endif; ?>
-<?php $__u_wp = function_exists('getLoggedUser') ? getLoggedUser() : null; if ($__u_wp && !empty($__u_wp['webphone']) && !empty($__u_wp['extension']) && ($_SERVER['HTTP_SEC_FETCH_DEST'] ?? '') !== 'iframe'): ?>
+<?php $__u_wp = function_exists('getLoggedUser') ? getLoggedUser() : null; if ($__u_wp && userHasWebphone($__u_wp) && ($_SERVER['HTTP_SEC_FETCH_DEST'] ?? '') !== 'iframe'): ?>
 <script src="webphone.php?js=1"></script>
 <?php endif; ?>
 </body>

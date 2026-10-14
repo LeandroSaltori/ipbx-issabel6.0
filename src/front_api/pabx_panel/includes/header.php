@@ -44,7 +44,7 @@
         </button>
         <?php endif; ?>
 
-        <?php $__u_wp = function_exists('getLoggedUser') ? getLoggedUser() : null; if ($__u_wp && !empty($__u_wp['webphone']) && !empty($__u_wp['extension'])): ?>
+        <?php $__u_wp = function_exists('getLoggedUser') ? getLoggedUser() : null; if ($__u_wp && userHasWebphone($__u_wp)): ?>
         <!-- Webphone: ícone de telefone; a bolinha mostra o estado do ramal (verde = registrado) -->
         <button type="button" id="webphone-pill" onclick="toggleWebPhone()" title="Webphone" class="relative w-9 h-9 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition flex items-center justify-center">
             <i class="fa-solid fa-phone text-[15px]"></i>

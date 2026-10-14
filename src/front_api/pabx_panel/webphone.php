@@ -16,7 +16,7 @@ if (isset($_GET['js'])) {
     $u = getLoggedUser();
     header('Content-Type: application/javascript; charset=utf-8');
     header('Cache-Control: no-cache');
-    if ($u && !empty($u['webphone']) && !empty($u['extension'])) readfile(__DIR__ . '/webphone_widget.js');
+    if ($u && userHasWebphone($u)) readfile(__DIR__ . '/webphone_widget.js');
     exit;
 }
 
@@ -31,6 +31,17 @@ if (isset($_GET['cred'])) {
         exit;
     }
     $u = getLoggedUser();
+    // Conta personalizada (outro servidor): o navegador registra direto no domínio/porta informados
+    if ($u && !empty($u['webphone']) && !empty($u['wp_custom'])) {
+        $ch = preg_replace('/[^a-z0-9.\-]/', '', strtolower((string)($u['wp_host'] ?? '')));
+        $cp = (int)($u['wp_port'] ?? 8089); $cu = (string)($u['wp_user'] ?? ''); $cs = decryptSmtpPassword((string)($u['wp_pass'] ?? ''));
+        if ($ch === '' || $cp < 1 || $cp > 65535 || $cu === '' || $cs === '') {
+            echo json_encode(['success' => false, 'error' => 'A conta personalizada do Webphone está incompleta. Revise domínio, porta, usuário e senha em Configurações > Usuários.']);
+            exit;
+        }
+        echo json_encode(['success' => true, 'ext' => $cu, 'secret' => $cs, 'name' => (string)($u['name'] ?? ''), 'wss' => 'wss://' . $ch . ':' . $cp . '/ws', 'host' => $ch, 'webrtc' => true, 'stun' => trim((string)getSetting('webphone_stun'))]);
+        exit;
+    }
     $ext = preg_replace('/[^0-9A-Za-z_\-]/', '', (string)($u['extension'] ?? ''));
     if (!$u || empty($u['webphone']) || $ext === '') {
         echo json_encode(['success' => false, 'error' => 'O Webphone não está habilitado para o seu usuário. Peça ao administrador em Configurações > Usuários.']);

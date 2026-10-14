@@ -3618,6 +3618,11 @@ function getSystemUserById($id) {
     }
 }
 
+/** O usuário tem Webphone? Habilitado + (ramal vinculado do PABX ou conta personalizada de outro servidor). */
+function userHasWebphone($u) {
+    return !empty($u) && !empty($u['webphone']) && (!empty($u['extension']) || !empty($u['wp_custom']));
+}
+
 function saveSystemUser($data) {
     global $db;
     if (!$db) return ['success' => false, 'error' => 'Banco de dados inacessível'];
@@ -3628,7 +3633,16 @@ function saveSystemUser($data) {
     $role = trim($data['role'] ?? 'Usuário');
     $extension = trim($data['extension'] ?? '');
     $whatsapp = trim($data['whatsapp'] ?? '');
-    $webphone = (!empty($data['webphone']) && $extension !== '') ? 1 : 0; // webphone só existe com ramal vinculado
+    $wpCustom = !empty($data['wp_custom']) ? 1 : 0;
+    $webphone = (!empty($data['webphone']) && ($extension !== '' || $wpCustom)) ? 1 : 0; // webphone só existe com ramal vinculado ou conta personalizada
+    $wpHost = strtolower(trim((string)($data['wp_host'] ?? ''))); $wpPort = (int)($data['wp_port'] ?? 8089); $wpUser = trim((string)($data['wp_user'] ?? '')); $wpPassIn = (string)($data['wp_pass'] ?? '');
+    if ($wpCustom) {
+        if (!preg_match('/^[a-z0-9]([a-z0-9.\-]{0,251}[a-z0-9])?$/', $wpHost)) return ['success' => false, 'error' => 'Conta personalizada: informe o domínio ou IP do servidor (somente letras, números, ponto e hífen).'];
+        if ($wpPort < 1 || $wpPort > 65535) return ['success' => false, 'error' => 'Conta personalizada: porta inválida (1 a 65535).'];
+        if (!preg_match('/^[A-Za-z0-9_.+\-]{1,64}$/', $wpUser)) return ['success' => false, 'error' => 'Conta personalizada: informe o usuário (ramal) do outro servidor.'];
+        if (strlen($wpPassIn) > 128 || preg_match('/[\x00-\x1f]/', $wpPassIn)) return ['success' => false, 'error' => 'Conta personalizada: senha inválida.'];
+        $extension = ''; // a conta personalizada substitui o ramal do PABX só no Webphone
+    }
     $permissions = isset($data['permissions']) && is_array($data['permissions']) ? json_encode(array_values($data['permissions'])) : '[]';
 
     if (empty($name) || empty($email)) {
@@ -3639,6 +3653,9 @@ function saveSystemUser($data) {
         if ($id > 0) {
             $stmt = $db->prepare("UPDATE system_users SET name = :name, email = :email, role = :role, extension = :ext, whatsapp = :wa, webphone = :wp, permissions = :perm, updated_at = CURRENT_TIMESTAMP WHERE id = :id");
             $stmt->execute([':name' => $name, ':email' => $email, ':role' => $role, ':ext' => $extension, ':wa' => $whatsapp, ':wp' => $webphone, ':perm' => $permissions, ':id' => $id]);
+            $db->prepare("UPDATE system_users SET wp_custom = :c, wp_host = :h, wp_port = :p, wp_user = :u WHERE id = :id")->execute([':c' => $wpCustom, ':h' => $wpCustom ? $wpHost : '', ':p' => $wpCustom ? $wpPort : 8089, ':u' => $wpCustom ? $wpUser : '', ':id' => $id]);
+            if (!$wpCustom) $db->prepare("UPDATE system_users SET wp_pass = '' WHERE id = :id")->execute([':id' => $id]);
+            elseif ($wpPassIn !== '') $db->prepare("UPDATE system_users SET wp_pass = :s WHERE id = :id")->execute([':s' => encryptSmtpPassword($wpPassIn), ':id' => $id]);
             if (!empty($data['password'])) {
                 $pw = authSetPassword($id, $data['password']);
                 if (!$pw['success']) return ['success' => false, 'error' => $pw['error']];
@@ -3657,7 +3674,9 @@ function saveSystemUser($data) {
                 return ['success' => false, 'error' => 'Defina uma senha (mínimo 8 caracteres) para o novo usuário.'];
             }
             $stmt->execute([':name' => $name, ':email' => $email, ':role' => $role, ':ext' => $extension, ':wa' => $whatsapp, ':wp' => $webphone, ':perm' => $permissions]);
-            $pw = authSetPassword((int)$db->lastInsertId(), $data['password']);
+            $newId = (int)$db->lastInsertId();
+            if ($wpCustom) $db->prepare("UPDATE system_users SET wp_custom = 1, wp_host = :h, wp_port = :p, wp_user = :u, wp_pass = :s WHERE id = :id")->execute([':h' => $wpHost, ':p' => $wpPort, ':u' => $wpUser, ':s' => encryptSmtpPassword($wpPassIn), ':id' => $newId]);
+            $pw = authSetPassword($newId, $data['password']);
             if (!$pw['success']) {
                 $db->prepare("DELETE FROM system_users WHERE email = :e")->execute([':e' => $email]);
                 return ['success' => false, 'error' => $pw['error']];

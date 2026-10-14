@@ -14,12 +14,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_save_user'])) 
         'email'       => trim($_POST['user_email'] ?? ''),
         'role'        => trim($_POST['user_role'] ?? 'Usuário'),
         'extension'   => trim($_POST['user_extension'] ?? ''),
+        'wp_custom'   => (($_POST['user_extension'] ?? '') === '__custom__') ? 1 : 0,
+        'wp_host'     => trim($_POST['user_wp_host'] ?? ''),
+        'wp_port'     => intval($_POST['user_wp_port'] ?? 8089),
+        'wp_user'     => trim($_POST['user_wp_user'] ?? ''),
+        'wp_pass'     => (string)($_POST['user_wp_pass'] ?? ''),
         'whatsapp'    => trim($_POST['user_whatsapp'] ?? ''),
         'webphone'    => !empty($_POST['user_webphone']) ? 1 : 0,
         'password'    => (string)($_POST['user_password'] ?? ''),
         'permissions' => isset($_POST['permissions']) && is_array($_POST['permissions']) ? $_POST['permissions'] : []
     ];
 
+    if ($user_data['wp_custom']) $user_data['extension'] = '';
     $res = saveSystemUser($user_data);
     if ($res['success']) {
         $msg_success = $res['message'];
@@ -220,7 +226,7 @@ try {
                             </td>
                             <td class="p-3 text-right">
                                 <div class="flex items-center justify-end gap-1.5">
-                                    <button onclick='openEditUserModal(<?php echo json_encode($u); ?>)' class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-white rounded-lg font-bold text-[10px] transition border border-slate-700 flex items-center gap-1">
+                                    <button onclick='openEditUserModal(<?php $__uj = $u; $__uj['wp_pass_set'] = !empty($u['wp_pass']) ? 1 : 0; unset($__uj['wp_pass'], $__uj['password_hash']); echo json_encode($__uj); ?>)' class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-white rounded-lg font-bold text-[10px] transition border border-slate-700 flex items-center gap-1">
                                         <i class="fa-solid fa-pen"></i> Editar
                                     </button>
                                     <?php if ($u['id'] != 1): ?>
@@ -300,7 +306,16 @@ try {
                             <?php $__is_wr = isset($webrtc_set[(string)$e_code]); ?>
                             <option value="<?php echo $e_code; ?>" data-webrtc="<?php echo $__is_wr ? '1' : '0'; ?>"><?php echo $e_label . ($__is_wr ? ' · WebRTC' : ' · sem WebRTC'); ?></option>
                         <?php endforeach; ?>
+                        <option value="__custom__">Personalizado (outro servidor)…</option>
                     </select>
+                    <div id="wp-custom-box" class="hidden mt-2 p-3 rounded-xl bg-slate-950 border border-emerald-500/30 grid grid-cols-2 gap-2">
+                        <p class="col-span-2 text-[10px] text-slate-400">Registra o Webphone deste usuário em outro servidor (ex.: testar o ramal de outro cliente). O navegador conecta direto nesse servidor por WSS, que precisa estar liberado e com certificado aceito.</p>
+                        <input type="text" id="form-wp-host" name="user_wp_host" placeholder="Domínio ou IP (ex.: cliente.ddns.net)" autocomplete="off" class="col-span-2 px-3 py-2 bg-slate-900 border border-slate-800 rounded-lg text-xs text-emerald-300 font-mono focus:border-emerald-500 focus:outline-none">
+                        <input type="number" id="form-wp-port" name="user_wp_port" min="1" max="65535" value="8089" placeholder="Porta WSS" autocomplete="off" class="px-3 py-2 bg-slate-900 border border-slate-800 rounded-lg text-xs text-emerald-300 font-mono focus:border-emerald-500 focus:outline-none">
+                        <input type="text" id="form-wp-user" name="user_wp_user" placeholder="Usuário / ramal" autocomplete="off" class="px-3 py-2 bg-slate-900 border border-slate-800 rounded-lg text-xs text-emerald-300 font-mono focus:border-emerald-500 focus:outline-none">
+                        <input type="password" id="form-wp-pass" name="user_wp_pass" placeholder="Senha" autocomplete="new-password" class="col-span-2 px-3 py-2 bg-slate-900 border border-slate-800 rounded-lg text-xs text-emerald-300 font-mono focus:border-emerald-500 focus:outline-none">
+                        <span id="form-wp-pass-note" class="col-span-2 text-[10px] text-slate-400" style="display:none">Senha já salva (criptografada). Deixe em branco para mantê-la.</span>
+                    </div>
                 </div>
             </div>
 
@@ -454,6 +469,12 @@ function applyWebrtcDim() {
     });
     const w = document.getElementById('form-user-webphone-warn');
     const cur = sel.options[sel.selectedIndex];
+    const isCustom = !!cur && cur.value === '__custom__';
+    document.getElementById('wp-custom-box').classList.toggle('hidden', !isCustom);
+    if (isCustom) {
+        if (on) { w.style.display = 'none'; } else { w.textContent = 'Marque Habilitar Webphone para usar a conta personalizada.'; w.style.display = 'block'; }
+        return;
+    }
     if (on && cur && cur.value && cur.getAttribute('data-webrtc') === '0') {
         w.textContent = 'O ramal ' + cur.value + ' não está como WebRTC no PABX: o Webphone não vai registrar. Ative WebRTC nesse ramal ou escolha outro (os apagados não são WebRTC).';
         w.style.display = 'block';
@@ -466,6 +487,15 @@ document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('form-user-extension').addEventListener('change', applyWebrtcDim);
 });
 
+// Conta personalizada do Webphone (a senha nunca vem para a tela: só a indicação de que já existe)
+function fillWpCustom(u) {
+    document.getElementById('form-wp-host').value = u.wp_host || '';
+    document.getElementById('form-wp-port').value = u.wp_port || 8089;
+    document.getElementById('form-wp-user').value = u.wp_user || '';
+    document.getElementById('form-wp-pass').value = '';
+    document.getElementById('form-wp-pass-note').style.display = u.wp_pass_set ? 'block' : 'none';
+}
+
 function openAddUserModal() {
     document.getElementById('user-modal-title').innerText = 'Criar Novo Usuário';
     document.getElementById('form-user-id').value = '0';
@@ -475,6 +505,7 @@ function openAddUserModal() {
     document.getElementById('form-user-role').value = 'Administrador';
     document.getElementById('form-user-extension').value = '';
     document.getElementById('form-user-webphone').checked = false;
+    fillWpCustom({});
     applyWebrtcDim();
     document.getElementById('form-user-whatsapp').value = '';
     
@@ -489,9 +520,10 @@ function openEditUserModal(u) {
     document.getElementById('form-user-name').value = u.name || '';
     document.getElementById('form-user-email').value = u.email || '';
     document.getElementById('form-user-role').value = u.role || 'Administrador';
-    document.getElementById('form-user-extension').value = u.extension || '';
+    document.getElementById('form-user-extension').value = parseInt(u.wp_custom || 0, 10) === 1 ? '__custom__' : (u.extension || '');
     document.getElementById('form-user-whatsapp').value = u.whatsapp || '';
     document.getElementById('form-user-webphone').checked = parseInt(u.webphone || 0, 10) === 1;
+    fillWpCustom(u);
     applyWebrtcDim();
 
     // Marcar checkboxes salva no banco

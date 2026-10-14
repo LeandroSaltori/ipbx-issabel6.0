@@ -89,6 +89,8 @@ try {
 
     try { $db->exec("ALTER TABLE system_users ADD COLUMN password_hash TEXT DEFAULT ''"); } catch (Exception $e) {}
     try { $db->exec("ALTER TABLE system_users ADD COLUMN webphone INTEGER DEFAULT 0"); } catch (Exception $e) {}
+    // Webphone com conta personalizada (outro servidor): domínio, porta WSS, usuário e senha (criptografada)
+    foreach (['wp_custom INTEGER DEFAULT 0', "wp_host TEXT DEFAULT ''", 'wp_port INTEGER DEFAULT 8089', "wp_user TEXT DEFAULT ''", "wp_pass TEXT DEFAULT ''"] as $__c) { try { $db->exec("ALTER TABLE system_users ADD COLUMN $__c"); } catch (Exception $e) {} }
 
     // Carga inicial: apenas o administrador; os demais usuários são cadastrados em Configurações > Usuários
     $u_cnt = $db->query("SELECT COUNT(*) as total FROM system_users")->fetchColumn();
