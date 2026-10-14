@@ -9,6 +9,8 @@ Na própria tela de login do painel clássico aparecem duas opções, **Painel N
 4. Quem é do grupo Webphone continua indo direto para `/phone`.
 
 ## Instalação (no servidor, como root)
+> Desde esta versão o instalador do painel novo (`install.sh`, menu [32] e `instalar-front-api.sh`) já aplica este patch e o `login-novo` sozinho em todo cliente novo. Os passos abaixo servem só para aplicar à mão ou desfazer.
+
 1. Atualize o painel novo com o comando de sempre (o instalador cria a chave `/etc/ipbx/sso.key`).
 2. `bash /root/ipbx-test/docs/patches/painel-antigo/seletor-painel/aplicar.sh`
    - cria o snapshot em `/var/backup/ipbx/backup_AAAA-MM-DD_HHMMSS` (com manifesto e link `latest`);

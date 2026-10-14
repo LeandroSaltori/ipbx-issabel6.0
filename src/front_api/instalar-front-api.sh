@@ -232,6 +232,21 @@ if [ -d "$SOURCE_DIR/../modules/sec_fb_banned" ] && [ -d /var/www/html/modules/s
   echo "[✓] Telas nativas do Fail2ban atualizadas para exibir o jail do painel."
 fi
 
+# Login novo da Prisma com a escolha "Painel Novo 6.0 / Painel Clássico" (padrão em todo cliente novo).
+# Usa os patches do repositório (cada um cria o snapshot em /var/backup/ipbx e pode ser desfeito com --desfazer).
+PATCH_DIR="$SOURCE_DIR/../../docs/patches/painel-antigo"
+if [ -f "$PATCH_DIR/seletor-painel/aplicar.sh" ] && [ -f "$PATCH_DIR/login-novo/aplicar-login.sh" ]; then
+  if [ -f /var/www/html/index.php ] && [ -f /var/www/html/themes/prisma_v5/_common/login.tpl ]; then
+    if bash "$PATCH_DIR/seletor-painel/aplicar.sh" && bash "$PATCH_DIR/login-novo/aplicar-login.sh"; then
+      echo "[✓] Tela de login com escolha Painel Novo 6.0 / Clássico aplicada."
+    else
+      echo "[!] Aviso: o login com escolha de painel não foi aplicado (o painel novo segue funcionando). Rode os patches em docs/patches/painel-antigo à mão."
+    fi
+  else
+    echo "[!] Tema prisma_v5 do painel clássico não encontrado: login com escolha de painel não aplicado."
+  fi
+fi
+
 # Limpeza de arquivos temporários se houve clone
 if [ -n "$TMP_REPO" ] && [ -d "$TMP_REPO" ]; then
   rm -rf "$TMP_REPO"
