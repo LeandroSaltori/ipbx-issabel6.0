@@ -15,6 +15,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_save_user'])) 
         'role'        => trim($_POST['user_role'] ?? 'Usuário'),
         'extension'   => trim($_POST['user_extension'] ?? ''),
         'whatsapp'    => trim($_POST['user_whatsapp'] ?? ''),
+        'webphone'    => !empty($_POST['user_webphone']) ? 1 : 0,
         'password'    => (string)($_POST['user_password'] ?? ''),
         'permissions' => isset($_POST['permissions']) && is_array($_POST['permissions']) ? $_POST['permissions'] : []
     ];
@@ -299,6 +300,15 @@ try {
                 </div>
             </div>
 
+            <!-- Webphone do usuário (usa o ramal vinculado acima) -->
+            <label class="flex items-start gap-3 p-3 rounded-xl bg-slate-950 border border-slate-800 cursor-pointer">
+                <input type="checkbox" id="form-user-webphone" name="user_webphone" value="1" class="mt-0.5 rounded border-slate-700 bg-slate-900 text-emerald-500 focus:ring-emerald-500">
+                <span>
+                    <span class="text-xs font-bold text-emerald-400 block"><i class="fa-solid fa-headset mr-1"></i> Habilitar Webphone (atender e ligar pelo navegador)</span>
+                    <span class="text-[10px] text-slate-400 block">Usa o ramal vinculado acima, sem digitar senha. O ramal precisa estar configurado como WebRTC no PABX; se não estiver, o próprio Webphone avisa ao abrir.</span>
+                </span>
+            </label>
+
             <!-- WhatsApp do Usuário (Notificações) -->
             <div class="space-y-1">
                 <label class="text-xs font-bold text-cyan-400 block">Número do WhatsApp do Usuário (Notificações):</label>
@@ -436,7 +446,8 @@ function openAddUserModal() {
     document.getElementById('form-user-name').value = '';
     document.getElementById('form-user-email').value = '';
     document.getElementById('form-user-role').value = 'Administrador';
-    document.getElementById('form-user-extension').value = '201';
+    document.getElementById('form-user-extension').value = '';
+    document.getElementById('form-user-webphone').checked = false;
     document.getElementById('form-user-whatsapp').value = '';
     
     updatePermissionsByRole('Administrador');
@@ -452,6 +463,7 @@ function openEditUserModal(u) {
     document.getElementById('form-user-role').value = u.role || 'Administrador';
     document.getElementById('form-user-extension').value = u.extension || '';
     document.getElementById('form-user-whatsapp').value = u.whatsapp || '';
+    document.getElementById('form-user-webphone').checked = parseInt(u.webphone || 0, 10) === 1;
 
     // Marcar checkboxes salva no banco
     const checks = document.querySelectorAll('.perm-check');

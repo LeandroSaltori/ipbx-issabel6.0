@@ -3577,6 +3577,7 @@ function saveSystemUser($data) {
     $role = trim($data['role'] ?? 'Usuário');
     $extension = trim($data['extension'] ?? '');
     $whatsapp = trim($data['whatsapp'] ?? '');
+    $webphone = (!empty($data['webphone']) && $extension !== '') ? 1 : 0; // webphone só existe com ramal vinculado
     $permissions = isset($data['permissions']) && is_array($data['permissions']) ? json_encode(array_values($data['permissions'])) : '[]';
 
     if (empty($name) || empty($email)) {
@@ -3585,8 +3586,8 @@ function saveSystemUser($data) {
 
     try {
         if ($id > 0) {
-            $stmt = $db->prepare("UPDATE system_users SET name = :name, email = :email, role = :role, extension = :ext, whatsapp = :wa, permissions = :perm, updated_at = CURRENT_TIMESTAMP WHERE id = :id");
-            $stmt->execute([':name' => $name, ':email' => $email, ':role' => $role, ':ext' => $extension, ':wa' => $whatsapp, ':perm' => $permissions, ':id' => $id]);
+            $stmt = $db->prepare("UPDATE system_users SET name = :name, email = :email, role = :role, extension = :ext, whatsapp = :wa, webphone = :wp, permissions = :perm, updated_at = CURRENT_TIMESTAMP WHERE id = :id");
+            $stmt->execute([':name' => $name, ':email' => $email, ':role' => $role, ':ext' => $extension, ':wa' => $whatsapp, ':wp' => $webphone, ':perm' => $permissions, ':id' => $id]);
             if (!empty($data['password'])) {
                 $pw = authSetPassword($id, $data['password']);
                 if (!$pw['success']) return ['success' => false, 'error' => $pw['error']];
@@ -3600,11 +3601,11 @@ function saveSystemUser($data) {
                 return ['success' => false, 'error' => "O e-mail '$email' já está cadastrado."];
             }
 
-            $stmt = $db->prepare("INSERT INTO system_users (name, email, role, extension, whatsapp, permissions, status) VALUES (:name, :email, :role, :ext, :wa, :perm, 'Ativo')");
+            $stmt = $db->prepare("INSERT INTO system_users (name, email, role, extension, whatsapp, webphone, permissions, status) VALUES (:name, :email, :role, :ext, :wa, :wp, :perm, 'Ativo')");
             if (empty($data['password'])) {
                 return ['success' => false, 'error' => 'Defina uma senha (mínimo 8 caracteres) para o novo usuário.'];
             }
-            $stmt->execute([':name' => $name, ':email' => $email, ':role' => $role, ':ext' => $extension, ':wa' => $whatsapp, ':perm' => $permissions]);
+            $stmt->execute([':name' => $name, ':email' => $email, ':role' => $role, ':ext' => $extension, ':wa' => $whatsapp, ':wp' => $webphone, ':perm' => $permissions]);
             $pw = authSetPassword((int)$db->lastInsertId(), $data['password']);
             if (!$pw['success']) {
                 $db->prepare("DELETE FROM system_users WHERE email = :e")->execute([':e' => $email]);

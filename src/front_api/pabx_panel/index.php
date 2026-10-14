@@ -1510,113 +1510,7 @@ if ($__route_perm !== '' && !hasUserPermission($__route_perm)) {
         </div>
     </div>
 
-    <!-- WebRTC Softphone Modal Flutuante -->
-    <div id="webphone-modal" class="fixed bottom-16 right-6 z-50 hidden w-96 bg-slate-900/95 backdrop-blur-xl border border-slate-700/60 rounded-3xl shadow-2xl overflow-hidden transition-all duration-300">
-        <!-- Modal Header -->
-        <div class="p-4 bg-slate-950/80 border-b border-slate-800 flex items-center justify-between">
-            <div class="flex items-center gap-3">
-                <div class="w-8 h-8 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-sm font-bold border border-emerald-500/30">
-                    <i class="fa-solid fa-headset"></i>
-                </div>
-                <div>
-                    <h3 class="text-sm font-extrabold text-white flex items-center gap-1.5">
-                        WebPhone
-                        <i class="fa-solid fa-grip-vertical text-slate-600 text-xs"></i>
-                    </h3>
-                    <span id="webphone-status-label" class="text-[11px] text-slate-400 font-medium block">Desconectado</span>
-                </div>
-            </div>
-            <div class="flex items-center gap-2 text-slate-400 text-xs">
-                <button title="Fixar" class="hover:text-white transition p-1"><i class="fa-solid fa-thumbtack"></i></button>
-                <button title="Configurações" class="hover:text-white transition p-1"><i class="fa-solid fa-gear"></i></button>
-                <button onclick="toggleWebPhone()" title="Minimizar" class="hover:text-white transition p-1"><i class="fa-solid fa-minus"></i></button>
-            </div>
-        </div>
-
-        <!-- Modal Body Form & Dialpad -->
-        <div class="p-5 space-y-4 text-xs">
-            <!-- Box de Alerta de Erro SIP/WSS -->
-            <div id="webphone-error-alert" class="hidden p-3 rounded-xl bg-rose-500/10 text-rose-400 border border-rose-500/30 font-bold space-y-1">
-                <div class="flex items-center gap-1.5 text-xs">
-                    <i class="fa-solid fa-triangle-exclamation"></i>
-                    <span id="webphone-error-title">Falha ao Conectar Ramal</span>
-                </div>
-                <p id="webphone-error-desc" class="text-[11px] text-rose-300 font-normal leading-tight">Verifique a senha, o ramal ou aceite o certificado SSL da URL WSS no navegador.</p>
-            </div>
-
-            <!-- VIEW 1: Form de Conexão -->
-            <div id="webphone-form-view" class="space-y-3">
-                <div class="text-center pb-1">
-                    <h4 class="font-extrabold text-white text-xs">Credenciais do Ramal WebRTC</h4>
-                    <p class="text-[11px] text-slate-400 mt-0.5">Conecte seu ramal diretamente pelo navegador</p>
-                </div>
-
-                <div>
-                    <label class="block text-[10px] font-extrabold uppercase tracking-wider text-slate-400 mb-1">RAMAL SIP</label>
-                    <input type="text" id="webphone-sip-ext" placeholder="Ex: 1001" value="1001"
-                           class="w-full px-3.5 py-2.5 bg-slate-950/90 border border-slate-800 rounded-xl text-white font-mono placeholder-slate-600 focus:border-emerald-500 focus:outline-none transition">
-                </div>
-
-                <div>
-                    <label class="block text-[10px] font-extrabold uppercase tracking-wider text-slate-400 mb-1">SENHA DO RAMAL</label>
-                    <input type="password" id="webphone-sip-pass" placeholder="Senha do ramal" value="1001"
-                           class="w-full px-3.5 py-2.5 bg-slate-950/90 border border-slate-800 rounded-xl text-white font-mono placeholder-slate-600 focus:border-emerald-500 focus:outline-none transition">
-                </div>
-
-                <div>
-                    <?php $default_wss_host = isset($_SERVER['HTTP_HOST']) ? explode(':', $_SERVER['HTTP_HOST'])[0] : '192.168.0.251'; ?>
-                    <label class="block text-[10px] font-extrabold uppercase tracking-wider text-slate-400 mb-1">SERVIDOR WSS (WEBSOCKET)</label>
-                    <input type="text" id="webphone-wss-url" placeholder="wss://<?php echo $default_wss_host; ?>:8089/ws" value="wss://<?php echo $default_wss_host; ?>:8089/ws"
-                           class="w-full px-3.5 py-2.5 bg-slate-950/90 border border-slate-800 rounded-xl text-white font-mono placeholder-slate-600 focus:border-emerald-500 focus:outline-none transition">
-                    <span class="text-[10px] text-slate-500 block mt-1 leading-tight">
-                        Exemplo: wss://<?php echo $default_wss_host; ?>:8089/ws
-                    </span>
-                </div>
-
-                <button onclick="connectWebPhoneSip()" class="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold rounded-xl transition shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2 text-xs mt-2">
-                    <i class="fa-solid fa-plug"></i>
-                    <span>Conectar Ramal</span>
-                </button>
-            </div>
-
-            <!-- VIEW 2: Dialpad Numérico de Chamadas -->
-            <div id="webphone-dialpad-view" class="hidden space-y-3">
-                <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 text-center">
-                    <input type="text" id="webphone-dial-display" placeholder="Digite ou clique nos números..."
-                           class="w-full bg-transparent text-center text-xl font-bold font-mono text-emerald-400 focus:outline-none tracking-widest">
-                </div>
-
-                <!-- Teclado Numérico -->
-                <div class="grid grid-cols-3 gap-2 text-center font-mono">
-                    <button onclick="pressDialKey('1')" class="py-2.5 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl text-sm transition">1</button>
-                    <button onclick="pressDialKey('2')" class="py-2.5 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl text-sm transition">2</button>
-                    <button onclick="pressDialKey('3')" class="py-2.5 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl text-sm transition">3</button>
-                    <button onclick="pressDialKey('4')" class="py-2.5 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl text-sm transition">4</button>
-                    <button onclick="pressDialKey('5')" class="py-2.5 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl text-sm transition">5</button>
-                    <button onclick="pressDialKey('6')" class="py-2.5 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl text-sm transition">6</button>
-                    <button onclick="pressDialKey('7')" class="py-2.5 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl text-sm transition">7</button>
-                    <button onclick="pressDialKey('8')" class="py-2.5 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl text-sm transition">8</button>
-                    <button onclick="pressDialKey('9')" class="py-2.5 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl text-sm transition">9</button>
-                    <button onclick="pressDialKey('*')" class="py-2.5 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl text-sm transition">*</button>
-                    <button onclick="pressDialKey('0')" class="py-2.5 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl text-sm transition">0</button>
-                    <button onclick="pressDialKey('#')" class="py-2.5 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl text-sm transition">#</button>
-                </div>
-
-                <div class="grid grid-cols-2 gap-2 pt-1">
-                    <button onclick="makeWebPhoneCall()" class="py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl transition flex items-center justify-center gap-1.5 shadow">
-                        <i class="fa-solid fa-phone"></i> Ligar
-                    </button>
-                    <button onclick="hangupWebPhoneCall()" class="py-2.5 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl transition flex items-center justify-center gap-1.5 shadow">
-                        <i class="fa-solid fa-phone-slash"></i> Desligar
-                    </button>
-                </div>
-
-                <button onclick="disconnectWebPhoneSip()" class="w-full py-1.5 text-slate-400 hover:text-white text-[11px] font-bold transition text-center">
-                    Desconectar Ramal
-                </button>
-            </div>
-        </div>
-    </div>
+    <!-- Webphone: agora é uma janela própria (webphone.php), que mantém o ramal registrado enquanto estiver aberta -->
 
     <!-- Modal: Análise de Inteligência Artificial do Operador -->
     <div id="modal-operator-ia" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-xl flex items-center justify-center p-4 transition-all duration-300">
@@ -2079,151 +1973,27 @@ if ($__route_perm !== '' && !hasUserPermission($__route_perm)) {
             if (sb) sb.classList.toggle('hidden');
         }
 
+        // Webphone: janela própria (webphone.php). Fica registrada no PABX enquanto aberta, mesmo navegando no painel.
+        let __wpWin = null;
         function toggleWebPhone() {
-            const wp = document.getElementById('webphone-modal');
-            if (wp) wp.classList.toggle('hidden');
+            if (__wpWin && !__wpWin.closed) { __wpWin.focus(); return __wpWin; }
+            __wpWin = window.open('webphone.php', 'prisma_webphone', 'width=400,height=780,menubar=no,toolbar=no,location=no,status=no,resizable=yes');
+            if (!__wpWin) alert('O navegador bloqueou a janela do Webphone. Permita pop-ups para este endereço e tente de novo.');
+            return __wpWin;
         }
-
-        function pressDialKey(key) {
-            const disp = document.getElementById('webphone-dial-display');
-            if (disp) disp.value += key;
+        function connectWebPhoneSip() { toggleWebPhone(); }
+        function disconnectWebPhoneSip() { if (__wpWin && !__wpWin.closed) __wpWin.close(); __wpWin = null; }
+        // Liga para um número usando o Webphone (abre a janela se preciso; ela disca assim que registrar)
+        function makeWebPhoneCall(numero) {
+            const num = String(numero || '').replace(/[^0-9*#+]/g, '');
+            if (!num) { alert('Digite um número para discar.'); return; }
+            const aberta = __wpWin && !__wpWin.closed;
+            const w = toggleWebPhone();
+            if (!w) return;
+            const enviar = () => { try { w.postMessage({type: 'webphone-dial', number: num}, location.origin); } catch (e) {} };
+            if (aberta) enviar(); else setTimeout(enviar, 4000);
         }
-
-        function showWebphoneError(title, desc) {
-            const errBox = document.getElementById('webphone-error-alert');
-            const errTitle = document.getElementById('webphone-error-title');
-            const errDesc = document.getElementById('webphone-error-desc');
-
-            if (errBox) errBox.classList.remove('hidden');
-            if (errTitle) errTitle.innerText = title;
-            if (errDesc) errDesc.innerText = desc;
-        }
-
-        function hideWebphoneError() {
-            const errBox = document.getElementById('webphone-error-alert');
-            if (errBox) errBox.classList.add('hidden');
-        }
-
-        function backspaceDialKey() {
-            const disp = document.getElementById('webphone-dial-display');
-            if (disp && disp.value.length > 0) disp.value = disp.value.slice(0, -1);
-        }
-
-        function openWebphoneSettingsModal() {
-            alert('⚙️ Configurações do WebPhone:\n- Permissões de Microfone e Fone: Permitidas no Navegador\n- Protocolo: WebRTC (JsSIP WSS)');
-        }
-
-        function connectWebPhoneSip() {
-            hideWebphoneError();
-            const ext = document.getElementById('webphone-sip-ext')?.value?.trim();
-            const pass = document.getElementById('webphone-sip-pass')?.value?.trim();
-            const wss = document.getElementById('webphone-wss-url')?.value?.trim();
-
-            if (!ext || !pass || !wss) {
-                showWebphoneError("Campos Incompletos", "Preencha o Ramal, Senha e Servidor WSS para conectar.");
-                return;
-            }
-
-            const label = document.getElementById('webphone-status-label');
-            if (label) label.innerHTML = `<span class="text-amber-400 font-bold"><i class="fa-solid fa-spinner fa-spin"></i> Conectando WSS...</span>`;
-
-            try {
-                if (typeof JsSIP === 'undefined') {
-                    // Sem a biblioteca JsSIP não há registro real: nunca simular
-                    if (label) label.innerHTML = `<span class="text-rose-400 font-bold"><i class="fa-solid fa-circle-xmark"></i> Biblioteca JsSIP não carregou</span>`;
-                    showWebphoneError("Softphone indisponível", "A biblioteca JsSIP não foi carregada (CDN bloqueado?). Não é possível registrar o ramal.");
-                    return;
-                }
-
-                const domainHost = window.location.hostname || 'localhost';
-                const socket = new JsSIP.WebSocketInterface(wss);
-                const configuration = {
-                    sockets: [socket],
-                    uri: `sip:${ext}@${domainHost}`,
-                    password: pass,
-                    register: true
-                };
-
-                jsSipUa.on('newRTCSession', (data) => {
-                    const session = data.session;
-                    activeSipSession = session;
-
-                    if (session.direction === 'incoming') {
-                        if (label) label.innerHTML = `<span class="text-amber-400 font-bold animate-pulse"><i class="fa-solid fa-phone-incoming"></i> Chamada Recebida...</span>`;
-                        if (confirm(`📞 Chamada recebida de ${session.remote_identity.uri.user}. Atender?`)) {
-                            session.answer({ mediaConstraints: { audio: true, video: false } });
-                        } else {
-                            session.terminate();
-                        }
-                    } else {
-                        if (label) label.innerHTML = `<span class="text-amber-400 font-bold animate-pulse"><i class="fa-solid fa-phone-volume"></i> Discando...</span>`;
-                    }
-
-                    session.on('progress', () => {
-                        if (label) label.innerHTML = `<span class="text-amber-400 font-bold animate-pulse"><i class="fa-solid fa-phone-volume"></i> Chamando...</span>`;
-                    });
-
-                    session.on('confirmed', () => {
-                        if (label) label.innerHTML = `<span class="text-emerald-400 font-bold animate-pulse"><i class="fa-solid fa-headset"></i> Em Chamada</span>`;
-                    });
-
-                    session.on('ended', () => {
-                        activeSipSession = null;
-                        if (label) label.innerHTML = `<span class="text-emerald-400 font-bold"><i class="fa-solid fa-circle-check"></i> Registrado (${ext})</span>`;
-                    });
-
-                    session.on('failed', (e) => {
-                        activeSipSession = null;
-                        if (label) label.innerHTML = `<span class="text-emerald-400 font-bold"><i class="fa-solid fa-circle-check"></i> Registrado (${ext})</span>`;
-                    });
-
-                    session.connection.addEventListener('track', (e) => {
-                        const remoteAudio = document.getElementById('webphone-remote-audio');
-                        if (remoteAudio && e.streams && e.streams[0]) {
-                            remoteAudio.srcObject = e.streams[0];
-                            remoteAudio.play().catch(err => console.log('Audio play info:', err));
-                        }
-                    });
-                });
-
-                jsSipUa.start();
-
-            } catch (err) {
-                if (label) label.innerHTML = `<span class="text-rose-400 font-bold"><i class="fa-solid fa-circle-xmark"></i> Erro WSS</span>`;
-                showWebphoneError("Erro de Conexão WebSocket", `Não foi possível abrir o socket em ${wss}. Abra a URL no navegador para aceitar o certificado SSL autoassinado do PABX.`);
-            }
-        }
-
-        function disconnectWebPhoneSip() {
-            if (jsSipUa) {
-                jsSipUa.stop();
-                jsSipUa = null;
-            }
-            const label = document.getElementById('webphone-status-label');
-            if (label) label.innerText = 'Desconectado';
-            document.getElementById('webphone-dialpad-view')?.classList.add('hidden');
-            document.getElementById('webphone-form-view')?.classList.remove('hidden');
-        }
-
-        function makeWebPhoneCall() {
-            const num = document.getElementById('webphone-dial-display')?.value;
-            if (!num) { alert("Digite um número para discar."); return; }
-            const domainHost = window.location.hostname || 'localhost';
-            if (jsSipUa) {
-                activeSipSession = jsSipUa.call(`sip:${num}@${domainHost}`, { mediaConstraints: { audio: true, video: false } });
-            } else {
-                alert(`Discando via WebPhone para ${num}...`);
-            }
-        }
-
-        function hangupWebPhoneCall() {
-            if (activeSipSession) {
-                activeSipSession.terminate();
-                activeSipSession = null;
-            }
-            const disp = document.getElementById('webphone-dial-display');
-            if (disp) disp.value = '';
-        }
+        function hangupWebPhoneCall() { /* o desligar fica na janela do Webphone */ }
 
         // GLOBAL AUDIO MANAGER: Intercepta reprodução em qualquer <audio> do sistema
         // Garante que APENAS 1 áudio toque por vez! Ao iniciar um, pausa automaticamente todos os outros.
@@ -2311,12 +2081,9 @@ if ($__route_perm !== '' && !hasUserPermission($__route_perm)) {
                 return;
             }
 
-            // Se o Webphone estiver ativo e registrado com o mesmo ramal de origem, discar via WebPhone
-            if (typeof jsSipUa !== 'undefined' && jsSipUa && jsSipUa.isRegistered()) {
-                const disp = document.getElementById('webphone-dial-display');
-                if (disp) disp.value = to;
-                if (typeof toggleWebphoneModal === 'function') toggleWebphoneModal(true);
-                makeWebPhoneCall();
+            // Webphone aberto: disca por ele (usa o ramal do próprio usuário); senão segue pelo PABX (AMI Originate)
+            if (__wpWin && !__wpWin.closed) {
+                makeWebPhoneCall(to);
                 return;
             }
 
@@ -2977,6 +2744,16 @@ if ($__route_perm !== '' && !hasUserPermission($__route_perm)) {
                         <label class="font-bold text-slate-300">Nível de Acesso:</label>
                         <input type="text" disabled value="<?php echo htmlspecialchars((string)($__pu['role'] ?? '')); ?>" class="w-full bg-slate-950/60 border border-slate-800 text-slate-400 rounded-xl px-3 py-2.5 font-bold cursor-not-allowed">
                     </div>
+                </div>
+
+                <div class="flex items-center justify-between gap-3 p-3 rounded-xl bg-slate-950 border border-slate-800">
+                    <div>
+                        <span class="font-bold text-slate-300 block"><i class="fa-solid fa-headset text-emerald-400 mr-1"></i> Webphone</span>
+                        <span class="text-[11px] text-slate-400"><?php echo (!empty($__pu['webphone']) && !empty($__pu['extension'])) ? 'Habilitado para o seu usuário (ramal ' . htmlspecialchars((string)$__pu['extension']) . ').' : 'Não habilitado. Peça ao administrador em Configurações > Usuários.'; ?></span>
+                    </div>
+                    <?php if (!empty($__pu['webphone']) && !empty($__pu['extension'])): ?>
+                    <button type="button" onclick="closeModal('modal-user-profile'); toggleWebPhone();" style="white-space:nowrap !important;flex-shrink:0 !important;width:auto !important;overflow:visible !important;text-overflow:clip !important;" class="px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs transition flex items-center gap-2"><i class="fa-solid fa-phone"></i> Abrir Webphone</button>
+                    <?php endif; ?>
                 </div>
 
                 <div class="bg-amber-500/10 border border-amber-500/20 p-3 rounded-xl text-[11px] text-amber-300">

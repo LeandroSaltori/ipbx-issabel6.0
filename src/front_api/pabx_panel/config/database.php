@@ -63,7 +63,7 @@ try {
     // Estrutura do banco: só roda quando a versão mudou (PRAGMA user_version). No dia a dia o acesso NÃO grava nada aqui,
     // então páginas, FOP, crons e AGI nunca disputam o bloqueio de escrita na abertura (causa do "database is locked").
     // Ao criar/alterar tabelas ou colunas abaixo, aumente $__schema_ver para o banco ser atualizado uma única vez.
-    $__schema_ver = 2;
+    $__schema_ver = 3;
     if ((int)$db->query('PRAGMA user_version')->fetchColumn() < $__schema_ver) {
     // Criar tabelas se não existirem
     $db->exec("CREATE TABLE IF NOT EXISTS settings (key_name TEXT PRIMARY KEY, value_val TEXT)");
@@ -88,6 +88,7 @@ try {
     try { $db->exec("ALTER TABLE sent_logs ADD COLUMN response_raw TEXT"); } catch (Exception $e) {}
 
     try { $db->exec("ALTER TABLE system_users ADD COLUMN password_hash TEXT DEFAULT ''"); } catch (Exception $e) {}
+    try { $db->exec("ALTER TABLE system_users ADD COLUMN webphone INTEGER DEFAULT 0"); } catch (Exception $e) {}
 
     // Carga inicial: apenas o administrador; os demais usuários são cadastrados em Configurações > Usuários
     $u_cnt = $db->query("SELECT COUNT(*) as total FROM system_users")->fetchColumn();
