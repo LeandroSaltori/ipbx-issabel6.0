@@ -304,6 +304,21 @@ fi
 chmod +x /usr/local/bin/ipbx-security 2>/dev/null || true
 log_success "Comando global disponivel no terminal: ipbx-security"
 
+# ==============================================================================
+# 8. IPBX SENTINEL - MONITOR ANTI-WEBSHELL (QUARENTENA + ALERTA TELEGRAM)
+# ==============================================================================
+log_info "8. Instalando IPbx Sentinel (varredura web a cada 5 min, quarentena reversivel)..."
+SENTINEL_SRC="$(dirname "$(readlink -f "$0" 2>/dev/null || echo "$0")")/ipbx-sentinel.sh"
+if [ ! -f "$SENTINEL_SRC" ] && [ -f "${REPO_DIR:-/root/ipbx-issabel6.0}/scripts/ipbx-sentinel.sh" ]; then
+    SENTINEL_SRC="${REPO_DIR:-/root/ipbx-issabel6.0}/scripts/ipbx-sentinel.sh"
+fi
+if [ -f "$SENTINEL_SRC" ]; then
+    bash "$SENTINEL_SRC" --install || log_warn "Nao foi possivel instalar o Sentinel agora."
+else
+    curl -sSL "https://raw.githubusercontent.com/LeandroSaltori/ipbx-issabel6.0/main/scripts/ipbx-sentinel.sh" -o /usr/local/bin/ipbx-sentinel 2>/dev/null \
+        && chmod +x /usr/local/bin/ipbx-sentinel && /usr/local/bin/ipbx-sentinel --install || log_warn "Sentinel nao encontrado; pulando."
+fi
+
 echo ""
 log_success "======================================================================"
 log_success "  BLINDAGEM DE SEGURANÇA & SANEAMENTO CONCLUÍDOS COM SUCESSO!        "

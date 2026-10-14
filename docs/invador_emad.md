@@ -32,8 +32,8 @@ Bash
 #!/bin/bash
 
 # --- CONFIGURAÇÕES ---
-TOKEN="7558673015:AAEk7FbRtOXCB2xiiQ1fRT0Hwi-KEjf4JlI"
-CHAT_ID="-1003562264947"
+TOKEN="<definido em /etc/ipbx/telegram.conf>"
+CHAT_ID="<definido em /etc/ipbx/telegram.conf>"
 URL="https://api.telegram.org/bot$TOKEN/sendMessage"
 DIR="/var/www/html/"
 TERM="Emad__Was__Here"
@@ -66,4 +66,33 @@ Bash
 
 [ ] Restringir portas 80/443 via Firewall (MikroTik/pfSense).
 
-Servidor Invicta limpo e monitorado. Deseja que eu gere um comando de teste para você disparar uma mensagem "Fake" agora e confirmar se o alerta chega no seu grupo do Telegram?
+---
+
+## 5. Atualização: IPbx Sentinel (automático em toda a frota)
+
+O monitor manual acima foi substituído pelo **IPbx Sentinel** (`scripts/ipbx-sentinel.sh`), instalado pelo `ipbx-security-hardening.sh` (menu [20]). Compatível com Issabel 4 e 5; atua só na camada web e não toca no Asterisk.
+
+**O que detecta (caso real Issabel 4, 13/10/2026):**
+- Assinatura `Emad__Was__Here` e variantes.
+- `eval($a($b($c("..."))))`: eval ofuscado em cadeia de variáveis-função.
+- `eval(base64_decode(...))`, `system/shell_exec/passthru/assert` sobre `$_GET/$_POST/$_REQUEST`.
+- Módulos falsos em `/var/www/html/admin/modules/`: `phones`, `h`, `_cache`, `tinfo`, `fpbxphones`.
+- Qualquer `.php` dentro de pastas `images/` ou `img/`.
+
+**Legítimos ignorados (falsos positivos):** `admin/libraries/php-upgrade/*`, `XML_Unserializer.php`, arquivos `.js`, `var/templates_c`.
+
+**O que faz ao achar:** move para **quarentena** (`/var/backup/ipbx/quarantine/AAAA-MM-DD_HHMMSS/`, reversível), registra em `/var/log/ipbx-sentinel.log` e avisa no Telegram com data/hora, arquivo, motivo e IP de origem (quando aparece no log do Apache).
+
+**Agenda:** `/etc/cron.d/ipbx-sentinel`: a cada 5 min (arquivos recentes) + varredura completa às 03:30.
+
+**Comandos:** `ipbx-sentinel --scan | --list | --restore ARQUIVO | --test-alert | --selftest | --uninstall`
+
+**Telegram:** crie `/etc/ipbx/telegram.conf` (modo 600) com `TELEGRAM_BOT_TOKEN=` e `TELEGRAM_CHAT_ID=`. Segredos **nunca** vão para o repositório. Sem esse arquivo, o Sentinel reaproveita as credenciais do monitor já instalado.
+
+**Falso positivo:** adicione o caminho em `/etc/ipbx/sentinel.allow` (um por linha, aceita `*`).
+
+**Decisões de segurança:**
+- Sem `rm` direto: quarentena permite desfazer erros.
+- Sem `chown/chmod -R` no site inteiro: afrouxaria bancos e sessões do painel novo. Opcional: `SENTINEL_HEAL_PERMS=1` apenas remove escrita de "outros".
+- Sem `chattr +i` na raiz: impede atualizações e o instalador.
+- **Após o incidente:** trocar senhas, revisar rotas internacionais, restringir 80/443 no firewall e **gerar novo token do bot** (o token antigo apareceu no repositório e deve ser considerado exposto).
