@@ -6,6 +6,7 @@
  */
 return [
     'done' => [
+        ['data' => '2026-10-14', 'mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-table-cells', 'titulo' => 'Webphone mais limpo, com abas de ícones', 'desc' => 'O Webphone agora tem três ícones clicáveis (teclado, agenda e últimas chamadas) no lugar dos textos, e o histórico ganhou tela própria, deixando o teclado mais compacto.'],
         ['data' => '2026-10-14', 'mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-user-gear', 'titulo' => 'WhatsApp do usuário opcional e Webphone no Perfil', 'desc' => 'O número de WhatsApp para notificações deixou de ser obrigatório no cadastro de usuários. No Meu Perfil você vê o estado do Webphone e pode reconectar o ramal com um clique.'],
         ['data' => '2026-10-14', 'mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-circle-check', 'titulo' => 'Agenda com status real e ramais WebRTC destacados', 'desc' => 'Na Agenda do Webphone, ramais online aparecem em verde e os offline em vermelho e apagados. Ao habilitar o Webphone para um usuário, os ramais que não são WebRTC aparecem apagados na lista, com aviso.'],
         ['data' => '2026-10-14', 'mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-address-book', 'titulo' => 'Agenda de ramais dentro do Webphone', 'desc' => 'O Webphone ganhou a aba Agenda: lista os ramais com bolinha verde para quem está online e os contatos externos da agenda do PABX, com busca e ligação com um clique. É a mesma agenda usada no MicroSIP, atualizada sozinha.'],

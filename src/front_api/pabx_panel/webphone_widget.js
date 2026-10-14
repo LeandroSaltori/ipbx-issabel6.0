@@ -41,9 +41,9 @@ main{padding:12px;display:flex;flex-direction:column;gap:10px}
 #xfer input{flex:1;min-width:0;background:#0b1220;border:1px solid #334155;border-radius:10px;color:#fff;padding:8px 10px}
 .lvl{height:5px;border-radius:4px;background:#0b1220;overflow:hidden;margin-top:9px}.lvl i{display:block;height:100%;width:0;background:linear-gradient(90deg,#10b981,#6366f1);transition:width .15s}
 .q{display:flex;align-items:center;justify-content:center;gap:6px;font-size:11px;color:#94a3b8;margin-top:7px}.dot{width:9px;height:9px;border-radius:50%;background:#94a3b8}
-#tabs{display:flex;gap:6px}.tab{flex:1;padding:8px 10px;border-radius:10px;border:1px solid #334155;background:#1c1b2f;color:#94a3b8;font-weight:800;font-size:12px;cursor:pointer;white-space:nowrap!important}
+#tabs{display:flex;gap:6px}.tab{flex:1;padding:10px 0;font-size:16px!important;line-height:1;border-radius:10px;border:1px solid #334155;background:#1c1b2f;color:#94a3b8;font-weight:800;font-size:12px;cursor:pointer;white-space:nowrap!important}
 .tab.on{background:linear-gradient(135deg,#7c3aed,#6366f1);border-color:#6366f1;color:#fff}
-#agenda{display:none}#agenda.show{display:block}#tab-dial.hide{display:none}
+#agenda,#hpane{display:none}#agenda.show,#hpane.show{display:block}#tab-dial.hide{display:none}
 #ag-q{width:100%;background:#0b1220;border:1px solid #334155;border-radius:12px;color:#fff;padding:9px 11px;font-size:13px}#ag-q:focus{outline:none;border-color:#6366f1}
 #ag-list{margin-top:8px;max-height:330px;overflow:auto}
 .ag-h{margin:8px 2px 4px;font-size:10.5px;text-transform:uppercase;letter-spacing:.6px;color:#94a3b8}
@@ -70,12 +70,13 @@ h4{margin:0 0 6px;font-size:10.5px;text-transform:uppercase;letter-spacing:.6px;
       <div id="xfer"><input id="xnum" placeholder="Ramal ou número" inputmode="tel"><button class="btn call" data-act="transfer">OK</button></div>
       <div class="lvl" title="Nível do seu microfone"><i id="lv"></i></div><div class="q"><span class="dot" id="qd"></span><span id="qt">Qualidade: medindo...</span></div>
       <div class="row"><button class="btn hang" data-act="hangup"><i class="fa-solid fa-phone-slash"></i> Desligar</button></div></div>
-    <div id="tabs"><button class="tab on" data-act="tab" data-k="dial"><i class="fa-solid fa-table-cells"></i> Teclado</button><button class="tab" data-act="tab" data-k="agenda"><i class="fa-regular fa-address-book"></i> Agenda</button></div>
+    <div id="tabs" role="tablist"><button class="tab on" data-act="tab" data-k="dial" title="Teclado" aria-label="Teclado"><i class="fa-solid fa-table-cells"></i></button><button class="tab" data-act="tab" data-k="agenda" title="Agenda" aria-label="Agenda"><i class="fa-regular fa-address-book"></i></button><button class="tab" data-act="tab" data-k="hist" title="Últimas chamadas" aria-label="Últimas chamadas"><i class="fa-solid fa-clock-rotate-left"></i></button></div>
     <div class="box" id="agenda"><input id="ag-q" type="search" placeholder="Buscar ramal ou contato..." autocomplete="off"><div id="ag-list"></div><div class="sub" id="ag-st" style="margin-top:6px"></div></div>
     <div id="tab-dial"><div class="box"><input id="disp" placeholder="Número ou ramal" inputmode="tel" autocomplete="off">
       <div class="pad">${KEYS.map(k => `<button data-act="key" data-k="${k}">${k}</button>`).join('')}</div>
       <div class="row"><button class="btn call" id="b-call" data-act="dial"><i class="fa-solid fa-phone"></i> Ligar</button><button class="btn sec" data-act="del"><i class="fa-solid fa-delete-left"></i> Apagar</button></div></div>
-    <div class="box" style="margin-top:10px"><h4>Últimas chamadas deste navegador</h4><div id="hist"></div></div></div>
+</div>
+    <div class="box" id="hpane"><h4>Últimas chamadas deste navegador</h4><div id="hist"></div></div>
   </main>
 </div>
 <audio id="ra" autoplay></audio>`;
@@ -112,7 +113,7 @@ h4{margin:0 0 6px;font-size:10.5px;text-transform:uppercase;letter-spacing:.6px;
       const i = document.createElement('i'); i.className = 'fa-solid ' + (x.r === 'mis' ? 'fa-phone-slash mis' : x.d === 'in' ? 'fa-arrow-down inn' : 'fa-arrow-up out');
       const n = document.createElement('span'); n.className = 'n'; n.textContent = x.n;
       const t = document.createElement('span'); t.className = 'd'; t.textContent = new Date(x.t).toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'}) + (x.s ? ' · ' + x.s + 's' : '');
-      d.append(i, n, t); d.addEventListener('click', () => { $('disp').value = x.n; });
+      d.append(i, n, t); d.addEventListener('click', () => { $('disp').value = x.n; showTab('dial'); });
       box.appendChild(d);
     });
   }
@@ -189,7 +190,7 @@ h4{margin:0 0 6px;font-size:10.5px;text-transform:uppercase;letter-spacing:.6px;
   let agItems = [], agTimer = null, agLoaded = 0, tabAtual = 'dial';
   function showTab(k) {
     tabAtual = k;
-    $('agenda').classList.toggle('show', k === 'agenda'); $('tab-dial').classList.toggle('hide', k === 'agenda');
+    $('agenda').classList.toggle('show', k === 'agenda'); $('hpane').classList.toggle('show', k === 'hist'); $('tab-dial').classList.toggle('hide', k !== 'dial');
     root.querySelectorAll('.tab').forEach(b => b.classList.toggle('on', b.dataset.k === k));
     if (k === 'agenda') { loadAgenda(); $('ag-q').focus(); } else { clearTimeout(agTimer); }
   }
