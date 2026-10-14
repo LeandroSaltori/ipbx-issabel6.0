@@ -592,7 +592,7 @@ if ($ast_db) {
                     <span class="text-[10px] text-brand-400 font-extrabold opacity-0 group-hover:opacity-100 transition flex items-center gap-1">Ver chamadas <i class="fa-solid fa-chevron-right text-[8px]"></i></span>
                 </div>
             </div>
-            <div class="h-8 w-full mt-2 -mb-1 opacity-80">
+            <div class="h-5 w-full mt-1 -mb-1 opacity-80">
                 <svg class="w-full h-full" viewBox="0 0 100 30" preserveAspectRatio="none">
                     <defs>
                         <linearGradient id="grad-blue-c1" x1="0" y1="0" x2="0" y2="1">
@@ -624,7 +624,7 @@ if ($ast_db) {
                     <span class="text-[10px] text-emerald-400 font-extrabold opacity-0 group-hover:opacity-100 transition flex items-center gap-1">Ver chamadas <i class="fa-solid fa-chevron-right text-[8px]"></i></span>
                 </div>
             </div>
-            <div class="h-8 w-full mt-2 -mb-1 opacity-80">
+            <div class="h-5 w-full mt-1 -mb-1 opacity-80">
                 <svg class="w-full h-full" viewBox="0 0 100 30" preserveAspectRatio="none">
                     <defs>
                         <linearGradient id="grad-green-c2" x1="0" y1="0" x2="0" y2="1">
@@ -656,7 +656,7 @@ if ($ast_db) {
                     <span class="text-[10px] text-purple-400 font-extrabold opacity-0 group-hover:opacity-100 transition flex items-center gap-1">Ver chamadas <i class="fa-solid fa-chevron-right text-[8px]"></i></span>
                 </div>
             </div>
-            <div class="h-8 w-full mt-2 -mb-1 opacity-80">
+            <div class="h-5 w-full mt-1 -mb-1 opacity-80">
                 <svg class="w-full h-full" viewBox="0 0 100 30" preserveAspectRatio="none">
                     <defs>
                         <linearGradient id="grad-purple-c3" x1="0" y1="0" x2="0" y2="1">
