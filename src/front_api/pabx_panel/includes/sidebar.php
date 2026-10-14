@@ -21,22 +21,20 @@ function isGroupActive($modules_array) {
 
 <aside id="sidebar-panel" class="w-64 bg-slate-900/95 border-r border-slate-800 flex flex-col shrink-0 h-screen sticky top-0 self-start transition-all duration-300 z-30 select-none">
     <!-- Logo Header & Collapse Button -->
-    <div class="p-4 border-b border-slate-800 flex items-center justify-between">
-        <div class="flex items-center gap-3 sidebar-text">
-            <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-brand-600 to-indigo-500 flex items-center justify-center text-white shadow-lg shadow-brand-500/20 font-black text-lg">
-                P
-            </div>
-            <div>
-                <h1 class="text-sm font-black tracking-wider text-white flex items-center gap-1.5">
-                    PRISMA
-                    <span class="px-1.5 py-0.5 text-[9px] bg-brand-500/20 text-brand-400 border border-brand-500/30 rounded font-bold uppercase">TELECOM</span>
-                </h1>
-                <span class="text-[10px] text-slate-400 block font-mono">v6.1 • PABX IP</span>
-            </div>
-        </div>
+    <div id="brand-header" class="px-4 py-3.5 border-b border-slate-800 flex items-center justify-between relative overflow-hidden" style="background:linear-gradient(135deg,#0b1020 0%,#1c1b2f 55%,#2a2250 100%)">
+        <span aria-hidden="true" class="pointer-events-none absolute -right-8 -top-10 w-28 h-28 rounded-full" style="background:radial-gradient(circle,rgba(124,58,237,.35),transparent 70%)"></span>
+        <!-- Marca completa (menu aberto) -->
+        <a href="index.php?module=dashboard&action=view_v1" onclick="brandHome()" class="brand-full relative flex flex-col gap-1.5" title="Ir para o Dashboard e recolher os menus">
+            <img src="img/logo-prisma.png" alt="Prisma Telecom" width="150" height="42" style="height:42px;width:auto;display:block" draggable="false">
+            <span class="text-[10px] font-mono tracking-wide" style="color:#a5b4fc">PABX IP <span style="color:#64748b">•</span> v6.1</span>
+        </a>
+        <!-- Marca reduzida (menu recolhido): clique para abrir -->
+        <button type="button" onclick="toggleSidebarCollapse()" class="brand-mini hidden relative mx-auto" title="Mostrar barra lateral" style="background:none;border:0;padding:0">
+            <img src="img/triangulo-prisma.png" alt="Prisma" width="30" height="29" style="width:30px;height:auto;display:block" draggable="false">
+        </button>
 
         <!-- Botão Ocultar / Collapse Sidebar -->
-        <button onclick="toggleSidebarCollapse()" class="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition" title="Ocultar / Mostrar Barra Lateral">
+        <button onclick="toggleSidebarCollapse()" class="brand-full relative p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-white/10 transition" title="Ocultar / Mostrar Barra Lateral">
             <i class="fa-solid fa-indent text-sm"></i>
         </button>
     </div>
@@ -296,6 +294,15 @@ function isGroupActive($modules_array) {
     });
     document.addEventListener('keydown', function (e) { if (e.key === 'Escape') toggleUserMenu(false); });
 
+    // Clique na marca: vai para o Dashboard com todos os grupos do menu recolhidos
+    function brandHome() {
+        try {
+            ['grp-ramais', 'grp-filas', 'grp-whatsapp', 'grp-relatorios', 'grp-config'].forEach(function (g) {
+                localStorage.setItem('sidebar_grp_' + g, 'closed');
+            });
+        } catch (e) {}
+    }
+
     function toggleSidebarGroup(grpId) {
         const el = document.getElementById(grpId);
         const icon = document.getElementById('icon-' + grpId);
@@ -317,6 +324,8 @@ function isGroupActive($modules_array) {
             if (isCollapsed) t.classList.add('hidden');
             else t.classList.remove('hidden');
         });
+        sidebar.querySelectorAll('.brand-full').forEach(t => t.classList.toggle('hidden', isCollapsed));
+        sidebar.querySelectorAll('.brand-mini').forEach(t => t.classList.toggle('hidden', !isCollapsed));
         localStorage.setItem('sidebar_collapsed', isCollapsed ? 'true' : 'false');
     }
 

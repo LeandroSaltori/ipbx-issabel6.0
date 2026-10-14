@@ -25,6 +25,7 @@ return [
         ['t' => 'Visão geral do dia', 'd' => 'Indicadores de chamadas recebidas, atendidas, perdidas e em andamento, com gráficos que atualizam sozinhos.'],
         ['t' => 'Topo e cards compactos', 'd' => 'O título, os filtros de período (Hoje, 7 dias, 30 dias, Externas, Internas, Todas, datas e Filtrar) e os cards de indicadores foram reduzidos para caber em uma só linha na tela em tamanho normal, sem precisar diminuir o zoom do navegador. Os seis cards têm a mesma altura.'],
         ['t' => 'Menu da sua conta', 'd' => 'No rodapé do menu lateral ficam Novidades, Modo Claro/Escuro e a sua conta, com a inicial do nome, o nome e o perfil. Clique na conta para abrir o menu com Perfil (seus dados), Painel clássico e Sair. Clique fora ou aperte Esc para fechar.'],
+        ['t' => 'Logo da Prisma: volta ao início', 'd' => 'Clique na logo da Prisma, no topo do menu lateral, para ir direto ao Dashboard. Os grupos do menu (Telefonia, Atendimento, WhatsApp, Relatórios e Configurações) se recolhem, deixando só o Dashboard à vista. Com o menu recolhido, a logo vira o triângulo da Prisma; clique nele para abrir o menu de novo.'],
     ]],
     ['id' => 'ramais', 'titulo' => 'Telefonia & Ramais', 'icon' => 'fa-phone', 'itens' => [
         ['t' => 'Painel do Operador', 'd' => 'Mostra todos os ramais em tempo real: livre, em chamada, tocando ou fora do ar, além de linhas, estacionamento e salas de conferência.'],
