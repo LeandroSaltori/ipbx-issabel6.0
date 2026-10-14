@@ -14,13 +14,13 @@
   const CSS = `
 :host{all:initial}
 *{box-sizing:border-box;font-family:'Segoe UI',Inter,system-ui,sans-serif}
-.fab{position:fixed;right:24px;bottom:20px;z-index:2147482000;width:52px;height:52px;border-radius:50%;border:1px solid rgba(124,58,237,.6);background:linear-gradient(135deg,#7c3aed,#6366f1);color:#fff;font-size:20px;cursor:pointer;box-shadow:0 10px 30px rgba(99,102,241,.45);display:flex;align-items:center;justify-content:center;transition:transform .15s}
+.fab{position:fixed;right:var(--wp-right,20px);bottom:20px;z-index:2147482000;width:52px;height:52px;border-radius:50%;border:2px solid rgba(16,185,129,.55);background:#1c1b2f;color:#10b981;font-size:20px;cursor:pointer;box-shadow:0 10px 30px rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;transition:transform .15s}
 .fab:hover{transform:scale(1.07)}
-.fab.ring{animation:ring 1s infinite;background:linear-gradient(135deg,#059669,#10b981)}
+.fab.ring{animation:ring 1s infinite;background:linear-gradient(135deg,#059669,#10b981);color:#fff}
 @keyframes ring{0%,100%{transform:rotate(0)}20%{transform:rotate(-14deg)}40%{transform:rotate(14deg)}60%{transform:rotate(-10deg)}80%{transform:rotate(10deg)}}
 .fdot{position:absolute;top:2px;right:2px;width:13px;height:13px;border-radius:50%;background:#94a3b8;border:2px solid #0f172a}
 .fdot.ok{background:#10b981}.fdot.warn{background:#f59e0b}.fdot.bad{background:#f43f5e}
-#panel{position:fixed;inset:auto 24px 84px auto;margin:0;padding:0;border:1px solid #334155;width:340px;max-width:calc(100vw - 24px);max-height:calc(100vh - 110px);overflow:auto;border-radius:22px;background:rgba(15,23,42,.97);backdrop-filter:blur(14px);color:#e2e8f0;font-size:13px;box-shadow:0 25px 60px rgba(0,0,0,.55)}
+#panel{position:fixed;inset:auto var(--wp-right,20px) 84px auto;margin:0;padding:0;border:1px solid #334155;width:340px;max-width:calc(100vw - 24px);max-height:calc(100vh - 110px);overflow:auto;border-radius:22px;background:rgba(15,23,42,.97);backdrop-filter:blur(14px);color:#e2e8f0;font-size:13px;box-shadow:0 25px 60px rgba(0,0,0,.55)}
 header{padding:12px 14px;background:linear-gradient(135deg,#1c1b2f,#252440);border-bottom:1px solid #334155;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:2}
 header .ic{width:34px;height:34px;border-radius:50%;background:rgba(16,185,129,.15);color:#10b981;display:flex;align-items:center;justify-content:center;border:1px solid rgba(16,185,129,.35)}
 header .t{flex:1;min-width:0}header b{display:block;font-size:14px;color:#fff}
@@ -246,8 +246,14 @@ h4{margin:0 0 6px;font-size:10.5px;text-transform:uppercase;letter-spacing:.6px;
   // Navegar no painel recarrega a página: durante uma chamada, avisa antes de sair (o áudio cairia)
   window.addEventListener('beforeunload', e => { if (inCall) { e.preventDefault(); e.returnValue = ''; return ''; } });
 
+  // Não cobre o botão do Chat IA do painel (canto inferior direito): fica ao lado dele
+  function placeFab() {
+    const ia = document.getElementById('ai-chat-fab');
+    const w = ia ? ia.getBoundingClientRect().width : 0; // botão ausente ou oculto: o telefone ocupa o canto
+    host.style.setProperty('--wp-right', w > 0 ? (20 + Math.round(w) + 12) + 'px' : '20px');
+  }
   function boot() {
-    document.body.appendChild(host);
+    document.body.appendChild(host); placeFab(); window.addEventListener('load', placeFab); setTimeout(placeFab, 1500);
     hist(); const d = ss.get('prisma_wp_num'); if (d) $('disp').value = d;
     status('Buscando credenciais...', 'warn');
     try { if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission(); } catch (e) {}
