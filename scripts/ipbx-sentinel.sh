@@ -6,7 +6,7 @@
 # Monitor UNICO de seguranca (substitui o antigo monitor_prisma.sh). A varredura de
 # arquivos atua so na camada web (/var/www/html); nao toca nos scripts PHP legitimos
 # do painel, APIs, WhatsApp ou webhooks. Os checks de host (firewall, dialplan, cron)
-# apenas leem; so o firewall e reativado se cair. Nunca reinicia o Asterisk.
+# apenas leem; o firewall so e reiniciado se SENTINEL_FIREWALL_HEAL=1. Nunca reinicia o Asterisk.
 #
 # O QUE FAZ
 #  1. Webshells: procura assinaturas conhecidas (caso Emad e eval ofuscado em
