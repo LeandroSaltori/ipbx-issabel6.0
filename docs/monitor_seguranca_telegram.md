@@ -13,7 +13,7 @@ O **IPbx Sentinel** (`scripts/ipbx-sentinel.sh`) é o monitor único de seguran�
 | 1 min | **Firewall** (`iptables`/`firewalld` parado ou com poucas regras) | Avisa uma vez, **reativa** o firewall e avisa quando voltar |
 | 1 min | **Dialplan malicioso** (`thanku-outcall`, `custom-get-extensions`) | Só alerta |
 | 1 min | **Crontab suspeito** (`asterisk` e `root`) | Só alerta |
-| 1 min | **Versão vulnerável do painel** (aviso oficial Issabel de 02/08/2026: `issabel-framework` ≤ 4.0.0-12 no Issabel 4 ou ≤ 5.0.0-3 no Issabel 5 permite controle remoto) | Só alerta, uma vez por versão, com o comando de atualização. **Não atualiza sozinho** |
+| 1 min | **Versão vulnerável do painel** (aviso oficial Issabel de 02/08/2026: `issabel-framework` ≤ 4.0.0-12 no Issabel 4 ou ≤ 5.0.0-3 no Issabel 5 permite controle remoto) | Alerta uma vez por versão. A correção é automática na instalação (opção [20]/`install.sh`) ou com `ipbx-sentinel --update-framework` |
 | 5 min | **Web shells e invasões** em `/var/www/html` (assinaturas `Emad__Was__Here`, `eval` ofuscado em cadeia, `eval(base64_decode`, `c99shell`, `r57shell`...) | Quarentena reversível + alerta com data, arquivo e IP de origem |
 | 5 min | **Módulos falsos** (`phones`, `h`, `_cache`, `tinfo`, `fpbxphones`) e **PHP em pastas de imagem** | Quarentena + alerta |
 | 5 min | **Contas e senhas**: usuário novo, senha/permissão alterada ou removido (painel `acl.db`, FreePBX, MySQL, `/etc/issabel.conf`, `/etc/amportal.conf`, `/etc/freepbx.conf`) e **nomes suspeitos** (`atmin`, `emad`...) | Só alerta (nunca desfaz) |
@@ -62,15 +62,21 @@ ipbx-sentinel --selftest      # autoteste do detector
 
 ## 🛡️ Aviso oficial Issabel de 02/08/2026 (crítico)
 
-Há uma campanha automatizada explorando o `issabel-framework`. A correção é a atualização do pacote (faça snapshot/backup antes):
+Há uma campanha automatizada explorando o `issabel-framework` (Issabel 4 ≤ 4.0.0-12; Issabel 5 ≤ 5.0.0-3). O Sentinel identifica a versão do servidor e **corrige automaticamente** ao ser instalado (opção **[20]** do menu, `install.sh` ou `ipbx-sentinel --install`):
 
-```bash
-# Issabel 4
-yum --disablerepo=* --enablerepo=issabel-updates update issabel-framework
-# Issabel 5
-yum --disablerepo=* --enablerepo=issabel-cinco-updates update issabel-framework
-```
+1. Detecta Issabel 4 ou 5 pela versão do `issabel-framework` instalado (se não estiver na faixa vulnerável, não faz nada).
+2. Cria o **snapshot** em `/var/backup/ipbx/backup_AAAA-MM-DD_HHMMSS` (manifesto, bancos do painel, configs do Asterisk, crontab, lista de pacotes) e atualiza o link `latest`.
+3. Atualiza só o pacote, pelo repositório oficial correto:
+   - Issabel 4: `yum --disablerepo=* --enablerepo=issabel-updates update issabel-framework`
+   - Issabel 5: `yum --disablerepo=* --enablerepo=issabel-cinco-updates update issabel-framework`
+4. Avisa no Telegram o resultado (sucesso ou falha, com o comando manual).
 
-- A atualização **impede novas invasões, mas não remove** malware instalado antes: depois de atualizar, rode `ipbx-sentinel --scan` e revise contas (`--baseline` só com o servidor limpo).
+Manual a qualquer momento: `ipbx-sentinel --update-framework`. Para desativar a correção automática na instalação: `SENTINEL_AUTO_UPDATE_FRAMEWORK=0` em `/etc/ipbx/sentinel.conf` (o alerta continua).
+
+- A atualização **impede novas invasões, mas não remove** malware instalado antes: depois, rode `ipbx-sentinel --scan` e revise contas (`--baseline` só com o servidor limpo).
 - Não exponha o servidor diretamente à Internet; troque as senhas administrativas se houver suspeita de acesso indevido; use apenas repositórios oficiais.
-- O Sentinel avisa no Telegram se o servidor ainda estiver numa versão afetada.
+- O Asterisk não é reiniciado pelo Sentinel; confira se o `yum` não reinicia serviços no seu ambiente.
+
+## 🖥️ Painel novo (`/front_api/`) exige PHP 7.0 ou superior
+
+O `instalar-front-api.sh` verifica o PHP antes de instalar. Em PHP antigo (Issabel 4 = PHP 5.4) ele **cancela sem alterar nada**. Se um painel anterior foi sobrescrito por engano: `bash /var/www/html/front_api/instalar-front-api.sh --rollback`.

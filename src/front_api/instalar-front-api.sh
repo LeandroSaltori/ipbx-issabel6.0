@@ -38,6 +38,15 @@ echo "=========================================================="
 echo "  Instalador Automático - front_api (Painel PABX Asterisk)"
 echo "=========================================================="
 
+# O painel novo exige PHP >= 7.0 (usa "??"). Em PHP antigo (ex.: Issabel 4 = PHP 5.4) a pagina
+# quebra com erro de sintaxe, entao NAO instala e nao mexe no que ja existe.
+if command -v php &>/dev/null && ! php -r 'exit(PHP_VERSION_ID >= 70000 ? 0 : 1);' 2>/dev/null; then
+  echo "[-] Este servidor usa PHP $(php -r 'echo PHP_VERSION;' 2>/dev/null), e o painel novo exige PHP 7.0 ou superior."
+  echo "    Instalacao CANCELADA: nada foi alterado. (Issabel 4 usa PHP 5.4; o painel novo e para Issabel 5.)"
+  echo "    Se um painel anterior ja foi sobrescrito por engano: bash $0 --rollback"
+  exit 1
+fi
+
 # 1. Localização da fonte de arquivos
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TMP_REPO=""

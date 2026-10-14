@@ -26,6 +26,7 @@
 # USO
 #   ipbx-sentinel --scan           varredura completa (padrao; roda na instalacao e sob demanda)
 #   ipbx-sentinel --incremental    so arquivos alterados recentemente (cron)
+#   ipbx-sentinel --update-framework  corrige issabel-framework vulneravel (snapshot + yum)
 #   ipbx-sentinel --host           so checks de host: firewall, dialplan, cron (cron, 1 min)
 #   ipbx-sentinel --install        instala comando, config e cron (/etc/cron.d)
 #   ipbx-sentinel --uninstall      remove o cron
@@ -39,6 +40,7 @@
 #   SENTINEL_ACTION=quarantine     # quarantine | alert (apenas avisa)
 #   SENTINEL_HEAL_PERMS=0          # 1 = remove escrita de "outros" em arquivos web
 #   SENTINEL_FIREWALL_HEAL=1       # 1 = reativa iptables/firewalld se cair (0 = so avisa)
+#   SENTINEL_AUTO_UPDATE_FRAMEWORK=1  # 1 = ao instalar, atualiza issabel-framework vulneravel (snapshot antes)
 # Telegram: /etc/ipbx/telegram.conf  ->  TELEGRAM_BOT_TOKEN=...  TELEGRAM_CHAT_ID=...
 # Excecoes (falsos positivos): /etc/ipbx/sentinel.allow (um caminho/glob por linha)
 # ==============================================================================
@@ -361,26 +363,65 @@ check_cron() {
 }
 
 # Aviso oficial Issabel (02/08/2026): issabel-framework <= 4.0.0-12 (Issabel 4) ou <= 5.0.0-3
-# (Issabel 5) permite controle remoto. So ALERTA (uma vez por versao); nao atualiza sozinho.
-check_framework() {
-  local v="${SENTINEL_FRAMEWORK_VER:-}" ver rel major lim_rel fix vuln=0
+# (Issabel 5) permite controle remoto. Detecta a versao e o repositorio de correcao certo.
+FW_VER=""; FW_FIX_REPO=""
+framework_vulnerable() {  # 0 = vulneravel (preenche FW_VER e FW_FIX_REPO)
+  local v="${SENTINEL_FRAMEWORK_VER:-}" ver rel major lim_rel vuln=0
   if [ -z "$v" ]; then
-    command -v rpm >/dev/null 2>&1 || return 0
-    v="$(rpm -q --qf '%{VERSION}-%{RELEASE}' issabel-framework 2>/dev/null)" || return 0
+    command -v rpm >/dev/null 2>&1 || return 1
+    v="$(rpm -q --qf '%{VERSION}-%{RELEASE}' issabel-framework 2>/dev/null)" || return 1
   fi
-  case "$v" in [0-9]*-*) ;; *) return 0 ;; esac
+  case "$v" in [0-9]*-*) ;; *) return 1 ;; esac
   ver="${v%%-*}"; rel="${v#*-}"; rel="${rel%%[!0-9]*}"; rel="${rel:-0}"; major="${ver%%.*}"
   case "$major" in
-    4) lim_rel=12; fix='yum --disablerepo=* --enablerepo=issabel-updates update issabel-framework' ;;
-    5) lim_rel=3;  fix='yum --disablerepo=* --enablerepo=issabel-cinco-updates update issabel-framework' ;;
-    *) return 0 ;;
+    4) lim_rel=12; FW_FIX_REPO=issabel-updates ;;
+    5) lim_rel=3;  FW_FIX_REPO=issabel-cinco-updates ;;
+    *) return 1 ;;
   esac
   if [ "$ver" = "$major.0.0" ]; then [ "$rel" -le "$lim_rel" ] && vuln=1
   elif [ "$(printf '%s\n%s\n' "$ver" "$major.0.0" | sort -V | head -1)" = "$ver" ]; then vuln=1; fi
-  [ "$vuln" = "1" ] || return 0
-  seen_once "framework|$v" || return 0
-  log "FRAMEWORK vulneravel: issabel-framework ${v}"
-  send_telegram "ALERTA: ATUALIZACAO DE SEGURANCA PENDENTE - ${HOSTNAME_S}"$'\n'"$(date '+%d/%m/%Y %H:%M:%S')"$'\n'"issabel-framework ${v} tem falha critica (aviso oficial de 02/08/2026) que permite controle remoto do servidor."$'\n\n'"Atualize (com backup/snapshot antes): ${fix}"$'\n'"Se suspeitar de invasao, a atualizacao NAO remove malware ja instalado: rode ipbx-sentinel --scan."
+  FW_VER="$v"; [ "$vuln" = "1" ]
+}
+
+check_framework() {  # so alerta (cron de 1 min); a correcao e feita por --update-framework
+  framework_vulnerable || return 0
+  seen_once "framework|$FW_VER" || return 0
+  log "FRAMEWORK vulneravel: issabel-framework ${FW_VER}"
+  send_telegram "ALERTA: ATUALIZACAO DE SEGURANCA PENDENTE - ${HOSTNAME_S}"$'\n'"$(date '+%d/%m/%Y %H:%M:%S')"$'\n'"issabel-framework ${FW_VER} tem falha critica (aviso oficial de 02/08/2026) que permite controle remoto do servidor."$'\n\n'"Corrija com: ipbx-sentinel --update-framework (faz snapshot antes)."$'\n'"A atualizacao NAO remove malware ja instalado: rode ipbx-sentinel --scan."
+}
+
+snapshot_pre_update() {  # $1 = descricao (regra de snapshot pre-atualizacao)
+  local ts dir root="${SENTINEL_BACKUP_ROOT:-/var/backup/ipbx}" f
+  ts="$(date '+%Y-%m-%d_%H%M%S')"; dir="$root/backup_${ts}"
+  mkdir -p "$dir/html" "$dir/db" "$dir/asterisk" 2>/dev/null || return 1
+  echo "$1 - $(date '+%d/%m/%Y as %H:%M:%S')" > "$dir/manifesto.txt"
+  for f in /var/www/db/menu.db /var/www/db/acl.db; do [ -f "$f" ] && cp -pf "$f" "$dir/db/" 2>/dev/null; done
+  for f in extensions_custom.conf extensions_override_issabelpbx.conf features_general_custom.conf pjsip.conf pjsip_custom.conf; do [ -f "/etc/asterisk/$f" ] && cp -pf "/etc/asterisk/$f" "$dir/asterisk/" 2>/dev/null; done
+  crontab -l > "$dir/crontab.txt" 2>/dev/null
+  rpm -qa 2>/dev/null | grep -i issabel | sort > "$dir/pacotes-issabel.txt"
+  ln -sfn "$dir" "$root/latest" 2>/dev/null
+  echo "$dir"
+}
+
+cmd_update_framework() {
+  framework_vulnerable || { echo "issabel-framework ${FW_VER:-nao encontrado}: nada a corrigir."; return 0; }
+  local pm snap rc old="$FW_VER"
+  pm="$(command -v yum || command -v dnf)"; [ -n "$pm" ] || { echo "yum/dnf nao encontrado."; return 1; }
+  snap="$(snapshot_pre_update "Atualizacao de seguranca issabel-framework ${old} (aviso oficial 02/08/2026)")" || { echo "Snapshot falhou; atualizacao cancelada."; return 1; }
+  echo "Snapshot gravado em: $snap"
+  echo "Atualizando issabel-framework ($old) pelo repositorio ${FW_FIX_REPO}..."
+  timeout 900 "$pm" -y --disablerepo='*' --enablerepo="$FW_FIX_REPO" update issabel-framework >> "$LOG_FILE" 2>&1; rc=$?
+  SENTINEL_FRAMEWORK_VER=""
+  if [ $rc -eq 0 ] && ! framework_vulnerable; then
+    local nv; nv="$(rpm -q --qf '%{VERSION}-%{RELEASE}' issabel-framework 2>/dev/null)"
+    log "FRAMEWORK atualizado: ${old} -> ${nv}"
+    send_telegram "issabel-framework atualizado com sucesso em ${HOSTNAME_S}: ${old} -> ${nv} ($(date '+%d/%m/%Y %H:%M:%S')). Snapshot: ${snap}. A atualizacao nao remove malware antigo: rode ipbx-sentinel --scan."
+    echo "OK: ${old} -> ${nv}"
+  else
+    log "FRAMEWORK: falha ao atualizar (codigo ${rc}); ver ${LOG_FILE}"
+    send_telegram "FALHA ao atualizar issabel-framework em ${HOSTNAME_S} (versao ${old}). Rode manualmente: ${pm} --disablerepo=* --enablerepo=${FW_FIX_REPO} update issabel-framework. Snapshot: ${snap}"
+    echo "FALHA ao atualizar (codigo $rc). Detalhes em ${LOG_FILE}"; return 1
+  fi
 }
 
 host_checks() { check_firewall; check_dialplan; check_cron; check_framework; }
@@ -440,12 +481,13 @@ CRON
   chmod 644 /etc/cron.d/ipbx-sentinel
   # Watchdog (sem credenciais): se o Sentinel ou seu cron forem apagados, restaura e avisa
   cat > /etc/cron.d/ipbx-watchdog <<'WD'
-* * * * * root [ -x /usr/local/bin/ipbx-sentinel ] && [ -f /etc/cron.d/ipbx-sentinel ] || { [ -f /etc/ipbx/ipbx-sentinel.bak ] && /bin/cp -pf /etc/ipbx/ipbx-sentinel.bak /usr/local/bin/ipbx-sentinel && chmod +x /usr/local/bin/ipbx-sentinel && /usr/local/bin/ipbx-sentinel --install >/dev/null 2>&1 && /usr/local/bin/ipbx-sentinel --alert-restored >/dev/null 2>&1; }
+* * * * * root [ -x /usr/local/bin/ipbx-sentinel ] && [ -f /etc/cron.d/ipbx-sentinel ] || { [ -f /etc/ipbx/ipbx-sentinel.bak ] && /bin/cp -pf /etc/ipbx/ipbx-sentinel.bak /usr/local/bin/ipbx-sentinel && chmod +x /usr/local/bin/ipbx-sentinel && /usr/local/bin/ipbx-sentinel --install --no-update >/dev/null 2>&1 && /usr/local/bin/ipbx-sentinel --alert-restored >/dev/null 2>&1; }
 WD
   chmod 644 /etc/cron.d/ipbx-watchdog
   migrate_old_monitor
   echo "Sentinel instalado: /usr/local/bin/ipbx-sentinel + /etc/cron.d/ipbx-sentinel (host a cada 1 min, arquivos alterados a cada 5 min; sem varredura noturna)."
   echo "Telegram: $TG_CONF (TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID). Teste: ipbx-sentinel --test-alert"
+  if [ "$1" != "--no-update" ] && [ "${SENTINEL_AUTO_UPDATE_FRAMEWORK:-1}" = "1" ]; then cmd_update_framework; fi
   echo "Varredura completa inicial (uma vez; depois so quando voce pedir: ipbx-sentinel --scan)..."
   do_scan full
 }
@@ -489,7 +531,7 @@ cmd_selftest() {
 }
 
 case "${1:-}" in
-  --install)     cmd_install ;;
+  --install)     cmd_install "$2" ;;
   --uninstall)   rm -f /etc/cron.d/ipbx-sentinel; echo "Cron do Sentinel removido." ;;
   --list)        cmd_list ;;
   --restore)     cmd_restore "$2" ;;
@@ -498,8 +540,9 @@ case "${1:-}" in
   --test-alert)  send_telegram "Teste do IPbx Sentinel em ${HOSTNAME_S} - $(date '+%d/%m/%Y %H:%M:%S'). Se esta mensagem chegou, o alerta esta funcionando." ; echo "Enviado (se o Telegram estiver configurado)." ;;
   --incremental) do_scan inc ;;
   --host)        host_checks ;;
+  --update-framework) cmd_update_framework ;;
   --alert-restored) send_telegram "ALERTA: o IPbx Sentinel (ou seu agendamento) foi APAGADO em ${HOSTNAME_S} e foi restaurado automaticamente - $(date '+%d/%m/%Y %H:%M:%S'). Investigue quem tem acesso root." ;;
   --scan|"")     do_scan full ;;
-  *) echo "Uso: $0 [--scan|--incremental|--host|--install|--uninstall|--list|--restore ARQ|--baseline|--test-alert|--selftest]"; exit 1 ;;
+  *) echo "Uso: $0 [--scan|--incremental|--host|--update-framework|--install|--uninstall|--list|--restore ARQ|--baseline|--test-alert|--selftest]"; exit 1 ;;
 esac
 exit 0
