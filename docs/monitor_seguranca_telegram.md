@@ -42,6 +42,7 @@ ipbx-sentinel --test-alert    # teste do Telegram
 ipbx-sentinel --list          # itens em quarentena
 ipbx-sentinel --restore ARQ   # restaura um arquivo da quarentena
 ipbx-sentinel --baseline      # refaz a foto de contas/senhas (servidor limpo)
+ipbx-sentinel --audit [DIAS] # auditoria forense somente-leitura (veja abaixo)
 ipbx-sentinel --status        # mostra se a vigilancia de contas consegue ler painel, MySQL e arquivos
 ipbx-sentinel --selftest      # autoteste do detector
 ```
@@ -82,3 +83,21 @@ Manual a qualquer momento: `ipbx-sentinel --update-framework`. Para desativar a 
 ## 🖥️ Painel novo (`/front_api/`) exige PHP 7.0 ou superior
 
 O `instalar-front-api.sh` verifica o PHP antes de instalar. Em PHP antigo (Issabel 4 = PHP 5.4) ele **cancela sem alterar nada**. Se um painel anterior foi sobrescrito por engano: `bash /var/www/html/front_api/instalar-front-api.sh --rollback`.
+
+---
+
+## 🔎 Auditoria pós-incidente (`ipbx-sentinel --audit [DIAS]`)
+
+Somente leitura (não altera nada). Cobre o que um invasor costuma deixar além dos arquivos web, e salva o relatório em `/var/log/ipbx-sentinel-audit-*.txt`. Pontos marcados com `[!]` precisam de revisão humana:
+
+1. Contas do sistema (UID 0 extra, shells de login, **chaves SSH** com fingerprint, `sudo` sem senha, `sshd_config`).
+2. Agendamentos suspeitos (`curl`, `wget`, `base64`, `/tmp`, `/dev/shm`...) em crontabs, `/etc/cron.*`.
+3. Processos rodando de `/tmp`, `/dev/shm` ou binário apagado; maiores consumidores de CPU.
+4. Portas abertas e portas sensíveis expostas (3306, 5038, 6379...).
+5. Persistência/rootkit: `/etc/ld.so.preload`, `rc.local`, serviços systemd novos, arquivos suspeitos em áreas temporárias.
+6. Binários do sistema diferentes do pacote original (`rpm -Va`).
+7. Arquivos alterados nos últimos N dias (padrão 30) em `/etc`, `/usr/local`, `/opt`, `/root`, cron e AGI.
+8. **Origem do ataque**: data de modificação mais antiga dos arquivos em quarentena (quando o invasor entrou, no máximo) e IPs que acessaram esses arquivos nos logs do Apache.
+9. Asterisk: AMI aberto para qualquer origem e dialplan suspeito.
+
+Limites: o `last` e o `wtmp` só mostram logins SSH/console; uma invasão por falha web (RCE) não aparece ali. Logs rotacionados podem não retroceder até a data da invasão. Depois de um RCE com possível rootkit, reinstalar a partir de backup limpo continua sendo o caminho mais seguro.

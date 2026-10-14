@@ -27,6 +27,7 @@
 #   ipbx-sentinel --scan           varredura completa (padrao; roda na instalacao e sob demanda)
 #   ipbx-sentinel --incremental    so arquivos alterados recentemente (cron)
 #   ipbx-sentinel --update-framework  corrige issabel-framework vulneravel (snapshot + yum)
+#   ipbx-sentinel --audit [DIAS]   auditoria forense somente-leitura (contas, SSH, cron, processos, portas, rootkit, origem do ataque)
 #   ipbx-sentinel --status         mostra se a vigilancia de contas consegue ler painel/MySQL/arquivos
 #   ipbx-sentinel --host           so checks de host: firewall, dialplan, cron (cron, 1 min)
 #   ipbx-sentinel --install        instala comando, config e cron (/etc/cron.d)
@@ -305,6 +306,93 @@ identity_status() {
   local f; for f in $CRED_FILES; do [ -r "$f" ] && echo "  [OK] arquivo $f" || echo "  [--] arquivo $f (nao existe)"; done
 }
 
+# ------------------------------------------------------------------------------
+# AUDITORIA FORENSE (somente leitura): o que um invasor costuma deixar para tras alem
+# dos arquivos web. Nao altera nada. Relatorio tambem em /var/log/ipbx-sentinel-audit-*.txt
+# ------------------------------------------------------------------------------
+cmd_audit() {
+  local days="${1:-30}" AF=0 out ts; ts="$(date '+%Y%m%d_%H%M%S')"
+  out="${SENTINEL_AUDIT_OUT:-/var/log/ipbx-sentinel-audit-${ts}.txt}"
+  { 
+  sec()  { echo; echo "== $* =="; }
+  warn() { echo "  [!] $*"; AF=$((AF+1)); }
+  info() { echo "  $*"; }
+  echo "AUDITORIA IPbx Sentinel - ${HOSTNAME_S} - $(date '+%d/%m/%Y %H:%M:%S') (arquivos alterados nos ultimos ${days} dias)"
+
+  sec "1. Contas do sistema e acesso SSH"
+  awk -F: '$3==0 && $1!="root"{print $1}' /etc/passwd 2>/dev/null | while read -r u; do warn "usuario com UID 0 alem do root: $u"; done
+  awk -F: '$3>=1000 && $7 !~ /(nologin|false)$/ {print "  usuario com shell de login: "$1" (uid "$3")"}' /etc/passwd 2>/dev/null
+  local d f
+  for d in /root $(awk -F: '$7 !~ /(nologin|false|sync|shutdown|halt)$/ && $6 ~ /^\// {print $6}' /etc/passwd 2>/dev/null | sort -u); do
+    f="$d/.ssh/authorized_keys"; [ -s "$f" ] || continue
+    info "chaves SSH em $f:"; command -v ssh-keygen >/dev/null 2>&1 && ssh-keygen -lf "$f" 2>/dev/null | sed 's/^/     /'
+    warn "confira se TODAS as chaves acima sao suas ($f)"
+  done
+  grep -rhE 'NOPASSWD' /etc/sudoers /etc/sudoers.d 2>/dev/null | grep -v '^#' | while read -r l; do warn "sudo sem senha: $l"; done
+  grep -hiE '^\s*(PermitRootLogin|PasswordAuthentication|Port)\s' /etc/ssh/sshd_config 2>/dev/null | sed 's/^/  sshd: /'
+
+  sec "2. Agendamentos (cron)"
+  local u pat='curl|wget|base64|/tmp/|/dev/shm|/var/tmp|nc -|bash -i|python -c|perl -e|\.sh *>|supportpbx|emad|postroot'
+  for u in $(cut -d: -f1 /etc/passwd 2>/dev/null); do
+    crontab -l -u "$u" 2>/dev/null | grep -v '^#' | grep -E "$pat" | while read -r l; do warn "cron de $u: $l"; done
+  done
+  grep -rHE "$pat" /etc/cron.d /etc/cron.hourly /etc/cron.daily /etc/crontab 2>/dev/null | grep -v '^#' | grep -vE 'ipbx-sentinel|ipbx-watchdog|ipbx-front-api' | while read -r l; do warn "$l"; done
+  info "arquivos em /etc/cron.d: $(ls /etc/cron.d 2>/dev/null | tr '\n' ' ')"
+
+  sec "3. Processos suspeitos"
+  local pid exe
+  for pid in $(ls /proc 2>/dev/null | grep -E '^[0-9]+$'); do
+    exe="$(readlink "/proc/$pid/exe" 2>/dev/null)" || continue
+    case "$exe" in
+      /tmp/*|/var/tmp/*|/dev/shm/*|*"(deleted)"*) warn "processo $pid rodando de local suspeito: $exe ($(tr '\0' ' ' < /proc/$pid/cmdline 2>/dev/null | cut -c1-80))" ;;
+    esac
+  done
+  info "maiores consumidores de CPU:"; ps -eo pid,user,pcpu,comm --sort=-pcpu 2>/dev/null | head -6 | sed 's/^/     /'
+
+  sec "4. Portas abertas"
+  ss -tlnpH 2>/dev/null | awk '{print "  TCP "$4"  "$6}' | head -30
+  ss -tlnH 2>/dev/null | awk '{print $4}' | grep -E '^(\*|0\.0\.0\.0|\[::\]):(3306|5038|5432|6379|27017|11211|9200)$' | while read -r l; do warn "porta sensivel aberta para todas as interfaces: $l"; done
+
+  sec "5. Persistencia e rootkit"
+  [ -s /etc/ld.so.preload ] && warn "/etc/ld.so.preload existe (tipico de rootkit): $(cat /etc/ld.so.preload | head -3 | tr '\n' ' ')"
+  grep -vE '^\s*(#|$|touch /var/lock|exit)' /etc/rc.d/rc.local /etc/rc.local 2>/dev/null | while read -r l; do warn "rc.local: $l"; done
+  find /etc/systemd/system /usr/lib/systemd/system -type f -name '*.service' -mtime "-${days}" 2>/dev/null | head -10 | while read -r l; do warn "servico systemd criado/alterado recentemente: $l"; done
+  find /tmp /var/tmp /dev/shm -type f \( -name '*.php' -o -name '*.sh' -o -perm -u+x \) 2>/dev/null | head -15 | while read -r l; do warn "arquivo suspeito em area temporaria: $l"; done
+
+  sec "6. Binarios do sistema alterados (rpm -V)"
+  if command -v rpm >/dev/null 2>&1; then
+    timeout 300 rpm -Va --noconfig 2>/dev/null | awk '$1 ~ /^..5/ && $2!="c" {print $NF}' | grep -E '^/(usr/)?(s?bin)/|^/usr/lib64?/lib' | head -20 | while read -r l; do warn "binario/biblioteca diferente do pacote original: $l"; done
+  else info "rpm nao disponivel"; fi
+
+  sec "7. Arquivos alterados nos ultimos ${days} dias (fora do esperado)"
+  find /etc /usr/local /opt /root /var/spool/cron /var/lib/asterisk/agi-bin /var/www/cgi-bin -type f -mtime "-${days}" 2>/dev/null \
+    | grep -vE 'ipbx-sentinel|ipbx-watchdog|/etc/ipbx/|\.bash_history|/etc/(mtab|resolv|adjtime|asterisk/.*(cdr|queues_log)|alternatives|ld.so.cache)|/root/ipbx-' | head -40 | sed 's/^/  /'
+
+  sec "8. Origem do ataque (logs do Apache x arquivos em quarentena)"
+  if [ -d "$QUAR_ROOT" ]; then
+    local q; q="$(find "$QUAR_ROOT" -type f ! -name INDEX.tsv -printf '%TY-%Tm-%Td %TH:%TM\n' 2>/dev/null | sort)"
+    [ -n "$q" ] && info "arquivos em quarentena: $(echo "$q" | wc -l) | data de modificacao mais antiga: $(echo "$q" | head -1) | mais recente: $(echo "$q" | tail -1)  (a mais antiga indica quando o invasor entrou, no maximo)"
+  fi
+  local pats; pats="$(mktemp)"
+  awk -F'\t' '{n=$2; sub(/.*\//,"",n); print n}' "$QUAR_ROOT"/INDEX.tsv 2>/dev/null | sort -u | grep -vxE 'index\.php|config\.php|ajax\.php|configs\.php|config\.all\.php' > "$pats"
+  if [ -s "$pats" ]; then
+    local logs; logs="$(ls /var/log/httpd/*access_log* /var/log/apache2/*access* 2>/dev/null)"
+    info "arquivos maliciosos distintos conhecidos: $(wc -l < "$pats")"
+    for f in $logs; do case "$f" in *.gz) zcat "$f" 2>/dev/null;; *) cat "$f" 2>/dev/null;; esac; done | grep -F -f "$pats" | awk '{print $1}' | sort | uniq -c | sort -rn | head -10 | sed 's/^/     acessos aos arquivos maliciosos, por IP: /'
+  else info "sem itens em quarentena para cruzar"; fi
+  rm -f "$pats"
+
+  sec "9. Asterisk (acessos externos e desvios)"
+  awk '/^\[/{sec=$0} /^(permit|deny)/{print sec" "$0}' /etc/asterisk/manager.conf 2>/dev/null | grep -E 'permit *= *0\.0\.0\.0' | while read -r l; do warn "AMI aberto para qualquer origem: $l"; done
+  grep -nE 'thanku-outcall|custom-get-extensions|Dial\(.*[0-9]{11,}' /etc/asterisk/extensions*.conf 2>/dev/null | head -5 | while read -r l; do warn "dialplan suspeito: $l"; done
+
+  sec "RESUMO"
+  if [ "$AF" -eq 0 ]; then echo "  Nenhum sinal de alerta encontrado nesta auditoria."; else echo "  ${AF} ponto(s) marcado(s) com [!] para voce revisar."; fi
+  echo "  Esta auditoria so le o servidor. Reinstalar a partir de backup limpo continua sendo o caminho mais seguro apos um RCE."
+  } 2>&1 | tee "$out"
+  echo; echo "Relatorio salvo em: $out"
+}
+
 report_identity() {
   [ "${#IDENT_CHANGES[@]}" -gt 0 ] || return 0
   local msg c i=0
@@ -574,9 +662,10 @@ case "${1:-}" in
   --incremental) do_scan inc ;;
   --host)        host_checks ;;
   --status)      identity_status ;;
+  --audit)       cmd_audit "$2" ;;
   --update-framework) cmd_update_framework ;;
   --alert-restored) send_telegram "ALERTA: o IPbx Sentinel (ou seu agendamento) foi APAGADO em ${HOSTNAME_S} e foi restaurado automaticamente - $(date '+%d/%m/%Y %H:%M:%S'). Investigue quem tem acesso root." ;;
   --scan|"")     do_scan full ;;
-  *) echo "Uso: $0 [--scan|--incremental|--host|--status|--update-framework|--install|--uninstall|--list|--restore ARQ|--baseline|--test-alert|--selftest]"; exit 1 ;;
+  *) echo "Uso: $0 [--scan|--incremental|--host|--status|--audit [DIAS]|--update-framework|--install|--uninstall|--list|--restore ARQ|--baseline|--test-alert|--selftest]"; exit 1 ;;
 esac
 exit 0
