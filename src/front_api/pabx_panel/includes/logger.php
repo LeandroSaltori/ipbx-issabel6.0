@@ -17,6 +17,7 @@ define('LOG_CAT_AI',       'ai_copilot');
 define('LOG_CAT_WA',       'whatsapp');
 define('LOG_CAT_SECURITY', 'security');
 define('LOG_CAT_AUDIT',    'user_actions');
+define('LOG_CAT_PERF',     'desempenho');
 
 /**
  * Funções Auxiliares de Registro Rápido
@@ -119,6 +120,7 @@ function get_pabx_log_categories() {
         LOG_CAT_AI       => ['title' => 'Copiloto de IA & LLMs', 'icon' => 'fa-solid fa-wand-magic-sparkles', 'color' => 'indigo'],
         LOG_CAT_WA       => ['title' => 'Prismabot WhatsApp API', 'icon' => 'fa-brands fa-whatsapp', 'color' => 'teal'],
         LOG_CAT_SECURITY => ['title' => 'Segurança & Permissões', 'icon' => 'fa-solid fa-shield-halved', 'color' => 'blue'],
+        LOG_CAT_PERF     => ['title' => 'Desempenho (telas lentas)', 'icon' => 'fa-solid fa-gauge-high', 'color' => 'amber'],
     ];
 
     foreach ($categories as $cat => &$info) {

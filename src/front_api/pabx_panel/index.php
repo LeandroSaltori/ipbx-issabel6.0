@@ -5,9 +5,24 @@ ob_start();
  * Arquitetura Modular de Engenharia de Software
  */
 
+// Cronômetro: registra em Configurações > Logs > "Desempenho (telas lentas)" as telas/chamadas que demoram mais de 1,5 s
+$__perf_t0 = microtime(true);
+$__perf_marks = [];
+register_shutdown_function(function () use (&$__perf_t0, &$__perf_marks) {
+    $d = microtime(true) - $__perf_t0;
+    if ($d < 1.5 || !function_exists('pabx_log')) return;
+    $alvo = ($_GET['api_action'] ?? $_GET['action'] ?? '') !== '' ? (string)($_GET['api_action'] ?? $_GET['action']) : 'index';
+    $tela = (string)($_GET['module'] ?? 'dashboard') . '/' . $alvo;
+    $partes = []; $ant = 0.0;
+    foreach ($__perf_marks as $nome => $t) { $partes[] = $nome . ' ' . number_format($t - $ant, 2) . 's'; $ant = $t; }
+    $partes[] = 'tela/consultas ' . number_format($d - $ant, 2) . 's';
+    @pabx_log('desempenho', 'WARNING', 'Requisição lenta ' . number_format($d, 2) . 's | ' . $tela . ' | ' . implode(' | ', $partes));
+});
+
 require_once __DIR__ . '/config/database.php';
 require_once __DIR__ . '/includes/functions.php';
 require_once __DIR__ . '/includes/address_book_sync.php';
+$__perf_marks['abertura (banco+código)'] = microtime(true) - $__perf_t0;
 
 // Auto-sincronizar ramais na primeira inicialização se a tabela estiver vazia
 try {
@@ -40,6 +55,8 @@ if (($_GET['api_action'] ?? '') === 'whatsapp_webhook') {
 } else {
     authGate('page');
 }
+
+$__perf_marks['login/permissões'] = microtime(true) - $__perf_t0;
 
 // =========================================================================
 // HANDLER DE ENDPOINTS DE API (JSON)

@@ -952,7 +952,12 @@ function getAsteriskQueuesRealtimeStatus($period = 'today') {
         $__last_sync = (int)@file_get_contents($__f);
         if (time() - $__last_sync > 60) {
             @file_put_contents($__f, (string)time());
-            @syncPrismaAssets();
+            // Roda depois de entregar a resposta ao navegador (php-fpm): a tela não espera a sincronização com a central
+            if (PHP_SAPI !== 'cli' && function_exists('fastcgi_finish_request')) {
+                register_shutdown_function(function () { @fastcgi_finish_request(); @syncPrismaAssets(); });
+            } else {
+                @syncPrismaAssets();
+            }
         }
     }
     $queues_config = $db ? $db->query("SELECT * FROM queues_config ORDER BY queue_number ASC")->fetchAll(PDO::FETCH_ASSOC) : [];
