@@ -112,3 +112,10 @@ A auditoria de um servidor invadido mostrou persistência de root: contas `yum` 
 ### Caso real: agente de botnet SIP ("SIP Sentinel")
 
 No mesmo servidor havia o serviço `sipsentinel.service` (`/usr/bin/python3 /opt/sipsentinel/agent.py`, comentários em árabe), com SIPVicious (`svmap`) varrendo faixas de IP de terceiros na porta 5065 e módulos para enumerar ramais e tentar chamadas (`sip_tool.py`, `call_to`, `call_user_password`), autoatualizado remotamente (`.pkg_sync_version`). O servidor foi usado como **nó de ataque contra outras redes** (risco de fraude de tarifas e de reclamação de abuso). O Sentinel alerta a pasta e os processos desse agente em toda a frota. Contenção: capturar a conexão com o servidor de comando (`ss -tnp | grep python3`), copiar a pasta como evidência, depois `systemctl stop/disable sipsentinel` e `pkill -f svmap`. Trocar todas as credenciais de ramais/troncos SIP e revisar as faturas de operadora.
+
+### Nota da auditoria (secoes 6, 8 e 9)
+
+- **Secao 6:** no CentOS 7, `/bin` e `/sbin` sao links para `/usr/bin` e `/usr/sbin`, mas pacotes como grep, sed, net-tools e rpm registram o caminho antigo (`/bin/grep`). A conferencia agora tenta as duas grafias antes de acusar "sem pacote de origem", evitando falso alarme.
+- **Secao 8:** o invasor pode falsificar datas de arquivos; compare com a data de `/opt/sipsentinel` e de `/var/log/cron`.
+- **Secao 9:** alem de `permit=0.0.0.0`, avisa `bindaddr=0.0.0.0` no AMI e `allowguest=yes` no SIP.
+- IP `80.94.93.9` (acessou arquivos maliciosos nos logs do Apache) entrou na base global de bloqueio.

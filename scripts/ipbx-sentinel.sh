@@ -392,7 +392,13 @@ cmd_audit() {
           real="$(readlink -f "$f" 2>/dev/null)"; [ -f "$real" ] || continue
           case "$seen" in *" $real "*) continue ;; esac; seen="$seen$real "
           n=$((n+1))
-          line="$(rpm -q --dump -f "$real" 2>/dev/null | awk -v p="$real" '$1==p{print; exit}')"
+          # CentOS 7: /bin e /sbin sao links para /usr/bin e /usr/sbin, mas varios pacotes (grep, sed, net-tools, rpm)
+          # registram o caminho antigo (/bin/grep). Tenta todas as grafias antes de acusar "sem pacote".
+          line=""; local cand
+          for cand in "$f" "$real" "${real/#\/usr\/bin\//\/bin\/}" "${real/#\/usr\/sbin\//\/sbin\/}" "${real/#\/bin\//\/usr\/bin\/}" "${real/#\/sbin\//\/usr\/sbin\/}"; do
+            line="$(rpm -q --dump -f "$cand" 2>/dev/null | awk -v p="$cand" '$1==p{print; exit}')"
+            [ -n "$line" ] && break
+          done
           if [ -z "$line" ]; then warn "ferramenta critica SEM pacote de origem (pode ser trocada/plantada): $real"; bad=$((bad+1)); continue; fi
           dg="$(echo "$line" | awk '{print $4}')"
           case "${#dg}" in 32) calc="$(md5sum "$real" 2>/dev/null | awk '{print $1}')" ;; 64) calc="$(sha256sum "$real" 2>/dev/null | awk '{print $1}')" ;; *) continue ;; esac
@@ -410,7 +416,7 @@ cmd_audit() {
   sec "8. Origem do ataque (logs do Apache x arquivos em quarentena)"
   if [ -d "$QUAR_ROOT" ]; then
     local q; q="$(find "$QUAR_ROOT" -type f ! -name INDEX.tsv -printf '%TY-%Tm-%Td %TH:%TM\n' 2>/dev/null | sort)"
-    [ -n "$q" ] && info "arquivos em quarentena: $(echo "$q" | wc -l) | data de modificacao mais antiga: $(echo "$q" | head -1) | mais recente: $(echo "$q" | tail -1)  (a mais antiga indica quando o invasor entrou, no maximo)"
+    [ -n "$q" ] && info "arquivos em quarentena: $(echo "$q" | wc -l) | data de modificacao mais antiga: $(echo "$q" | head -1) | mais recente: $(echo "$q" | tail -1)  (a mais antiga indica quando o invasor entrou, no maximo; o invasor pode falsificar datas - confira tambem a data dos arquivos em /opt/sipsentinel e do /var/log/cron)"
   fi
   local pats; pats="$(mktemp)"
   awk -F'\t' '{n=$2; sub(/.*\//,"",n); print n}' "$QUAR_ROOT"/INDEX.tsv 2>/dev/null | sort -u | grep -vxE 'index\.php|config\.php|ajax\.php|configs\.php|config\.all\.php' > "$pats"
@@ -423,6 +429,10 @@ cmd_audit() {
 
   sec "9. Asterisk (acessos externos e desvios)"
   awk '/^\[/{sec=$0} /^(permit|deny)/{print sec" "$0}' /etc/asterisk/manager.conf 2>/dev/null | grep -E 'permit *= *0\.0\.0\.0' | while read -r l; do warn "AMI aberto para qualquer origem: $l"; done
+  grep -hiE '^ *bindaddr *= *0\.0\.0\.0' /etc/asterisk/manager.conf 2>/dev/null | head -1 | while read -r l; do warn "AMI escutando em todas as interfaces ($l): restrinja a 127.0.0.1 ou ao firewall"; done
+  awk '/^\[/{sec=$0} /^(permit|deny)/{print sec" "$0}' /etc/asterisk/manager*.conf 2>/dev/null | grep -vE '^\[general\]' | grep -E 'permit *= *(0\.0\.0\.0|[0-9.]+/0\.0\.0\.0)' | head -5 | while read -r l; do warn "usuario AMI aceita qualquer origem: $l"; done
+  grep -hiE '^ *allowguest *= *yes' /etc/asterisk/sip*.conf 2>/dev/null | head -1 | while read -r l; do warn "SIP aceita chamadas de visitante sem autenticacao ($l)"; done
+  info "secao 9 verifica: AMI aberto, bindaddr 0.0.0.0, allowguest; dialplan malicioso e checado a cada minuto pelo monitor do host"
   grep -nE 'thanku-outcall|custom-get-extensions|Dial\(.*[0-9]{11,}' /etc/asterisk/extensions*.conf 2>/dev/null | head -5 | while read -r l; do warn "dialplan suspeito: $l"; done
 
   sec "RESUMO"

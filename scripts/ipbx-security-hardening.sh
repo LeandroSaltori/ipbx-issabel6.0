@@ -307,7 +307,7 @@ log_success "Servico SSH saneado e verificado."
 
 # 6.1 Bloqueio de IPs maliciosos e botnets conhecidas no Firewall
 log_info "6.1 Bloqueando IPs de botnets e atacantes conhecidos no Firewall..."
-MALICIOUS_IPS=("212.83.160.70" "104.194.143.156" "51.91.234.105")
+MALICIOUS_IPS=("212.83.160.70" "104.194.143.156" "51.91.234.105" "80.94.93.9")
 for ip in "${MALICIOUS_IPS[@]}"; do
     iptables -C INPUT -s "$ip" -j DROP 2>/dev/null || iptables -I INPUT -s "$ip" -j DROP 2>/dev/null || true
     iptables -C OUTPUT -d "$ip" -j DROP 2>/dev/null || iptables -I OUTPUT -d "$ip" -j DROP 2>/dev/null || true
