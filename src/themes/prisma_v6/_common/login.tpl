@@ -106,7 +106,6 @@ body{font-family:'Noto Sans','Segoe UI',system-ui,sans-serif;color:#e6eef7;min-h
   } catch (e) {}
   var f = document.getElementById('form_login'), go = document.getElementById('go');
   f.addEventListener('submit', function(){
-    try { var c = document.querySelector('#painel-sel input:checked'); if (c) document.cookie = 'ipbx_painel=' + c.value + '; path=/; max-age=31536000; SameSite=Lax'; } catch (e) {}
     setTimeout(function(){ go.disabled = true; go.firstChild.textContent = 'Entrando...'; }, 0);
   });
   document.getElementById('eye').addEventListener('click', function(){

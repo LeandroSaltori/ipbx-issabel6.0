@@ -262,8 +262,9 @@ function isGroupActive($modules_array) {
             <div id="user-menu-pop" class="hidden absolute bottom-full left-0 right-0 mb-1 p-1 rounded-xl bg-slate-900 border border-slate-700 shadow-2xl z-30 space-y-0.5">
                 <button type="button" onclick="toggleUserMenu(false); openUserProfileModal();" class="w-full px-2.5 py-2 rounded-lg hover:bg-slate-800 text-slate-200 text-[12px] font-semibold transition flex items-center gap-2.5" style="white-space:nowrap"><i class="fa-regular fa-user w-4 text-center text-brand-400"></i> Perfil</button>
                 <?php if (!empty($_SESSION['via_sso'])): ?>
-                <a href="../seletor.php?ir=classico&lembrar=1" class="w-full px-2.5 py-2 rounded-lg hover:bg-slate-800 text-slate-200 text-[12px] font-semibold transition flex items-center gap-2.5" style="white-space:nowrap" title="Abrir o painel clássico"><i class="fa-solid fa-right-left w-4 text-center text-slate-400"></i> Painel clássico</a>
+                <a href="../seletor.php?ir=classico" class="w-full px-2.5 py-2 rounded-lg hover:bg-slate-800 text-slate-200 text-[12px] font-semibold transition flex items-center gap-2.5" style="white-space:nowrap" title="Abrir o painel clássico"><i class="fa-solid fa-right-left w-4 text-center text-slate-400"></i> Painel clássico</a>
                 <?php endif; ?>
+                <button type="button" onclick="limparCookiesPainel();" class="w-full px-2.5 py-2 rounded-lg hover:bg-slate-800 text-slate-200 text-[12px] font-semibold transition flex items-center gap-2.5" style="white-space:nowrap;flex-shrink:0" title="Apaga os dados que o painel guarda neste navegador, sem encerrar o seu acesso"><i class="fa-solid fa-cookie-bite w-4 text-center text-slate-400"></i> Limpar cookies</button>
                 <a href="index.php?auth=logout" class="w-full px-2.5 py-2 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 text-[12px] font-bold transition flex items-center gap-2.5" style="white-space:nowrap"><i class="fa-solid fa-right-from-bracket w-4 text-center"></i> Sair</a>
             </div>
             <button type="button" id="user-menu-btn" onclick="toggleUserMenu()" aria-haspopup="true" aria-expanded="false" class="w-full flex items-center gap-2.5 px-2 py-1.5 rounded-xl hover:bg-slate-800/70 transition text-left" title="Conta: perfil, painel clássico e sair">
@@ -280,6 +281,21 @@ function isGroupActive($modules_array) {
 </aside>
 
 <script>
+    // Apaga cookies comuns e dados guardados pelo painel neste navegador. O cookie de sessão (protegido) permanece: para encerrar o acesso use "Sair".
+    function limparCookiesPainel() {
+        try {
+            var partes = location.pathname.split('/').filter(Boolean), caminhos = ['/'], acc = '';
+            partes.forEach(function (p) { acc += '/' + p; caminhos.push(acc); });
+            document.cookie.split(';').forEach(function (c) {
+                var nome = c.split('=')[0].trim();
+                if (!nome) return;
+                caminhos.forEach(function (cam) { document.cookie = nome + '=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=' + cam; });
+            });
+        } catch (e) {}
+        try { localStorage.clear(); } catch (e) {}
+        try { sessionStorage.clear(); } catch (e) {}
+        try { (window.top || window).location.reload(); } catch (e) { location.reload(); }
+    }
     function toggleUserMenu(force) {
         const pop = document.getElementById('user-menu-pop');
         const btn = document.getElementById('user-menu-btn');

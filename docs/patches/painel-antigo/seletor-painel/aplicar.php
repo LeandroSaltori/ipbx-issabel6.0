@@ -23,25 +23,13 @@ $html = <<<'H'
 				</div>
 				{literal}
 				<style>#ipbx-painel-sel input:checked + .ipbx-pn{background:linear-gradient(135deg,#7c3aed,#6366f1);border-color:#7c3aed;color:#fff;font-weight:700}</style>
-				<script>
-				(function(){
-					try {
-						var m = document.cookie.match(/(?:^|; )ipbx_painel=([^;]+)/);
-						if (m) { var r = document.querySelector('#ipbx-painel-sel input[value="' + m[1] + '"]'); if (r) r.checked = true; }
-						document.getElementById('form_login').addEventListener('submit', function(){
-							var c = document.querySelector('#ipbx-painel-sel input:checked');
-							if (c) document.cookie = 'ipbx_painel=' + c.value + '; path=/; max-age=31536000; SameSite=Lax';
-						});
-					} catch (e) {}
-				})();
-				</script>
 				{/literal}
 				<!-- /IPBX-PAINEL-SELETOR -->
 
 H;
 $E1 = '/* IPBX-PAINEL-ENTRADA */'; $E2 = '/* /IPBX-PAINEL-ENTRADA */';
-$entrada = "    $E1\n    if (\$_SERVER['REQUEST_METHOD'] === 'GET' && !isset(\$_GET['menu'])) {\n        header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0'); header('Pragma: no-cache');\n        if (!isset(\$_GET['classico']) && (\$_COOKIE['ipbx_painel'] ?? '') === 'novo' && is_file(__DIR__ . '/seletor.php')) { header('Location: seletor.php?ir=novo'); exit; }\n    }\n    $E2\n";
-$php = "    $P1\n    if (in_array((\$_POST['painel'] ?? ''), ['novo', 'classico'], true) && !headers_sent()) setcookie('ipbx_painel', \$_POST['painel'], time() + 86400 * 365, '/', '', false, true);\n    if ((\$_POST['painel'] ?? '') === 'novo' && is_file(__DIR__ . '/seletor.php')) return 'seletor.php?ir=novo';\n    $P2\n";
+$entrada = "    $E1\n    if (\$_SERVER['REQUEST_METHOD'] === 'GET' && !isset(\$_GET['menu'])) {\n        header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0'); header('Pragma: no-cache');\n        if (isset(\$_COOKIE['ipbx_painel'])) setcookie('ipbx_painel', '', time() - 3600, '/');\n        if (!isset(\$_GET['classico']) && (\$_SESSION['ipbx_painel'] ?? '') === 'novo' && is_file(__DIR__ . '/seletor.php')) { header('Location: seletor.php?ir=novo'); exit; }\n    }\n    $E2\n";
+$php = "    $P1\n    if (in_array((\$_POST['painel'] ?? ''), ['novo', 'classico'], true)) \$_SESSION['ipbx_painel'] = \$_POST['painel'];\n    if ((\$_POST['painel'] ?? '') === 'novo' && is_file(__DIR__ . '/seletor.php')) return 'seletor.php?ir=novo';\n    $P2\n";
 
 $tpl = file_get_contents($theme); $idx = file_get_contents($index);
 if ($undo) {
@@ -50,6 +38,7 @@ if ($undo) {
     $idx = preg_replace('#\n[ \t]*' . preg_quote($P1, '#') . '.*?' . preg_quote($P2, '#') . '[ \t]*\n#s', "\n", $idx, 1);
 } else {
     /* Login novo já traz a escolha de painel (name="painel"); só o tema antigo recebe o bloco. */
+    $tpl = preg_replace('#\s*' . preg_quote($M1, '#') . '.*?' . preg_quote($M2, '#') . '\s*#s', "\n\n\t\t\t\t", $tpl, 1);
     if (strpos($tpl, $M1) === false && strpos($tpl, 'name="painel"') === false) {
         if (preg_match('#<div class="form-group">\s*<button type="submit"#', $tpl, $m, PREG_OFFSET_CAPTURE)) {
             $tpl = substr_replace($tpl, $html . "\t\t\t\t", $m[0][1], 0);

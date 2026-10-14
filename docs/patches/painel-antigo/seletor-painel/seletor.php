@@ -24,8 +24,9 @@ function seletorKey() { $k = @file_get_contents('/etc/ipbx/sso.key'); $k = is_st
 function b64u($s) { return rtrim(strtr(base64_encode($s), '+/', '-_'), '='); }
 
 if (($_GET['ir'] ?? '') === 'novo' || ($_GET['ir'] ?? '') === 'classico') {
-    // grava a escolha no servidor (não depende do formulário nem de JavaScript)
-    setcookie('ipbx_painel', $_GET['ir'], time() + 86400 * 365, '/', '', false, true);
+    // vale só enquanto este login estiver ativo (nada fica gravado no navegador)
+    $_SESSION['ipbx_painel'] = $_GET['ir'];
+    if (isset($_COOKIE['ipbx_painel'])) setcookie('ipbx_painel', '', time() - 3600, '/');
     if ($_GET['ir'] === 'classico') { header('Location: index.php?classico=1'); exit; }
     $key = seletorKey();
     if ($key === '') { $erro = 'Painel novo indisponível: entrada única não configurada neste servidor.'; }
@@ -61,8 +62,5 @@ label{display:block;margin-top:20px;color:#94a3b8;font-size:13px}.e{color:#fca5a
 <a class="c n" id="novo" href="?ir=novo"><div class="t">Painel Novo 6.0</div><div class="d">Dashboard, filas ao vivo, relatórios, WhatsApp e assistente inteligente.</div></a>
 <a class="c" id="classico" href="?ir=classico"><div class="t">Painel Clássico</div><div class="d">Todas as configurações da central, como sempre.</div></a>
 </div>
-<label><input type="checkbox" id="lembrar"> Lembrar minha escolha neste navegador</label>
 </div>
-<script>
-document.querySelectorAll('a.c').forEach(function(a){a.addEventListener('click',function(){var l=document.getElementById('lembrar').checked;if(l)a.href+='&lembrar=1';});});
-</script></body></html>
+</body></html>
