@@ -41,6 +41,16 @@ main{padding:12px;display:flex;flex-direction:column;gap:10px}
 #xfer input{flex:1;min-width:0;background:#0b1220;border:1px solid #334155;border-radius:10px;color:#fff;padding:8px 10px}
 .lvl{height:5px;border-radius:4px;background:#0b1220;overflow:hidden;margin-top:9px}.lvl i{display:block;height:100%;width:0;background:linear-gradient(90deg,#10b981,#6366f1);transition:width .15s}
 .q{display:flex;align-items:center;justify-content:center;gap:6px;font-size:11px;color:#94a3b8;margin-top:7px}.dot{width:9px;height:9px;border-radius:50%;background:#94a3b8}
+#tabs{display:flex;gap:6px}.tab{flex:1;padding:8px 10px;border-radius:10px;border:1px solid #334155;background:#1c1b2f;color:#94a3b8;font-weight:800;font-size:12px;cursor:pointer;white-space:nowrap!important}
+.tab.on{background:linear-gradient(135deg,#7c3aed,#6366f1);border-color:#6366f1;color:#fff}
+#agenda{display:none}#agenda.show{display:block}#tab-dial.hide{display:none}
+#ag-q{width:100%;background:#0b1220;border:1px solid #334155;border-radius:12px;color:#fff;padding:9px 11px;font-size:13px}#ag-q:focus{outline:none;border-color:#6366f1}
+#ag-list{margin-top:8px;max-height:330px;overflow:auto}
+.ag-h{margin:8px 2px 4px;font-size:10.5px;text-transform:uppercase;letter-spacing:.6px;color:#94a3b8}
+.ag{display:flex;align-items:center;gap:9px;padding:7px 6px;border-radius:10px;cursor:pointer}.ag:hover{background:#252440}
+.ag .p{width:9px;height:9px;border-radius:50%;background:#64748b;flex-shrink:0}.ag .p.on{background:#10b981}
+.ag .nm{flex:1;min-width:0;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ag .nu{color:#94a3b8;font-size:11px}
+.ag .go{background:#059669;border:0;color:#fff;border-radius:50%;width:28px;height:28px;cursor:pointer;flex-shrink:0}
 h4{margin:0 0 6px;font-size:10.5px;text-transform:uppercase;letter-spacing:.6px;color:#94a3b8}
 .h{display:flex;align-items:center;gap:8px;padding:6px 4px;border-bottom:1px solid #26263f;cursor:pointer;border-radius:8px}.h:hover{background:#252440}.h:last-child{border-bottom:0}
 .h .n{flex:1;font-weight:600}.h .d{color:#94a3b8;font-size:11px}.out{color:#10b981}.inn{color:#818cf8}.mis{color:#f43f5e}
@@ -60,10 +70,12 @@ h4{margin:0 0 6px;font-size:10.5px;text-transform:uppercase;letter-spacing:.6px;
       <div id="xfer"><input id="xnum" placeholder="Ramal ou número" inputmode="tel"><button class="btn call" data-act="transfer">OK</button></div>
       <div class="lvl" title="Nível do seu microfone"><i id="lv"></i></div><div class="q"><span class="dot" id="qd"></span><span id="qt">Qualidade: medindo...</span></div>
       <div class="row"><button class="btn hang" data-act="hangup"><i class="fa-solid fa-phone-slash"></i> Desligar</button></div></div>
-    <div class="box"><input id="disp" placeholder="Número ou ramal" inputmode="tel" autocomplete="off">
+    <div id="tabs"><button class="tab on" data-act="tab" data-k="dial"><i class="fa-solid fa-table-cells"></i> Teclado</button><button class="tab" data-act="tab" data-k="agenda"><i class="fa-regular fa-address-book"></i> Agenda</button></div>
+    <div class="box" id="agenda"><input id="ag-q" type="search" placeholder="Buscar ramal ou contato..." autocomplete="off"><div id="ag-list"></div><div class="sub" id="ag-st" style="margin-top:6px"></div></div>
+    <div id="tab-dial"><div class="box"><input id="disp" placeholder="Número ou ramal" inputmode="tel" autocomplete="off">
       <div class="pad">${KEYS.map(k => `<button data-act="key" data-k="${k}">${k}</button>`).join('')}</div>
       <div class="row"><button class="btn call" id="b-call" data-act="dial"><i class="fa-solid fa-phone"></i> Ligar</button><button class="btn sec" data-act="del"><i class="fa-solid fa-delete-left"></i> Apagar</button></div></div>
-    <div class="box"><h4>Últimas chamadas deste navegador</h4><div id="hist"></div></div>
+    <div class="box" style="margin-top:10px"><h4>Últimas chamadas deste navegador</h4><div id="hist"></div></div></div>
   </main>
 </div>
 <audio id="ra" autoplay></audio>`;
@@ -81,7 +93,7 @@ h4{margin:0 0 6px;font-size:10.5px;text-transform:uppercase;letter-spacing:.6px;
 
   // ---- abrir / fechar (Top Layer: fica por cima de qualquer tela do painel) ----
   function isOpen() { try { return panel.matches(':popover-open'); } catch (e) { return panel.dataset.open === '1'; } }
-  function open() { if (isOpen()) return; placePanel(); try { panel.showPopover(); } catch (e) { panel.style.display = 'block'; panel.dataset.open = '1'; } ss.set('prisma_wp_open', '1'); }
+  function open() { if (isOpen()) return; placePanel(); try { panel.showPopover(); } catch (e) { panel.style.display = 'block'; panel.dataset.open = '1'; } ss.set('prisma_wp_open', '1'); if (tabAtual === 'agenda') loadAgenda(); }
   function close() { try { panel.hidePopover(); } catch (e) { panel.style.display = 'none'; panel.dataset.open = '0'; } ss.set('prisma_wp_open', '0'); }
   function toggle() { isOpen() ? close() : open(); }
 
@@ -172,6 +184,52 @@ h4{margin:0 0 6px;font-size:10.5px;text-transform:uppercase;letter-spacing:.6px;
     }, 1000);
   }
 
+  // ---- agenda (ramais com status + contatos), lida de <endereço do painel>/agenda.php, o mesmo arquivo do MicroSIP ----
+  const AGENDA_URL = location.origin + '/agenda.php';   // o "domínio" só serve para montar este endereço
+  let agItems = [], agTimer = null, agLoaded = 0, tabAtual = 'dial';
+  function showTab(k) {
+    tabAtual = k;
+    $('agenda').classList.toggle('show', k === 'agenda'); $('tab-dial').classList.toggle('hide', k === 'agenda');
+    root.querySelectorAll('.tab').forEach(b => b.classList.toggle('on', b.dataset.k === k));
+    if (k === 'agenda') { loadAgenda(); $('ag-q').focus(); } else { clearTimeout(agTimer); }
+  }
+  function renderAgenda() {
+    const q = $('ag-q').value.trim().toLowerCase(), box = $('ag-list'); box.textContent = '';
+    const ok = it => !q || (it.name + ' ' + it.number).toLowerCase().includes(q);
+    const grupos = [['Ramais', agItems.filter(i => i.starred && ok(i))], ['Contatos externos', agItems.filter(i => !i.starred && ok(i))]];
+    let total = 0;
+    grupos.forEach(([titulo, lista]) => {
+      if (!lista.length) return; total += lista.length;
+      const h = document.createElement('div'); h.className = 'ag-h'; h.textContent = titulo + ' (' + lista.length + ')'; box.appendChild(h);
+      lista.forEach(it => {
+        const r = document.createElement('div'); r.className = 'ag'; r.title = it.info || '';
+        const p = document.createElement('span'); p.className = 'p' + (it.starred && it.presence ? ' on' : '');
+        const nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = it.name;
+        const nu = document.createElement('span'); nu.className = 'nu'; nu.textContent = it.number;
+        const g = document.createElement('button'); g.className = 'go'; g.title = 'Ligar'; const gi = document.createElement('i'); gi.className = 'fa-solid fa-phone'; g.appendChild(gi);
+        g.addEventListener('click', e => { e.stopPropagation(); showTab('dial'); dial(it.number); });
+        r.addEventListener('click', () => { $('disp').value = it.number; showTab('dial'); });
+        r.append(p, nm, nu, g); box.appendChild(r);
+      });
+    });
+    if (!total) { const s = document.createElement('div'); s.className = 'sub'; s.textContent = agItems.length ? 'Nada encontrado.' : 'Agenda vazia.'; box.appendChild(s); }
+  }
+  async function loadAgenda() {
+    clearTimeout(agTimer);
+    try {
+      const r = await fetch(AGENDA_URL, {cache: 'no-store'});
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const j = await r.json();
+      if (j.error) throw new Error(j.error);
+      agItems = (j.items || []).map(i => ({name: String(i.name || i.number || ''), number: String(i.number || ''), presence: parseInt(i.presence || 0, 10), starred: parseInt(i.starred || 0, 10), info: String(i.info || '')})).filter(i => i.number);
+      agLoaded = Date.now(); $('ag-st').textContent = agItems.filter(i => i.starred && i.presence).length + ' ramal(is) online de ' + agItems.filter(i => i.starred).length + ' · atualizado ' + new Date().toLocaleTimeString('pt-BR');
+      renderAgenda();
+      agTimer = setTimeout(() => { if (tabAtual === 'agenda' && isOpen()) loadAgenda(); }, Math.max(30, parseInt(j.refresh || 60, 10)) * 1000);
+    } catch (e) {
+      $('ag-list').textContent = ''; $('ag-st').textContent = 'Agenda indisponível (' + AGENDA_URL + '): ' + e.message + '. Instale o agenda.php pelo menu do IPbx.';
+    }
+  }
+
   // ---- ações ----
   function dial(n) {
     showErr(''); n = num(n != null ? n : $('disp').value);
@@ -195,6 +253,7 @@ h4{margin:0 0 6px;font-size:10.5px;text-transform:uppercase;letter-spacing:.6px;
     mute: () => { if (!cur) return; muted = !muted; muted ? cur.mute({audio: true}) : cur.unmute({audio: true}); $('b-mute').classList.toggle('on', muted); },
     hold: () => { if (!cur) return; held = !held; held ? cur.hold() : cur.unhold(); $('b-hold').classList.toggle('on', held); },
     xfer: () => $('xfer').classList.toggle('show'),
+    tab: k => showTab(k),
     transfer: () => { const n = num($('xnum').value); if (!cur || !n) return; try { cur.refer('sip:' + n + '@' + cfg.host); $('ic-state').textContent = 'Transferindo para ' + n + '...'; $('xnum').value = ''; $('xfer').classList.remove('show'); } catch (e) { showErr('Não foi possível transferir.'); } },
     answer: () => { if (!pend) return; ring(false); const s = pend, who = pendWho; pend = null; bind(s, 'in', who); s.answer({mediaConstraints: {audio: true, video: false}, pcConfig: cfg.pc, eventHandlers: {peerconnection: e => attachAudio(e.peerconnection)}}); },
     reject: () => { if (!pend) return; ring(false); const s = pend; pend = null; try { s.terminate({status_code: 486, reason_phrase: 'Busy Here'}); } catch (e) {} ui(); },
@@ -202,6 +261,7 @@ h4{margin:0 0 6px;font-size:10.5px;text-transform:uppercase;letter-spacing:.6px;
   root.addEventListener('click', e => { const b = e.target.closest && e.target.closest('[data-act]'); if (b && actions[b.dataset.act]) actions[b.dataset.act](b.dataset.k); });
   $('disp').addEventListener('keydown', e => { if (e.key === 'Enter') dial(); });
   $('disp').addEventListener('input', () => ss.set('prisma_wp_num', $('disp').value));
+  $('ag-q').addEventListener('input', renderAgenda);
 
   // ---- registro no PABX ----
   function start(c) {

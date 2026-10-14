@@ -36,26 +36,32 @@ if (isset($_GET['cred'])) {
         echo json_encode(['success' => false, 'error' => 'O Webphone não está habilitado para o seu usuário. Peça ao administrador em Configurações > Usuários.']);
         exit;
     }
-    $secret = ''; $webrtc = false;
+    $secret = ''; $webrtc = false; $diag = [];
     try {
         $ast = getAsteriskDBConnection();
-        if ($ast) {
-            foreach (['pjsip', 'sip'] as $tbl) {
+        if (!$ast) { $diag[] = 'sem conexão com o banco do PABX'; }
+        else {
+            foreach (['sip', 'pjsip'] as $tbl) {
+                $col = astOptionsValueCol($ast, $tbl);
+                if ($col === '') { $diag[] = "tabela $tbl ausente"; continue; }
                 try {
-                    $st = $ast->prepare("SELECT keyword, value FROM $tbl WHERE id = :id AND keyword IN ('secret','webrtc','transport','media_encryption','dtlsenable')");
+                    $st = $ast->prepare("SELECT keyword, `$col` AS v FROM `$tbl` WHERE id = :id AND keyword IN ('secret','webrtc','transport','media_encryption','dtlsenable')");
                     $st->execute([':id' => $ext]);
+                    $n = 0;
                     while ($r = $st->fetch(PDO::FETCH_ASSOC)) {
-                        $k = strtolower($r['keyword']); $v = strtolower(trim((string)$r['value']));
-                        if ($k === 'secret' && $secret === '') $secret = (string)$r['value'];
+                        $n++; $k = strtolower($r['keyword']); $v = strtolower(trim((string)$r['v']));
+                        if ($k === 'secret' && $secret === '') $secret = (string)$r['v'];
                         if (($k === 'webrtc' && $v === 'yes') || ($k === 'transport' && strpos($v, 'ws') !== false)
                             || ($k === 'media_encryption' && $v === 'dtls') || ($k === 'dtlsenable' && $v === 'yes')) $webrtc = true;
                     }
-                } catch (Exception $e) { /* tabela inexistente nesta instalação */ }
+                    $diag[] = "$tbl: $n opção(ões) do ramal";
+                } catch (Exception $e) { $diag[] = "$tbl: erro de consulta"; }
             }
         }
-    } catch (Exception $e) {}
+    } catch (Exception $e) { $diag[] = 'erro ao consultar o PABX'; }
     if ($secret === '') {
-        echo json_encode(['success' => false, 'error' => "Não foi possível ler a senha do ramal $ext no PABX."]);
+        if (function_exists('pabx_log')) pabx_log('system_errors', 'WARNING', 'Webphone: senha do ramal não encontrada', ['ramal' => $ext, 'detalhe' => implode('; ', $diag)]);
+        echo json_encode(['success' => false, 'error' => "Não foi possível ler a senha do ramal $ext no PABX (" . implode('; ', $diag) . ").  Confira se o ramal $ext existe no PABX com esse número."]);
         exit;
     }
     $host = explode(':', (string)($_SERVER['HTTP_HOST'] ?? ''))[0];

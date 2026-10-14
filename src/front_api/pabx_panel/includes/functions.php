@@ -549,17 +549,25 @@ function syncPrismaAssets() {
 
         $extensions_found = [];
         $webrtc_exts = [];
+        // A coluna de valor chama-se 'data' (ou 'value', conforme a versão do IssabelPBX): detecta em vez de supor
+        $__vc_sip = astOptionsValueCol($ast_db, 'sip'); $__vc_pj = astOptionsValueCol($ast_db, 'pjsip');
         try {
-            $q_w1 = $ast_db->query("SELECT id FROM sip WHERE keyword = 'webrtc' AND value = 'yes'");
-            if ($q_w1) while ($r = $q_w1->fetch(PDO::FETCH_ASSOC)) { $webrtc_exts[$r['id']] = true; }
+            if ($__vc_sip !== '') {
+                $q_w1 = $ast_db->query("SELECT id FROM sip WHERE keyword = 'webrtc' AND $__vc_sip = 'yes'");
+                if ($q_w1) while ($r = $q_w1->fetch(PDO::FETCH_ASSOC)) { $webrtc_exts[$r['id']] = true; }
+            }
         } catch (Exception $ew1) {}
         try {
-            $q_w2 = $ast_db->query("SELECT id FROM sip WHERE keyword = 'transport' AND (value LIKE '%wss%' OR value LIKE '%ws%')");
-            if ($q_w2) while ($r = $q_w2->fetch(PDO::FETCH_ASSOC)) { $webrtc_exts[$r['id']] = true; }
+            if ($__vc_sip !== '') {
+                $q_w2 = $ast_db->query("SELECT id FROM sip WHERE keyword = 'transport' AND ($__vc_sip LIKE '%wss%' OR $__vc_sip LIKE '%ws%')");
+                if ($q_w2) while ($r = $q_w2->fetch(PDO::FETCH_ASSOC)) { $webrtc_exts[$r['id']] = true; }
+            }
         } catch (Exception $ew2) {}
         try {
-            $q_w3 = $ast_db->query("SELECT id FROM pjsip WHERE keyword = 'webrtc' AND value = 'yes'");
-            if ($q_w3) while ($r = $q_w3->fetch(PDO::FETCH_ASSOC)) { $webrtc_exts[$r['id']] = true; }
+            if ($__vc_pj !== '') {
+                $q_w3 = $ast_db->query("SELECT id FROM pjsip WHERE keyword = 'webrtc' AND $__vc_pj = 'yes'");
+                if ($q_w3) while ($r = $q_w3->fetch(PDO::FETCH_ASSOC)) { $webrtc_exts[$r['id']] = true; }
+            }
         } catch (Exception $ew3) {}
 
         try {
@@ -3091,6 +3099,23 @@ function getPABXInboundCallFlows() {
 /**
  * Obtém conexão MySQL autenticada com o banco 'asterisk' extraindo credenciais de /etc/amportal.conf
  */
+/**
+ * Nome da coluna de valor nas tabelas de opções dos ramais do IssabelPBX/FreePBX (sip, pjsip): 'data' na maioria das
+ * versões e 'value' em outras. Retorna '' se a tabela não existir.
+ */
+function astOptionsValueCol($ast, $table) {
+    static $cache = [];
+    if (isset($cache[$table])) return $cache[$table];
+    $col = '';
+    try {
+        $names = [];
+        $st = $ast->query("SHOW COLUMNS FROM `" . str_replace('`', '', $table) . "`");
+        if ($st) while ($r = $st->fetch(PDO::FETCH_ASSOC)) $names[] = strtolower($r['Field']);
+        if (in_array('data', $names, true)) $col = 'data'; elseif (in_array('value', $names, true)) $col = 'value';
+    } catch (Exception $e) { $col = ''; }
+    return $cache[$table] = $col;
+}
+
 function getAsteriskDBConnection() {
     static $conn = null;
     if ($conn !== null) return $conn;
