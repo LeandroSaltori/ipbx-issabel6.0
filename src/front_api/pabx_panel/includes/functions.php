@@ -217,6 +217,15 @@ function executeAsteriskAMICommandRaw($action, $params = []) {
         if (!isset($seen[$k])) { $seen[$k] = 1; $uniq[] = $c; }
     }
     $credentials_to_try = $uniq;
+    // Testa primeiro o usuário que funcionou da última vez: uma credencial recusada custa ~1 s (o Asterisk atrasa a recusa),
+    // e antes isso se repetia em TODA consulta ao AMI. Guarda só o NOME do usuário (nunca a senha).
+    $__ami_ok_file = __DIR__ . '/../logs/.ami_user_ok';
+    $__ami_ok = $GLOBALS['__ami_user_ok'] ?? (is_readable($__ami_ok_file) ? trim((string)@file_get_contents($__ami_ok_file)) : '');
+    if ($__ami_ok !== '') {
+        usort($credentials_to_try, function ($x, $y) use ($__ami_ok) {
+            return (int)(($y['user'] ?? '') === $__ami_ok) - (int)(($x['user'] ?? '') === $__ami_ok);
+        });
+    }
     $socket = null;
     $authenticated = false;
     $last_error = '';
@@ -247,6 +256,10 @@ function executeAsteriskAMICommandRaw($action, $params = []) {
         if (stripos($login_response, 'Response: Success') !== false) {
             $authenticated = true;
             $socket = $s;
+            if (($cred['user'] ?? '') !== $__ami_ok) {
+                $GLOBALS['__ami_user_ok'] = (string)$cred['user'];
+                @file_put_contents($__ami_ok_file, (string)$cred['user'], LOCK_EX);
+            }
             break;
         }
         $last_error = "Credencial AMI recusada para usuário " . $cred['user'];

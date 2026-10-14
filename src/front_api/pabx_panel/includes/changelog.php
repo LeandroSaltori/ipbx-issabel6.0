@@ -6,6 +6,7 @@
  */
 return [
     'done' => [
+        ['data' => '2026-10-14', 'mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-bolt', 'titulo' => 'Navegação entre as abas bem mais ágil', 'desc' => 'Corrigimos a fila que fazia as telas demorarem vários segundos para abrir enquanto o painel atualizava ramais, filas e troncos em segundo plano, e a conversa com a central ficou mais rápida.'],
         ['data' => '2026-10-14', 'mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-gauge-high', 'titulo' => 'Telas mais rápidas e registro de lentidão', 'desc' => 'A sincronização automática com a central agora roda depois de a tela abrir, sem deixar você esperando. Telas ou chamadas que demoram mais de 1,5 segundo passam a ser registradas em Configurações > Logs > Desempenho, para o suporte achar o que está lento.'],
         ['data' => '2026-10-14', 'mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-people-group', 'titulo' => 'Filas mantêm a mensagem de abandono e o supervisor', 'desc' => 'A atualização automática de ramais e filas não apaga mais a mensagem de abandono e o WhatsApp do supervisor que você configurou, e deixou o painel mais rápido por só gravar quando algo realmente mudou.'],
         ['data' => '2026-10-14', 'mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-database', 'titulo' => 'Fim do erro "banco de dados bloqueado"', 'desc' => 'Corrigimos o erro que às vezes aparecia ao abrir uma tela quando várias coisas acessavam o painel ao mesmo tempo (tela aberta, rotinas automáticas, WhatsApp). O painel agora aguarda e atende todos sem travar.'],

@@ -65,6 +65,11 @@ $__perf_marks['login/permissões'] = microtime(true) - $__perf_t0;
 if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['action'], ['get_logs', 'get_fop_extensions', 'get_trunks_status', 'get_queues_realtime', 'get_parking_lots', 'fop_action', 'originate_call', 'save_contact', 'test_llm_connection', 'analyze_pabx_insights', 'generate_ai_insights', 'get_ai_insights_history', 'delete_ai_insight', 'transcribe_audio', 'get_kpi_calls_detail', 'get_active_calls', 'get_time_groups', 'get_time_group_rules', 'save_time_group_rule', 'delete_time_group_rule', 'get_announcements_list', 'update_announcement_audio', 'sync_assets', 'ai_chat', 'ai_chat_info', 'ai_chat_history', 'ai_chat_clear', 'ai_chat_confirm', 'ext_features_get', 'ext_features_set', 'whatsapp_webhook']))) {
     $action = $_GET['api_action'] ?? $_GET['action'];
     if (function_exists('auditRequest')) auditRequest('', '', true, (string)$action);
+    // Consultas de atualização automática (só leitura) soltam a sessão já: o PHP trava o arquivo de sessão durante a requisição inteira,
+    // e essas consultas esperam o AMI por 2-5 s; sem soltar, cada tela aberta ficava na fila atrás delas (navegação lenta).
+    if (in_array($action, ['get_fop_extensions', 'get_trunks_status', 'get_queues_realtime', 'get_parking_lots', 'get_conferences_status', 'get_active_calls', 'get_logs', 'get_kpi_calls_detail'], true) && session_status() === PHP_SESSION_ACTIVE) {
+        @session_write_close();
+    }
     while (ob_get_level()) { @ob_end_clean(); }
     header('Content-Type: application/json; charset=utf-8');
 
