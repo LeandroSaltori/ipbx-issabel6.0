@@ -87,7 +87,7 @@ O monitor manual acima foi substituído pelo **IPbx Sentinel** (`scripts/ipbx-se
 
 **O que faz ao achar:** move para **quarentena** (`/var/backup/ipbx/quarantine/AAAA-MM-DD_HHMMSS/`, reversível), registra em `/var/log/ipbx-sentinel.log` e avisa no Telegram com data/hora, arquivo, motivo e IP de origem (quando aparece no log do Apache).
 
-**Agenda:** `/etc/cron.d/ipbx-sentinel`: a cada 5 min (arquivos recentes) + varredura completa às 03:30.
+**Agenda:** `/etc/cron.d/ipbx-sentinel`: a cada 1 min (firewall, dialplan, cron) e a cada 5 min (arquivos alterados nos últimos 10 min). **Não há varredura noturna** (sem alertas de madrugada). A varredura completa roda uma vez na instalação e sob demanda: `ipbx-sentinel --scan`. Limitação: um arquivo malicioso antigo, que não foi modificado recentemente, só é achado nessa varredura completa.
 
 **Comandos:** `ipbx-sentinel --scan | --list | --restore ARQUIVO | --baseline | --test-alert | --selftest | --uninstall`
 
@@ -110,7 +110,7 @@ O Sentinel agora também faz o que o antigo `monitor_prisma.sh` fazia, em um só
 | 1 min (`--host`, leve) | Firewall | Se `iptables`/`firewalld` cair (ou ficar com poucas regras), avisa **uma vez** e reativa (`SENTINEL_FIREWALL_HEAL=0` = só avisa). Avisa de novo quando voltar. |
 | 1 min | Dialplan malicioso | `thanku-outcall` / `custom-get-extensions` em `/etc/asterisk/extensions*.conf`. Só alerta, uma vez por achado. |
 | 1 min | Crontab suspeito | `asterisk` e `root` com `curl`/`wget`/`php`... Só alerta, uma vez por achado. |
-| 5 min / 03:30 | Arquivos e contas | Web shells, módulos falsos, PHP em pastas estáticas, contas/senhas e nomes suspeitos (`atmin`, etc.). |
+| 5 min | Arquivos alterados e contas | Web shells, módulos falsos, PHP em pastas estáticas, contas/senhas e nomes suspeitos (`atmin`, etc.). |
 
 - **Watchdog sem token:** `/etc/cron.d/ipbx-watchdog` restaura o Sentinel e o cron se alguém apagar e avisa no Telegram. Substitui o watchdog antigo, que tinha o token fixo.
 - **Migração automática** (`ipbx-sentinel --install`): copia as credenciais do monitor antigo para `/etc/ipbx/telegram.conf`, remove a linha do crontab e os arquivos `monitor_prisma.sh` / `monitor_issabel_users.sh`.

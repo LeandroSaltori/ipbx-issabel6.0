@@ -23,7 +23,7 @@
 #     data/hora, arquivo e IP de origem (quando aparece no log do Apache).
 #
 # USO
-#   ipbx-sentinel --scan           varredura completa (padrao)
+#   ipbx-sentinel --scan           varredura completa (padrao; roda na instalacao e sob demanda)
 #   ipbx-sentinel --incremental    so arquivos alterados recentemente (cron)
 #   ipbx-sentinel --host           so checks de host: firewall, dialplan, cron (cron, 1 min)
 #   ipbx-sentinel --install        instala comando, config e cron (/etc/cron.d)
@@ -412,7 +412,6 @@ cmd_install() {
 # IPbx Sentinel - monitor unico de seguranca
 * * * * * root /usr/bin/flock -n /var/run/ipbx-sentinel-host.lock /usr/bin/nice -n 19 /usr/local/bin/ipbx-sentinel --host >/dev/null 2>&1
 */5 * * * * root /usr/bin/flock -n /var/run/ipbx-sentinel.lock /usr/bin/nice -n 19 /usr/local/bin/ipbx-sentinel --incremental >/dev/null 2>&1
-30 3 * * * root /usr/bin/flock -n /var/run/ipbx-sentinel.lock /usr/bin/nice -n 19 /usr/local/bin/ipbx-sentinel --scan >/dev/null 2>&1
 CRON
   chmod 644 /etc/cron.d/ipbx-sentinel
   # Watchdog (sem credenciais): se o Sentinel ou seu cron forem apagados, restaura e avisa
@@ -421,8 +420,10 @@ CRON
 WD
   chmod 644 /etc/cron.d/ipbx-watchdog
   migrate_old_monitor
-  echo "Sentinel instalado: /usr/local/bin/ipbx-sentinel + /etc/cron.d/ipbx-sentinel (host a cada 1 min, arquivos a cada 5 min, varredura completa as 03:30)."
+  echo "Sentinel instalado: /usr/local/bin/ipbx-sentinel + /etc/cron.d/ipbx-sentinel (host a cada 1 min, arquivos alterados a cada 5 min; sem varredura noturna)."
   echo "Telegram: $TG_CONF (TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID). Teste: ipbx-sentinel --test-alert"
+  echo "Varredura completa inicial (uma vez; depois so quando voce pedir: ipbx-sentinel --scan)..."
+  do_scan full
 }
 
 cmd_list() { if [ -s "$QUAR_ROOT/INDEX.tsv" ]; then awk -F'\t' '{printf "%s | %s | %s\n   -> %s\n", $1, $4, $2, $3}' "$QUAR_ROOT/INDEX.tsv"; else echo "Quarentena vazia."; fi; }

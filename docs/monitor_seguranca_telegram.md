@@ -2,49 +2,57 @@
 
 > **Monitor único.** O antigo `monitor_prisma.sh` foi unificado no **IPbx Sentinel** (`scripts/ipbx-sentinel.sh`). Ao rodar a opção **[20]** do menu (ou o `install.sh`), o Sentinel é instalado, as credenciais do Telegram do monitor antigo são copiadas para `/etc/ipbx/telegram.conf` (modo 600) e o cron/arquivos antigos são removidos. O token **não fica mais dentro de scripts**: edite `/etc/ipbx/telegram.conf` (`TELEGRAM_BOT_TOKEN=` / `TELEGRAM_CHAT_ID=`) e teste com `ipbx-sentinel --test-alert`. Detalhes completos em [invador_emad.md](./invador_emad.md).
 
-Este script realiza o monitoramento contínuo de segurança do servidor Issabel PBX e envia **notificações instantâneas via Telegram** em caso de anomalias ou ameaças.
+O **IPbx Sentinel** (`scripts/ipbx-sentinel.sh`) é o monitor único de segurança do servidor. Ele envia **notificações via Telegram** quando detecta anomalias e, nos casos de arquivo, move o item para uma quarentena reversível.
 
 ---
 
-## 🎯 O que o monitor verifica:
+## 🎯 O que o monitor verifica
 
-1. **🕵️ Detecção de Invasão e Web Shells:**
-   - Varre a pasta `/var/www/html/` em busca de assinaturas conhecidas de invasores e backdoors (como `Emad__Was__Here`, `c99shell`, `r57shell`, injeções PHP `eval(base64_decode`, etc.).
-   - Dispara alerta imediato no grupo do Telegram com o caminho exato do arquivo infectado.
+| Frequência | Verificação | Ação |
+|---|---|---|
+| 1 min | **Firewall** (`iptables`/`firewalld` parado ou com poucas regras) | Avisa uma vez, **reativa** o firewall e avisa quando voltar |
+| 1 min | **Dialplan malicioso** (`thanku-outcall`, `custom-get-extensions`) | Só alerta |
+| 1 min | **Crontab suspeito** (`asterisk` e `root`) | Só alerta |
+| 5 min | **Web shells e invasões** em `/var/www/html` (assinaturas `Emad__Was__Here`, `eval` ofuscado em cadeia, `eval(base64_decode`, `c99shell`, `r57shell`...) | Quarentena reversível + alerta com data, arquivo e IP de origem |
+| 5 min | **Módulos falsos** (`phones`, `h`, `_cache`, `tinfo`, `fpbxphones`) e **PHP em pastas de imagem** | Quarentena + alerta |
+| 5 min | **Contas e senhas**: usuário novo, senha/permissão alterada ou removido (painel `acl.db`, FreePBX, MySQL, `/etc/issabel.conf`, `/etc/amportal.conf`, `/etc/freepbx.conf`) e **nomes suspeitos** (`atmin`, `emad`...) | Só alerta (nunca desfaz) |
 
-2. **🛡️ Monitor de Firewall (Status e Regras):**
-   - Verifica se o serviço do Firewall (`iptables` ou `firewalld`) está ativo.
-   - Caso o Firewall caia ou a quantidade de regras esteja anormalmente baixa, dispara alerta e **tenta reativar o Firewall automaticamente**.
-
-3. **👤 Monitor de Novos Usuários Web (SQLite):**
-   - Monitora a tabela `acl_user` em `/var/www/db/acl.db`.
-   - Se um novo usuário com acesso à interface WEB for criado (legítimo ou por exploit), envia alerta informando o Login, Descrição, Servidor e Horário.
+- Não há varredura noturna (sem alertas de madrugada). A varredura completa roda **uma vez na instalação** e **sob demanda** (`ipbx-sentinel --scan`).
+- Cada achado é avisado **uma única vez** (sem repetir a cada minuto).
+- O Sentinel nunca reinicia o Asterisk; o único serviço reativado é o firewall.
+- **Watchdog:** se alguém apagar o Sentinel ou o agendamento, ele é restaurado automaticamente e o Telegram avisa.
 
 ---
 
-## 🚀 Como Configurar e Executar:
+## 🚀 Como instalar e usar
 
-### Modo 1: Via Menu Interativo
+### Via menu interativo
 ```bash
 ipbx-update
 # Escolha a opção [20] Monitor Segurança Telegram
 ```
+A opção [20] roda o hardening de segurança e instala o Sentinel. O `install.sh` também o instala.
 
-### Modo 2: Execução Manual para Teste
+### Comandos do dia a dia
 ```bash
-bash /root/ipbx-issabel6.0/scripts/monitor_prisma.sh
-```
-
-### Modo 3: Agendamento no Crontab (A cada minuto)
-```bash
-(crontab -l 2>/dev/null; echo "* * * * * /usr/local/bin/monitor_issabel_users.sh") | crontab -
+ipbx-sentinel --scan          # varredura completa agora
+ipbx-sentinel --test-alert    # teste do Telegram
+ipbx-sentinel --list          # itens em quarentena
+ipbx-sentinel --restore ARQ   # restaura um arquivo da quarentena
+ipbx-sentinel --baseline      # refaz a foto de contas/senhas (servidor limpo)
+ipbx-sentinel --selftest      # autoteste do detector
 ```
 
 ---
 
-## ⚙️ Personalização de Cliente / Token:
-Dentro do script `scripts/monitor_prisma.sh`, você pode configurar o nome do cliente:
-```bash
-CLIENTE="IPBX - Nome do Cliente"
-```
-Se não for preenchido, o script usa automaticamente o **hostname** da VPS.
+## ⚙️ Configuração
+
+- **Telegram:** `/etc/ipbx/telegram.conf` (modo 600):
+  ```bash
+  TELEGRAM_BOT_TOKEN="..."
+  TELEGRAM_CHAT_ID="..."
+  ```
+  O token **nunca** fica dentro de scripts do repositório. Se o servidor vinha do monitor antigo (`monitor_prisma.sh`), a instalação copia as credenciais dele para esse arquivo e remove o monitor antigo. Depois, troque o token no BotFather.
+- **Opções:** `/etc/ipbx/sentinel.conf` (`SENTINEL_ACTION=quarantine|alert`, `SENTINEL_FIREWALL_HEAL=1|0`, `SENTINEL_HEAL_PERMS=0|1`).
+- **Exceções (falso positivo):** `/etc/ipbx/sentinel.allow` (um caminho por linha).
+- O nome do servidor nos alertas é o **hostname** da máquina.
