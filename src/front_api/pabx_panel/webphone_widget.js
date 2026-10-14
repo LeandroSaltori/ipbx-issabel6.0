@@ -327,6 +327,8 @@ h4{margin:0 0 6px;font-size:10.5px;text-transform:uppercase;letter-spacing:.6px;
     host.style.setProperty('--wp-top', (p ? Math.round(p.getBoundingClientRect().bottom + 10) : 72) + 'px');
   }
   function boot() {
+    // As fontes dos ícones precisam estar declaradas no documento (não só dentro do shadow DOM); na casca do painel ele não as traz
+    try { if (!document.querySelector('link[href*="font-awesome"]')) { const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = FA; document.head.appendChild(l); } } catch (e) {}
     document.body.appendChild(host); window.addEventListener('resize', placePanel);
     hist(); const d = ss.get('prisma_wp_num'); if (d) $('disp').value = d;
     status('Buscando credenciais...', 'warn');
