@@ -27,6 +27,7 @@
 #   ipbx-sentinel --scan           varredura completa (padrao; roda na instalacao e sob demanda)
 #   ipbx-sentinel --incremental    so arquivos alterados recentemente (cron)
 #   ipbx-sentinel --update-framework  corrige issabel-framework vulneravel (snapshot + yum)
+#   ipbx-sentinel --status         mostra se a vigilancia de contas consegue ler painel/MySQL/arquivos
 #   ipbx-sentinel --host           so checks de host: firewall, dialplan, cron (cron, 1 min)
 #   ipbx-sentinel --install        instala comando, config e cron (/etc/cron.d)
 #   ipbx-sentinel --uninstall      remove o cron
@@ -243,10 +244,14 @@ identity_check() {
     esac
   done < "$now"
   if [ ! -s "$base" ]; then
+    [ -s "$now" ] || { seen_once "identidade-cega" && log "AVISO: vigilancia de contas INATIVA (nenhuma fonte legivel). Diagnostico: ipbx-sentinel --status"; }
     if [ -s "$now" ]; then cp -f "$now" "$base"; chmod 600 "$base" "$now"; log "Foto inicial de contas/senhas criada ($(wc -l < "$base") itens). Garanta que o servidor estava limpo neste momento."; fi
     return 0
   fi
-  [ -s "$now" ] || return 0   # sem leitura (ex.: banco fora do ar): nao conclui nada
+  if [ ! -s "$now" ]; then   # sem leitura (ex.: banco fora do ar): nao conclui nada, mas avisa (uma vez)
+    seen_once "identidade-cega" && log "AVISO: vigilancia de contas INATIVA (nenhuma fonte legivel). Diagnostico: ipbx-sentinel --status"
+    return 0
+  fi
   # Fonte lida pela 1a vez (ex.: MySQL ficou acessivel agora): entra na foto sem alarme
   local src
   for src in painel freepbx mysql arquivo; do
@@ -273,6 +278,22 @@ identity_check() {
     { cat "$now"; while IFS='|' read -r t k h; do [ "$t" = "ok" ] || grep -qF "ok|$t|" "$now" || echo "$t|$k|$h"; done < "$base"; grep -F 'ok|' "$base" | while read -r l; do grep -qF "$l" "$now" || echo "$l"; done; } | sort -u > "$base.new" && mv -f "$base.new" "$base"
     chmod 600 "$base" "$base.prev" "$now" 2>/dev/null   # alerta uma vez; nova foto passa a valer (fontes nao lidas ficam como estavam)
   fi
+}
+
+# Diagnostico: quais fontes de contas/senhas o Sentinel consegue ler neste servidor
+identity_status() {
+  local pw="" n
+  echo "Vigilancia de contas e senhas - fontes:"
+  if ! command -v sqlite3 >/dev/null 2>&1; then echo "  [X] painel (acl.db): comando sqlite3 nao instalado (yum install -y sqlite)"
+  elif [ ! -r "$ACL_DB" ]; then echo "  [X] painel (acl.db): arquivo $ACL_DB nao encontrado/legivel"
+  else n="$(sqlite3 "$ACL_DB" 'SELECT count(*) FROM acl_user;' 2>/dev/null)" && echo "  [OK] painel (acl.db): ${n} usuario(s)" || echo "  [X] painel (acl.db): consulta falhou"; fi
+  if ! command -v mysql >/dev/null 2>&1; then echo "  [X] MySQL/FreePBX: comando mysql nao instalado"
+  else
+    [ -r "$ISSABEL_CONF" ] && pw="$(sed -n 's/^mysqlrootpwd=//p' "$ISSABEL_CONF" | head -1)"
+    if n="$(MYSQL_PWD="$pw" mysql -uroot -N -B -e 'SELECT count(*) FROM mysql.user;' 2>/dev/null)"; then echo "  [OK] MySQL: ${n} usuario(s) (root acessivel)"
+    else echo "  [X] MySQL: nao foi possivel entrar como root (senha em $ISSABEL_CONF ausente ou diferente?)"; fi
+  fi
+  local f; for f in $CRED_FILES; do [ -r "$f" ] && echo "  [OK] arquivo $f" || echo "  [--] arquivo $f (nao existe)"; done
 }
 
 report_identity() {
@@ -487,6 +508,7 @@ WD
   migrate_old_monitor
   echo "Sentinel instalado: /usr/local/bin/ipbx-sentinel + /etc/cron.d/ipbx-sentinel (host a cada 1 min, arquivos alterados a cada 5 min; sem varredura noturna)."
   echo "Telegram: $TG_CONF (TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID). Teste: ipbx-sentinel --test-alert"
+  identity_status
   if [ "$1" != "--no-update" ] && [ "${SENTINEL_AUTO_UPDATE_FRAMEWORK:-1}" = "1" ]; then cmd_update_framework; fi
   echo "Varredura completa inicial (uma vez; depois so quando voce pedir: ipbx-sentinel --scan)..."
   do_scan full
@@ -540,9 +562,10 @@ case "${1:-}" in
   --test-alert)  send_telegram "Teste do IPbx Sentinel em ${HOSTNAME_S} - $(date '+%d/%m/%Y %H:%M:%S'). Se esta mensagem chegou, o alerta esta funcionando." ; echo "Enviado (se o Telegram estiver configurado)." ;;
   --incremental) do_scan inc ;;
   --host)        host_checks ;;
+  --status)      identity_status ;;
   --update-framework) cmd_update_framework ;;
   --alert-restored) send_telegram "ALERTA: o IPbx Sentinel (ou seu agendamento) foi APAGADO em ${HOSTNAME_S} e foi restaurado automaticamente - $(date '+%d/%m/%Y %H:%M:%S'). Investigue quem tem acesso root." ;;
   --scan|"")     do_scan full ;;
-  *) echo "Uso: $0 [--scan|--incremental|--host|--update-framework|--install|--uninstall|--list|--restore ARQ|--baseline|--test-alert|--selftest]"; exit 1 ;;
+  *) echo "Uso: $0 [--scan|--incremental|--host|--status|--update-framework|--install|--uninstall|--list|--restore ARQ|--baseline|--test-alert|--selftest]"; exit 1 ;;
 esac
 exit 0
