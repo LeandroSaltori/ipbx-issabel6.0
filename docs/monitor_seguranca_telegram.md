@@ -10,7 +10,7 @@ O **IPbx Sentinel** (`scripts/ipbx-sentinel.sh`) é o monitor único de seguran�
 
 | Frequência | Verificação | Ação |
 |---|---|---|
-| 1 min | **Firewall** (`iptables`/`firewalld` parado, ou ativo mas praticamente sem regras, o que deixa o servidor aberto) | Avisa uma vez, **reativa** o firewall e avisa quando voltar |
+| 1 min | **Firewall** (`iptables`/`firewalld` parado, ou ativo mas praticamente sem regras, o que deixa o servidor aberto) | Avisa uma vez e avisa quando voltar. Só avisa por padrão, pois o firewall é gerido pela tela do Issabel; para tentar reiniciar o serviço: `SENTINEL_FIREWALL_HEAL=1` |
 | 1 min | **Dialplan malicioso** (`thanku-outcall`, `custom-get-extensions`) | Só alerta |
 | 1 min | **Crontab suspeito** (`asterisk` e `root`) | Só alerta |
 | 1 min | **Versão vulnerável do painel** (aviso oficial Issabel de 02/08/2026: `issabel-framework` ≤ 4.0.0-12 no Issabel 4 ou ≤ 5.0.0-3 no Issabel 5 permite controle remoto) | Alerta uma vez por versão. A correção é automática na instalação (opção [20]/`install.sh`) ou com `ipbx-sentinel --update-framework` |
@@ -21,7 +21,7 @@ O **IPbx Sentinel** (`scripts/ipbx-sentinel.sh`) é o monitor único de seguran�
 - Não há varredura noturna (sem alertas de madrugada). A varredura completa roda **uma vez na instalação** e **sob demanda** (`ipbx-sentinel --scan`).
 - Se o Sentinel não conseguir ler uma fonte de contas (sem `sqlite3`, sem `mysql` ou senha do root diferente de `/etc/issabel.conf`), ele registra um AVISO no log (`/var/log/ipbx-sentinel.log`) e `ipbx-sentinel --status` mostra qual está cega.
 - Cada achado é avisado **uma única vez** (sem repetir a cada minuto).
-- O Sentinel nunca reinicia o Asterisk; o único serviço reativado é o firewall.
+- O Sentinel nunca reinicia o Asterisk; o firewall só é reiniciado se `SENTINEL_FIREWALL_HEAL=1`.
 - **Watchdog:** se alguém apagar o Sentinel ou o agendamento, ele é restaurado automaticamente e o Telegram avisa.
 
 ---
@@ -56,7 +56,7 @@ ipbx-sentinel --selftest      # autoteste do detector
   TELEGRAM_CHAT_ID="..."
   ```
   O token **nunca** fica dentro de scripts do repositório. Se o servidor vinha do monitor antigo (`monitor_prisma.sh`), a instalação copia as credenciais dele para esse arquivo e remove o monitor antigo. Depois, troque o token no BotFather.
-- **Opções:** `/etc/ipbx/sentinel.conf` (`SENTINEL_ACTION=quarantine|alert`, `SENTINEL_FIREWALL_HEAL=1|0`, `SENTINEL_HEAL_PERMS=0|1`).
+- **Opções:** `/etc/ipbx/sentinel.conf` (`SENTINEL_ACTION=quarantine|alert`, `SENTINEL_FIREWALL_HEAL=0|1` (padrão 0), `SENTINEL_HEAL_PERMS=0|1`).
 - **Exceções (falso positivo):** `/etc/ipbx/sentinel.allow` (um caminho por linha).
 - O nome do servidor nos alertas é o **hostname** da máquina.
 

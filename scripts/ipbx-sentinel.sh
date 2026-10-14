@@ -16,7 +16,7 @@
 #  3. PHP em pastas estaticas (images/, img/): nunca deveria existir.
 #  4. Contas e senhas: avisa se surgir usuario novo, senha alterada ou removido no
 #     painel (acl.db), FreePBX (ampusers), MySQL e arquivos /etc/*.conf de credenciais.
-#  5. Host (a cada minuto, leve): firewall caiu (alerta e reativa), dialplan malicioso
+#  5. Host (a cada minuto, leve): firewall parado ou sem regras (so alerta), dialplan malicioso
 #     (thanku-outcall), crontab suspeito de asterisk/root e issabel-framework
 #     vulneravel (aviso oficial 08/2026): so alertam.
 #  6. Autoprotecao: watchdog restaura o proprio Sentinel/cron se forem apagados.
@@ -40,7 +40,7 @@
 # CONFIGURACAO (opcional) em /etc/ipbx/sentinel.conf (root, modo 600):
 #   SENTINEL_ACTION=quarantine     # quarantine | alert (apenas avisa)
 #   SENTINEL_HEAL_PERMS=0          # 1 = remove escrita de "outros" em arquivos web
-#   SENTINEL_FIREWALL_HEAL=1       # 1 = reativa iptables/firewalld se cair (0 = so avisa)
+#   SENTINEL_FIREWALL_HEAL=0       # 0 = so avisa (padrao; o firewall e gerido pela tela do Issabel) | 1 = tenta reiniciar o servico
 #   SENTINEL_AUTO_UPDATE_FRAMEWORK=1  # 1 = ao instalar, atualiza issabel-framework vulneravel (snapshot antes)
 # Telegram: /etc/ipbx/telegram.conf  ->  TELEGRAM_BOT_TOKEN=...  TELEGRAM_CHAT_ID=...
 # Excecoes (falsos positivos): /etc/ipbx/sentinel.allow (um caminho/glob por linha)
@@ -62,7 +62,7 @@ HOSTNAME_S="$(hostname 2>/dev/null || echo pbx)"
 
 SENTINEL_ACTION="${SENTINEL_ACTION:-quarantine}"
 SENTINEL_HEAL_PERMS="${SENTINEL_HEAL_PERMS:-0}"
-SENTINEL_FIREWALL_HEAL="${SENTINEL_FIREWALL_HEAL:-1}"
+SENTINEL_FIREWALL_HEAL="${SENTINEL_FIREWALL_HEAL:-0}"
 [ -r "$CONF_FILE" ] && . "$CONF_FILE" 2>/dev/null
 SEND_ALERTS="${SENTINEL_NO_ALERT:+0}"
 SEND_ALERTS="${SEND_ALERTS:-1}"
@@ -502,7 +502,7 @@ cmd_install() {
   chmod +x /usr/local/bin/ipbx-sentinel
   /bin/cp -pf /usr/local/bin/ipbx-sentinel /etc/ipbx/ipbx-sentinel.bak 2>/dev/null   # copia para o watchdog
   if [ ! -f "$CONF_FILE" ]; then
-    printf '# IPbx Sentinel\nSENTINEL_ACTION=quarantine\nSENTINEL_HEAL_PERMS=0\nSENTINEL_FIREWALL_HEAL=1\n' > "$CONF_FILE"; chmod 600 "$CONF_FILE"
+    printf '# IPbx Sentinel\nSENTINEL_ACTION=quarantine\nSENTINEL_HEAL_PERMS=0\nSENTINEL_FIREWALL_HEAL=0\n' > "$CONF_FILE"; chmod 600 "$CONF_FILE"
   fi
   [ -f "$ALLOW_FILE" ] || { printf '# Caminhos/globs liberados (um por linha). Ex.: /var/www/html/meu_modulo/*\n' > "$ALLOW_FILE"; chmod 600 "$ALLOW_FILE"; }
   cat > /etc/cron.d/ipbx-sentinel <<'CRON'
