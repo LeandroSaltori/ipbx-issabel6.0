@@ -110,6 +110,7 @@ O Sentinel agora também faz o que o antigo `monitor_prisma.sh` fazia, em um só
 | 1 min (`--host`, leve) | Firewall | Se `iptables`/`firewalld` cair (ou ficar com poucas regras), avisa **uma vez** e reativa (`SENTINEL_FIREWALL_HEAL=0` = só avisa). Avisa de novo quando voltar. |
 | 1 min | Dialplan malicioso | `thanku-outcall` / `custom-get-extensions` em `/etc/asterisk/extensions*.conf`. Só alerta, uma vez por achado. |
 | 1 min | Crontab suspeito | `asterisk` e `root` com `curl`/`wget`/`php`... Só alerta, uma vez por achado. |
+| 1 min | Versão do painel | Alerta (uma vez) se `issabel-framework` estiver na faixa vulnerável do aviso oficial de 02/08/2026 (≤ 4.0.0-12 / ≤ 5.0.0-3), com o comando de atualização. Não atualiza sozinho. |
 | 5 min | Arquivos alterados e contas | Web shells, módulos falsos, PHP em pastas estáticas, contas/senhas e nomes suspeitos (`atmin`, etc.). |
 
 - **Watchdog sem token:** `/etc/cron.d/ipbx-watchdog` restaura o Sentinel e o cron se alguém apagar e avisa no Telegram. Substitui o watchdog antigo, que tinha o token fixo.
