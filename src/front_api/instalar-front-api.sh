@@ -260,6 +260,9 @@ fi
 
 echo "=========================================================="
 echo " [✓] front_api instalado com sucesso no PABX!"
+# Recarrega o PHP (cache de opcode) sem derrubar conexões: garante que a versão nova seja a servida
+(systemctl reload httpd 2>/dev/null || apachectl graceful 2>/dev/null || service httpd graceful 2>/dev/null || true) >/dev/null 2>&1
+echo "[+] Servidor web recarregado (graceful)."
 echo ""
 echo " Pasta de produção: $DEST_DIR"
 echo " Backup original mantido: $BACKUP_OLD"
