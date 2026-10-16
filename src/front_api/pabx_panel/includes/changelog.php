@@ -6,6 +6,7 @@
  */
 return [
     'done' => [
+        ['data' => '2026-10-16', 'mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-right-to-bracket', 'titulo' => 'Sessão expirada volta para o login do Prisma', 'desc' => 'Quando a sessão acaba, o painel agora leva você à tela de login do IPbx Prisma, onde escolhe Painel Novo ou Clássico, em vez de uma tela de login simples à parte.'],
         ['data' => '2026-10-16', 'mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-lock', 'titulo' => 'Painel não pede mais login do nada', 'desc' => 'Corrigimos a queda de sessão que mostrava a tela de login no meio da navegação, principalmente ao usar o painel clássico ou a configuração da central em outras abas. Depois desta atualização você entra uma vez e a sessão fica estável.'],
         ['data' => '2026-10-14', 'mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-plug-circle-bolt', 'titulo' => 'Webphone com conta de outro servidor', 'desc' => 'Em Configurações > Usuários, a lista de ramais ganhou a opção Personalizado: informe domínio, porta, usuário e senha para registrar o Webphone em outro servidor, por exemplo para testar o ramal de um cliente. A senha fica guardada de forma protegida.'],
         ['data' => '2026-10-14', 'mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-code', 'titulo' => 'Console da central dentro do painel', 'desc' => 'Administradores agora consultam ramais, registros e chamadas e leem o log por ramal direto no painel, sem precisar de acesso por terminal. Só consultas e recargas suaves, com tudo registrado.'],

@@ -156,6 +156,16 @@ function authClassicLoginUrl() {
     return ($up === '' || $up === '.' || $up === '\\') ? '/' : rtrim($up, '/') . '/';
 }
 
+/** O login do Prisma com a escolha de painel está instalado? (chave SSO legível + painel clássico com o seletor aplicado) */
+function authClassicLoginAvailable() {
+    require_once __DIR__ . '/sso.php';
+    if (!function_exists('ssoKey') || (string)ssoKey() === '') return false;
+    $idx = rtrim((string)($_SERVER['DOCUMENT_ROOT'] ?? ''), '/') . '/index.php';
+    if ($idx === '/index.php' || !is_readable($idx)) $idx = '/var/www/html/index.php';
+    $txt = @file_get_contents($idx, false, null, 0, 400000);
+    return is_string($txt) && strpos($txt, 'IPBX-PAINEL-SELETOR') !== false;
+}
+
 function authLogout() {
     if (function_exists('pabx_log')) { $__u = $_SESSION['logged_user_id'] ?? 0; pabx_log('user_actions', 'INFO', '[AUTH] Saiu do painel (logout)', ['user_id' => $__u]); }
     $viaSso = !empty($_SESSION['via_sso']) || isset($_COOKIE['issabelSession']);
@@ -302,6 +312,20 @@ function authGate($mode = 'page') {
 
     if (!authHasAnyPassword()) {
         authRenderLogin('', 'Nenhuma senha de acesso foi definida ainda. No servidor, execute: php ' . realpath(__DIR__ . '/..') . '/set_password.php');
+    }
+    // Sem sessão (expirou ou nunca entrou): leva à tela de login do Prisma, com a escolha Painel Novo / Clássico.
+    // O login interno (e-mail e senha) fica como alternativa em ?login=local e quando o login do Prisma não está instalado.
+    if ($mode === 'page' && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET' && ($_GET['login'] ?? '') !== 'local' && authClassicLoginAvailable()) {
+        $dest = authClassicLoginUrl();
+        $selfDir = rtrim(dirname($_SERVER['SCRIPT_NAME'] ?? '/front_api/index.php'), '/');
+        if ($dest !== '' && strpos($dest, $selfDir . '/') !== 0 && $dest !== $selfDir) {
+            while (ob_get_level()) { @ob_end_clean(); }
+            header('Content-Type: text/html; charset=utf-8');
+            header('Cache-Control: no-store');
+            $j = json_encode($dest, JSON_UNESCAPED_SLASHES);
+            echo '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Entrar - IPbx Prisma</title><meta http-equiv="refresh" content="0;url=' . htmlspecialchars($dest, ENT_QUOTES, 'UTF-8') . '"><script>try{window.top.location.replace(' . $j . ');}catch(e){window.location.replace(' . $j . ');}</script></head><body style="background:#0f172a"></body></html>';
+            exit;
+        }
     }
     authRenderLogin();
 }
