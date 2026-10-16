@@ -91,6 +91,20 @@ if (!empty($uid)) {
     }
 }
 
+// 1c. Igual ao relatório clássico: último recurso é procurar em qualquer subpasta do monitor
+if (!$foundPath && !empty($uid)) {
+    $__names = [];
+    if (!empty($row['recordingfile'])) $__names[] = basename($row['recordingfile']);
+    foreach ($__names as $__n) {
+        $fp = trim((string)@shell_exec('find /var/spool/asterisk/monitor/ -name ' . escapeshellarg($__n) . ' -size +0 2>/dev/null | head -n 1'));
+        if ($fp !== '' && is_file($fp)) { $foundPath = $fp; break; }
+    }
+    if (!$foundPath && preg_match('/^[0-9]+\.[0-9]+$/', $uid)) {
+        $fp = trim((string)@shell_exec('find /var/spool/asterisk/monitor/ -name ' . escapeshellarg("*{$uid}*") . ' -size +0 2>/dev/null | head -n 1'));
+        if ($fp !== '' && is_file($fp)) $foundPath = $fp;
+    }
+}
+
 // 2. Se for por nome de arquivo (anúncios, URAs, sons do sistema): resolve só dentro de /var/lib/asterisk/sounds
 $soundParts = [];
 if (!$foundPath && !empty($file)) {
