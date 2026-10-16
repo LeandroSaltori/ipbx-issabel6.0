@@ -1246,6 +1246,20 @@ if [ -d "$REPO_DIR/src/themes/prisma_v5" ]; then
     log_success "Tema Prisma v5 e Favicon aplicados."
 fi
 
+# Login novo com a escolha "Painel Novo 6.0 / Painel Clássico": precisa vir DEPOIS da cópia do tema
+# (o tema do repositório traz o login.tpl antigo e sobrescreveria o novo). Os patches são idempotentes e fazem snapshot.
+PATCH_LOGIN_DIR="$REPO_DIR/docs/patches/painel-antigo"
+if [ -f "$PATCH_LOGIN_DIR/seletor-painel/aplicar.sh" ] && [ -f "$PATCH_LOGIN_DIR/login-novo/aplicar-login.sh" ] \
+   && [ -f /var/www/html/index.php ] && [ -f /var/www/html/themes/prisma_v5/_common/login.tpl ]; then
+    if bash "$PATCH_LOGIN_DIR/seletor-painel/aplicar.sh" && bash "$PATCH_LOGIN_DIR/login-novo/aplicar-login.sh"; then
+        log_success "Tela de login com escolha Painel Novo 6.0 / Clássico aplicada."
+    else
+        log_warn "Login com escolha de painel não aplicado (o painel novo segue funcionando). Veja docs/patches/painel-antigo."
+    fi
+else
+    log_warn "Login com escolha de painel não aplicado: tema prisma_v5 ou patches não encontrados."
+fi
+
 # ==============================================================================
 # 18. INSTALAÇÃO DE FERRAMENTAS DE DIAGNÓSTICO (NET-TOOLS, TCPDUMP & SNGREP)
 # ==============================================================================
