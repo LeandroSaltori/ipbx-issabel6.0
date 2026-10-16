@@ -523,6 +523,15 @@ if ($agenteFiltro != '' || $statusFiltro != '' || $numeroFiltro != '') {
     $chamadas = array_values($chamadas);
 }
 
+// Paginação do extrato (métricas, gráficos e exportações usam o período filtrado COMPLETO)
+$__perPage = (int)($_GET['per_page'] ?? 20);
+if (!in_array($__perPage, [20, 50, 100], true)) $__perPage = 20;
+$__totalRows = count($chamadas);
+$__totalPages = max(1, (int)ceil($__totalRows / $__perPage));
+$__page = min($__totalPages, max(1, (int)($_GET['page'] ?? 1)));
+$__offset = ($__page - 1) * $__perPage;
+$__pageRows = array_slice($chamadas, $__offset, $__perPage);
+
 // Cálculo das Métricas Gerais e SLA
 $totalChamadas    = count($chamadas);
 $totalAtendidas   = 0;
@@ -967,7 +976,7 @@ $agNaoAtendJson = json_encode($agNaoAtend);
                             </td>
                         </tr>
                     <?php else: ?>
-                        <?php $i = 1; foreach ($chamadas as $c): ?>
+                        <?php $i = $__offset + 1; foreach ($__pageRows as $c): ?>
                             <tr class="hover:bg-slate-800/40 transition">
                                 <td class="py-3 px-4 text-slate-500 font-bold"><?php echo $i++; ?></td>
                                 <td class="py-3 px-4 text-slate-300"><?php echo htmlspecialchars($c['datetime']); ?></td>
@@ -999,9 +1008,7 @@ $agNaoAtendJson = json_encode($agNaoAtend);
                                 </td>
                                 <td class="py-3 px-4 text-center print:hidden">
                                     <?php if ($c['status'] == 'ATENDIDA'): ?>
-                                        <audio controls class="h-6 w-44 inline-block opacity-90">
-                                            <source src="get_audio.php?uid=<?php echo urlencode($c['uniqueid']); ?>" type="audio/wav">
-                                        </audio>
+                                        <button type="button" onclick="ipbxPlayRow(this,'<?php echo htmlspecialchars(rawurlencode($c['uniqueid']), ENT_QUOTES); ?>')" title="Ouvir gravação" style="white-space:nowrap !important;flex-shrink:0 !important;width:auto !important;overflow:visible !important;text-overflow:clip !important;" class="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 rounded-full text-[11px] font-bold"><i class="fa-solid fa-play"></i> Ouvir</button>
                                     <?php else: ?>
                                         <span class="text-slate-600">-</span>
                                     <?php endif; ?>
@@ -1012,11 +1019,36 @@ $agNaoAtendJson = json_encode($agNaoAtend);
                 </tbody>
             </table>
         </div>
+        <?php
+        $__q = $_GET; unset($__q['page']);
+        $__link = function ($pg, $pp = null) use ($__q, $__perPage) { $q = $__q; $q['page'] = $pg; $q['per_page'] = $pp ?: $__perPage; return '?' . http_build_query($q); };
+        ?>
+        <div class="flex flex-wrap items-center justify-between gap-3 pt-4 text-xs text-slate-400 print:hidden">
+            <span>Mostrando <?php echo $__totalRows ? ($__offset + 1) : 0; ?>–<?php echo min($__offset + $__perPage, $__totalRows); ?> de <?php echo $__totalRows; ?> · Página <?php echo $__page; ?> de <?php echo $__totalPages; ?></span>
+            <div class="flex items-center gap-1 flex-wrap">
+                <?php foreach ([20, 50, 100] as $__pp): ?>
+                    <a href="<?php echo htmlspecialchars($__link(1, $__pp)); ?>" class="px-2 py-1 rounded-lg border border-slate-700 <?php echo $__pp === $__perPage ? 'bg-purple-600 text-white' : 'bg-slate-800 text-slate-300'; ?>"><?php echo $__pp; ?></a>
+                <?php endforeach; ?>
+                <?php if ($__page > 1): ?><a href="<?php echo htmlspecialchars($__link(1)); ?>" class="px-2 py-1 rounded-lg bg-slate-800 border border-slate-700 text-slate-300">«</a><a href="<?php echo htmlspecialchars($__link($__page - 1)); ?>" class="px-2 py-1 rounded-lg bg-slate-800 border border-slate-700 text-slate-300">‹ Anterior</a><?php endif; ?>
+                <?php if ($__page < $__totalPages): ?><a href="<?php echo htmlspecialchars($__link($__page + 1)); ?>" class="px-2 py-1 rounded-lg bg-slate-800 border border-slate-700 text-slate-300">Próxima ›</a><a href="<?php echo htmlspecialchars($__link($__totalPages)); ?>" class="px-2 py-1 rounded-lg bg-slate-800 border border-slate-700 text-slate-300">»</a><?php endif; ?>
+            </div>
+        </div>
     </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
+// Gravação sob demanda: só carrega o áudio quando o usuário clica (o relatório abre rápido)
+function ipbxPlayRow(btn, uid) {
+    var cell = btn.parentNode;
+    var a = document.createElement('audio');
+    a.controls = true; a.autoplay = true; a.preload = 'auto';
+    a.className = 'h-8 w-48 inline-block';
+    a.src = 'get_audio.php?uid=' + uid;
+    a.onerror = function () { cell.innerHTML = '<span class="text-rose-400 text-[11px]" title="Arquivo não encontrado ou sem conversor">Gravação indisponível</span>'; };
+    document.querySelectorAll('audio').forEach(function (x) { try { x.pause(); } catch (e) {} });
+    cell.innerHTML = ''; cell.appendChild(a);
+}
 function setPresetDate(preset) {
     document.getElementById('input_preset').value = preset;
     const form = document.getElementById('form-filtro-filas');

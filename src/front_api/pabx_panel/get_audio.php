@@ -19,6 +19,7 @@ if (!empty($_GET['uid']) && !empty($_GET['exp']) && !empty($_GET['sig'])) {
     if (!$__signed) { http_response_code(403); header('Content-Type: text/plain; charset=utf-8'); echo 'Link inválido ou expirado'; exit; }
 }
 if (!$__signed) authGate('plain');
+if (function_exists('session_status') && session_status() === PHP_SESSION_ACTIVE) @session_write_close(); // não trava as demais requisições do painel enquanto converte o áudio
 
 $file = (!$__signed && isset($_GET['file'])) ? trim($_GET['file']) : '';
 $uid  = isset($_GET['uid']) ? trim($_GET['uid']) : '';
