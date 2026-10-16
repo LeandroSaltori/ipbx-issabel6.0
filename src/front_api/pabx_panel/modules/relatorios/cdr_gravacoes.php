@@ -35,6 +35,12 @@ $date_end       = date('Y-m-d H:i:s', strtotime($date_end_raw));
 $src_filter     = trim($_GET['src_filter'] ?? '');
 $status_filter  = $_GET['status_filter'] ?? 'ALL';
 $type_filter    = $_GET['type_filter'] ?? 'ALL';
+$field_name     = $_GET['field_name'] ?? 'any';
+if (!in_array($field_name, ['any', 'src', 'dst', 'channel', 'dstchannel', 'accountcode', 'did'], true)) $field_name = 'any';
+$queue_filter   = preg_replace('/[^0-9A-Za-z_\-]/', '', (string)($_GET['queue_filter'] ?? ''));
+$min_duration   = max(0, (int)($_GET['min_duration'] ?? 0));
+$hide_zero      = !empty($_GET['hide_zero']);
+$only_recorded  = !empty($_GET['only_recorded']);
 
 // Conexão Nativa com o banco de dados Asterisk CDR
 $ast_db = function_exists('getAsteriskPdoConnection') ? getAsteriskPdoConnection('asteriskcdrdb') : null;
@@ -53,9 +59,23 @@ if ($ast_db) {
         ];
 
         if ($src_filter !== '') {
-            $where_clauses[] = "(src LIKE :src OR dst LIKE :src)";
+            if ($field_name === 'any') {
+                $where_clauses[] = "(src LIKE :src OR dst LIKE :src)";
+            } else {
+                $__hasDid = true;
+                if ($field_name === 'did') { try { $__hasDid = (bool)$ast_db->query("SHOW COLUMNS FROM cdr LIKE 'did'")->fetch(); } catch (Exception $e) { $__hasDid = false; } }
+                if ($__hasDid) $where_clauses[] = "`$field_name` LIKE :src"; else $where_clauses[] = "1=0";
+            }
             $params[':src'] = "%$src_filter%";
         }
+        if ($queue_filter !== '') {
+            $where_clauses[] = "(dst = :qf OR dcontext LIKE :qfc OR dstchannel LIKE :qfc OR accountcode = :qf)";
+            $params[':qf'] = $queue_filter;
+            $params[':qfc'] = "%$queue_filter%";
+        }
+        if ($hide_zero && $min_duration < 1) $min_duration = 1;
+        if ($min_duration > 0) { $where_clauses[] = "billsec >= :md"; $params[':md'] = $min_duration; }
+        if ($only_recorded) $where_clauses[] = "recordingfile IS NOT NULL AND recordingfile <> ''";
 
         if ($status_filter !== 'ALL') {
             $where_clauses[] = "disposition = :st";
@@ -159,6 +179,16 @@ if (isset($_GET['export']) && in_array($_GET['export'], ['csv', 'xlsx', 'pdf'], 
 
                 <input type="text" name="src_filter" value="<?php echo htmlspecialchars($src_filter); ?>" placeholder="Ramal/Número..." class="px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:border-brand-500 focus:outline-none w-full sm:w-48">
                 
+                <select name="field_name" title="Campo da busca" class="px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:border-brand-500 focus:outline-none">
+                    <?php foreach (['any' => 'Origem ou Destino', 'src' => 'Origem', 'dst' => 'Destino', 'channel' => 'Canal Origem', 'dstchannel' => 'Canal Destino', 'accountcode' => 'Fila / Conta', 'did' => 'DID Entrante'] as $__k => $__v): ?>
+                    <option value="<?php echo $__k; ?>" <?php echo $field_name === $__k ? 'selected' : ''; ?>><?php echo $__v; ?></option>
+                    <?php endforeach; ?>
+                </select>
+                <input type="text" name="queue_filter" value="<?php echo htmlspecialchars($queue_filter); ?>" placeholder="Fila/Grupo" class="w-24 px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:border-brand-500 focus:outline-none">
+                <input type="number" min="0" name="min_duration" value="<?php echo $min_duration ?: ''; ?>" placeholder="Dur. mín (s)" class="w-28 px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:border-brand-500 focus:outline-none">
+                <label class="flex items-center gap-1 text-xs text-slate-300"><input type="checkbox" name="hide_zero" value="1" <?php echo $hide_zero ? 'checked' : ''; ?>> Ocultar zeradas</label>
+                <label class="flex items-center gap-1 text-xs text-slate-300"><input type="checkbox" name="only_recorded" value="1" <?php echo $only_recorded ? 'checked' : ''; ?>> Só com gravação</label>
+
                 <select name="status_filter" class="px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:border-brand-500 focus:outline-none">
                     <option value="ALL" <?php echo $status_filter === 'ALL' ? 'selected' : ''; ?>>Todos Status</option>
                     <option value="ANSWERED" <?php echo $status_filter === 'ANSWERED' ? 'selected' : ''; ?>>Atendidas</option>

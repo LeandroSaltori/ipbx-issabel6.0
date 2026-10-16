@@ -65,6 +65,29 @@ if (!empty($uid)) {
                 }
             }
         } catch (Exception $e) {}
+
+        // 1b. Sem gravação na linha encontrada (chamadas de fila têm várias "pernas"): procura nas
+        //     demais pernas da mesma chamada (linkedid) e, por último, pelo uniqueid no nome do arquivo.
+        if (!$foundPath) {
+            try {
+                $legs = [];
+                $q = $ast_db->prepare("SELECT calldate, recordingfile FROM cdr WHERE recordingfile <> '' AND (linkedid = :u OR uniqueid = :u OR linkedid = (SELECT linkedid FROM (SELECT linkedid FROM cdr WHERE uniqueid = :u LIMIT 1) t)) ORDER BY billsec DESC LIMIT 10");
+                $q->execute([':u' => $uid]);
+                $legs = $q->fetchAll(PDO::FETCH_ASSOC);
+                foreach ($legs as $lg) {
+                    $fp = findRecordingPath($lg['recordingfile'], $lg['calldate'] ?? '');
+                    if ($fp !== '') { $foundPath = $fp; break; }
+                }
+            } catch (Exception $e) {}
+        }
+        if (!$foundPath && preg_match('/^[0-9]+\.[0-9]+$/', $uid)) {
+            $root = '/var/spool/asterisk/monitor';
+            $g = glob("$root/*{$uid}*") ?: glob("$root/*/*/*/*{$uid}*") ?: [];
+            foreach ($g as $m) {
+                $rp = realpath($m);
+                if ($rp && is_file($rp) && filesize($rp) > 0 && strpos($rp, $root . '/') === 0) { $foundPath = $rp; break; }
+            }
+        }
     }
 }
 
