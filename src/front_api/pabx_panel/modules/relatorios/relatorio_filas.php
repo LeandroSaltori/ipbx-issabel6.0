@@ -713,7 +713,7 @@ $agNaoAtendJson = json_encode($agNaoAtend);
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 text-xs">
+            <div class="flex flex-wrap items-end gap-3 text-xs [&>div]:flex-1 [&>div]:min-w-[140px]">
                 <!-- Data Início Clicável com Ícone de Calendário -->
                 <div class="space-y-1">
                     <label class="text-slate-400 font-bold block">Data Início:</label>
@@ -783,15 +783,12 @@ $agNaoAtendJson = json_encode($agNaoAtend);
                     <label class="text-slate-400 font-bold block">Telefone / BINA:</label>
                     <input type="text" name="numero_filtro" placeholder="Ex: 11999998888" value="<?php echo htmlspecialchars($numeroFiltro); ?>" class="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono focus:border-purple-500 focus:outline-none">
                 </div>
-            </div>
-
-            <div class="flex flex-wrap items-end gap-4 text-xs">
-                <div class="space-y-1">
-                    <label class="text-slate-400 font-bold block">Duração mínima (segundos):</label>
-                    <input type="number" min="0" name="min_duration" value="<?php echo $minDuracao ?: ''; ?>" placeholder="Ex: 10" class="w-40 px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono focus:border-purple-500 focus:outline-none">
+                <div class="space-y-1 !flex-none !min-w-[120px] w-32">
+                    <label class="text-slate-400 font-bold block">Dur. mín. (s):</label>
+                    <input type="number" min="0" name="min_duration" value="<?php echo $minDuracao ?: ''; ?>" placeholder="Ex: 10" class="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono focus:border-purple-500 focus:outline-none">
                 </div>
-                <label class="flex items-center gap-2 text-slate-300 pb-2"><input type="checkbox" name="hide_zero" value="1" <?php echo $ocultarZero ? 'checked' : ''; ?>> Ocultar zeradas (0s)</label>
-                <label class="flex items-center gap-2 text-slate-300 pb-2"><input type="checkbox" name="only_recorded" value="1" <?php echo $soGravadas ? 'checked' : ''; ?>> Apenas com gravação</label>
+                <label class="flex items-center gap-2 text-slate-300 pb-2 whitespace-nowrap !flex-none"><input type="checkbox" name="hide_zero" value="1" <?php echo $ocultarZero ? 'checked' : ''; ?>> Ocultar zeradas (0s)</label>
+                <label class="flex items-center gap-2 text-slate-300 pb-2 whitespace-nowrap !flex-none"><input type="checkbox" name="only_recorded" value="1" <?php echo $soGravadas ? 'checked' : ''; ?>> Apenas com gravação</label>
             </div>
 
             <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-800/60">
@@ -1038,7 +1035,7 @@ $agNaoAtendJson = json_encode($agNaoAtend);
                                 </td>
                                 <td class="py-3 px-4 text-center print:hidden">
                                     <?php if ($c['status'] == 'ATENDIDA'): ?>
-                                        <button type="button" onclick="ipbxPlayRow(this,'<?php echo htmlspecialchars(rawurlencode($c['uniqueid']), ENT_QUOTES); ?>')" title="Ouvir gravação" style="white-space:nowrap !important;flex-shrink:0 !important;width:auto !important;overflow:visible !important;text-overflow:clip !important;" class="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 rounded-full text-[11px] font-bold"><i class="fa-solid fa-play"></i> Ouvir</button>
+                                        <button type="button" onclick="ipbxOpenPlayer('<?php echo htmlspecialchars(rawurlencode($c['uniqueid']), ENT_QUOTES); ?>','<?php echo htmlspecialchars(addslashes($c['numero'] ?: '-'), ENT_QUOTES); ?>','<?php echo htmlspecialchars(addslashes(fmtRamalDisplay($c['ramal'], $extNameMap)), ENT_QUOTES); ?>')" title="Ouvir gravação" style="white-space:nowrap !important;flex-shrink:0 !important;width:auto !important;overflow:visible !important;text-overflow:clip !important;" class="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 rounded-full text-[11px] font-bold"><i class="fa-solid fa-play"></i> Ouvir</button>
                                     <?php else: ?>
                                         <span class="text-slate-600">-</span>
                                     <?php endif; ?>
@@ -1066,19 +1063,9 @@ $agNaoAtendJson = json_encode($agNaoAtend);
     </div>
 </div>
 
+<?php require_once dirname(__DIR__, 2) . '/includes/audio_player.php'; ?>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-// Gravação sob demanda: só carrega o áudio quando o usuário clica (o relatório abre rápido)
-function ipbxPlayRow(btn, uid) {
-    var cell = btn.parentNode;
-    var a = document.createElement('audio');
-    a.controls = true; a.autoplay = true; a.preload = 'auto';
-    a.className = 'h-8 w-48 inline-block';
-    a.src = 'get_audio.php?uid=' + uid;
-    a.onerror = function () { cell.innerHTML = '<span class="text-rose-400 text-[11px]" title="Arquivo não encontrado ou sem conversor">Gravação indisponível</span>'; };
-    document.querySelectorAll('audio').forEach(function (x) { try { x.pause(); } catch (e) {} });
-    cell.innerHTML = ''; cell.appendChild(a);
-}
 function setPresetDate(preset) {
     document.getElementById('input_preset').value = preset;
     const form = document.getElementById('form-filtro-filas');

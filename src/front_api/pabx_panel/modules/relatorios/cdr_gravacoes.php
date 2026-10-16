@@ -129,6 +129,7 @@ if (isset($_GET['export']) && in_array($_GET['export'], ['csv', 'xlsx', 'pdf'], 
 }
 ?>
 
+<?php require_once dirname(__DIR__, 2) . '/includes/audio_player.php'; ?>
 <div class="space-y-6">
     <!-- Header & Filtros no Padrão Brasil -->
     <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-5 shadow-xl space-y-4">
@@ -397,10 +398,8 @@ function exportToCSV() {
                                      <div class="flex items-center justify-end gap-1.5">
                                          <?php if (!empty($c['recordingfile'])): ?>
                                              <?php if (hasUserPermission('listen_recordings')): ?>
-                                                 <audio controls class="h-7 max-w-[180px] inline-block">
-                                                     <source src="relatorio_filas.php?action=stream_audio&uid=<?php echo urlencode($c['uniqueid']); ?>" type="audio/wav">
-                                                 </audio>
-                                                 <a href="relatorio_filas.php?action=download_audio&uid=<?php echo urlencode($c['uniqueid']); ?>" title="📥 Download Áudio .WAV da Chamada" class="p-1.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition">
+                                                 <button type="button" onclick="ipbxOpenPlayer('<?php echo htmlspecialchars(rawurlencode($c['uniqueid']), ENT_QUOTES); ?>','<?php echo htmlspecialchars(addslashes($c['src']), ENT_QUOTES); ?>','<?php echo htmlspecialchars(addslashes($c['dst']), ENT_QUOTES); ?>')" title="Ouvir gravação" style="white-space:nowrap !important;flex-shrink:0 !important;width:auto !important;overflow:visible !important;text-overflow:clip !important;" class="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 rounded-full text-[11px] font-bold"><i class="fa-solid fa-play"></i> Ouvir</button>
+                                                 <a href="get_audio.php?uid=<?php echo urlencode($c['uniqueid']); ?>" download title="📥 Download Áudio .WAV da Chamada" class="p-1.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition">
                                                      <i class="fa-solid fa-download"></i>
                                                  </a>
 
