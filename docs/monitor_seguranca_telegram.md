@@ -32,10 +32,10 @@ O **IPbx Sentinel** (`scripts/ipbx-sentinel.sh`) é o monitor único de seguran�
 Como o mesmo monitor roda em vários clientes, **todo alerta sai com o mesmo cabeçalho**: ícone de gravidade, nome do cliente (também na primeira linha, que aparece na prévia do celular), servidor, IP e data/hora. Exemplo:
 
 ```
-🚨 [Helpnet Matriz] ALERTA: FIREWALL SEM PROTECAO
-🏢 Cliente: Helpnet Matriz
-🖥 Servidor: ipbx.helpnet (192.168.0.251)
-🔗 Acesso: helpnet.ddns.net:5444
+🚨 [NomeDoCliente] ALERTA: FIREWALL SEM PROTECAO
+🏢 Cliente: NomeDoCliente
+🖥 Servidor: ipbx.nomedocliente (IP do servidor)
+🔗 Acesso: endereco-do-cliente:porta
 🕒 14/10/2026 08:38:39
 ```
 
