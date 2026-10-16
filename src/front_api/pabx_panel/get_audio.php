@@ -122,42 +122,60 @@ if ($ffm !== '' && is_executable($ffm) && (count($soundParts) > 1 || ($foundPath
 }
 
 if ($foundPath) {
-    $pExt = strtolower(pathinfo($foundPath, PATHINFO_EXTENSION));
-
-    // 1. Tentar SoX para conversão forçada para PCM 16-bit WAV (Alta Compatibilidade com HTML5)
-    $sox = trim(@shell_exec('which sox 2>/dev/null'));
-    if (empty($sox) && file_exists('/usr/bin/sox')) $sox = '/usr/bin/sox';
-    if (!empty($sox) && is_executable($sox)) {
-        header('Content-Type: audio/wav');
-        header('Content-Disposition: inline; filename="' . basename($foundPath) . '.wav"');
-        header('Cache-Control: no-cache, must-revalidate');
-        header('X-Audio-Source: sox-transcoder');
-        passthru(escapeshellcmd($sox) . ' ' . escapeshellarg($foundPath) . ' -t wav -e signed-integer -b 16 -r 16000 -c 1 - 2>/dev/null');
+    // Converte para WAV PCM 16-bit em ARQUIVO (cache) e serve com Content-Length + Range:
+    // o navegador mostra a duração, permite avançar e nunca recebe resposta vazia.
+    $cacheDir = rtrim(sys_get_temp_dir(), '/') . '/ipbx_audio_cache';
+    if (!is_dir($cacheDir)) @mkdir($cacheDir, 0700, true);
+    $key = md5($foundPath . '|' . @filemtime($foundPath) . '|' . @filesize($foundPath));
+    $out = "$cacheDir/$key.wav";
+    $valid = function ($f) { return is_file($f) && filesize($f) > 1024; };
+    if (!$valid($out)) {
+        @unlink($out);
+        $tmp = "$out." . bin2hex(random_bytes(4)) . '.tmp.wav';
+        $in  = escapeshellarg($foundPath);
+        $o   = escapeshellarg($tmp);
+        $ext = strtolower(pathinfo($foundPath, PATHINFO_EXTENSION));
+        $fi  = isset($rawFmt[$ext]) ? '-f ' . $rawFmt[$ext][0] . ' -ar ' . $rawFmt[$ext][1] . ' -ac 1 ' : '';
+        $cmds = [];
+        if ($ffm !== '' && is_executable($ffm)) $cmds[] = escapeshellcmd($ffm) . " -nostdin -y -loglevel error {$fi}-i $in -ar 16000 -ac 1 -c:a pcm_s16le -f wav $o 2>&1";
+        $sox = trim((string)@shell_exec('which sox 2>/dev/null'));
+        if ($sox === '' && file_exists('/usr/bin/sox')) $sox = '/usr/bin/sox';
+        if ($sox !== '' && is_executable($sox)) $cmds[] = escapeshellcmd($sox) . " $in -t wav -e signed-integer -b 16 -r 16000 -c 1 $o 2>&1";
+        foreach ($cmds as $c) {
+            @unlink($tmp);
+            @shell_exec($c);
+            if ($valid($tmp)) { @rename($tmp, $out); break; }
+        }
+        @unlink($tmp);
+        // Sem conversor: se já for WAV com cabeçalho PCM, serve o original
+        if (!$valid($out) && $ext === 'wav') {
+            $h = (string)@file_get_contents($foundPath, false, null, 0, 24);
+            if (strlen($h) >= 24 && substr($h, 0, 4) === 'RIFF' && unpack('v', substr($h, 20, 2))[1] === 1) $out = $foundPath;
+        }
+    }
+    if (!$valid($out)) {
+        http_response_code(415);
+        header('Content-Type: text/plain; charset=utf-8');
+        echo 'Gravação encontrada, mas não foi possível convertê-la (instale ffmpeg ou sox no servidor)';
         exit;
     }
-
-    // 2. Tentar FFmpeg para conversão para PCM 16-bit WAV
-    $ffmpeg = trim(@shell_exec('which ffmpeg 2>/dev/null'));
-    if (empty($ffmpeg) && file_exists('/usr/bin/ffmpeg')) $ffmpeg = '/usr/bin/ffmpeg';
-    if (!empty($ffmpeg) && is_executable($ffmpeg)) {
-        header('Content-Type: audio/wav');
-        header('Content-Disposition: inline; filename="' . basename($foundPath) . '.wav"');
-        header('Cache-Control: no-cache, must-revalidate');
-        header('X-Audio-Source: ffmpeg-transcoder');
-        passthru(escapeshellcmd($ffmpeg) . ' -i ' . escapeshellarg($foundPath) . ' -f wav -acodec pcm_s16le -ar 16000 -ac 1 - 2>/dev/null');
-        exit;
+    $size = filesize($out); $start = 0; $end = $size - 1;
+    if (!empty($_SERVER['HTTP_RANGE']) && preg_match('/bytes=(\d*)-(\d*)/', $_SERVER['HTTP_RANGE'], $m)) {
+        if ($m[1] !== '') { $start = (int)$m[1]; if ($m[2] !== '') $end = min($end, (int)$m[2]); }
+        elseif ($m[2] !== '') { $start = max(0, $size - (int)$m[2]); }
+        if ($start > $end || $start >= $size) { http_response_code(416); header("Content-Range: bytes */$size"); exit; }
+        http_response_code(206);
+        header("Content-Range: bytes $start-$end/$size");
     }
-
-    // 3. Streaming Direto com HTTP headers
-    $fsize = filesize($foundPath);
-    $mime_map = ['wav'=>'audio/wav','mp3'=>'audio/mpeg','gsm'=>'audio/x-gsm','ogg'=>'audio/ogg'];
-    $foundMime = isset($mime_map[$pExt]) ? $mime_map[$pExt] : 'audio/wav';
-    header("Content-Type: $foundMime");
-    header("Content-Length: $fsize");
-    header("Accept-Ranges: bytes");
-    header("Cache-Control: no-cache");
-    header("X-Audio-Source: direct-file");
-    readfile($foundPath);
+    header('Content-Type: audio/wav');
+    header('Accept-Ranges: bytes');
+    header('Content-Length: ' . ($end - $start + 1));
+    header('Content-Disposition: inline; filename="' . basename($foundPath) . '.wav"');
+    header('Cache-Control: private, max-age=300');
+    header('X-Audio-Source: ipbx-converted');
+    $fh = fopen($out, 'rb'); fseek($fh, $start); $left = $end - $start + 1;
+    while ($left > 0 && !feof($fh)) { $buf = fread($fh, min(65536, $left)); if ($buf === false) break; echo $buf; $left -= strlen($buf); flush(); }
+    fclose($fh);
     exit;
 }
 
