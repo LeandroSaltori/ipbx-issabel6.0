@@ -14,6 +14,9 @@ if (session_status() === PHP_SESSION_NONE) {
             'samesite' => 'Strict',
         ]);
     }
+    // Nome de cookie próprio: o painel clássico e o IssabelPBX (/admin) usam PHPSESSID no mesmo endereço e,
+    // ao entrar/sair/renovar a sessão numa aba deles, apagavam o cookie do painel novo (login pedido do nada).
+    if (PHP_SAPI !== 'cli') session_name('IPBXPRISMASESS');
     // Sessão própria do painel: pasta privada e validade longa (8 h). Evita que a limpeza
     // automática de sessões do painel clássico (24 min) derrube o login do painel novo.
     $__sessDir = __DIR__ . '/../logs/sessions';
