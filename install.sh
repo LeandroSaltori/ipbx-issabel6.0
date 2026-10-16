@@ -141,6 +141,16 @@ if [ -f "$REPO_DIR/scripts/ipbx-timezone.sh" ]; then
 fi
 
 # ==============================================================================
+# PRE-REQUISITO: comando sqlite3 (registro de menus/permissoes do Issabel depende dele)
+# Sem ele, as etapas de menu (Relatorio de Filas, Relatorio Geral, Painel IPbx, Nome Ramais) eram puladas em silencio.
+# ==============================================================================
+if ! command -v sqlite3 &>/dev/null; then
+    log_info "Instalando sqlite (comando sqlite3 necessario para registrar menus e permissoes)..."
+    yum install -y sqlite 2>/dev/null || dnf install -y sqlite 2>/dev/null || yum install -y sqlite3 2>/dev/null || dnf install -y sqlite3 2>/dev/null || true
+    command -v sqlite3 &>/dev/null || log_warn "sqlite3 nao instalado: menus e permissoes (Relatorio de Filas etc.) NAO serao registrados. Instale 'sqlite' e rode o instalador de novo."
+fi
+
+# ==============================================================================
 # 1. ALTERAR TELA DO TERMINAL (MOTD)
 # ==============================================================================
 log_info "1/20 - Configurando tela personalizada do terminal (MOTD)..."
@@ -1169,6 +1179,21 @@ if [ -d "$REPO_DIR/src/ramais" ]; then
     /bin/cp -rf "$REPO_DIR/src/ramais/"* /var/www/html/ramais/
     chown -R asterisk:asterisk /var/www/html/ramais
     log_success "Módulo Ramais e Relatório de Filas configurados."
+fi
+
+# Verificacao do Relatorio de Filas (so informa; nao interrompe a instalacao)
+log_info "Verificando o Relatorio de Filas (qstatslite)..."
+if [ -n "${MYSQL_CMD:-}" ]; then
+    __qs_tabs="$($MYSQL_CMD -N -e "SHOW TABLES" 2>/dev/null | tr '\n' ' ')"
+    case "$__qs_tabs" in *queue_stats*) log_success "Banco qstatslite criado (tabelas de filas presentes).";; *) log_warn "Banco qstatslite SEM tabelas: o relatorio clássico ficara vazio. Rode: php /usr/local/parselog/parselog.php all";; esac
+    __qs_n="$($MYSQL_CMD -N -e "SELECT COUNT(*) FROM queue_stats" 2>/dev/null)"
+    log_info "Eventos de fila ja importados: ${__qs_n:-0}."
+fi
+[ -f /var/log/asterisk/queue_log ] && log_success "queue_log do Asterisk presente." || log_warn "queue_log ainda nao existe (so aparece apos a primeira chamada em fila; o parselog importa a cada minuto)."
+crontab -l 2>/dev/null | grep -q "parselog.php" && log_success "Importacao automatica (parselog) agendada a cada minuto." || log_warn "parselog NAO esta agendado no cron: o relatorio nao atualiza."
+if command -v sqlite3 &>/dev/null; then
+    [ "$(sqlite3 /var/www/db/menu.db "SELECT COUNT(*) FROM menu WHERE id IN ('relatorio_de_filas','relatorio_filas')" 2>/dev/null)" -ge 1 ] 2>/dev/null \
+        && log_success "Menu Reports > Relatorio de Filas registrado." || log_warn "Menu do Relatorio de Filas nao registrado em menu.db."
 fi
 
 # ==============================================================================
