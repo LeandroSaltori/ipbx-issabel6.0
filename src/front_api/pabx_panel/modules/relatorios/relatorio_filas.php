@@ -74,6 +74,9 @@ if ($filter_preset === 'hoje') {
 $agenteFiltro = isset($_GET['agente_filtro']) ? trim($_GET['agente_filtro']) : '';
 $statusFiltro = isset($_GET['status_filtro']) ? trim($_GET['status_filtro']) : '';
 $numeroFiltro = isset($_GET['numero_filtro']) ? trim($_GET['numero_filtro']) : '';
+$minDuracao   = max(0, (int)($_GET['min_duration'] ?? 0));
+$ocultarZero  = !empty($_GET['hide_zero']);
+$soGravadas   = !empty($_GET['only_recorded']);
 $filaFiltro   = isset($_GET['fila']) ? (is_array($_GET['fila']) ? $_GET['fila'] : [$_GET['fila']]) : [];
 
 $dataInicioEsc = $conn ? mysqli_real_escape_string($conn, $dataInicio) : $dataInicio;
@@ -512,6 +515,24 @@ if (!empty($uidsMissing) && $conn) {
     }
 }
 
+// Duração mínima / ocultar zeradas (0s de conversa) — igual ao relatório de ligações clássico
+if ($ocultarZero && $minDuracao < 1) $minDuracao = 1;
+if ($minDuracao > 0) {
+    $chamadas = array_values(array_filter($chamadas, function($c) use ($minDuracao) { return (int)$c['tempo_falando'] >= $minDuracao; }));
+}
+// Apenas com gravação: confere no CDR quais chamadas têm arquivo de gravação
+if ($soGravadas && $conn) {
+    $__uids = [];
+    foreach ($chamadas as $c) { if ($c['uniqueid'] !== '' && $c['uniqueid'] !== null) $__uids[$c['uniqueid']] = true; }
+    $__rec = [];
+    foreach (array_chunk(array_keys($__uids), 500) as $__ch) {
+        $__in = implode(',', array_map(function($u) use ($conn) { return "'" . mysqli_real_escape_string($conn, $u) . "'"; }, $__ch));
+        $__r = @mysqli_query($conn, "SELECT uniqueid FROM asteriskcdrdb.cdr WHERE recordingfile <> '' AND uniqueid IN ($__in)");
+        if ($__r) while ($__x = mysqli_fetch_assoc($__r)) $__rec[$__x['uniqueid']] = true;
+    }
+    $chamadas = array_values(array_filter($chamadas, function($c) use ($__rec) { return isset($__rec[$c['uniqueid']]); }));
+}
+
 // Filtros adicionais em PHP (Agente, Status, Número)
 if ($agenteFiltro != '' || $statusFiltro != '' || $numeroFiltro != '') {
     $chamadas = array_filter($chamadas, function($c) use ($agenteFiltro, $statusFiltro, $numeroFiltro) {
@@ -762,6 +783,15 @@ $agNaoAtendJson = json_encode($agNaoAtend);
                     <label class="text-slate-400 font-bold block">Telefone / BINA:</label>
                     <input type="text" name="numero_filtro" placeholder="Ex: 11999998888" value="<?php echo htmlspecialchars($numeroFiltro); ?>" class="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono focus:border-purple-500 focus:outline-none">
                 </div>
+            </div>
+
+            <div class="flex flex-wrap items-end gap-4 text-xs">
+                <div class="space-y-1">
+                    <label class="text-slate-400 font-bold block">Duração mínima (segundos):</label>
+                    <input type="number" min="0" name="min_duration" value="<?php echo $minDuracao ?: ''; ?>" placeholder="Ex: 10" class="w-40 px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono focus:border-purple-500 focus:outline-none">
+                </div>
+                <label class="flex items-center gap-2 text-slate-300 pb-2"><input type="checkbox" name="hide_zero" value="1" <?php echo $ocultarZero ? 'checked' : ''; ?>> Ocultar zeradas (0s)</label>
+                <label class="flex items-center gap-2 text-slate-300 pb-2"><input type="checkbox" name="only_recorded" value="1" <?php echo $soGravadas ? 'checked' : ''; ?>> Apenas com gravação</label>
             </div>
 
             <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-800/60">
