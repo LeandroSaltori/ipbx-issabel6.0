@@ -135,3 +135,84 @@ function ssoImportAll($aclPath = '/var/www/db/acl.db') {
     }
     return ['ok' => true, 'novos' => $novos, 'existentes' => $existentes];
 }
+
+/* ---------- Sincronia do cadastro com a base de usuários da central (entrada pelo login inicial) ---------- */
+
+function aclOpenRW($aclPath = '/var/www/db/acl.db') {
+    if (!is_file($aclPath) || !is_writable($aclPath)) return null;
+    try { return new PDO('sqlite:' . $aclPath, null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]); } catch (Exception $e) { return null; }
+}
+
+function aclGroupForRole($role) {
+    foreach (ssoGroupMap() as $g => $r) { if ($r === $role) return $g; }
+    return 'ramal';
+}
+
+/**
+ * Cria/atualiza o usuário na central para ele conseguir entrar pelo login inicial (mesmo usuário e senha).
+ * Devolve ['ok'=>bool,'login'=>string,'error'=>string]. Falha de gravação nunca derruba o salvamento do painel novo.
+ */
+function aclSyncUser($rowId, $password = '') {
+    global $db;
+    ssoEnsureSchema();
+    $acl = aclOpenRW();
+    if (!$acl) return ['ok' => false, 'login' => '', 'error' => 'sem permissão de gravação na base de usuários da central'];
+    try {
+        $st = $db->prepare("SELECT * FROM system_users WHERE id = :i"); $st->execute([':i' => (int)$rowId]);
+        $u = $st->fetch(PDO::FETCH_ASSOC);
+        if (!$u) return ['ok' => false, 'login' => '', 'error' => 'usuário não encontrado'];
+        $login = trim((string)($u['issabel_user'] ?? ''));
+        $isNew = false;
+        if ($login === '') {
+            $login = strtolower(preg_replace('/[^a-z0-9._-]/i', '', explode('@', (string)$u['email'])[0]));
+            if ($login === '') return ['ok' => false, 'login' => '', 'error' => 'e-mail sem nome de usuário válido'];
+            $q = $acl->prepare("SELECT COUNT(*) FROM acl_user WHERE name = :n"); $q->execute([':n' => $login]);
+            if ($q->fetchColumn() > 0) return ['ok' => false, 'login' => $login, 'error' => "já existe na central um usuário '$login' que não está vinculado a este cadastro"];
+            $isNew = true;
+        }
+        $q = $acl->prepare("SELECT id FROM acl_user WHERE name = :n"); $q->execute([':n' => $login]);
+        $aid = (int)$q->fetchColumn();
+        $ext = preg_match('/^\d{2,10}$/', (string)$u['extension']) ? $u['extension'] : '';
+        $acl->beginTransaction();
+        if (!$aid) {
+            $acl->prepare("INSERT INTO acl_user (name, description, md5_password, extension) VALUES (:n, :d, :p, :x)")
+                ->execute([':n' => $login, ':d' => $u['name'], ':p' => $password !== '' ? md5($password) : md5(bin2hex(random_bytes(16))), ':x' => $ext]);
+            $aid = (int)$acl->lastInsertId();
+        } else {
+            $acl->prepare("UPDATE acl_user SET description = :d, extension = :x WHERE id = :i")->execute([':d' => $u['name'], ':x' => $ext, ':i' => $aid]);
+            if ($password !== '') $acl->prepare("UPDATE acl_user SET md5_password = :p WHERE id = :i")->execute([':p' => md5($password), ':i' => $aid]);
+        }
+        if ($login !== 'admin') {
+            $g = $acl->prepare("SELECT id FROM acl_group WHERE LOWER(name) = :g"); $g->execute([':g' => aclGroupForRole($u['role'])]);
+            $gid = (int)$g->fetchColumn();
+            if ($gid) {
+                $acl->prepare("DELETE FROM acl_membership WHERE id_user = :i")->execute([':i' => $aid]);
+                $acl->prepare("INSERT INTO acl_membership (id_user, id_group) VALUES (:i, :g)")->execute([':i' => $aid, ':g' => $gid]);
+            }
+        }
+        $acl->commit();
+        if ($isNew || ($u['issabel_user'] ?? '') === '') $db->prepare("UPDATE system_users SET issabel_user = :l WHERE id = :i")->execute([':l' => $login, ':i' => (int)$rowId]);
+        return ['ok' => true, 'login' => $login, 'error' => ''];
+    } catch (Exception $e) {
+        try { $acl->rollBack(); } catch (Exception $e2) {}
+        return ['ok' => false, 'login' => '', 'error' => 'falha ao gravar na central'];
+    }
+}
+
+/** Remove da central o usuário vinculado (o 'admin' nunca é removido). */
+function aclRemoveUser($login) {
+    $login = trim((string)$login);
+    if ($login === '' || $login === 'admin') return false;
+    $acl = aclOpenRW();
+    if (!$acl) return false;
+    try {
+        $q = $acl->prepare("SELECT id FROM acl_user WHERE name = :n"); $q->execute([':n' => $login]);
+        $aid = (int)$q->fetchColumn();
+        if (!$aid) return true;
+        $acl->beginTransaction();
+        $acl->prepare("DELETE FROM acl_membership WHERE id_user = :i")->execute([':i' => $aid]);
+        $acl->prepare("DELETE FROM acl_user WHERE id = :i")->execute([':i' => $aid]);
+        $acl->commit();
+        return true;
+    } catch (Exception $e) { return false; }
+}

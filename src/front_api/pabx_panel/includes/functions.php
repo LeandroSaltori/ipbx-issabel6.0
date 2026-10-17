@@ -3660,7 +3660,8 @@ function saveSystemUser($data) {
                 $pw = authSetPassword($id, $data['password']);
                 if (!$pw['success']) return ['success' => false, 'error' => $pw['error']];
             }
-            return ['success' => true, 'message' => "Usuário '$name' atualizado com sucesso!"];
+            $sy = aclSyncUser($id, (string)($data['password'] ?? ''));
+            return ['success' => true, 'message' => "Usuário '$name' atualizado com sucesso!" . ($sy['ok'] ? " Login da central: {$sy['login']}." : " Atenção: não foi possível atualizar o login da central ({$sy['error']}).")];
         } else {
             // Verificar duplicidade de e-mail
             $ch = $db->prepare("SELECT id FROM system_users WHERE email = :email");
@@ -3681,7 +3682,8 @@ function saveSystemUser($data) {
                 $db->prepare("DELETE FROM system_users WHERE email = :e")->execute([':e' => $email]);
                 return ['success' => false, 'error' => $pw['error']];
             }
-            return ['success' => true, 'message' => "Usuário '$name' cadastrado com sucesso!"];
+            $sy = aclSyncUser($newId, (string)$data['password']);
+            return ['success' => true, 'message' => "Usuário '$name' cadastrado com sucesso!" . ($sy['ok'] ? " Já pode entrar no login inicial com o usuário '{$sy['login']}' e a mesma senha." : " Atenção: não foi possível criar o login da central ({$sy['error']}); ele entra pelo login com e-mail e senha.")];
         }
     } catch (Exception $e) {
         return ['success' => false, 'error' => "Erro no banco de dados: " . $e->getMessage()];
@@ -3692,8 +3694,12 @@ function deleteSystemUser($id) {
     global $db;
     if (!$db || intval($id) <= 0) return false;
     try {
+        $q = $db->prepare("SELECT issabel_user FROM system_users WHERE id = :id"); $q->execute([':id' => intval($id)]);
+        $il = (string)$q->fetchColumn();
         $stmt = $db->prepare("DELETE FROM system_users WHERE id = :id");
-        return $stmt->execute([':id' => intval($id)]);
+        $ok = $stmt->execute([':id' => intval($id)]);
+        if ($ok && $il !== '') aclRemoveUser($il);
+        return $ok;
     } catch (Exception $e) {
         return false;
     }
