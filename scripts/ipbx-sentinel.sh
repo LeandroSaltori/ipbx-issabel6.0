@@ -564,6 +564,23 @@ check_firewall() {
   fi
 }
 
+# Padrao IPbx: todo Issabel (Rocky Linux 8) tem iptables + fail2ban ativos. So alerta (uma vez por queda).
+check_fail2ban() {
+  command -v systemctl >/dev/null 2>&1 || return 0
+  local flag="$STATE_DIR/f2b.down" st why=""
+  mkdir -p "$STATE_DIR" 2>/dev/null
+  if ! systemctl list-unit-files 2>/dev/null | grep -q '^fail2ban\.service'; then why="nao instalado"
+  else st="$(systemctl is-active fail2ban 2>/dev/null)"; [ "$st" = "active" ] || why="parado (estado: ${st:-inactive})"; fi
+  if [ -n "$why" ]; then
+    if [ ! -f "$flag" ]; then
+      : > "$flag"; log "FAIL2BAN: ${why}."
+      send_telegram "ALERTA: FAIL2BAN SEM PROTECAO"$'\n'"Servico: fail2ban - ${why}"$'\n'"Efeito: tentativas de senha (SIP/SSH/painel) nao sao bloqueadas."$'\n'"Acao: apenas alerta."
+    fi
+  elif [ -f "$flag" ]; then
+    rm -f "$flag"; log "FAIL2BAN: restabelecido."; send_telegram "Fail2ban restabelecido"
+  fi
+}
+
 check_dialplan() {
   local g="${SENTINEL_DIALPLAN_GLOB:-/etc/asterisk/extensions*.conf}" hit
   # shellcheck disable=SC2086
@@ -706,7 +723,7 @@ check_botnet() {
   [ -n "$p" ] && persist_alert "botnet|proc" "processo de varredura/ataque SIP em execucao neste servidor: $(echo "$p" | cut -c1-120)"
 }
 
-host_checks() { check_firewall; check_dialplan; check_cron; check_framework; check_persistence; check_immutable; check_botnet; }
+host_checks() { check_firewall; check_fail2ban; check_dialplan; check_cron; check_framework; check_persistence; check_immutable; check_botnet; }
 
 do_scan() {
   local mode="$1"
