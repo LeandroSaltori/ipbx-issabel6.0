@@ -144,15 +144,6 @@ No `/var/log/secure` do servidor invadido apareciam, em varias datas (25/09, 26/
 
 Todo servidor IPbx é Issabel em Rocky Linux 8 com **iptables e fail2ban ativos** (o firewall do provedor/VPS é uma camada extra, não substitui o do servidor). O Sentinel alerta se o iptables ficar sem regras ou o fail2ban parar/não existir. O MySQL só aceita conexões locais (`localhost`); `root` com host `%` gera alerta, a menos que o próprio sistema precise de acesso remoto.
 
-## Exceção: servidor sem firewall próprio (não é o padrão)
-
-Só se o servidor realmente não tiver iptables (firewall somente externo), silencie o alerta de iptables vazio:
-
-```
-ipbx-sentinel --firewall-externo     # silencia o alerta de iptables vazio
-ipbx-sentinel --firewall-local       # volta a cobrar o iptables do próprio servidor
-```
-
 ## Usuário padrão da nuvem com sudo sem senha
 
 Imagens de nuvem (ex.: usuário `rocky`) já vêm com `NOPASSWD: ALL`. Se for o usuário legítimo do provedor, libere só ele; qualquer outro usuário com sudo sem senha continua alertando:

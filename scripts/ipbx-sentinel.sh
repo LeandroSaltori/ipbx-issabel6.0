@@ -38,7 +38,6 @@
 #   ipbx-sentinel --test-alert     envia mensagem de teste ao Telegram
 #   ipbx-sentinel --set-cliente "Nome" [host:porta]   define o cliente que aparece em TODOS os alertas
 #   ipbx-sentinel --install [--cliente "Nome"]        o cliente nos alertas e o nome do host; --cliente e opcional (sobrescreve)
-#   ipbx-sentinel --firewall-externo | --firewall-local   informa se ha firewall do provedor/rede na frente (silencia o alerta de iptables vazio)
 #   ipbx-sentinel --sudo-ok USUARIO   libera o aviso de sudo sem senha para um usuario legitimo (ex.: usuario padrao da nuvem)
 #   ipbx-sentinel --selftest       testa o detector em pasta temporaria
 #
@@ -70,7 +69,6 @@ HOSTNAME_S="$(hostname 2>/dev/null || echo pbx)"
 SENTINEL_ACTION="${SENTINEL_ACTION:-quarantine}"
 SENTINEL_HEAL_PERMS="${SENTINEL_HEAL_PERMS:-0}"
 SENTINEL_FIREWALL_HEAL="${SENTINEL_FIREWALL_HEAL:-0}"
-SENTINEL_FIREWALL_EXTERNO="${SENTINEL_FIREWALL_EXTERNO:-0}"   # 1 = ha firewall do provedor/rede na frente: nao cobra iptables local
 SENTINEL_SUDO_OK="${SENTINEL_SUDO_OK:-}"                     # usuarios com sudo sem senha liberados (ex.: rocky,cloud-user)
 [ -r "$CONF_FILE" ] && . "$CONF_FILE" 2>/dev/null
 # Identificacao do cliente nos alertas (/etc/ipbx/cliente.conf: CLIENTE_NOME, CLIENTE_ACESSO opcional)
@@ -538,7 +536,6 @@ seen_forget() {  # $1 = chave: esquece o alerta (a condicao sumiu; se voltar, av
 
 check_firewall() {
   command -v systemctl >/dev/null 2>&1 || return 0
-  if [ "${SENTINEL_FIREWALL_EXTERNO:-0}" = "1" ]; then rm -f "$STATE_DIR/fw.down" 2>/dev/null; return 0; fi   # firewall do provedor/rede na frente
   local svc="" st rules bad=0 flag="$STATE_DIR/fw.down"
   mkdir -p "$STATE_DIR" 2>/dev/null
   if systemctl is-enabled iptables >/dev/null 2>&1 || systemctl is-active iptables >/dev/null 2>&1; then svc=iptables
@@ -770,6 +767,7 @@ cmd_install() {
   if [ -f "$self" ] && [ "$self" != "/usr/local/bin/ipbx-sentinel" ]; then /bin/cp -f "$self" /usr/local/bin/ipbx-sentinel; fi
   chmod +x /usr/local/bin/ipbx-sentinel
   /bin/cp -pf /usr/local/bin/ipbx-sentinel /etc/ipbx/ipbx-sentinel.bak 2>/dev/null   # copia para o watchdog
+  [ -f "$CONF_FILE" ] && sed -i '/^SENTINEL_FIREWALL_EXTERNO=/d' "$CONF_FILE" 2>/dev/null   # opcao removida: todo servidor tem firewall proprio
   if [ ! -f "$CONF_FILE" ]; then
     printf '# IPbx Sentinel\nSENTINEL_ACTION=quarantine\nSENTINEL_HEAL_PERMS=0\nSENTINEL_FIREWALL_HEAL=0\n' > "$CONF_FILE"; chmod 600 "$CONF_FILE"
   fi
@@ -842,8 +840,6 @@ cmd_selftest() {
 case "${1:-}" in
   --install)     shift; cmd_install "$@" ;;
   --set-cliente) set_cliente "$2" "$3" ;;
-  --firewall-externo) set_conf SENTINEL_FIREWALL_EXTERNO 1; echo "Ok: firewall externo informado; o alerta de iptables vazio fica desligado neste servidor." ;;
-  --firewall-local)   set_conf SENTINEL_FIREWALL_EXTERNO 0; echo "Ok: o Sentinel volta a cobrar o iptables deste servidor." ;;
   --sudo-ok)
     [[ "$2" =~ ^[A-Za-z0-9_.-]{1,32}$ ]] || { echo "Uso: ipbx-sentinel --sudo-ok USUARIO"; exit 1; }
     set_conf SENTINEL_SUDO_OK "$(printf '%s\n%s\n' "${SENTINEL_SUDO_OK//,/$'\n'}" "$2" | sed '/^$/d' | sort -u | paste -sd, -)"
