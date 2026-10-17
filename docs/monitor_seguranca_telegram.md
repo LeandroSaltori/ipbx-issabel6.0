@@ -139,3 +139,22 @@ No mesmo servidor havia o serviço `sipsentinel.service` (`/usr/bin/python3 /opt
 ### Conta de root recriada pelo invasor (caso real)
 
 No `/var/log/secure` do servidor invadido apareciam, em varias datas (25/09, 26/09 duas vezes e 13/10), a sequencia `userdel abort` -> `useradd abort` (UID 0, home `/dev/null`, shell bash) e `useradd yum` com o mesmo perfil: um script do invasor recriava as contas de root. Por isso o Sentinel agora esquece o alerta de uma conta UID 0 quando ela some e **avisa de novo se ela voltar**. Para descobrir quem executou: `grep -E '23:14' /var/log/cron /var/log/secure` (ajuste a hora). Ao apagar essas contas use `userdel NOME` (nunca `-f`: o home delas e `/dev/null`).
+
+## Firewall do provedor/rede na frente do servidor
+
+Quando o firewall fica fora do servidor (painel do provedor, firewall de borda), o iptables local fica vazio de propósito e o alerta "FIREWALL SEM PROTECAO" é falso positivo. Informe uma vez por servidor:
+
+```
+ipbx-sentinel --firewall-externo     # silencia o alerta de iptables vazio
+ipbx-sentinel --firewall-local       # volta a cobrar o iptables do próprio servidor
+```
+
+## Usuário padrão da nuvem com sudo sem senha
+
+Imagens de nuvem (ex.: usuário `rocky`) já vêm com `NOPASSWD: ALL`. Se for o usuário legítimo do provedor, libere só ele; qualquer outro usuário com sudo sem senha continua alertando:
+
+```
+ipbx-sentinel --sudo-ok rocky
+```
+
+Antes de liberar, confirme que ninguém além de você usa essa conta (`last -a | head`, `cat ~rocky/.ssh/authorized_keys`).

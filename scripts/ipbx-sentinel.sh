@@ -38,6 +38,8 @@
 #   ipbx-sentinel --test-alert     envia mensagem de teste ao Telegram
 #   ipbx-sentinel --set-cliente "Nome" [host:porta]   define o cliente que aparece em TODOS os alertas
 #   ipbx-sentinel --install [--cliente "Nome"]        o cliente nos alertas e o nome do host; --cliente e opcional (sobrescreve)
+#   ipbx-sentinel --firewall-externo | --firewall-local   informa se ha firewall do provedor/rede na frente (silencia o alerta de iptables vazio)
+#   ipbx-sentinel --sudo-ok USUARIO   libera o aviso de sudo sem senha para um usuario legitimo (ex.: usuario padrao da nuvem)
 #   ipbx-sentinel --selftest       testa o detector em pasta temporaria
 #
 # CONFIGURACAO (opcional) em /etc/ipbx/sentinel.conf (root, modo 600):
@@ -68,6 +70,8 @@ HOSTNAME_S="$(hostname 2>/dev/null || echo pbx)"
 SENTINEL_ACTION="${SENTINEL_ACTION:-quarantine}"
 SENTINEL_HEAL_PERMS="${SENTINEL_HEAL_PERMS:-0}"
 SENTINEL_FIREWALL_HEAL="${SENTINEL_FIREWALL_HEAL:-0}"
+SENTINEL_FIREWALL_EXTERNO="${SENTINEL_FIREWALL_EXTERNO:-0}"   # 1 = ha firewall do provedor/rede na frente: nao cobra iptables local
+SENTINEL_SUDO_OK="${SENTINEL_SUDO_OK:-}"                     # usuarios com sudo sem senha liberados (ex.: rocky,cloud-user)
 [ -r "$CONF_FILE" ] && . "$CONF_FILE" 2>/dev/null
 # Identificacao do cliente nos alertas (/etc/ipbx/cliente.conf: CLIENTE_NOME, CLIENTE_ACESSO opcional)
 CLIENTE_NOME=""; CLIENTE_ACESSO=""
@@ -142,6 +146,13 @@ send_telegram() {
 }
 
 # Grava o nome do cliente (usado em todos os alertas). Sem aspas/cifrao/crase para nao quebrar o .conf.
+set_conf() {  # $1 = CHAVE, $2 = VALOR (grava em /etc/ipbx/sentinel.conf, modo 600)
+  mkdir -p "$(dirname "$CONF_FILE")" 2>/dev/null
+  [ -f "$CONF_FILE" ] || { printf '# IPbx Sentinel\n' > "$CONF_FILE"; }
+  grep -vE "^$1=" "$CONF_FILE" > "$CONF_FILE.tmp" 2>/dev/null; printf '%s=%s\n' "$1" "$2" >> "$CONF_FILE.tmp"
+  mv -f "$CONF_FILE.tmp" "$CONF_FILE"; chmod 600 "$CONF_FILE" 2>/dev/null
+}
+
 set_cliente() {
   local nome acesso="${2:-}"
   nome="$(printf '%s' "$1" | tr -d '"`$\\\r\n' | sed 's/^ *//;s/ *$//' | cut -c1-60)"
@@ -527,6 +538,7 @@ seen_forget() {  # $1 = chave: esquece o alerta (a condicao sumiu; se voltar, av
 
 check_firewall() {
   command -v systemctl >/dev/null 2>&1 || return 0
+  if [ "${SENTINEL_FIREWALL_EXTERNO:-0}" = "1" ]; then rm -f "$STATE_DIR/fw.down" 2>/dev/null; return 0; fi   # firewall do provedor/rede na frente
   local svc="" st rules bad=0 flag="$STATE_DIR/fw.down"
   mkdir -p "$STATE_DIR" 2>/dev/null
   if systemctl is-enabled iptables >/dev/null 2>&1 || systemctl is-active iptables >/dev/null 2>&1; then svc=iptables
@@ -665,7 +677,8 @@ check_persistence() {
   done
   # shellcheck disable=SC2086
   while read -r l; do [ -n "$l" ] && persist_alert "sudo|$l" "sudo SEM SENHA para qualquer comando: $l"; done \
-    < <(cat ${SENTINEL_SUDOERS:-/etc/sudoers /etc/sudoers.d/*} 2>/dev/null | grep -vE '^\s*#' | grep -E 'NOPASSWD:\s*ALL\s*$')
+    < <(cat ${SENTINEL_SUDOERS:-/etc/sudoers /etc/sudoers.d/*} 2>/dev/null | grep -vE '^\s*#' | grep -E 'NOPASSWD:\s*ALL\s*$' \
+        | awk -v ok=",${SENTINEL_SUDO_OK// /}," '{u=$1; if (index(ok, "," u ",")==0) print}')
 }
 
 # Atributo imutavel/append-only em arquivos criticos: truque de invasor para impedir a
@@ -812,6 +825,12 @@ cmd_selftest() {
 case "${1:-}" in
   --install)     shift; cmd_install "$@" ;;
   --set-cliente) set_cliente "$2" "$3" ;;
+  --firewall-externo) set_conf SENTINEL_FIREWALL_EXTERNO 1; echo "Ok: firewall externo informado; o alerta de iptables vazio fica desligado neste servidor." ;;
+  --firewall-local)   set_conf SENTINEL_FIREWALL_EXTERNO 0; echo "Ok: o Sentinel volta a cobrar o iptables deste servidor." ;;
+  --sudo-ok)
+    [[ "$2" =~ ^[A-Za-z0-9_.-]{1,32}$ ]] || { echo "Uso: ipbx-sentinel --sudo-ok USUARIO"; exit 1; }
+    set_conf SENTINEL_SUDO_OK "$(printf '%s\n%s\n' "${SENTINEL_SUDO_OK//,/$'\n'}" "$2" | sed '/^$/d' | sort -u | paste -sd, -)"
+    echo "Ok: sudo sem senha liberado para o usuario $2 (os demais continuam alertando)." ;;
   --uninstall)   rm -f /etc/cron.d/ipbx-sentinel; echo "Cron do Sentinel removido." ;;
   --list)        cmd_list ;;
   --restore)     cmd_restore "$2" ;;
