@@ -340,6 +340,8 @@ try {
             <div class="space-y-1">
                 <label class="text-xs font-bold text-amber-400 block">Senha de acesso ao painel:</label>
                 <input type="password" id="form-user-password" name="user_password" minlength="8" autocomplete="new-password" placeholder="Mínimo 8 caracteres (em branco mantém a atual)" class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-amber-200 focus:border-amber-500 focus:outline-none font-mono">
+            
+                <p class="text-[10px] text-slate-400 leading-relaxed">Esta senha vale para o login por <b>e-mail e senha</b> do Painel Novo (link "Usuário do Painel Novo?" na tela de login). Usuários importados da central (e-mail terminado em <code>@painel-classico.local</code>) entram pelo login inicial com a <b>senha que já têm na central</b>.</p>
             </div>
 
             <!-- SEÇÃO 1: PERMISSÕES DE ACESSO AOS MÓDULOS -->
