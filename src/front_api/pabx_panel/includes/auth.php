@@ -234,7 +234,7 @@ function authRenderLogin($error = '', $notice = '') {
             <label>Senha</label>
             <input type="password" name="password" required>
             <button type="submit">Entrar</button>
-        </form>';
+        </form>' . (authClassicLoginAvailable() ? '<p class="sub" style="margin:18px 0 0;text-align:center"><a href="' . htmlspecialchars(authClassicLoginUrl(), ENT_QUOTES, 'UTF-8') . '" style="color:#a5b4fc">Voltar ao login do Prisma</a></p>' : '');
     while (ob_get_level()) { @ob_end_clean(); }
     header('Content-Type: text/html; charset=utf-8');
     header('Cache-Control: no-store');

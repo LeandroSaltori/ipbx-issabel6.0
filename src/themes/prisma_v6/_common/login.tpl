@@ -96,6 +96,7 @@ body{font-family:'Noto Sans','Segoe UI',system-ui,sans-serif;color:#e6eef7;min-h
       </div>
       <button type="submit" class="go" name="submit_login" id="go"><span>Entrar</span><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
     </form>
+    <div class="foot" style="margin-bottom:6px"><a href="front_api/index.php?login=local" style="text-decoration:underline">Usuário do Painel Novo? Entrar com e-mail e senha</a></div>
     <div class="foot"><a href="http://www.prismatelecom.com" target="_blank" rel="noopener">IPbx | Prisma Telecom 2006 - {$currentyear}.</a></div>
   </main>
 </div>
