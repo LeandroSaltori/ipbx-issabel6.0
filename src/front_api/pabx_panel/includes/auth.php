@@ -121,8 +121,11 @@ function authLogin($email, $password) {
     if (!authFail2banActive() && authIsLocked($email)) {
         return ['success' => false, 'error' => 'Muitas tentativas. Aguarde ' . AUTH_LOCK_MINUTES . ' minutos e tente novamente.'];
     }
-    $st = $db->prepare("SELECT * FROM system_users WHERE lower(email) = lower(:e) LIMIT 1");
-    $st->execute([':e' => $email]);
+    require_once __DIR__ . '/sso.php'; ssoEnsureSchema();
+    // Aceita e-mail completo, usuário vinculado da central (ex.: 200) ou só a parte antes do @ do e-mail
+    $like = str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], strtolower($email)) . '@%';
+    $st = $db->prepare("SELECT * FROM system_users WHERE lower(email) = lower(:e) OR lower(COALESCE(issabel_user,'')) = lower(:e) OR lower(email) LIKE :l ESCAPE '\\' ORDER BY (lower(email) = lower(:e)) DESC, (lower(COALESCE(issabel_user,'')) = lower(:e)) DESC, id ASC LIMIT 1");
+    $st->execute([':e' => $email, ':l' => $like]);
     $u = $st->fetch(PDO::FETCH_ASSOC);
 
     // Sempre executa password_verify para não vazar existência do usuário pelo tempo de resposta
