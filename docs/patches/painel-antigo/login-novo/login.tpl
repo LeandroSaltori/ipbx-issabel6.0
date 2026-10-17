@@ -79,7 +79,7 @@ body{font-family:'Noto Sans','Segoe UI',system-ui,sans-serif;color:#e6eef7;min-h
       setTimeout(function(){ var a=document.getElementById('login_error_alert'); if(a){ a.style.opacity='0'; setTimeout(function(){ a.style.display='none'; },900); } },4500);
     </script>{/literal}
     {/if}
-    <form method="post" action="index.php" id="form_login" autocomplete="off" onsubmit="var u=document.getElementById('input_user');if(u&&u.value.indexOf('@')>0){u.value=u.value.split('@')[0].trim();}">
+    <form method="post" action="index.php" id="form_login" autocomplete="off" onsubmit="var u=document.getElementById('input_user');if(u){u.value=u.value.trim().replace(/@painel-classico\.local$/i,'');}">
       <div class="fld">
         <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 5-6 8-6s6.500 2 8 6"/></svg>
         <input type="text" name="input_user" id="input_user" placeholder="Usuário" autocomplete="off" autofocus required>

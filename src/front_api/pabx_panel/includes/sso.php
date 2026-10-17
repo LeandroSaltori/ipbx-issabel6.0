@@ -164,8 +164,8 @@ function aclSyncUser($rowId, $password = '') {
         $login = trim((string)($u['issabel_user'] ?? ''));
         $isNew = false;
         if ($login === '') {
-            $login = strtolower(preg_replace('/[^a-z0-9._-]/i', '', explode('@', (string)$u['email'])[0]));
-            if ($login === '') return ['ok' => false, 'login' => '', 'error' => 'e-mail sem nome de usuário válido'];
+            $login = trim((string)$u['email']);
+            if ($login === '' || preg_match('/[\s\x00-\x1f]/', $login)) return ['ok' => false, 'login' => '', 'error' => 'e-mail inválido para o login'];
             $q = $acl->prepare("SELECT COUNT(*) FROM acl_user WHERE name = :n"); $q->execute([':n' => $login]);
             if ($q->fetchColumn() > 0) return ['ok' => false, 'login' => $login, 'error' => "já existe na central um usuário '$login' que não está vinculado a este cadastro"];
             $isNew = true;
