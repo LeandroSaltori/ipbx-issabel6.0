@@ -3625,6 +3625,7 @@ function userHasWebphone($u) {
 
 function saveSystemUser($data) {
     global $db;
+    require_once __DIR__ . '/sso.php';
     if (!$db) return ['success' => false, 'error' => 'Banco de dados inacessível'];
 
     $id = isset($data['id']) ? intval($data['id']) : 0;
@@ -3692,6 +3693,7 @@ function saveSystemUser($data) {
 
 function deleteSystemUser($id) {
     global $db;
+    require_once __DIR__ . '/sso.php';
     if (!$db || intval($id) <= 0) return false;
     try {
         $q = $db->prepare("SELECT issabel_user FROM system_users WHERE id = :id"); $q->execute([':id' => intval($id)]);
