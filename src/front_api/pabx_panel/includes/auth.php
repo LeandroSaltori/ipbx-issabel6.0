@@ -317,8 +317,8 @@ function authGate($mode = 'page') {
         authRenderLogin('', 'Nenhuma senha de acesso foi definida ainda. No servidor, execute: php ' . realpath(__DIR__ . '/..') . '/set_password.php');
     }
     // Sem sessão (expirou ou nunca entrou): leva à tela de login do Prisma, com a escolha Painel Novo / Clássico.
-    // O login interno (e-mail e senha) fica como alternativa em ?login=local e quando o login do Prisma não está instalado.
-    if ($mode === 'page' && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET' && ($_GET['login'] ?? '') !== 'local' && authClassicLoginAvailable()) {
+    // Com o login do Prisma instalado, é sempre ele (usuários do painel novo também existem na central). A tela interna (e-mail e senha) só aparece quando o login do Prisma não está instalado.
+    if ($mode === 'page' && authClassicLoginAvailable()) {
         $dest = authClassicLoginUrl();
         $selfDir = rtrim(dirname($_SERVER['SCRIPT_NAME'] ?? '/front_api/index.php'), '/');
         if ($dest !== '' && strpos($dest, $selfDir . '/') !== 0 && $dest !== $selfDir) {
