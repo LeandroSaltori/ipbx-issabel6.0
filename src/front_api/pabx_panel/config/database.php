@@ -66,7 +66,7 @@ try {
     // Estrutura do banco: só roda quando a versão mudou (PRAGMA user_version). No dia a dia o acesso NÃO grava nada aqui,
     // então páginas, FOP, crons e AGI nunca disputam o bloqueio de escrita na abertura (causa do "database is locked").
     // Ao criar/alterar tabelas ou colunas abaixo, aumente $__schema_ver para o banco ser atualizado uma única vez.
-    $__schema_ver = 3;
+    $__schema_ver = 4;
     if ((int)$db->query('PRAGMA user_version')->fetchColumn() < $__schema_ver) {
     // Criar tabelas se não existirem
     $db->exec("CREATE TABLE IF NOT EXISTS settings (key_name TEXT PRIMARY KEY, value_val TEXT)");
