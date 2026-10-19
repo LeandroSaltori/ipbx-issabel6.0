@@ -22,7 +22,7 @@ function ssoKey() {
 
 /** Equivalência padrão grupo do painel clássico -> perfil do painel novo (ajustável em integration_rules 'sso_group_map'). */
 function ssoGroupMap() {
-    $map = ['administrator' => 'Administrador', 'supervisor' => 'Supervisor', 'ramal' => 'Usuário'];
+    $map = ['administrator' => 'Administrador', 'administrador' => 'Administrador', 'supervisor' => 'Supervisor', 'ramal' => 'Usuário', 'ramais' => 'Usuário', 'extension' => 'Usuário'];
     $custom = function_exists('getSetting') ? json_decode((string)getSetting('sso_group_map'), true) : null;
     if (is_array($custom)) foreach ($custom as $g => $r) { if (in_array($r, ['Administrador', 'Supervisor', 'Usuário'], true)) $map[strtolower((string)$g)] = $r; }
     return $map;
@@ -143,9 +143,11 @@ function aclOpenRW($aclPath = '/var/www/db/acl.db') {
     try { return new PDO('sqlite:' . $aclPath, null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]); } catch (Exception $e) { return null; }
 }
 
-function aclGroupForRole($role) {
-    foreach (ssoGroupMap() as $g => $r) { if ($r === $role) return $g; }
-    return 'ramal';
+/** Grupos da central que equivalem a um perfil do painel novo (nomes em português ou inglês, sem diferenciar maiúsculas). */
+function aclGroupNamesForRole($role) {
+    $names = [];
+    foreach (ssoGroupMap() as $g => $r) { if ($r === $role) $names[] = strtolower((string)$g); }
+    return $names;
 }
 
 /**
@@ -183,8 +185,10 @@ function aclSyncUser($rowId, $password = '') {
             if ($password !== '') $acl->prepare("UPDATE acl_user SET md5_password = :p WHERE id = :i")->execute([':p' => md5($password), ':i' => $aid]);
         }
         if ($login !== 'admin') {
-            $g = $acl->prepare("SELECT id FROM acl_group WHERE LOWER(name) = :g"); $g->execute([':g' => aclGroupForRole($u['role'])]);
-            $gid = (int)$g->fetchColumn();
+            $gid = 0;
+            $gl = $acl->query("SELECT id, name FROM acl_group ORDER BY id")->fetchAll(PDO::FETCH_ASSOC);
+            $want = aclGroupNamesForRole($u['role']);
+            foreach ($gl as $gr) { if (in_array(strtolower(trim((string)$gr['name'])), $want, true)) { $gid = (int)$gr['id']; break; } }
             if ($gid) {
                 $acl->prepare("DELETE FROM acl_membership WHERE id_user = :i")->execute([':i' => $aid]);
                 $acl->prepare("INSERT INTO acl_membership (id_user, id_group) VALUES (:i, :g)")->execute([':i' => $aid, ':g' => $gid]);
