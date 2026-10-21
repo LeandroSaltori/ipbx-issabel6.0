@@ -108,3 +108,10 @@ Este documento estabelece as regras e padrões arquiteturais obrigatórios para 
 2. Criar o item na seção da tela correspondente (ou nova seção) com `['t' => título, 'd' => texto]`; ajustar o texto de itens existentes quando o comportamento mudar; remover o que deixar de existir.
 3. Texto em português, voltado ao cliente, sem jargão técnico e sem nomes de terceiros (apenas IPbx Prisma e Prismabot).
 4. Nova tela/módulo também entra no manual e no menu lateral. Um commit que entrega função sem atualizar o manual está incompleto.
+
+---
+
+## 12. CHAVES DE API E INTEGRAÇÕES NUNCA SÃO APAGADAS EM ATUALIZAÇÕES
+1. Atualizar o sistema **não pode remover nem redefinir** chaves de API, tokens, URLs de servidor e integrações já configuradas (Prismabot, WhatsApp direto, IA, REST API do PABX, SMTP, Telegram, webhooks etc.), para o cliente não precisar reconfigurar.
+2. A base viva `.ht_whatsapp_config.sqlite` e os arquivos de configuração fora da pasta do painel (ex.: `/etc/ipbx/*.conf`) são preservados pelo instalador; migrações de esquema só acrescentam colunas/tabelas, e valores padrão só são gravados na primeira execução.
+3. Só se remove uma credencial quando for **extremamente necessário** (ex.: provedor descontinuado), e isso deve ser dito ao usuário antes de publicar.
