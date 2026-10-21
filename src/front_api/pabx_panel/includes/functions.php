@@ -2014,7 +2014,7 @@ function uazapiSendText($number, $text) {
  * FORA do código, em /etc/ipbx/uazapi.conf (linhas "url=..." e "admintoken=..."), legível só pelo servidor web.
  * Retorna ['url','admintoken'] ou null quando o arquivo não existe/está incompleto.
  */
-function uazapiAdminConf() {
+function uazapiFileConf() {
     static $c = false;
     if ($c !== false) return $c;
     $c = null;
@@ -2037,13 +2037,24 @@ function uazapiAdminConf() {
 /** Modo de conexão do WhatsApp direto: 'prisma' (servidor da Prisma) ou 'own' (URL e token do próprio cliente). */
 function uazapiMode() {
     if (getSetting('uazapi_mode') === 'own') return 'own';
-    return uazapiAdminConf() ? 'prisma' : 'own';
+    return uazapiFileConf() ? 'prisma' : 'own';
+}
+
+/**
+ * Credenciais de administração que permitem criar a instância sozinho:
+ * modo Prisma = arquivo /etc/ipbx/uazapi.conf; modo próprio = endereço + token de administração informados na tela (opcional).
+ */
+function uazapiAdminConf() {
+    if (uazapiMode() === 'prisma') return uazapiFileConf();
+    $u = rtrim(trim((string)getSetting('uazapi_url')), '/');
+    $t = trim((string)getSetting('uazapi_admin_token'));
+    return ($u !== '' && $t !== '') ? ['url' => $u, 'admintoken' => $t] : null;
 }
 
 /** Chamada com o token de administração do servidor da Prisma. */
 function uazapiAdminRequest($method, $path, $body = null, $timeout = 20) {
     $c = uazapiAdminConf();
-    if (!$c) return ['http' => 0, 'resp' => '', 'error' => 'Servidor da Prisma não disponível nesta central.'];
+    if (!$c) return ['http' => 0, 'resp' => '', 'error' => 'Credenciais de administração do servidor não informadas.'];
     $ch = curl_init($c['url'] . $path);
     $opts = [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => $timeout, CURLOPT_SSL_VERIFYPEER => false, CURLOPT_SSL_VERIFYHOST => false,
              CURLOPT_HTTPHEADER => ['Content-Type: application/json', 'Accept: application/json', 'admintoken: ' . $c['admintoken']]];
@@ -2055,9 +2066,8 @@ function uazapiAdminRequest($method, $path, $body = null, $timeout = 20) {
 
 /** Garante a instância deste cliente no servidor da Prisma (cria uma vez e guarda o token). Retorna '' se ok ou a mensagem de erro. */
 function uazapiEnsureInstance() {
-    if (uazapiMode() !== 'prisma') return '';
     $c = uazapiAdminConf();
-    if (!$c) return 'Servidor da Prisma não disponível nesta central.';
+    if (!$c) return '';   // modo próprio só com o token da conexão: nada a criar
     if (trim((string)getSetting('uazapi_token')) !== '' && rtrim((string)getSetting('uazapi_url'), '/') === $c['url']) return '';
     $host = preg_replace('/[^a-z0-9]+/', '-', strtolower((string)(gethostname() ?: 'ipbx')));
     $name = 'ipbx-' . trim($host, '-') . '-' . substr(bin2hex(random_bytes(4)), 0, 6);

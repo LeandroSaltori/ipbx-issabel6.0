@@ -108,10 +108,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $u_tok = trim($_POST['uazapi_token'] ?? '');
         if ($u_url !== '' && !preg_match('#^https?://#i', $u_url)) $u_url = 'https://' . $u_url;
         saveSetting('wa_provider', $prov);
-        $u_mode = (($_POST['uazapi_mode'] ?? '') === 'own' || !uazapiAdminConf()) ? 'own' : 'prisma';
+        $u_mode = (($_POST['uazapi_mode'] ?? '') === 'own' || !uazapiFileConf()) ? 'own' : 'prisma';
         saveSetting('uazapi_mode', $u_mode);
         if ($u_mode === 'own') {
+            $u_adm = trim($_POST['uazapi_admin_token'] ?? '');
+            // Servidor ou administrador novo, sem token de conexão informado: a conexão antiga não vale mais; será criada outra sozinha
+            if ($u_tok === '' && ($u_adm !== '' || ($u_url !== '' && $u_url !== rtrim((string)getSetting('uazapi_url'), '/')))) {
+                saveSetting('uazapi_token', ''); saveSetting('uazapi_instance_name', '');
+            }
             if ($u_url !== '') saveSetting('uazapi_url', $u_url);
+            if ($u_adm !== '') saveSetting('uazapi_admin_token', $u_adm);
             if ($u_tok !== '') saveSetting('uazapi_token', $u_tok);
         }
         $findKey = function ($arr, $key) use (&$findKey) {
@@ -509,7 +515,7 @@ if (empty($currentPbxToken) && !empty($currentPbxPass) && $_SERVER['REQUEST_METH
             </div>
             <?php
                 $__prov = (($settings['wa_provider'] ?? '') === 'uazapi') ? 'uazapi' : 'zpro';
-                $__admin = uazapiAdminConf() ? true : false;
+                $__admin = uazapiFileConf() ? true : false;
                 $__mode = uazapiMode();
                 $__wh_url = panelPublicBaseUrl() . '/index.php?api_action=whatsapp_webhook&token=' . (string)getSetting('webhook_token');
                 $__btn = 'white-space:nowrap !important;flex-shrink:0 !important;width:auto !important;overflow:visible !important;text-overflow:clip !important;';
@@ -543,6 +549,11 @@ if (empty($currentPbxToken) && !empty($currentPbxPass) && $_SERVER['REQUEST_METH
                         <div>
                             <label class="block font-bold text-slate-300 mb-1.5 uppercase tracking-wider text-[11px]">Endereço do servidor</label>
                             <input type="text" name="uazapi_url" value="<?php echo htmlspecialchars((string)($settings['uazapi_url'] ?? '')); ?>" placeholder="https://seu-servidor.exemplo.com" class="w-full px-3 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono focus:border-emerald-500 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block font-bold text-slate-300 mb-1.5 uppercase tracking-wider text-[11px]">Token de administração do servidor</label>
+                            <input type="password" name="uazapi_admin_token" value="" placeholder="<?php echo !empty($settings['uazapi_admin_token']) ? '•••••••• (salvo — deixe em branco para manter)' : 'Cole o token de administração (a conexão é criada sozinha)'; ?>" autocomplete="off" class="w-full px-3 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono focus:border-emerald-500 focus:outline-none">
+                            <p class="text-[11px] text-slate-500 mt-1">Basta informar o endereço e este token: o painel cria a conexão sozinho. Se preferir, deixe em branco e informe só o token de uma conexão que você já criou.</p>
                         </div>
                         <div>
                             <label class="block font-bold text-slate-300 mb-1.5 uppercase tracking-wider text-[11px]">Token da conexão</label>
@@ -648,9 +659,10 @@ if (empty($currentPbxToken) && !empty($currentPbxPass) && $_SERVER['REQUEST_METH
                 var go = function () { var d = waDialog(); if (!d.open) d.showModal(); waStart(''); };
                 if (ownMode) {
                     var u = document.querySelector('input[name="uazapi_url"]'), t = document.querySelector('input[name="uazapi_token"]');
-                    var tokSaved = <?php echo !empty($settings['uazapi_token']) ? 'true' : 'false'; ?>;
-                    if (!u.value.trim() || (!t.value.trim() && !tokSaved)) { alert('Informe o endereço do servidor e o token e clique em "Salvar servidor de envio" antes de conectar.'); return; }
-                    if (t.value.trim() || u.value.trim() !== <?php echo json_encode((string)($settings['uazapi_url'] ?? '')); ?>) { alert('Clique em "Salvar servidor de envio" para gravar os dados e depois em "Conectar WhatsApp".'); return; }
+                    var tokSaved = <?php echo (!empty($settings['uazapi_token']) || !empty($settings['uazapi_admin_token'])) ? 'true' : 'false'; ?>;
+                    var a = document.querySelector('input[name="uazapi_admin_token"]');
+                    if (!u.value.trim() || (!t.value.trim() && !(a && a.value.trim()) && !tokSaved)) { alert('Informe o endereço do servidor e o token de administração (ou o token de uma conexão) e clique em "Salvar servidor de envio" antes de conectar.'); return; }
+                    if (t.value.trim() || (a && a.value.trim()) || u.value.trim() !== <?php echo json_encode((string)($settings['uazapi_url'] ?? '')); ?>) { alert('Clique em "Salvar servidor de envio" para gravar os dados e depois em "Conectar WhatsApp".'); return; }
                 } else if (document.querySelector('input[name="uazapi_mode"][value="prisma"]') && <?php echo json_encode($__mode); ?> !== 'prisma') {
                     alert('Clique em "Salvar servidor de envio" para ativar o servidor da Prisma e depois em "Conectar WhatsApp".'); return;
                 }
