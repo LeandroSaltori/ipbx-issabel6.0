@@ -71,6 +71,7 @@ return [
         ['t' => 'Ouvir gravações', 'd' => 'Peça a gravação de uma chamada e o player aparece dentro do próprio chat, com opção de abrir ou baixar.'],
         ['t' => 'Enviar relatório por WhatsApp', 'd' => 'Peça "envie o resumo de hoje para o número tal". O assistente mostra o que vai enviar e só envia depois da sua confirmação.'],
         ['t' => 'Sugerir recursos nos ramais', 'd' => 'O assistente propõe a alteração e você confirma antes de ser aplicada.'],
+        ['t' => 'Alterar ramais pelo assistente', 'd' => 'Peça, por exemplo, "renomeie o ramal 200 para Lays Souza" ou "cadastre o celular 16 99999-0000 no ramal 200 e ative o aviso de perdida externa". O assistente mostra um cartão com o que vai mudar e só aplica depois que você clicar em Confirmar. O nome é gravado também na central, igual à tela Ramais & Atendentes. A senha do ramal não é alterada pelo assistente.'],
         ['t' => 'Histórico e nova conversa', 'd' => 'Sua conversa fica salva. O botão de nova conversa limpa a tela, mas o registro continua guardado para a administração.'],
         ['t' => 'Privacidade', 'd' => 'Os administradores podem consultar as conversas de cada usuário em Configurações > Conversas do Assistente IA. Cada consulta fica registrada no log de ações.'],
     ]],

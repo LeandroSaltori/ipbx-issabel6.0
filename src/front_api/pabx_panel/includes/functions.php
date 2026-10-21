@@ -5915,6 +5915,15 @@ function aiChatToolDefs() {
             'feature'   => ['type' => 'string', 'enum' => ['dnd', 'cf', 'cfb', 'cfu']],
             'value'     => ['type' => 'string', 'description' => 'on/off para dnd; número de destino para desvios; vazio desativa'],
         ], ['extension', 'feature']),
+        $fn('propose_extension_edit', 'Propõe alterar um ramal: nome do atendente, celular/WhatsApp para avisos e permissões de aviso por WhatsApp. NÃO executa: o usuário precisa clicar em Confirmar. Informe só o que deve mudar. whatsapp vazio remove o celular. Não altera senha.', [
+            'extension'       => ['type' => 'string', 'description' => 'Ramal (ex.: 201)'],
+            'name'            => ['type' => 'string', 'description' => 'Novo nome do atendente'],
+            'whatsapp'        => ['type' => 'string', 'description' => 'Celular com DDD (ex.: 11999998888); vazio remove'],
+            'notify_missed'   => ['type' => 'boolean', 'description' => 'Avisar o atendente de chamada externa perdida'],
+            'notify_internal' => ['type' => 'boolean', 'description' => 'Avisar o atendente de chamada interna perdida'],
+            'notify_busy'     => ['type' => 'boolean', 'description' => 'Avisar o cliente quando o ramal está ocupado'],
+            'send_ai_summary' => ['type' => 'boolean', 'description' => 'Enviar resumo por IA ao atendente'],
+        ], ['extension']),
         $fn('send_report', 'Envia por WhatsApp o resumo do período (chamadas, atendidas, TMA, TME) para um número. SÓ chame depois de o usuário confirmar explicitamente o número de destino.', [
             'phone' => ['type' => 'string', 'description' => 'Número com DDD (ex.: 11999998888)'],
             'days'  => ['type' => 'integer', 'description' => 'Últimos N dias (1 = hoje). Padrão 1'],
@@ -5993,6 +6002,9 @@ function aiChatExecTool($name, $a) {
         }
         if ($name === 'propose_extension_feature') {
             return aiProposeFeature($a['extension'] ?? '', strtolower((string)($a['feature'] ?? '')), $a['value'] ?? '');
+        }
+        if ($name === 'propose_extension_edit') {
+            return aiProposeExtensionEdit($a);
         }
         if ($name === 'send_report') {
             if (!hasUserPermission('send_whatsapp')) return ['error' => 'Este usuário não tem permissão para enviar WhatsApp.'];
@@ -6152,6 +6164,83 @@ function aiProposeFeature($ext, $field, $value) {
     $GLOBALS['__ai_proposals'][] = ['id' => $id, 'resumo' => $resumo];
     return ['proposta_criada' => true, 'resumo' => $resumo, 'instrucao' => 'NADA foi alterado ainda. Diga ao usuário para clicar em Confirmar no cartão exibido abaixo da sua resposta.'];
 }
+/** Propõe alteração de ramal (nome, celular, avisos). NÃO executa; o usuário confirma pelo cartão. */
+function aiProposeExtensionEdit($a) {
+    global $db;
+    if (!hasUserPermission('manage_settings')) return ['error' => 'Este usuário não tem permissão para alterar ramais.'];
+    aiHistoryEnsure();
+    $ext = preg_replace('/\D/', '', (string)($a['extension'] ?? ''));
+    $st = $db->prepare("SELECT * FROM extensions_config WHERE extension = ?");
+    $st->execute([$ext]);
+    $cur = $st->fetch(PDO::FETCH_ASSOC);
+    if ($ext === '' || !$cur) return ['error' => "Ramal $ext não encontrado."];
+    $ch = []; $lines = [];
+    if (array_key_exists('name', $a)) {
+        $n = trim(preg_replace('/[\x00-\x1F\x7F]+/u', ' ', (string)$a['name']));
+        if ($n === '' || mb_strlen($n) > 60) return ['error' => 'O nome do atendente deve ter de 1 a 60 caracteres.'];
+        if ($n !== (string)$cur['agent_name']) { $ch['name'] = $n; $lines[] = 'nome "' . ($cur['agent_name'] ?: '—') . '" → "' . $n . '"'; }
+    }
+    if (array_key_exists('whatsapp', $a)) {
+        $w = preg_replace('/\D/', '', (string)$a['whatsapp']);
+        if ($w !== '') {
+            if (strlen($w) <= 11) $w = '55' . $w;
+            if (strlen($w) < 12 || strlen($w) > 13) return ['error' => 'Celular inválido. Informe DDD + número.'];
+        }
+        if ($w !== (string)($cur['whatsapp_number'] ?? '')) { $ch['whatsapp'] = $w; $lines[] = $w === '' ? 'remover o celular' : 'celular → ' . $w; }
+    }
+    $flags = ['notify_missed' => ['notify_agent_missed', 'aviso de perdida externa'], 'notify_internal' => ['notify_agent_internal', 'aviso de perdida interna'],
+              'notify_busy' => ['notify_client_busy', 'aviso ao cliente quando ocupado'], 'send_ai_summary' => ['send_ai_summary', 'resumo por IA']];
+    foreach ($flags as $k => $def) {
+        if (!array_key_exists($k, $a)) continue;
+        $on = filter_var($a[$k], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+        if ($on === null) $on = in_array(strtolower(trim((string)$a[$k])), ['sim', 'ativar', 'on'], true);
+        $v = $on ? 1 : 0;
+        if ($v !== (int)($cur[$def[0]] ?? 0)) { $ch[$k] = $v; $lines[] = ($on ? 'ativar ' : 'desativar ') . $def[1]; }
+    }
+    if (!$ch) return ['error' => "Nada a alterar: o ramal $ext já está assim."];
+    $resumo = "Ramal $ext" . (!empty($cur['agent_name']) ? ' (' . $cur['agent_name'] . ')' : '') . ': ' . implode('; ', $lines);
+    $id = bin2hex(random_bytes(8));
+    $db->prepare("INSERT INTO ai_pending_actions (id, username, ext, field, value, resumo, status, created_at) VALUES (?,?,?,?,?,?,'pending',?)")
+       ->execute([$id, aiChatUser(), $ext, 'edit', json_encode($ch, JSON_UNESCAPED_UNICODE), $resumo, time()]);
+    $GLOBALS['__ai_proposals'][] = ['id' => $id, 'resumo' => $resumo];
+    return ['proposta_criada' => true, 'resumo' => $resumo, 'instrucao' => 'NADA foi alterado ainda. Diga ao usuário para clicar em Confirmar no cartão exibido abaixo da sua resposta.'];
+}
+
+/** Aplica a alteração de ramal confirmada: mesmo caminho da tela Ramais & Atendentes (painel + Issabel). */
+function applyExtensionEdit($ext, $ch) {
+    global $db;
+    $st = $db->prepare("SELECT * FROM extensions_config WHERE extension = ?");
+    $st->execute([$ext]);
+    $cur = $st->fetch(PDO::FETCH_ASSOC);
+    if (!$cur) return ['success' => false, 'error' => "Ramal $ext não encontrado."];
+    $sets = []; $par = [':e' => $ext];
+    $map = ['name' => 'agent_name', 'whatsapp' => 'whatsapp_number', 'notify_missed' => 'notify_agent_missed', 'notify_internal' => 'notify_agent_internal', 'notify_busy' => 'notify_client_busy', 'send_ai_summary' => 'send_ai_summary'];
+    foreach ($map as $k => $col) if (array_key_exists($k, $ch)) { $sets[] = "$col = :$k"; $par[":$k"] = $ch[$k]; }
+    if (!$sets) return ['success' => false, 'error' => 'Nada a alterar.'];
+    $db->prepare("UPDATE extensions_config SET " . implode(', ', $sets) . ", updated_at = CURRENT_TIMESTAMP WHERE extension = :e")->execute($par);
+    $warn = '';
+    if (array_key_exists('notify_missed', $ch) && function_exists('syncExtensionDestinationsWithAsterisk')) {
+        syncExtensionDestinationsWithAsterisk($ext, (int)$ch['notify_missed']);
+    }
+    if (array_key_exists('name', $ch)) {
+        $tech = (string)($cur['tech'] ?: 'PJSIP');
+        $ok = false;
+        if (function_exists('pbxapiAvailable') && pbxapiAvailable() && file_exists(__DIR__ . '/pbxapi_client.php')) {
+            require_once __DIR__ . '/pbxapi_client.php';
+            $cl = new PbxApiClient($db);
+            $r = $cl->updateExtension($ext, ['name' => $ch['name'], 'tech' => strtolower($tech)]);
+            $ok = !empty($r['success']);
+            if (!$ok) $warn = (string)($r['message'] ?? 'a API do PABX recusou');
+        } else {
+            $ok = renameExtensionInIssabel($ext, $ch['name'], $tech);
+            if (!$ok) $warn = 'não foi possível gravar o nome no PABX (verifique a senha do MySQL)';
+        }
+        if (!$ok) return ['success' => false, 'error' => 'Salvo só no painel; o nome não foi gravado na central: ' . $warn];
+    }
+    if (function_exists('pabx_log')) pabx_log('security', 'INFO', "Ramal {$ext} alterado pelo assistente (confirmado pelo usuário).", ['ext' => $ext, 'campos' => array_keys($ch)]);
+    return ['success' => true];
+}
+
 /** Confirma ou cancela uma proposta do próprio usuário (válida por 10 min). */
 function aiProposalResolve($id, $accept) {
     global $db;
@@ -6169,6 +6258,9 @@ function aiProposalResolve($id, $accept) {
         $db->prepare("UPDATE ai_pending_actions SET status = 'cancelled' WHERE id = ?")->execute([$p['id']]);
         return ['success' => true, 'message' => 'Cancelado. Nada foi alterado.'];
     }
+    if ($p['field'] === 'edit') {
+        $r = applyExtensionEdit($p['ext'], (array)json_decode((string)$p['value'], true));
+    } else
     $r = setExtensionFeature($p['ext'], $p['field'], $p['field'] === 'dnd' ? (bool)$p['value'] : $p['value']);
     $db->prepare("UPDATE ai_pending_actions SET status = ? WHERE id = ?")->execute([!empty($r['success']) ? 'done' : 'failed', $p['id']]);
     if (function_exists('logUserAction')) logUserAction('Chat IA: ' . $p['resumo'], !empty($r['success']) ? 'confirmado' : ('falhou: ' . ($r['error'] ?? '')), 'CONFIG');
@@ -6181,7 +6273,7 @@ function aiChatRun($history) {
     if ($cfg['key'] === '' || !$cfg['enabled']) return ['ok' => false, 'error' => 'IA não configurada. Configure em Configurações > Inteligência Artificial.'];
     $sys = "Você é o assistente do IPbx Prisma, a central telefônica da Prisma Telecom. Hoje é " . date('d/m/Y H:i') . ". "
          . "Responda em português, curto e objetivo. Para QUALQUER pergunta sobre chamadas, ramais, filas, números ou gravações, consulte SEMPRE uma ferramenta antes de responder; nunca responda de memória nem estime. Use SOMENTE dados retornados pelas ferramentas; nunca invente números, ramais ou ligações. Quando falar de quantidade de chamadas, deixe claro se são externas (clientes), internas (ramal a ramal) ou todas: por padrão fale das externas, como o Dashboard, e cite as internas à parte. Se nenhuma ferramenta responder, diga que não encontrou o dado. "
-         . "Se faltar informação (ex.: qual ramal), pergunte. Você só consulta; as únicas ações são: send_report (resumo por WhatsApp, só após o usuário confirmar o número) e propose_extension_feature (apenas PROPÕE; o usuário confirma por um botão e você nunca diz que foi feito antes disso). Para tabelas use markdown. Para gravações use recording_link e entregue o link em markdown [Ouvir gravação](url). "
+         . "Se faltar informação (ex.: qual ramal), pergunte. Você só consulta; as únicas ações são: send_report (resumo por WhatsApp, só após o usuário confirmar o número), propose_extension_feature (Não Perturbe e desvios) e propose_extension_edit (nome do atendente, celular e avisos por WhatsApp do ramal; você NÃO altera senha de ramal). Ambas apenas PROPÕEM: o usuário confirma por um botão e você nunca diz que foi feito antes disso. Para tabelas use markdown. Para gravações use recording_link e entregue o link em markdown [Ouvir gravação](url). "
          . "Nunca cite nomes de softwares de terceiros da central telefônica nem do serviço de WhatsApp: o produto se chama IPbx Prisma e o serviço de WhatsApp se chama Prismabot. Se precisar falar da tecnologia, diga apenas \"o sistema\" ou \"a central\". "
          . "NUNCA invente links ou endereços: use somente links devolvidos pelas ferramentas (ex.: recording_link). Se a ferramenta devolver erro, explique o erro ao usuário. "
          . "Se o usuário pedir algo fora do escopo do PABX, explique educadamente o que você pode fazer.";
