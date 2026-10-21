@@ -5,6 +5,8 @@
 
 $msg_success = '';
 $msg_error = '';
+$modal_error = '';
+$modal_data = [];
 
 // Processar formulário de adicionar/editar usuário
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_save_user'])) {
@@ -30,7 +32,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_save_user'])) 
     if ($res['success']) {
         $msg_success = $res['message'];
     } else {
-        $msg_error = $res['error'];
+        // O erro aparece dentro da própria janela do cadastro, que reabre com o que foi digitado (menos a senha)
+        $modal_error = $res['error'];
+        $modal_data = $user_data; unset($modal_data['password'], $modal_data['wp_pass']);
     }
 }
 
@@ -266,7 +270,7 @@ try {
             </button>
         </div>
 
-        <form method="POST" action="index.php?module=configuracoes&action=usuarios" class="space-y-4">
+        <form id="form-user" method="POST" action="index.php?module=configuracoes&action=usuarios" class="space-y-4" novalidate onsubmit="return validateUserForm(event)">
             <input type="hidden" name="action_save_user" value="1">
             <input type="hidden" id="form-user-id" name="user_id" value="0">
 
@@ -414,6 +418,10 @@ try {
                 </div>
             </div>
 
+            <div id="user-form-error" class="hidden p-3 bg-rose-500/10 border border-rose-500/30 text-rose-300 rounded-xl text-xs font-bold flex items-center gap-2" role="alert">
+                <i class="fa-solid fa-triangle-exclamation"></i> <span id="user-form-error-text"></span>
+            </div>
+
             <div class="pt-3 flex justify-end gap-2 border-t border-slate-800">
                 <button type="button" onclick="closeUserModal()" class="px-4 py-2 bg-slate-800 text-slate-300 hover:text-white rounded-xl text-xs font-bold transition">Cancelar</button>
                 <button type="submit" class="px-5 py-2.5 bg-brand-600 hover:bg-brand-500 text-white rounded-xl text-xs font-extrabold transition shadow-lg shadow-brand-600/30 flex items-center gap-2">
@@ -549,5 +557,72 @@ function openEditUserModal(u) {
 
 function closeUserModal() {
     document.getElementById('modal-user-form').classList.add('hidden');
+    showUserFormError('');
+}
+
+// Erro dentro da própria janela do cadastro (perto do botão Salvar), com foco no campo com problema
+function showUserFormError(msg, fieldId) {
+    const box = document.getElementById('user-form-error');
+    if (!box) return;
+    document.getElementById('user-form-error-text').innerText = msg || '';
+    box.classList.toggle('hidden', !msg);
+    if (msg) {
+        box.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        const f = fieldId ? document.getElementById(fieldId) : null;
+        if (f) { try { f.focus({ preventScroll: true }); } catch (e) { f.focus(); } }
+    }
+}
+
+const __USER_EMAILS = <?php $___em = []; foreach ($system_users as $___u) { $___em[] = ['id' => (int)$___u['id'], 'email' => strtolower((string)$___u['email'])]; } echo json_encode($___em); ?>;
+
+// Confere tudo antes de enviar; qualquer problema aparece na mesma janela e nada é enviado
+function validateUserForm(ev) {
+    const val = id => (document.getElementById(id) || {}).value || '';
+    const uid = parseInt(val('form-user-id'), 10) || 0;
+    const name = val('form-user-name').trim();
+    const email = val('form-user-email').trim();
+    const pass = val('form-user-password');
+    let err = '', field = '';
+    if (!name) { err = 'Informe o nome completo.'; field = 'form-user-name'; }
+    else if (!email) { err = 'Informe o e-mail / login do usuário.'; field = 'form-user-email'; }
+    else if (/\s/.test(email)) { err = 'O e-mail / login não pode ter espaços.'; field = 'form-user-email'; }
+    else if (__USER_EMAILS.some(x => x.email === email.toLowerCase() && x.id !== uid)) { err = "O e-mail / login '" + email + "' já está cadastrado em outro usuário."; field = 'form-user-email'; }
+    else if (uid === 0 && pass.length < 8) { err = 'Defina uma senha de acesso com no mínimo 8 caracteres para o novo usuário.'; field = 'form-user-password'; }
+    else if (uid > 0 && pass !== '' && pass.length < 8) { err = 'A senha deve ter no mínimo 8 caracteres (ou deixe em branco para manter a atual).'; field = 'form-user-password'; }
+    else if (val('form-user-extension') === '__custom__') {
+        if (!val('form-wp-host').trim()) { err = 'Conta personalizada: informe o domínio ou IP do outro servidor.'; field = 'form-wp-host'; }
+        else if (!val('form-wp-user').trim()) { err = 'Conta personalizada: informe o usuário (ramal) do outro servidor.'; field = 'form-wp-user'; }
+    }
+    if (err) { if (ev && ev.preventDefault) ev.preventDefault(); showUserFormError(err, field); return false; }
+    showUserFormError('');
+    return true;
+}
+
+// Reabre a janela com o que o usuário digitou quando o servidor recusa o cadastro (o erro aparece dentro dela)
+function restoreUserForm(d, msg) {
+    if (parseInt(d.id, 10) > 0) {
+        openEditUserModal({ id: d.id, name: d.name, email: d.email, role: d.role, extension: d.extension, whatsapp: d.whatsapp, webphone: d.webphone,
+            wp_custom: d.wp_custom, wp_host: d.wp_host, wp_port: d.wp_port, wp_user: d.wp_user, permissions_list: d.permissions || [] });
+        document.getElementById('user-modal-title').innerText = 'Editar Usuário: ' + (d.name || '');
+    } else {
+        openAddUserModal();
+        document.getElementById('form-user-name').value = d.name || '';
+        document.getElementById('form-user-email').value = d.email || '';
+        document.getElementById('form-user-role').value = d.role || 'Administrador';
+        updatePermissionsByRole(d.role || 'Administrador');
+        document.getElementById('form-user-extension').value = parseInt(d.wp_custom || 0, 10) === 1 ? '__custom__' : (d.extension || '');
+        document.getElementById('form-user-whatsapp').value = d.whatsapp || '';
+        document.getElementById('form-user-webphone').checked = parseInt(d.webphone || 0, 10) === 1;
+        fillWpCustom(d);
+        applyWebrtcDim();
+        if ((d.role || '') !== 'Administrador') {
+            const plist = d.permissions || [];
+            document.querySelectorAll('.perm-check').forEach(c => { if (d.role === 'Personalizado') c.checked = plist.includes(c.value); });
+        }
+    }
+    showUserFormError(msg, '');
 }
 </script>
+<?php if ($modal_error !== ''): ?>
+<script>window.addEventListener('load', function () { restoreUserForm(<?php echo json_encode($modal_data, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP); ?>, <?php echo json_encode($modal_error, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP); ?>); });</script>
+<?php endif; ?>
