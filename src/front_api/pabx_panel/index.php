@@ -168,7 +168,16 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
         }
         if ($action === 'uazapi_connect') {
             $b = json_decode(file_get_contents('php://input'), true) ?: [];
-            $err = uazapiEnsureInstance();
+            // Criar canal: grava o servidor informado na tela (sem exigir "Salvar" antes) e cria a conexão sozinho
+            if (isset($b['url']) || isset($b['admin_token']) || isset($b['token']) || isset($b['mode'])) {
+                uazapiSaveSettings('uazapi', (string)($b['mode'] ?? ''), (string)($b['url'] ?? ''), (string)($b['admin_token'] ?? ''), (string)($b['token'] ?? ''));
+            }
+            $chName = trim(preg_replace('/\s+/', ' ', (string)($b['name'] ?? '')));
+            if (mb_strlen($chName) > 40) $chName = mb_substr($chName, 0, 40);
+            $had = trim((string)getSetting('uazapi_token')) !== '';
+            if (!$had && trim((string)getSetting('uazapi_url')) === '') { echo json_encode(['success' => false, 'error' => 'Informe o endereço do servidor.'], JSON_UNESCAPED_UNICODE); exit; }
+            if (!$had && !uazapiAdminConf()) { echo json_encode(['success' => false, 'error' => 'Informe o token de administração do servidor (ou o token de um canal que você já criou).'], JSON_UNESCAPED_UNICODE); exit; }
+            $err = uazapiEnsureInstance($chName);
             if ($err !== '') { echo json_encode(['success' => false, 'error' => $err], JSON_UNESCAPED_UNICODE); exit; }
             $ph = preg_replace('/\D/', '', (string)($b['phone'] ?? ''));
             $r = uazapiRequest('POST', '/instance/connect', $ph !== '' ? ['phone' => $ph] : new stdClass(), 20);
@@ -177,7 +186,7 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
             if ($r['http'] < 200 || $r['http'] >= 300) { echo json_encode(['success' => false, 'error' => 'O servidor respondeu HTTP ' . $r['http'] . '. Confira o endereço.']); exit; }
             $wh = uazapiConfigureWebhook();
             logUserAction("Conectar WhatsApp direto", $ph !== '' ? 'código de pareamento' : 'QR Code', "CONFIG");
-            echo json_encode(['success' => true, 'webhook' => $wh['ok'], 'webhook_error' => $wh['error'], 'webhook_private' => !empty($wh['private'])], JSON_UNESCAPED_UNICODE);
+            echo json_encode(['success' => true, 'created' => !$had, 'webhook' => $wh['ok'], 'webhook_error' => $wh['error'], 'webhook_private' => !empty($wh['private'])], JSON_UNESCAPED_UNICODE);
             exit;
         }
         if ($action === 'uazapi_disconnect') {

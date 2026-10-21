@@ -1968,7 +1968,7 @@ function uazapiRequest($method, $path, $body = null, $timeout = 10) {
     $base  = rtrim(trim((string)getSetting('uazapi_url')), '/');
     $token = trim((string)getSetting('uazapi_token'));
     if ($base === '' || $token === '') {
-        return ['http' => 0, 'resp' => '', 'error' => 'UAZAPI não configurada (URL do servidor ou token da instância ausente).'];
+        return ['http' => 0, 'resp' => '', 'error' => 'Nenhum canal de WhatsApp criado ainda. Clique em "Criar canal" para gerar o QR Code.'];
     }
     $ch = curl_init($base . $path);
     $opts = [
@@ -2065,12 +2065,12 @@ function uazapiAdminRequest($method, $path, $body = null, $timeout = 20) {
 }
 
 /** Garante a instância deste cliente no servidor da Prisma (cria uma vez e guarda o token). Retorna '' se ok ou a mensagem de erro. */
-function uazapiEnsureInstance() {
+function uazapiEnsureInstance($label = '') {
     $c = uazapiAdminConf();
     if (!$c) return '';   // modo próprio só com o token da conexão: nada a criar
     if (trim((string)getSetting('uazapi_token')) !== '' && rtrim((string)getSetting('uazapi_url'), '/') === $c['url']) return '';
-    $host = preg_replace('/[^a-z0-9]+/', '-', strtolower((string)(gethostname() ?: 'ipbx')));
-    $name = 'ipbx-' . trim($host, '-') . '-' . substr(bin2hex(random_bytes(4)), 0, 6);
+    $host = preg_replace('/[^a-z0-9]+/', '-', strtolower(trim((string)$label) !== '' ? (string)$label : (string)(gethostname() ?: 'ipbx')));
+    $name = 'ipbx-' . trim(substr($host, 0, 40), '-') . '-' . substr(bin2hex(random_bytes(4)), 0, 6);
     $r = uazapiAdminRequest('POST', '/instance/create', ['name' => $name, 'systemName' => 'IPbx Prisma']);
     if ($r['error'] !== '') return $r['error'];
     $d = json_decode($r['resp'], true);
@@ -2080,6 +2080,27 @@ function uazapiEnsureInstance() {
     saveSetting('uazapi_token', $tok);
     saveSetting('uazapi_instance_name', $name);
     return '';
+}
+
+/**
+ * Grava o servidor de envio "WhatsApp direto". Usado pelo botão Salvar e pelo Criar canal (que salva e cria numa tacada só).
+ * Valores em branco mantêm o que já está salvo; informar novo endereço ou novo token de administração, sem token de conexão, descarta a conexão antiga.
+ */
+function uazapiSaveSettings($provider, $mode, $url, $adminTok, $connTok) {
+    $url = rtrim(trim((string)$url), '/');
+    if ($url !== '' && !preg_match('#^https?://#i', $url)) $url = 'https://' . $url;
+    saveSetting('wa_provider', $provider === 'uazapi' ? 'uazapi' : 'zpro');
+    $mode = ($mode === 'own' || !uazapiFileConf()) ? 'own' : 'prisma';
+    saveSetting('uazapi_mode', $mode);
+    if ($mode !== 'own') return $mode;
+    $adminTok = trim((string)$adminTok); $connTok = trim((string)$connTok);
+    if ($connTok === '' && ($adminTok !== '' || ($url !== '' && $url !== rtrim((string)getSetting('uazapi_url'), '/')))) {
+        saveSetting('uazapi_token', ''); saveSetting('uazapi_instance_name', '');
+    }
+    if ($url !== '') saveSetting('uazapi_url', $url);
+    if ($adminTok !== '') saveSetting('uazapi_admin_token', $adminTok);
+    if ($connTok !== '') saveSetting('uazapi_token', $connTok);
+    return $mode;
 }
 
 /** Endereço público deste painel (derivado da requisição; nada fixo no código). */

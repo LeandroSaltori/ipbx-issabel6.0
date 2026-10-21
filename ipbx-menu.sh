@@ -228,6 +228,25 @@ update_tema() {
         /bin/cp -rf "$REPO_DIR/src/themes/prisma_v5" /var/www/html/themes/
         chown -R asterisk:asterisk /var/www/html/themes
         log_success "Tema Prisma v5 e Favicon aplicados."
+    # Ativa o tema no Issabel (settings.db). Sem isso a central nova segue com o tema original e o login fica o padrão do Issabel.
+    # Só troca quando o tema atual NÃO é um tema Prisma (quem já usa prisma_v5/prisma_v6 mantém a escolha).
+    THEME_DB=/var/www/db/settings.db
+    if [ -f "$THEME_DB" ] && [ -d /var/www/html/themes/prisma_v5 ]; then
+        TEMA_ATUAL=$(php -r '$d=new PDO("sqlite:'"$THEME_DB"'");echo (string)$d->query("select value from settings where key=\"theme\"")->fetchColumn();' 2>/dev/null)
+        case "$TEMA_ATUAL" in
+            prisma_*) log_info "Tema ativo já é $TEMA_ATUAL (mantido)." ;;
+            *)
+                cp -p "$THEME_DB" "$THEME_DB.bak-ipbx" 2>/dev/null || true
+                if php -r '$d=new PDO("sqlite:'"$THEME_DB"'");$s=$d->prepare("update settings set value=? where key=\"theme\"");$s->execute(["prisma_v5"]);if(!$s->rowCount()){$d->prepare("insert into settings(key,value) values(\"theme\",?)")->execute(["prisma_v5"]);}' 2>/dev/null; then
+                    rm -rf /var/www/html/templates_c/* 2>/dev/null || true
+                    log_success "Tema Prisma v5 ativado (antes: ${TEMA_ATUAL:-padrão})."
+                else
+                    log_warn "Não foi possível ativar o tema Prisma v5 em $THEME_DB."
+                fi ;;
+        esac
+    else
+        log_warn "settings.db ou tema prisma_v5 não encontrado: tema não ativado."
+    fi
     else
         log_error "Pasta src/themes/prisma_v5 não encontrada no repositório."
     fi

@@ -26,10 +26,21 @@ $h = function($s) { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); };
                 <div class="font-bold text-slate-100 text-sm"><?php echo $h($it['t']); ?></div>
                 <div class="text-slate-400 text-sm mt-0.5"><?php echo $h($it['d']); ?></div>
                 <?php if (!empty($it['img']) && preg_match('#^[A-Za-z0-9_./-]+$#', $it['img']) && strpos($it['img'], '..') === false): ?>
-                <img src="assets/<?php echo $h($it['img']); ?>" alt="<?php echo $h($it['t']); ?>" loading="lazy" class="mt-2 rounded-xl border border-slate-700 max-w-full">
+                <img src="img/<?php echo $h($it['img']); ?>" alt="<?php echo $h($it['t']); ?>" loading="lazy" class="mt-2 rounded-xl border border-slate-700 max-w-full">
                 <?php endif; ?>
+                <?php if (!empty($it['kw'])): ?><span class="hidden" aria-hidden="true"><?php echo $h($it['kw']); ?></span><?php endif; ?>
                 <?php if (!empty($it['passos'])): ?>
                 <ol class="list-decimal ml-5 mt-2 text-sm text-slate-300 space-y-1"><?php foreach ($it['passos'] as $p) echo '<li>' . $h($p) . '</li>'; ?></ol>
+                <?php endif; ?>
+                <?php if (!empty($it['imgs']) && is_array($it['imgs'])): ?>
+                <div class="mt-3 space-y-3">
+                <?php foreach ($it['imgs'] as $__i => $im): if (empty($im['f']) || !preg_match('#^[A-Za-z0-9_./-]+$#', $im['f']) || strpos($im['f'], '..') !== false) continue; ?>
+                    <figure class="m-0">
+                        <img src="img/<?php echo $h($im['f']); ?>" alt="<?php echo $h($im['c'] ?? $it['t']); ?>" loading="lazy" class="rounded-xl border border-slate-700 max-w-full" style="max-height:560px">
+                        <?php if (!empty($im['c'])): ?><figcaption class="text-xs text-slate-400 mt-1"><b class="text-slate-300">Figura <?php echo (int)$__i + 1; ?>.</b> <?php echo $h($im['c']); ?></figcaption><?php endif; ?>
+                    </figure>
+                <?php endforeach; ?>
+                </div>
                 <?php endif; ?>
                 <?php if (!empty($it['campos'])): ?>
                 <div class="mt-2 text-sm"><div class="font-bold text-slate-200 mb-1">Campos</div>
