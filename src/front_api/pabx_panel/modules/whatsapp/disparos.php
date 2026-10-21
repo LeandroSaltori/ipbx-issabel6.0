@@ -9,6 +9,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_send_manual_te
     $msg = trim($_POST['message']);
     if (!empty($phone) && !empty($msg)) {
         $test_result = sendWhatsAppAPI($phone, $msg, 'MANUAL_TEST', '9999', 'DISPARO_MANUAL');
+        // Anexo opcional (foto, áudio, vídeo ou documento): vai no tipo certo quando o envio é pelo WhatsApp direto
+        if (!empty($test_result['success']) && !empty($_FILES['anexo']['tmp_name']) && is_uploaded_file($_FILES['anexo']['tmp_name'])) {
+            $f = $_FILES['anexo'];
+            if ($f['size'] > 16 * 1024 * 1024) {
+                $test_result = ['success' => false, 'error' => 'Mensagem enviada, mas o anexo passa de 16 MB e não foi enviado.'];
+            } else {
+                $mime = (function_exists('mime_content_type') ? (string)@mime_content_type($f['tmp_name']) : '') ?: 'application/octet-stream';
+                $fr = sendWhatsAppFile($phone, (string)$f['name'], (string)file_get_contents($f['tmp_name']), $mime, '', 'MANUAL_TEST', '9999', 'DISPARO_MANUAL_ARQUIVO', 'auto');
+                if (empty($fr['success'])) $test_result = ['success' => false, 'error' => 'Mensagem enviada, mas o anexo falhou: ' . ($fr['error'] ?: 'erro desconhecido')];
+            }
+        }
     }
 }
 ?>
@@ -19,7 +30,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_send_manual_te
             <h3 class="text-sm font-bold text-white flex items-center gap-2">
                 <i class="fa-solid fa-paper-plane text-indigo-400"></i> Disparo Rápido de Teste de WhatsApp
             </h3>
-            <span class="text-xs text-slate-400">Envie uma mensagem instantânea de teste para validar sua conexão com a API Prismabot</span>
+            <span class="text-xs text-slate-400">Envie uma mensagem instantânea de teste para validar sua conexão de envio de WhatsApp</span>
         </div>
 
         <?php if ($test_result !== null): ?>
@@ -34,7 +45,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_send_manual_te
             </div>
         <?php endif; ?>
 
-        <form method="POST" action="" class="space-y-4 text-xs">
+        <form method="POST" action="" enctype="multipart/form-data" class="space-y-4 text-xs">
             <input type="hidden" name="action_send_manual_test" value="1">
 
             <div>
@@ -46,6 +57,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_send_manual_te
             <div>
                 <label class="block font-bold text-slate-300 mb-1">Conteúdo da Mensagem de Teste</label>
                 <textarea name="message" rows="4" required class="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-white focus:border-brand-500 focus:outline-none">Olá! Esta é uma mensagem de teste enviada diretamente pelo Painel IPbx Prisma x Prismabot para validação da API.</textarea>
+            </div>
+
+            <div>
+                <label class="block font-bold text-slate-300 mb-1">Anexo (opcional: foto, áudio, vídeo ou documento, até 16 MB)</label>
+                <input type="file" name="anexo" class="w-full text-slate-300 file:mr-3 file:px-3 file:py-2 file:rounded-lg file:border-0 file:bg-slate-700 file:text-white">
             </div>
 
             <button type="submit" class="px-6 py-2.5 bg-brand-600 hover:bg-brand-500 text-white font-bold rounded-lg transition shadow-lg shadow-brand-500/20">

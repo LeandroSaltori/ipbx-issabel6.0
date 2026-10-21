@@ -153,6 +153,45 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
         exit;
     }
 
+    // WhatsApp direto (QR Code): conectar, acompanhar, desconectar e registrar o recebimento de respostas
+    if (in_array($action, ['uazapi_connect', 'uazapi_status', 'uazapi_disconnect', 'uazapi_webhook'], true)) {
+        header('Content-Type: application/json; charset=utf-8');
+        if (!hasUserPermission('manage_settings')) { echo json_encode(['success' => false, 'error' => 'Sem permissão.']); exit; }
+        if ($action !== 'uazapi_status' && $_SERVER['REQUEST_METHOD'] !== 'POST') { echo json_encode(['success' => false, 'error' => 'Método inválido.']); exit; }
+        if ($action === 'uazapi_status') {
+            if (trim((string)getSetting('uazapi_token')) === '' || trim((string)getSetting('uazapi_url')) === '') {
+                echo json_encode(['success' => true, 'state' => 'not_configured']); exit;
+            }
+            $i = uazapiConnectionInfo();
+            echo json_encode(['success' => $i['state'] !== 'error', 'state' => $i['state'], 'qr' => $i['qr'], 'paircode' => $i['paircode'], 'name' => $i['name'], 'phone' => $i['phone'], 'error' => $i['error']], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        if ($action === 'uazapi_connect') {
+            $b = json_decode(file_get_contents('php://input'), true) ?: [];
+            $err = uazapiEnsureInstance();
+            if ($err !== '') { echo json_encode(['success' => false, 'error' => $err], JSON_UNESCAPED_UNICODE); exit; }
+            $ph = preg_replace('/\D/', '', (string)($b['phone'] ?? ''));
+            $r = uazapiRequest('POST', '/instance/connect', $ph !== '' ? ['phone' => $ph] : new stdClass(), 20);
+            if ($r['error'] !== '') { echo json_encode(['success' => false, 'error' => $r['error']], JSON_UNESCAPED_UNICODE); exit; }
+            if ($r['http'] === 401 || $r['http'] === 403) { echo json_encode(['success' => false, 'error' => 'Token da conexão recusado. Confira o token.']); exit; }
+            if ($r['http'] < 200 || $r['http'] >= 300) { echo json_encode(['success' => false, 'error' => 'O servidor respondeu HTTP ' . $r['http'] . '. Confira o endereço.']); exit; }
+            $wh = uazapiConfigureWebhook();
+            logUserAction("Conectar WhatsApp direto", $ph !== '' ? 'código de pareamento' : 'QR Code', "CONFIG");
+            echo json_encode(['success' => true, 'webhook' => $wh['ok'], 'webhook_error' => $wh['error'], 'webhook_private' => !empty($wh['private'])], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        if ($action === 'uazapi_disconnect') {
+            $r = uazapiRequest('POST', '/instance/disconnect', new stdClass(), 20);
+            $ok = ($r['error'] === '' && $r['http'] >= 200 && $r['http'] < 300);
+            logUserAction("Desconectar WhatsApp direto", "HTTP " . $r['http'], "CONFIG");
+            echo json_encode(['success' => $ok, 'error' => $ok ? '' : ($r['error'] ?: 'O servidor respondeu HTTP ' . $r['http'] . '.')], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        $wh = uazapiConfigureWebhook();
+        echo json_encode(['success' => $wh['ok'], 'error' => $wh['error'], 'private' => !empty($wh['private'])], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
     // Webhook de mensagens recebidas do Z-PRO: registra respostas de NPS (nota 1 a 5)
     if ($action === 'whatsapp_webhook') {
         $expected = getSetting('webhook_token');
@@ -180,8 +219,12 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
             }
             return '';
         };
+        $evt = strtolower($pick($in, ['EventType']));
+        if ($evt !== '' && $evt !== 'messages') { echo json_encode(['success' => true, 'ignored' => true, 'reason' => 'event_' . $evt]); exit; }
+        if (in_array(strtolower($pick($in, ['message.isGroup', 'chat.wa_isGroup'])), ['1', 'true'], true)) { echo json_encode(['success' => true, 'ignored' => true, 'reason' => 'group']); exit; }
+        if (strtolower($pick($in, ['message.wasSentByApi'])) === 'true') { echo json_encode(['success' => true, 'ignored' => true]); exit; }
         $fromMe = $pick($in, ['fromMe', 'message.fromMe', 'data.fromMe', 'msg.fromMe', 'message.key.fromMe']);
-        $phone  = preg_replace('/\D/', '', $pick($in, ['number', 'from', 'phone', 'contact.number', 'ticket.contact.number', 'data.from', 'message.from', 'msg.from', 'message.chatid', 'message.sender', 'chat.phone', 'chat.wa_chatid']));
+        $phone  = preg_replace('/\D/', '', $pick($in, ['number', 'from', 'phone', 'contact.number', 'ticket.contact.number', 'data.from', 'message.from', 'msg.from', 'chat.phone', 'message.chatid', 'message.sender', 'chat.wa_chatid']));
         $text   = trim($pick($in, ['body', 'text', 'message.body', 'message.text', 'data.body', 'msg.body', 'message.content', 'message']));
         if ($fromMe === '1' || strtolower($fromMe) === 'true' || $phone === '' || $text === '') {
             echo json_encode(['success' => true, 'ignored' => true]);

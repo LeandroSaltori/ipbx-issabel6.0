@@ -1713,7 +1713,7 @@ function getAsteriskConferences() {
  * Envia um ARQUIVO (documento/áudio) por WhatsApp pelo provedor ativo.
  * Z-PRO: POST {api_url}/base64 (base64Data, mimeType, fileName). UAZAPI: POST /send/media (type=document).
  */
-function sendWhatsAppFile($phone, $fileName, $content, $mime = 'application/octet-stream', $caption = '', $call_id = 'MANUAL', $extension = 'PAINEL', $rule_type = 'ENVIO_MANUAL_ARQUIVO') {
+function sendWhatsAppFile($phone, $fileName, $content, $mime = 'application/octet-stream', $caption = '', $call_id = 'MANUAL', $extension = 'PAINEL', $rule_type = 'ENVIO_MANUAL_ARQUIVO', $mediaType = 'document') {
     global $db;
     $num = preg_replace('/\D/', '', (string)$phone);
     if (strlen($num) === 10 || strlen($num) === 11) $num = '55' . $num;
@@ -1723,7 +1723,7 @@ function sendWhatsAppFile($phone, $fileName, $content, $mime = 'application/octe
     if ($num === '' || $content === '' || $content === null) {
         $err = 'Número ou arquivo vazio';
     } elseif (waProvider() === 'uazapi') {
-        $r = uazapiRequest('POST', '/send/media', ['number' => $num, 'type' => 'document', 'file' => base64_encode($content), 'docName' => $fileName, 'text' => (string)$caption], 60);
+        $r = uazapiRequest('POST', '/send/media', ['number' => $num, 'type' => ($mediaType === 'auto' ? uazapiMediaType($mime) : 'document'), 'file' => base64_encode($content), 'docName' => $fileName, 'text' => (string)$caption], 60);
         $http = $r['http']; $resp = $r['resp']; $err = $r['error'];
         $ok = ($err === '' && $http >= 200 && $http < 300);
         if (!$ok && $err === '') $err = 'HTTP ' . $http . ($http === 401 ? ' (token da instância inválido)' : '');
@@ -2007,6 +2007,124 @@ function uazapiSendText($number, $text) {
         if ($r['http'] === 401) $err .= ' (token da instância inválido)';
     }
     return ['ok' => $ok, 'http' => $r['http'], 'resp' => $r['resp'], 'error' => $err];
+}
+
+/**
+ * Servidor de WhatsApp direto gerenciado pela Prisma: URL e token de administração ficam
+ * FORA do código, em /etc/ipbx/uazapi.conf (linhas "url=..." e "admintoken=..."), legível só pelo servidor web.
+ * Retorna ['url','admintoken'] ou null quando o arquivo não existe/está incompleto.
+ */
+function uazapiAdminConf() {
+    static $c = false;
+    if ($c !== false) return $c;
+    $c = null;
+    $f = '/etc/ipbx/uazapi.conf';
+    if (is_readable($f)) {
+        $kv = [];
+        foreach ((array)@file($f, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $ln) {
+            $ln = trim($ln);
+            if ($ln === '' || $ln[0] === '#' || strpos($ln, '=') === false) continue;
+            list($k, $v) = explode('=', $ln, 2);
+            $kv[strtolower(trim($k))] = trim($v);
+        }
+        if (!empty($kv['url']) && !empty($kv['admintoken'])) {
+            $c = ['url' => rtrim($kv['url'], '/'), 'admintoken' => $kv['admintoken']];
+        }
+    }
+    return $c;
+}
+
+/** Modo de conexão do WhatsApp direto: 'prisma' (servidor da Prisma) ou 'own' (URL e token do próprio cliente). */
+function uazapiMode() {
+    if (getSetting('uazapi_mode') === 'own') return 'own';
+    return uazapiAdminConf() ? 'prisma' : 'own';
+}
+
+/** Chamada com o token de administração do servidor da Prisma. */
+function uazapiAdminRequest($method, $path, $body = null, $timeout = 20) {
+    $c = uazapiAdminConf();
+    if (!$c) return ['http' => 0, 'resp' => '', 'error' => 'Servidor da Prisma não disponível nesta central.'];
+    $ch = curl_init($c['url'] . $path);
+    $opts = [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => $timeout, CURLOPT_SSL_VERIFYPEER => false, CURLOPT_SSL_VERIFYHOST => false,
+             CURLOPT_HTTPHEADER => ['Content-Type: application/json', 'Accept: application/json', 'admintoken: ' . $c['admintoken']]];
+    if (strtoupper($method) === 'POST') { $opts[CURLOPT_POST] = true; $opts[CURLOPT_POSTFIELDS] = json_encode($body ?? new stdClass(), JSON_UNESCAPED_UNICODE); }
+    curl_setopt_array($ch, $opts);
+    $resp = curl_exec($ch); $http = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE); $err = curl_error($ch); curl_close($ch);
+    return ['http' => $http, 'resp' => (string)$resp, 'error' => $err ? ('cURL Error: ' . $err) : ''];
+}
+
+/** Garante a instância deste cliente no servidor da Prisma (cria uma vez e guarda o token). Retorna '' se ok ou a mensagem de erro. */
+function uazapiEnsureInstance() {
+    if (uazapiMode() !== 'prisma') return '';
+    $c = uazapiAdminConf();
+    if (!$c) return 'Servidor da Prisma não disponível nesta central.';
+    if (trim((string)getSetting('uazapi_token')) !== '' && rtrim((string)getSetting('uazapi_url'), '/') === $c['url']) return '';
+    $host = preg_replace('/[^a-z0-9]+/', '-', strtolower((string)(gethostname() ?: 'ipbx')));
+    $name = 'ipbx-' . trim($host, '-') . '-' . substr(bin2hex(random_bytes(4)), 0, 6);
+    $r = uazapiAdminRequest('POST', '/instance/create', ['name' => $name, 'systemName' => 'IPbx Prisma']);
+    if ($r['error'] !== '') return $r['error'];
+    $d = json_decode($r['resp'], true);
+    $tok = is_array($d) ? (string)($d['token'] ?? ($d['instance']['token'] ?? '')) : '';
+    if ($r['http'] < 200 || $r['http'] >= 300 || $tok === '') return 'Não foi possível criar a conexão (HTTP ' . $r['http'] . ').';
+    saveSetting('uazapi_url', $c['url']);
+    saveSetting('uazapi_token', $tok);
+    saveSetting('uazapi_instance_name', $name);
+    return '';
+}
+
+/** Endereço público deste painel (derivado da requisição; nada fixo no código). */
+function panelPublicBaseUrl() {
+    $https = !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off';
+    $host  = (string)($_SERVER['HTTP_HOST'] ?? '');
+    if ($host === '') return '';
+    return ($https ? 'https://' : 'http://') . $host . rtrim(dirname($_SERVER['SCRIPT_NAME'] ?? '/front_api/index.php'), '/\\');
+}
+
+/** Registra no servidor o endereço que recebe as respostas dos clientes (NPS) e o estado da conexão. */
+function uazapiConfigureWebhook() {
+    $tok = getSetting('webhook_token');
+    if (empty($tok)) { $tok = bin2hex(random_bytes(16)); saveSetting('webhook_token', $tok); }
+    $base = panelPublicBaseUrl();
+    if ($base === '') return ['ok' => false, 'error' => 'Não foi possível descobrir o endereço do painel.', 'url' => ''];
+    $url = $base . '/index.php?api_action=whatsapp_webhook&token=' . $tok;
+    $r = uazapiRequest('POST', '/webhook', ['enabled' => true, 'url' => $url, 'events' => ['messages', 'connection'], 'excludeMessages' => ['wasSentByApi', 'fromMeYes'], 'addUrlEvents' => false, 'addUrlTypesMessages' => false]);
+    $ok = ($r['error'] === '' && $r['http'] >= 200 && $r['http'] < 300);
+    // Endereço interno (rede privada/localhost): o servidor de WhatsApp na internet não consegue entregar as respostas
+    $h = (string)parse_url($url, PHP_URL_HOST);
+    $private = ($h === 'localhost' || strpos($h, '.') === false)
+        || (filter_var($h, FILTER_VALIDATE_IP) && !filter_var($h, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE));
+    return ['ok' => $ok, 'error' => $ok ? '' : ($r['error'] ?: 'HTTP ' . $r['http']), 'url' => $url, 'private' => $private];
+}
+
+/** Estado da conexão: ['state'=>connected|connecting|disconnected|error, 'qr','paircode','name','phone','error']. */
+function uazapiConnectionInfo() {
+    $r = uazapiRequest('GET', '/instance/status', null, 8);
+    $out = ['state' => 'error', 'qr' => '', 'paircode' => '', 'name' => '', 'phone' => '', 'error' => '', 'http' => $r['http']];
+    if ($r['error'] !== '') { $out['error'] = $r['error']; return $out; }
+    if ($r['http'] === 401 || $r['http'] === 403) { $out['error'] = 'Token da conexão recusado.'; return $out; }
+    $d = json_decode($r['resp'], true);
+    if ($r['http'] < 200 || $r['http'] >= 300 || !is_array($d)) { $out['error'] = 'Servidor respondeu HTTP ' . $r['http'] . '.'; return $out; }
+    $inst = is_array($d['instance'] ?? null) ? $d['instance'] : [];
+    $st = strtolower((string)($inst['status'] ?? ''));
+    if ($st === '' && is_array($d['status'] ?? null)) $st = !empty($d['status']['connected']) ? 'connected' : 'disconnected';
+    if ($st === '' && is_string($d['status'] ?? null)) $st = strtolower($d['status']);
+    $out['state']    = in_array($st, ['connected', 'connecting', 'disconnected'], true) ? $st : ($st === 'hibernated' ? 'disconnected' : 'error');
+    $qr = (string)($inst['qrcode'] ?? '');
+    if ($qr !== '') $out['qr'] = (strpos($qr, 'data:image') === 0) ? $qr : ('data:image/png;base64,' . $qr);
+    $out['paircode'] = (string)($inst['paircode'] ?? '');
+    $out['name']     = (string)($inst['profileName'] ?? '');
+    $out['phone']    = preg_replace('/\D/', '', (string)($inst['owner'] ?? ''));
+    if ($out['state'] === 'error') $out['error'] = 'Estado desconhecido (' . ($st ?: 'vazio') . ').';
+    return $out;
+}
+
+/** Tipo de mídia da UAZAPI a partir do MIME: image, video, audio ou document. */
+function uazapiMediaType($mime) {
+    $m = strtolower((string)$mime);
+    if (strpos($m, 'image/') === 0 && strpos($m, 'svg') === false) return 'image';
+    if (strpos($m, 'video/') === 0) return 'video';
+    if (strpos($m, 'audio/') === 0) return 'audio';
+    return 'document';
 }
 
 function sendWhatsAppAPI($phone, $message, $call_id = 'MANUAL', $extension = 'GERAL', $rule_type = 'DESCONHECIDO') {
@@ -6236,12 +6354,12 @@ function integrationStatusChecks() {
     // --- WhatsApp
     $prov = waProvider();
     $conf = whatsappProviderConfigured();
-    $add('WhatsApp', 'Servidor de envio', $conf ? 'ok' : 'fail', ($prov === 'uazapi' ? 'uazapi' : 'Prismabot') . ($conf ? ': credenciais preenchidas.' : ': credenciais incompletas.'));
+    $add('WhatsApp', 'Servidor de envio', $conf ? 'ok' : 'fail', ($prov === 'uazapi' ? 'WhatsApp direto' : 'Prismabot') . ($conf ? ': credenciais preenchidas.' : ': credenciais incompletas.'));
     if ($prov === 'uazapi' && $conf) {
         $u = uazapiRequest('GET', '/instance/status', null, 6);
         $d = json_decode($u['resp'], true);
         $stt = is_array($d) ? (string)($d['instance']['status'] ?? $d['status'] ?? '') : '';
-        $add('WhatsApp', 'Instância uazapi', ($u['error'] === '' && $u['http'] === 200 && stripos($stt, 'connected') !== false) ? 'ok' : 'warn', $u['error'] !== '' ? $u['error'] : ('Estado: ' . ($stt !== '' ? $stt : 'HTTP ' . $u['http'])));
+        $add('WhatsApp', 'Conexão WhatsApp direto', ($u['error'] === '' && $u['http'] === 200 && stripos($stt, 'connected') !== false) ? 'ok' : 'warn', $u['error'] !== '' ? $u['error'] : ('Estado: ' . ($stt !== '' ? $stt : 'HTTP ' . $u['http'])));
     }
     $add('WhatsApp', 'Respostas de pesquisa (NPS)', getSetting('webhook_token') ? 'ok' : 'warn', getSetting('webhook_token') ? 'Webhook com token gerado.' : 'Webhook ainda não gerado.');
     $tr = getSetting('trunk_alert_enabled') === '1';
