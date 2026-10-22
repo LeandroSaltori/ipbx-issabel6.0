@@ -1952,7 +1952,16 @@ function buildShareAttachments($body) {
 
 /** Provedor de envio WhatsApp ativo: 'zpro' (Prismabot/Z-PRO, padrão) ou 'uazapi'. */
 function waProvider() {
+    if (!empty($GLOBALS['__wa_provider_override'])) return $GLOBALS['__wa_provider_override'];
     return getSetting('wa_provider') === 'uazapi' ? 'uazapi' : 'zpro';
+}
+
+/** Quais servidores de envio estão configurados: ['zpro' => bool, 'uazapi' => bool]. */
+function waChannelsConfigured() {
+    return [
+        'zpro'   => trim((string)getSetting('api_url')) !== '' && trim((string)getSetting('api_token')) !== '',
+        'uazapi' => trim((string)getSetting('uazapi_url')) !== '' && trim((string)getSetting('uazapi_token')) !== '',
+    ];
 }
 
 /** Há credenciais completas para o provedor ativo? */
@@ -2094,7 +2103,7 @@ function uazapiSaveSettings($provider, $mode, $url, $adminTok, $connTok) {
     saveSetting('uazapi_mode', $mode);
     if ($mode !== 'own') return $mode;
     $adminTok = trim((string)$adminTok); $connTok = trim((string)$connTok);
-    if ($connTok === '' && ($adminTok !== '' || ($url !== '' && $url !== rtrim((string)getSetting('uazapi_url'), '/')))) {
+    if ($connTok === '' && (($adminTok !== '' && $adminTok !== (string)getSetting('uazapi_admin_token')) || ($url !== '' && $url !== rtrim((string)getSetting('uazapi_url'), '/')))) {
         saveSetting('uazapi_token', ''); saveSetting('uazapi_instance_name', '');
     }
     if ($url !== '') saveSetting('uazapi_url', $url);

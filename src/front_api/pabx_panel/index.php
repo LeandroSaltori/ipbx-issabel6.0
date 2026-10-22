@@ -800,6 +800,8 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
 
         }
         $lu  = getLoggedUser();
+        $ch  = (string)($body['channel'] ?? '');
+        if (in_array($ch, ['zpro', 'uazapi'], true) && !empty(waChannelsConfigured()[$ch])) $GLOBALS['__wa_provider_override'] = $ch;
         $res = sendWhatsAppAPI($phone, $msg, $uid !== '' ? $uid : 'MANUAL', (string)($lu['extension'] ?? 'PAINEL'), 'ENVIO_MANUAL');
         $files_sent = 0; $file_warns = [];
         if (!empty($res['success'])) {
@@ -3457,9 +3459,20 @@ window.ipbxIaHistory = async function (module, title) {
       <button type="button" onclick="closeNovaConversa()" style="background:none;border:0;color:#94a3b8;cursor:pointer;font-size:16px" title="Fechar"><i class="fa-solid fa-xmark"></i></button>
     </div>
     <p style="margin:0 0 14px;color:#94a3b8;font-size:12px">Envie uma mensagem de WhatsApp para um número específico.</p>
-    <div style="margin-bottom:14px;padding:8px 12px;border-radius:12px;font-size:12px;<?php echo $__wa_ok ? 'background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.35);color:#6ee7b7' : 'background:rgba(244,63,94,.1);border:1px solid rgba(244,63,94,.35);color:#fda4af'; ?>">
-      <?php echo $__wa_ok ? 'Envio por: <b>' . htmlspecialchars($__wa_nome) . '</b>' : 'O envio por <b>' . htmlspecialchars($__wa_nome) . '</b> não está configurado. Ajuste em Configurações &gt; API.'; ?>
+    <?php $__ncc = waChannelsConfigured(); $__nc_names = ['zpro' => 'Prismabot (API)', 'uazapi' => 'WhatsApp direto (QR Code)']; $__nc_avail = array_keys(array_filter($__ncc)); ?>
+    <?php if (count($__nc_avail) > 1): ?>
+    <div style="margin-bottom:14px">
+      <label for="nc-channel" style="font-size:12px;font-weight:700;color:#cbd5e1;display:block;margin-bottom:6px">Enviar por</label>
+      <select id="nc-channel" class="nc-in">
+        <?php foreach ($__nc_avail as $__k): ?><option value="<?php echo $__k; ?>" <?php echo waProvider() === $__k ? 'selected' : ''; ?>><?php echo $__nc_names[$__k]; ?></option><?php endforeach; ?>
+      </select>
     </div>
+    <?php else: ?>
+    <input type="hidden" id="nc-channel" value="<?php echo $__nc_avail ? $__nc_avail[0] : ''; ?>">
+    <div style="margin-bottom:14px;padding:8px 12px;border-radius:12px;font-size:12px;<?php echo $__nc_avail ? 'background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.35);color:#6ee7b7' : 'background:rgba(244,63,94,.1);border:1px solid rgba(244,63,94,.35);color:#fda4af'; ?>">
+      <?php echo $__nc_avail ? 'Envio por: <b>' . $__nc_names[$__nc_avail[0]] . '</b>' : 'Nenhum servidor de envio está configurado. Ajuste em Configurações &gt; APIs &amp; Conexões.'; ?>
+    </div>
+    <?php endif; ?>
     <label style="font-size:12px;font-weight:700;color:#cbd5e1;display:block;margin-bottom:6px">Número *</label>
     <input id="nc-search" class="nc-in" type="search" autocomplete="off" placeholder="Buscar contato no sistema..." oninput="ncSearch(this.value)">
     <div id="nc-results"></div>
@@ -3520,7 +3533,7 @@ window.ipbxIaHistory = async function (module, title) {
     if ($('nc-sign').checked && NC_USER) msg = '*' + NC_USER + '*\n' + msg;
     const btn = $('nc-send'), orig = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Enviando...';
     try {
-      const r = await fetch('index.php?api_action=send_whatsapp_message', {method: 'POST', credentials: 'same-origin', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({phone: phone, message: msg})});
+      const r = await fetch('index.php?api_action=send_whatsapp_message', {method: 'POST', credentials: 'same-origin', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({phone: phone, message: msg, channel: ($('nc-channel') ? $('nc-channel').value : '')})});
       const j = await r.json();
       if (j.success) {
         closeNovaConversa(); $('nc-msg').value = ''; $('nc-phone').value = ''; $('nc-search').value = ''; $('nc-results').style.display = 'none';

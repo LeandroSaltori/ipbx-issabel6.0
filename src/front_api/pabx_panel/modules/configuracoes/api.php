@@ -61,7 +61,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // URL pública do painel (usada nos links assinados de gravação enviados por WhatsApp)
     if (isset($_POST['action_save_public_url'])) {
-        $active_tab = 'prismabot';
+        $active_tab = 'avisos';
         $pub = rtrim(trim($_POST['public_base_url'] ?? ''), '/');
         if ($pub !== '' && !preg_match('#^https?://[A-Za-z0-9.\-:\[\]]+(/[A-Za-z0-9._~/\-]*)?$#', $pub)) {
             $msg_error = "⚠️ URL pública inválida. Use o formato https://pbx.seudominio.com.br/front_api";
@@ -74,7 +74,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // Alerta de tronco fora do ar (WhatsApp ao supervisor)
     if (isset($_POST['action_save_trunk_alert']) || isset($_POST['action_test_trunk_alert'])) {
-        $active_tab = 'prismabot';
+        $active_tab = 'avisos';
         saveSetting('trunk_alert_enabled', isset($_POST['trunk_alert_enabled']) ? '1' : '0');
         saveSetting('trunk_alert_numbers', trim($_POST['trunk_alert_numbers'] ?? ''));
         $msg_status = "Alerta de tronco salvo.";
@@ -91,7 +91,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // Chamadas perdidas: regras de inteligência
     if (isset($_POST['action_save_missed_rules'])) {
-        $active_tab = 'prismabot';
+        $active_tab = 'avisos';
         $mr = max(0, min(60, (int)($_POST['missed_min_ring_seconds'] ?? 10)));
         saveSetting('missed_min_ring_seconds', (string)$mr);
         saveSetting('missed_ignore_answered_elsewhere', isset($_POST['missed_ignore_answered_elsewhere']) ? '1' : '0');
@@ -99,16 +99,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         logUserAction("Regras de chamada perdida", "min_toque={$mr}s", "CONFIG");
     }
 
-    // 1b. Servidor de envio WhatsApp (Prismabot/Z-PRO ou UAZAPI)
-    $uaz_qr = '';
-    if (isset($_POST['action_save_wa_provider']) || isset($_POST['action_test_uazapi']) || isset($_POST['action_connect_uazapi'])) {
-        $active_tab = 'prismabot';
+    // 1b. Qual servidor de envio WhatsApp está em uso (Prismabot ou WhatsApp direto)
+    if (isset($_POST['action_set_wa_provider'])) {
         $prov = (($_POST['wa_provider'] ?? 'zpro') === 'uazapi') ? 'uazapi' : 'zpro';
+        $active_tab = $prov === 'uazapi' ? 'uazapi' : 'prismabot';
+        if ($prov === 'uazapi' && getSetting('uazapi_token') === '' && !uazapiFileConf()) {
+            $msg_error = "⚠️ O WhatsApp direto ainda não foi conectado. Clique em \"Conectar WhatsApp\" e leia o QR Code antes de usá-lo.";
+        } else {
+            saveSetting('wa_provider', $prov);
+            $msg_status = $prov === 'uazapi' ? "Pronto: avisos, pesquisas e gravações agora saem pelo WhatsApp direto (QR Code)." : "Pronto: avisos, pesquisas e gravações agora saem pela API Prismabot.";
+            logUserAction("Servidor de envio WhatsApp", $prov, "CONFIG");
+        }
+    }
+
+    // 1c. WhatsApp direto (QR Code): salvar dados do servidor próprio / testar conexão
+    $uaz_qr = '';
+    if (isset($_POST['action_save_uazapi']) || isset($_POST['action_test_uazapi'])) {
+        $active_tab = 'uazapi';
         $u_url = rtrim(trim($_POST['uazapi_url'] ?? ''), '/');
         $u_tok = trim($_POST['uazapi_token'] ?? '');
         if ($u_url !== '' && !preg_match('#^https?://#i', $u_url)) $u_url = 'https://' . $u_url;
-        saveSetting('wa_provider', $prov);
-        $u_mode = uazapiSaveSettings($prov, $_POST['uazapi_mode'] ?? '', $u_url, $_POST['uazapi_admin_token'] ?? '', $u_tok);
+        $u_mode = uazapiSaveSettings(waProvider(), $_POST['uazapi_mode'] ?? '', $u_url, $_POST['uazapi_admin_token'] ?? '', $u_tok);
         $findKey = function ($arr, $key) use (&$findKey) {
             if (!is_array($arr)) return '';
             foreach ($arr as $k => $v) {
@@ -117,10 +128,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             return '';
         };
-        if (isset($_POST['action_save_wa_provider'])) {
-            $msg_status = $prov === 'uazapi' ? "Servidor de envio: WhatsApp direto (QR Code). Todas as mensagens passam a sair por ele." : "Servidor de envio: API Prismabot.";
-            logUserAction("Servidor de envio WhatsApp", $prov, "CONFIG");
-        } elseif (isset($_POST['action_test_uazapi'])) {
+        if (isset($_POST['action_save_uazapi'])) {
+            $msg_status = "Dados do servidor salvos. Agora clique em \"Conectar WhatsApp\".";
+            logUserAction("Servidor WhatsApp direto", "salvo", "CONFIG");
+        } else {
             $r = uazapiRequest('GET', '/instance/status', null, 8);
             $d = json_decode($r['resp'], true);
             $st = is_array($d) ? strtolower($findKey($d, 'status')) : '';
@@ -128,20 +139,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             elseif ($r['http'] === 401 || $r['http'] === 403) { $msg_error = "⚠️ Token da instância recusado (HTTP {$r['http']}). Confira o token."; }
             elseif ($r['http'] >= 200 && $r['http'] < 300) {
                 if ($st === 'connected') $msg_status = "✅ WhatsApp direto conectado e pareado.";
-                else $msg_error = "⚠️ Servidor alcançado, mas o WhatsApp não está conectado (estado: " . ($st ?: 'desconhecido') . "). Use \"Conectar WhatsApp\" e leia o QR Code com o celular.";
+                else $msg_error = "⚠️ Servidor alcançado, mas o WhatsApp não está conectado (estado: " . ($st ?: 'desconhecido') . "). Clique em \"Conectar WhatsApp\" e leia o QR Code com o celular.";
             } else { $msg_error = "⚠️ O servidor respondeu HTTP {$r['http']}. Confira o endereço do servidor."; }
             logUserAction("Teste UAZAPI", "HTTP " . $r['http'] . " status=" . $st, "CONFIG");
-        } else {
-            $r = uazapiRequest('POST', '/instance/connect', new stdClass(), 15);
-            $d = json_decode($r['resp'], true);
-            $qr = is_array($d) ? $findKey($d, 'qrcode') : '';
-            if ($r['error'] !== '') { $msg_error = "⚠️ " . $r['error']; }
-            elseif ($qr !== '') {
-                $uaz_qr = (strpos($qr, 'data:image') === 0) ? $qr : ('data:image/png;base64,' . $qr);
-                $msg_status = "Leia o QR Code abaixo no WhatsApp: Aparelhos conectados > Conectar um aparelho.";
-            } elseif ($r['http'] >= 200 && $r['http'] < 300) { $msg_status = "A instância já está conectada ou em processo de conexão."; }
-            else { $msg_error = "⚠️ Não foi possível gerar o QR Code (HTTP {$r['http']})."; }
-            logUserAction("Conectar UAZAPI", "HTTP " . $r['http'], "CONFIG");
         }
     }
 
@@ -236,7 +236,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $msg_error = "Erro ao salvar credenciais do Prismabot: " . $e->getMessage();
         }
     } elseif (isset($_POST['action_send_direct_test_wa'])) {
-        $active_tab = 'prismabot';
+        $active_tab = 'avisos';
         $test_phone = trim($_POST['test_wa_phone'] ?? '');
         $test_msg   = trim($_POST['test_wa_msg'] ?? '');
 
@@ -377,17 +377,27 @@ if (empty($currentPbxToken) && !empty($currentPbxPass) && $_SERVER['REQUEST_METH
         <button type="button" onclick="switchApiTab('prismabot')" id="btn-tab-prismabot" 
                 class="px-4 py-2.5 rounded-xl transition flex items-center gap-2 text-slate-400 hover:text-white">
             <i class="fa-solid fa-key text-amber-400"></i>
-            <span>2. API Prismabot WhatsApp</span>
+            <span>2. API Prismabot</span>
+        </button>
+        <button type="button" onclick="switchApiTab('uazapi')" id="btn-tab-uazapi" 
+                class="px-4 py-2.5 rounded-xl transition flex items-center gap-2 text-slate-400 hover:text-white">
+            <i class="fa-brands fa-whatsapp text-emerald-400"></i>
+            <span>3. WhatsApp direto (QR Code)</span>
+        </button>
+        <button type="button" onclick="switchApiTab('avisos')" id="btn-tab-avisos" 
+                class="px-4 py-2.5 rounded-xl transition flex items-center gap-2 text-slate-400 hover:text-white">
+            <i class="fa-solid fa-bell text-indigo-400"></i>
+            <span>4. Avisos e teste de envio</span>
         </button>
         <button type="button" onclick="switchApiTab('mysql')" id="btn-tab-mysql" 
                 class="px-4 py-2.5 rounded-xl transition flex items-center gap-2 text-slate-400 hover:text-white">
             <i class="fa-solid fa-database text-purple-400"></i>
-            <span>3. Banco MySQL CDR</span>
+            <span>5. Banco MySQL CDR</span>
         </button>
         <button type="button" onclick="switchApiTab('reset')" id="btn-tab-reset" 
                 class="px-4 py-2.5 rounded-xl transition flex items-center gap-2 text-slate-400 hover:text-white">
             <i class="fa-solid fa-triangle-exclamation text-rose-400"></i>
-            <span>4. Restauração Global</span>
+            <span>6. Restauração Global</span>
         </button>
     </div>
 
@@ -494,200 +504,25 @@ if (empty($currentPbxToken) && !empty($currentPbxPass) && $_SERVER['REQUEST_METH
 
     <!-- CONTEÚDO ABA 2: API PRISMABOT -->
     <div id="tab-content-prismabot" class="space-y-4 tab-pane hidden">
-        <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
-            <div class="border-b border-slate-800 pb-3 flex items-center gap-3">
-                <div class="p-3 bg-emerald-500/10 rounded-xl border border-emerald-500/20 text-emerald-400"><i class="fa-brands fa-whatsapp text-xl"></i></div>
-                <div>
-                    <h3 class="text-base font-bold text-slate-100">Servidor de envio WhatsApp</h3>
-                    <p class="text-xs text-slate-400">Escolha por onde as mensagens (NPS, chamadas perdidas, gravações) são enviadas. Só um fica ativo por vez.</p>
-                </div>
-            </div>
-            <?php
-                $__prov = (($settings['wa_provider'] ?? '') === 'uazapi') ? 'uazapi' : 'zpro';
-                $__admin = uazapiFileConf() ? true : false;
-                $__mode = uazapiMode();
-                $__wh_url = panelPublicBaseUrl() . '/index.php?api_action=whatsapp_webhook&token=' . (string)getSetting('webhook_token');
-                $__btn = 'white-space:nowrap !important;flex-shrink:0 !important;width:auto !important;overflow:visible !important;text-overflow:clip !important;';
-            ?>
-            <form method="POST" action="index.php?module=configuracoes&action=api" class="space-y-4 text-xs">
+        <?php
+            $__prov = waProvider();
+            $__btn = 'white-space:nowrap !important;flex-shrink:0 !important;width:auto !important;overflow:visible !important;text-overflow:clip !important;';
+        ?>
+        <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
+            <p class="text-slate-400">Se você contratou o Prismabot, preencha a URL e o token abaixo. Se não tem Prismabot, use a aba <b class="text-slate-200">3. WhatsApp direto (QR Code)</b>. Só um dos dois fica em uso por vez.</p>
+            <form method="POST" action="index.php?module=configuracoes&action=api" class="flex items-center gap-2">
                 <input type="hidden" name="active_tab" value="prismabot">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <label class="flex items-start gap-3 p-4 rounded-xl border border-slate-800 bg-slate-950 cursor-pointer">
-                        <input type="radio" name="wa_provider" value="zpro" <?php echo $__prov === 'zpro' ? 'checked' : ''; ?> onchange="toggleWaProvider()" class="mt-1 accent-amber-500">
-                        <span><b class="text-slate-100">API Prismabot</b><br><span class="text-slate-400">Para clientes com o serviço Prismabot contratado. Configurada na seção abaixo.</span></span>
-                    </label>
-                    <label class="flex items-start gap-3 p-4 rounded-xl border border-slate-800 bg-slate-950 cursor-pointer">
-                        <input type="radio" name="wa_provider" value="uazapi" <?php echo $__prov === 'uazapi' ? 'checked' : ''; ?> onchange="toggleWaProvider()" class="mt-1 accent-emerald-500">
-                        <span><b class="text-slate-100">WhatsApp direto (QR Code)</b><br><span class="text-slate-400">Para clientes sem Prismabot: o próprio sistema envia pelo seu WhatsApp, pareado lendo um QR Code.</span></span>
-                    </label>
-                </div>
-                <div id="wa-uazapi-fields" class="space-y-3 <?php echo $__prov === 'uazapi' ? '' : 'hidden'; ?>">
-                    <?php if ($__admin): ?>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <label class="flex items-start gap-3 p-3 rounded-xl border border-slate-800 bg-slate-950 cursor-pointer">
-                            <input type="radio" name="uazapi_mode" value="prisma" <?php echo $__mode === 'prisma' ? 'checked' : ''; ?> onchange="toggleWaMode()" class="mt-1 accent-emerald-500">
-                            <span><b class="text-slate-100">Servidor da Prisma</b> <span class="text-emerald-400">(recomendado)</span><br><span class="text-slate-400">Sem configurar nada: é só conectar e ler o QR Code.</span></span>
-                        </label>
-                        <label class="flex items-start gap-3 p-3 rounded-xl border border-slate-800 bg-slate-950 cursor-pointer">
-                            <input type="radio" name="uazapi_mode" value="own" <?php echo $__mode === 'own' ? 'checked' : ''; ?> onchange="toggleWaMode()" class="mt-1 accent-emerald-500">
-                            <span><b class="text-slate-100">Servidor próprio</b><br><span class="text-slate-400">Avançado: informe o endereço e o token do seu servidor.</span></span>
-                        </label>
-                    </div>
-                    <?php endif; ?>
-                    <div id="wa-own-fields" class="space-y-3 <?php echo $__mode === 'own' ? '' : 'hidden'; ?>">
-                        <div>
-                            <label class="block font-bold text-slate-300 mb-1.5 uppercase tracking-wider text-[11px]">Endereço do servidor</label>
-                            <input type="text" name="uazapi_url" value="<?php echo htmlspecialchars((string)($settings['uazapi_url'] ?? '')); ?>" placeholder="https://seu-servidor.exemplo.com" class="w-full px-3 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono focus:border-emerald-500 focus:outline-none">
-                        </div>
-                        <div>
-                            <label class="block font-bold text-slate-300 mb-1.5 uppercase tracking-wider text-[11px]">Token de administração do servidor</label>
-                            <input type="password" name="uazapi_admin_token" value="" placeholder="<?php echo !empty($settings['uazapi_admin_token']) ? '•••••••• (salvo — deixe em branco para manter)' : 'Cole o token de administração (a conexão é criada sozinha)'; ?>" autocomplete="off" class="w-full px-3 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono focus:border-emerald-500 focus:outline-none">
-                            <p class="text-[11px] text-slate-500 mt-1">Basta informar o endereço e este token: o painel cria a conexão sozinho. Se preferir, deixe em branco e informe só o token de uma conexão que você já criou.</p>
-                        </div>
-                        <div>
-                            <label class="block font-bold text-slate-300 mb-1.5 uppercase tracking-wider text-[11px]">Token da conexão</label>
-                            <input type="password" name="uazapi_token" value="" placeholder="<?php echo !empty($settings['uazapi_token']) ? '•••••••• (salvo — deixe em branco para manter)' : 'Cole o token da conexão'; ?>" autocomplete="off" class="w-full px-3 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono focus:border-emerald-500 focus:outline-none">
-                        </div>
-                    </div>
-                    <div class="flex items-center gap-3 p-3 rounded-xl border border-slate-800 bg-slate-950">
-                        <span id="wa-state-badge" class="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300 font-bold" style="white-space:nowrap">Verificando…</span>
-                        <span id="wa-state-detail" class="text-slate-400"></span>
-                    </div>
-                    <p class="text-[11px] text-slate-400">Respostas da pesquisa de satisfação: ao conectar, o painel registra sozinho o recebimento. Se precisar configurar à mão, o endereço é <code class="text-slate-300 break-all"><?php echo htmlspecialchars($__wh_url); ?></code></p>
-                </div>
-                <div class="flex flex-wrap gap-2">
-                    <button type="submit" name="action_save_wa_provider" style="<?php echo $__btn; ?>" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl"><i class="fa-solid fa-floppy-disk mr-1"></i> Salvar servidor de envio</button>
-                    <span id="wa-uazapi-btns" class="<?php echo $__prov === 'uazapi' ? '' : 'hidden'; ?> flex flex-wrap gap-2">
-                        <button type="button" id="wa-btn-connect" onclick="waOpenQr()" style="<?php echo $__btn; ?>" class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl"><i class="fa-solid fa-qrcode mr-1"></i> Criar canal e gerar QR Code</button>
-                        <button type="button" id="wa-btn-disc" onclick="waDisconnect()" style="<?php echo $__btn; ?>" class="px-5 py-2.5 bg-rose-700 hover:bg-rose-600 text-white font-bold rounded-xl"><i class="fa-solid fa-link-slash mr-1"></i> Desconectar / trocar número</button>
-                        <button type="submit" name="action_test_uazapi" style="<?php echo $__btn; ?>" class="px-5 py-2.5 bg-slate-700 hover:bg-slate-600 text-white font-bold rounded-xl"><i class="fa-solid fa-plug mr-1"></i> Testar conexão</button>
-                        <button type="button" onclick="waRegisterWebhook()" style="<?php echo $__btn; ?>" class="px-5 py-2.5 bg-slate-700 hover:bg-slate-600 text-white font-bold rounded-xl"><i class="fa-solid fa-inbox mr-1"></i> Registrar recebimento de respostas</button>
-                    </span>
-                </div>
+                <input type="hidden" name="wa_provider" value="zpro">
+                <?php if ($__prov === 'zpro'): ?>
+                    <span style="white-space:nowrap" class="px-3 py-1.5 rounded-lg bg-emerald-500/15 text-emerald-400 font-bold"><i class="fa-solid fa-circle-check mr-1"></i> Em uso para os envios</span>
+                <?php else: ?>
+                    <span style="white-space:nowrap" class="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-400 font-bold">Não está em uso</span>
+                    <button type="submit" name="action_set_wa_provider" style="<?php echo $__btn; ?>" class="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-xl">Usar o Prismabot nos envios</button>
+                <?php endif; ?>
             </form>
-            <script>
-            function toggleWaProvider() {
-                var u = document.querySelector('input[name="wa_provider"][value="uazapi"]').checked;
-                document.getElementById('wa-uazapi-fields').classList.toggle('hidden', !u);
-                document.getElementById('wa-uazapi-btns').classList.toggle('hidden', !u);
-                var z = document.getElementById('wa-zpro-fields'); if (z) z.classList.toggle('hidden', u);
-                if (u) waPollStatus(true);
-            }
-            function toggleWaMode() {
-                var o = document.querySelector('input[name="uazapi_mode"][value="own"]');
-                document.getElementById('wa-own-fields').classList.toggle('hidden', !(o && o.checked));
-            }
-            var __waTimer = null, __waDlg = null;
-            function waJson(action, body) {
-                return fetch('index.php?api_action=' + action, body === undefined ? {credentials: 'same-origin'} : {method: 'POST', credentials: 'same-origin', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)})
-                    .then(function (r) { return r.json(); });
-            }
-            function waSetBadge(state, detail) {
-                var b = document.getElementById('wa-state-badge'), d = document.getElementById('wa-state-detail'); if (!b) return;
-                var map = {connected: ['Conectado', 'bg-emerald-500/15 text-emerald-400'], connecting: ['Conectando…', 'bg-amber-500/15 text-amber-400'], disconnected: ['Desconectado', 'bg-rose-500/15 text-rose-400'], not_configured: ['Não conectado', 'bg-slate-800 text-slate-300'], error: ['Sem resposta', 'bg-rose-500/15 text-rose-400']};
-                var m = map[state] || map.error;
-                b.className = 'px-2.5 py-1 rounded-lg font-bold ' + m[1]; b.textContent = m[0]; d.textContent = detail || '';
-                var disc = document.getElementById('wa-btn-disc'); if (disc) disc.style.display = (state === 'connected' || state === 'connecting') ? '' : 'none';
-                __waState = state;
-                var cb = document.getElementById('wa-btn-connect'); if (cb) cb.innerHTML = (state === 'not_configured') ? '<i class="fa-solid fa-plus mr-1"></i> Criar canal e gerar QR Code' : '<i class="fa-solid fa-qrcode mr-1"></i> Conectar WhatsApp';
-                if (state === 'not_configured' && d && !detail) d.textContent = 'Nenhum canal criado ainda. Clique em "Criar canal e gerar QR Code".';
-            }
-            function waPollStatus(once) {
-                return waJson('uazapi_status').then(function (j) {
-                    var det = '';
-                    if (j.state === 'connected') det = (j.name ? j.name + ' · ' : '') + (j.phone ? '+' + j.phone : '');
-                    else if (j.error) det = j.error;
-                    waSetBadge(j.state || 'error', det);
-                    return j;
-                }).catch(function () { waSetBadge('error', 'Não foi possível consultar o servidor.'); return {}; });
-            }
-            var __waState = 'unknown';
-            function waForm() {
-                var g = function (n) { var e = document.querySelector('[name="' + n + '"]'); return e ? e.value.trim() : ''; };
-                var m = document.querySelector('input[name="uazapi_mode"]:checked');
-                return {mode: m ? m.value : 'own', url: g('uazapi_url'), admin_token: g('uazapi_admin_token'), token: g('uazapi_token')};
-            }
-            function waDialog() {
-                if (__waDlg) return __waDlg;
-                var d = document.createElement('dialog');
-                d.id = 'modal-wa-qr';
-                d.style.cssText = 'border:1px solid #334155;border-radius:16px;background:#0f172a;color:#e2e8f0;padding:24px;max-width:400px;width:92%;';
-                var btn = 'white-space:nowrap !important;flex-shrink:0 !important;width:auto !important;overflow:visible !important;text-overflow:clip !important;padding:9px 16px;border-radius:10px;color:#fff;font-weight:700;font-size:12px;';
-                var inp = 'width:100%;padding:9px 12px;border-radius:10px;background:#020617;border:1px solid #1e293b;color:#fff;font-size:13px;margin-top:4px;';
-                d.innerHTML = '<style>#modal-wa-qr::backdrop{background:rgba(0,0,0,.65);backdrop-filter:blur(4px)}</style>' +
-                    '<div style="font-weight:700;font-size:15px;margin-bottom:6px" id="wa-dlg-title">Criar canal de WhatsApp</div>' +
-                    '<div id="wa-step1">' +
-                    '<div style="font-size:12px;color:#94a3b8;margin-bottom:10px">O painel cria o canal no servidor e gera o QR Code. Você não precisa copiar nenhum token.</div>' +
-                    '<label style="font-size:11px;font-weight:700;color:#cbd5e1">NOME DO CANAL</label><input id="wa-in-name" type="text" maxlength="40" value="Atendimento" style="' + inp + '">' +
-                    '<label style="display:block;margin-top:10px;font-size:11px;font-weight:700;color:#cbd5e1">NÚMERO DO WHATSAPP (OPCIONAL)</label><input id="wa-in-phone" type="text" placeholder="Ex.: 11999998888" style="' + inp + '">' +
-                    '<div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap"><button type="button" id="wa-go" style="' + btn + 'background:#4f46e5">Criar canal e gerar QR Code</button><button type="button" id="wa-x1" style="' + btn + 'background:#475569">Cancelar</button></div></div>' +
-                    '<div id="wa-step2" style="display:none">' +
-                    '<div id="wa-qr-msg" style="font-size:12px;color:#94a3b8;margin-bottom:12px"></div>' +
-                    '<div id="wa-qr-box" style="background:#fff;border-radius:12px;min-height:240px;display:flex;align-items:center;justify-content:center;color:#475569;font-size:12px">Gerando QR Code…</div>' +
-                    '<div id="wa-qr-pair" style="margin-top:10px;font-size:12px;color:#94a3b8"></div>' +
-                    '<div style="margin-top:14px"><button type="button" id="wa-qr-close" style="' + btn + 'background:#475569">Fechar</button></div></div>';
-                document.body.appendChild(d);
-                d.querySelector('#wa-qr-close').onclick = function () { d.close(); };
-                d.querySelector('#wa-x1').onclick = function () { d.close(); };
-                d.querySelector('#wa-go').onclick = function () {
-                    var ph = d.querySelector('#wa-in-phone').value.replace(/\D/g, '');
-                    if (ph !== '' && ph.length < 10) { alert('Número inválido. Informe DDD + número ou deixe em branco.'); return; }
-                    if (ph !== '' && ph.length <= 11) ph = '55' + ph;
-                    waStart(ph, d.querySelector('#wa-in-name').value);
-                };
-                d.addEventListener('close', function () { if (__waTimer) { clearInterval(__waTimer); __waTimer = null; } waPollStatus(true); });
-                __waDlg = d; return d;
-            }
-            function waStart(phone, name) {
-                var d = waDialog(), box = d.querySelector('#wa-qr-box'), msg = d.querySelector('#wa-qr-msg'), pair = d.querySelector('#wa-qr-pair');
-                d.querySelector('#wa-step1').style.display = 'none'; d.querySelector('#wa-step2').style.display = '';
-                d.querySelector('#wa-dlg-title').textContent = 'Conectar WhatsApp';
-                box.textContent = 'Criando o canal e gerando o QR Code…'; pair.textContent = ''; msg.textContent = '';
-                if (__waTimer) { clearInterval(__waTimer); __waTimer = null; }
-                var body = waForm(); body.name = name || ''; if (phone) body.phone = phone;
-                waJson('uazapi_connect', body).then(function (j) {
-                    if (!j.success) { box.textContent = ''; msg.textContent = '⚠️ ' + (j.error || 'Não foi possível conectar.'); return; }
-                    msg.textContent = 'Abra o WhatsApp no celular > Aparelhos conectados > Conectar um aparelho' + (phone ? ' e informe o código abaixo.' : ' e leia o código.');
-                    if (j.webhook_private) { pair.textContent = 'Aviso: este painel está em rede interna; as respostas da pesquisa de satisfação só chegam se o endereço dele for acessível pela internet.'; }
-                    else if (!j.webhook) { pair.textContent = 'Aviso: não foi possível registrar o recebimento de respostas (' + (j.webhook_error || 'erro') + '). Use o botão "Registrar recebimento de respostas".'; }
-                    var tick = function () {
-                        waPollStatus().then(function (s) {
-                            if (s.state === 'connected') { clearInterval(__waTimer); __waTimer = null; box.innerHTML = '<div style="color:#059669;font-weight:700;padding:30px;text-align:center">✅ WhatsApp conectado<br><span style="font-weight:400;font-size:12px;color:#475569">' + (s.name || '') + '</span></div>'; pair.textContent = ''; msg.textContent = 'Pronto! As mensagens do painel já saem por este WhatsApp.'; setTimeout(function () { if (d.open) d.close(); }, 2500); return; }
-                            if (s.qr) { var im = box.querySelector('img'); if (!im) { box.textContent = ''; im = document.createElement('img'); im.alt = 'QR Code WhatsApp'; im.style.cssText = 'width:240px;height:240px'; box.appendChild(im); } im.src = s.qr; }
-                            if (s.paircode) pair.textContent = 'Código de pareamento: ' + s.paircode;
-                        });
-                    };
-                    tick(); __waTimer = setInterval(tick, 3000);
-                }).catch(function () { box.textContent = ''; msg.textContent = '⚠️ Falha de comunicação com o painel.'; });
-            }
-            function waOpenQr() {
-                var f = waForm();
-                var hasChannel = (__waState !== 'not_configured' && __waState !== 'unknown') || (f.token !== '');
-                var d = waDialog(); if (!d.open) d.showModal();
-                if (hasChannel) { waStart('', ''); return; }
-                if (f.mode === 'own' && f.url === '') { d.close(); alert('Informe o endereço do servidor e o token de administração.'); return; }
-                d.querySelector('#wa-step1').style.display = ''; d.querySelector('#wa-step2').style.display = 'none';
-                d.querySelector('#wa-dlg-title').textContent = 'Criar canal de WhatsApp';
-            }
-            function waDisconnect() {
-                var d = document.createElement('dialog');
-                d.style.cssText = 'border:1px solid #334155;border-radius:16px;background:#0f172a;color:#e2e8f0;padding:22px;max-width:380px;width:92%;';
-                d.innerHTML = '<style>dialog::backdrop{background:rgba(0,0,0,.65);backdrop-filter:blur(4px)}</style><div style="font-weight:700;margin-bottom:8px">Desconectar este WhatsApp?</div><div style="font-size:12px;color:#94a3b8;margin-bottom:14px">Os avisos e pesquisas deixam de sair até você conectar de novo (você poderá ler o QR Code com outro número).</div><div style="display:flex;gap:8px"><button type="button" id="wd-ok" style="white-space:nowrap;flex-shrink:0;padding:8px 14px;border-radius:10px;background:#be123c;color:#fff;font-weight:700;font-size:12px">Desconectar</button><button type="button" id="wd-no" style="white-space:nowrap;flex-shrink:0;padding:8px 14px;border-radius:10px;background:#475569;color:#fff;font-weight:700;font-size:12px">Cancelar</button></div>';
-                document.body.appendChild(d); d.showModal();
-                d.querySelector('#wd-no').onclick = function () { d.close(); d.remove(); };
-                d.querySelector('#wd-ok').onclick = function () {
-                    waJson('uazapi_disconnect', {}).then(function (j) { d.close(); d.remove(); if (!j.success) { alert('Não foi possível desconectar: ' + (j.error || '')); } waPollStatus(true); });
-                };
-            }
-            function waRegisterWebhook() {
-                waJson('uazapi_webhook', {}).then(function (j) { alert(j.success ? ('Recebimento de respostas registrado.' + (j.private ? ' Atenção: este painel está em rede interna; as respostas só chegam se o endereço dele for acessível pela internet.' : '')) : 'Não foi possível registrar: ' + (j.error || 'erro desconhecido')); });
-            }
-            if (document.querySelector('input[name="wa_provider"][value="uazapi"]').checked) waPollStatus(true);
-            </script>
         </div>
 
         <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
-            <div id="wa-zpro-fields" class="space-y-4 <?php echo $__prov === 'uazapi' ? 'hidden' : ''; ?>">
             <div class="border-b border-slate-800 pb-3 flex items-center gap-3">
                 <div class="p-3 bg-amber-500/10 rounded-xl border border-amber-500/20 text-amber-400">
                     <i class="fa-solid fa-key text-xl"></i>
@@ -805,7 +640,6 @@ if (empty($currentPbxToken) && !empty($currentPbxPass) && $_SERVER['REQUEST_METH
                     </button>
                 </div>
             </form>
-            </div><!-- /wa-zpro-fields -->
 
             <!-- WEBHOOK DE RESPOSTAS NPS (Prismabot -> PABX) -->
             <?php
@@ -826,6 +660,268 @@ if (empty($currentPbxToken) && !empty($currentPbxPass) && $_SERVER['REQUEST_METH
                 </div>
             </div>
 
+        </div>
+    </div>
+
+    <!-- CONTEÚDO ABA 3: WHATSAPP DIRETO (QR CODE) -->
+    <div id="tab-content-uazapi" class="space-y-4 tab-pane hidden">
+        <?php
+            $__prov  = waProvider();
+            $__admin = uazapiFileConf() ? true : false;
+            $__mode  = uazapiMode();
+            $__wh_url = panelPublicBaseUrl() . '/index.php?api_action=whatsapp_webhook&token=' . (string)getSetting('webhook_token');
+            $__btn = 'white-space:nowrap !important;flex-shrink:0 !important;width:auto !important;overflow:visible !important;text-overflow:clip !important;';
+            $__needServer = !$__admin && getSetting('uazapi_token') === '';
+        ?>
+        <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-5">
+            <div class="border-b border-slate-800 pb-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
+                <div class="flex items-center gap-3">
+                    <div class="p-3 bg-emerald-500/10 rounded-xl border border-emerald-500/20 text-emerald-400"><i class="fa-brands fa-whatsapp text-xl"></i></div>
+                    <div>
+                        <h3 class="text-base font-bold text-slate-100">WhatsApp direto (QR Code)</h3>
+                        <p class="text-xs text-slate-400">Envie avisos, pesquisas e gravações pelo seu próprio WhatsApp, sem precisar do Prismabot. É só ler um QR Code.</p>
+                    </div>
+                </div>
+                <form method="POST" action="index.php?module=configuracoes&action=api" class="flex items-center gap-2 text-xs">
+                    <input type="hidden" name="active_tab" value="uazapi">
+                    <input type="hidden" name="wa_provider" value="uazapi">
+                    <?php if ($__prov === 'uazapi'): ?>
+                        <span style="white-space:nowrap" class="px-3 py-1.5 rounded-lg bg-emerald-500/15 text-emerald-400 font-bold"><i class="fa-solid fa-circle-check mr-1"></i> Em uso para os envios</span>
+                    <?php else: ?>
+                        <span style="white-space:nowrap" class="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-400 font-bold">Não está em uso</span>
+                        <button type="submit" name="action_set_wa_provider" style="<?php echo $__btn; ?>" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl">Usar este WhatsApp nos envios</button>
+                    <?php endif; ?>
+                </form>
+            </div>
+
+            <form method="POST" action="index.php?module=configuracoes&action=api" class="space-y-5 text-xs">
+                <input type="hidden" name="active_tab" value="uazapi">
+
+                <?php if ($__needServer): ?>
+                <div id="wa-need-server" class="space-y-3 p-4 rounded-xl border border-amber-500/30 bg-amber-500/5">
+                    <div class="font-bold text-amber-300 text-sm">Antes de conectar: dados do seu servidor</div>
+                    <p class="text-slate-400">Informe o endereço e o token de administração do servidor de WhatsApp. O painel cria a conexão sozinho, você não precisa copiar mais nenhum token.</p>
+                </div>
+                <?php endif; ?>
+
+                <details id="wa-server-box" <?php echo $__needServer ? 'open' : ''; ?> class="rounded-xl border border-slate-800 bg-slate-950/60">
+                    <summary class="cursor-pointer select-none px-4 py-3 font-bold text-slate-200"><?php echo $__admin ? 'Opções avançadas (servidor próprio e recebimento de respostas)' : 'Dados do servidor'; ?></summary>
+                    <div class="px-4 pb-4 space-y-3">
+                        <?php if ($__admin): ?>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <label class="flex items-start gap-3 p-3 rounded-xl border border-slate-800 bg-slate-950 cursor-pointer">
+                                <input type="radio" name="uazapi_mode" value="prisma" <?php echo $__mode === 'prisma' ? 'checked' : ''; ?> onchange="toggleWaMode()" class="mt-1 accent-emerald-500">
+                                <span><b class="text-slate-100">Servidor da Prisma</b> <span class="text-emerald-400">(recomendado)</span><br><span class="text-slate-400">Nada a configurar: é só conectar e ler o QR Code.</span></span>
+                            </label>
+                            <label class="flex items-start gap-3 p-3 rounded-xl border border-slate-800 bg-slate-950 cursor-pointer">
+                                <input type="radio" name="uazapi_mode" value="own" <?php echo $__mode === 'own' ? 'checked' : ''; ?> onchange="toggleWaMode()" class="mt-1 accent-emerald-500">
+                                <span><b class="text-slate-100">Servidor próprio</b><br><span class="text-slate-400">Informe o endereço e o token do seu servidor.</span></span>
+                            </label>
+                        </div>
+                        <?php endif; ?>
+                        <div id="wa-own-fields" class="space-y-3 <?php echo $__mode === 'own' ? '' : 'hidden'; ?>">
+                            <div>
+                                <label class="block font-bold text-slate-300 mb-1.5 uppercase tracking-wider text-[11px]">Endereço do servidor</label>
+                                <input type="text" name="uazapi_url" value="<?php echo htmlspecialchars((string)($settings['uazapi_url'] ?? '')); ?>" placeholder="https://seu-servidor.exemplo.com" class="w-full px-3 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono focus:border-emerald-500 focus:outline-none">
+                            </div>
+                            <div>
+                                <label class="block font-bold text-slate-300 mb-1.5 uppercase tracking-wider text-[11px]">Token de administração do servidor</label>
+                                <input type="password" name="uazapi_admin_token" value="" placeholder="<?php echo !empty($settings['uazapi_admin_token']) ? '•••••••• (salvo — deixe em branco para manter)' : 'Cole o token de administração'; ?>" autocomplete="off" class="w-full px-3 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono focus:border-emerald-500 focus:outline-none">
+                                <p class="text-[11px] text-slate-500 mt-1">Com o endereço e este token, o painel cria a conexão sozinho ao clicar em "Conectar WhatsApp".</p>
+                            </div>
+                            <div>
+                                <label class="block font-bold text-slate-300 mb-1.5 uppercase tracking-wider text-[11px]">Token da conexão <span class="font-normal normal-case text-slate-500">(só se você já criou a conexão no servidor)</span></label>
+                                <input type="password" name="uazapi_token" value="" placeholder="<?php echo !empty($settings['uazapi_token']) ? '•••••••• (salvo — deixe em branco para manter)' : 'Normalmente deixe em branco'; ?>" autocomplete="off" class="w-full px-3 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono focus:border-emerald-500 focus:outline-none">
+                            </div>
+                            <div>
+                                <button type="submit" name="action_save_uazapi" style="<?php echo $__btn; ?>" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white font-bold rounded-xl"><i class="fa-solid fa-floppy-disk mr-1"></i> Salvar dados do servidor</button>
+                            </div>
+                        </div>
+                        <div class="pt-2 border-t border-slate-800 space-y-2">
+                            <div class="font-bold text-slate-300">Respostas da pesquisa de satisfação</div>
+                            <p class="text-slate-400">Ao conectar, o painel registra sozinho o recebimento das respostas. Se precisar, registre de novo ou configure à mão com o endereço <code class="text-slate-300 break-all"><?php echo htmlspecialchars($__wh_url); ?></code></p>
+                            <button type="button" onclick="waRegisterWebhook()" style="<?php echo $__btn; ?>" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white font-bold rounded-xl"><i class="fa-solid fa-inbox mr-1"></i> Registrar recebimento de respostas</button>
+                        </div>
+                    </div>
+                </details>
+
+                <!-- Estado e ação principal -->
+                <div class="rounded-2xl border border-slate-800 bg-slate-950 p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div class="flex items-center gap-3">
+                        <span id="wa-state-badge" class="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 font-bold text-sm" style="white-space:nowrap">Verificando…</span>
+                        <span id="wa-state-detail" class="text-slate-400 text-sm"></span>
+                    </div>
+                    <div class="flex flex-wrap gap-2">
+                        <button type="button" id="wa-btn-connect" onclick="waOpenQr()" style="<?php echo $__btn; ?>" class="px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-sm"><i class="fa-solid fa-qrcode mr-1"></i> Conectar WhatsApp</button>
+                        <button type="button" id="wa-btn-disc" onclick="waDisconnect()" style="<?php echo $__btn; ?>display:none;" class="px-5 py-3 bg-rose-700 hover:bg-rose-600 text-white font-bold rounded-xl text-sm"><i class="fa-solid fa-link-slash mr-1"></i> Desconectar / trocar número</button>
+                        <button type="submit" name="action_test_uazapi" style="<?php echo $__btn; ?>" class="px-5 py-3 bg-slate-700 hover:bg-slate-600 text-white font-bold rounded-xl text-sm"><i class="fa-solid fa-plug mr-1"></i> Testar conexão</button>
+                    </div>
+                </div>
+
+                <ol class="grid grid-cols-1 md:grid-cols-3 gap-3 text-slate-300">
+                    <li class="flex gap-3 p-4 rounded-xl border border-slate-800 bg-slate-950/60"><span class="w-6 h-6 shrink-0 rounded-full bg-indigo-600 text-white font-bold flex items-center justify-center">1</span><span>Clique em <b>Conectar WhatsApp</b>. Um QR Code aparece na tela.</span></li>
+                    <li class="flex gap-3 p-4 rounded-xl border border-slate-800 bg-slate-950/60"><span class="w-6 h-6 shrink-0 rounded-full bg-indigo-600 text-white font-bold flex items-center justify-center">2</span><span>No celular, abra o WhatsApp e vá em <b>Aparelhos conectados</b> › <b>Conectar um aparelho</b>.</span></li>
+                    <li class="flex gap-3 p-4 rounded-xl border border-slate-800 bg-slate-950/60"><span class="w-6 h-6 shrink-0 rounded-full bg-indigo-600 text-white font-bold flex items-center justify-center">3</span><span>Aponte a câmera para o QR Code. Quando aparecer <b>Conectado</b>, está pronto.</span></li>
+                </ol>
+            </form>
+
+            <script>
+            function toggleWaMode() {
+                var o = document.querySelector('input[name="uazapi_mode"][value="own"]');
+                document.getElementById('wa-own-fields').classList.toggle('hidden', !(o && o.checked));
+            }
+            var __waTimer = null, __waDlg = null, __waState = 'unknown', __waBusy = 0;
+            function waJson(action, body) {
+                return fetch('index.php?api_action=' + action, body === undefined ? {credentials: 'same-origin'} : {method: 'POST', credentials: 'same-origin', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)})
+                    .then(function (r) { return r.json(); });
+            }
+            function waSetBadge(state, detail) {
+                var b = document.getElementById('wa-state-badge'), d = document.getElementById('wa-state-detail'); if (!b) return;
+                var map = {connected: ['Conectado', 'bg-emerald-500/15 text-emerald-400'], connecting: ['Aguardando leitura do QR Code…', 'bg-amber-500/15 text-amber-400'], disconnected: ['Desconectado', 'bg-rose-500/15 text-rose-400'], not_configured: ['Ainda não conectado', 'bg-slate-800 text-slate-300'], error: ['Sem resposta do servidor', 'bg-rose-500/15 text-rose-400']};
+                var m = map[state] || map.error;
+                b.className = 'px-3 py-1.5 rounded-lg font-bold text-sm ' + m[1]; b.textContent = m[0]; d.textContent = detail || '';
+                __waState = state;
+                var ns = document.getElementById('wa-need-server'); if (ns && state === 'connected') ns.style.display = 'none';
+                var disc = document.getElementById('wa-btn-disc'); if (disc) disc.style.display = (state === 'connected' || state === 'connecting') ? '' : 'none';
+                var cb = document.getElementById('wa-btn-connect'); if (cb) cb.style.display = (state === 'connected') ? 'none' : '';
+                if (state === 'not_configured' && !detail) d.textContent = 'Clique em "Conectar WhatsApp" para começar.';
+            }
+            function waPollStatus() {
+                return waJson('uazapi_status').then(function (j) {
+                    var det = '';
+                    if (j.state === 'connected') det = (j.name ? j.name + ' · ' : '') + (j.phone ? '+' + j.phone : '');
+                    else if (j.error) det = j.error;
+                    waSetBadge(j.state || 'error', det);
+                    return j;
+                }).catch(function () { waSetBadge('error', 'Não foi possível consultar o servidor.'); return {}; });
+            }
+            function waForm() {
+                var g = function (n) { var e = document.querySelector('[name="' + n + '"]'); return e ? e.value.trim() : ''; };
+                var m = document.querySelector('input[name="uazapi_mode"]:checked');
+                return {mode: m ? m.value : 'own', url: g('uazapi_url'), admin_token: g('uazapi_admin_token'), token: g('uazapi_token')};
+            }
+            function waDialog() {
+                if (__waDlg) return __waDlg;
+                var d = document.createElement('dialog');
+                d.id = 'modal-wa-qr';
+                d.style.cssText = 'border:1px solid #334155;border-radius:18px;background:#0f172a;color:#e2e8f0;padding:26px;max-width:620px;width:94%;';
+                var btn = 'white-space:nowrap !important;flex-shrink:0 !important;width:auto !important;overflow:visible !important;text-overflow:clip !important;padding:10px 16px;border-radius:10px;color:#fff;font-weight:700;font-size:12px;';
+                var inp = 'width:100%;padding:10px 12px;border-radius:10px;background:#020617;border:1px solid #1e293b;color:#fff;font-size:13px;';
+                var num = 'width:22px;height:22px;flex-shrink:0;border-radius:50%;background:#4f46e5;color:#fff;font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:center;';
+                d.innerHTML = '<style>#modal-wa-qr::backdrop{background:rgba(0,0,0,.65);backdrop-filter:blur(4px)}</style>' +
+                    '<div style="font-weight:800;font-size:17px">Conectar WhatsApp</div>' +
+                    '<div id="wa-warn" style="display:none;margin-top:10px;padding:10px 12px;border-radius:10px;background:rgba(244,63,94,.12);border:1px solid rgba(244,63,94,.35);color:#fda4af;font-size:12px"></div>' +
+                    '<div style="display:flex;flex-wrap:wrap;gap:22px;margin-top:16px;align-items:flex-start">' +
+                      '<div style="flex:0 0 250px;max-width:100%">' +
+                        '<div id="wa-qr-box" style="background:#fff;border-radius:14px;width:250px;height:250px;max-width:100%;display:flex;align-items:center;justify-content:center;text-align:center;color:#475569;font-size:12px;padding:8px">Gerando o QR Code…</div>' +
+                        '<div id="wa-live" style="margin-top:10px;font-size:12px;color:#94a3b8;display:flex;align-items:center;gap:8px"><span style="width:8px;height:8px;border-radius:50%;background:#f59e0b;display:inline-block"></span><span id="wa-live-txt">Aguardando…</span></div>' +
+                      '</div>' +
+                      '<div style="flex:1 1 220px;min-width:210px">' +
+                        '<div style="font-weight:700;font-size:13px;margin-bottom:10px;color:#cbd5e1">Faça assim no celular:</div>' +
+                        '<div style="display:flex;gap:10px;margin-bottom:10px;font-size:13px"><span style="' + num + '">1</span><span>Abra o <b>WhatsApp</b>.</span></div>' +
+                        '<div style="display:flex;gap:10px;margin-bottom:10px;font-size:13px"><span style="' + num + '">2</span><span>Toque em <b>Mais opções (⋮)</b> no Android ou em <b>Configurações</b> no iPhone, depois em <b>Aparelhos conectados</b>.</span></div>' +
+                        '<div style="display:flex;gap:10px;margin-bottom:10px;font-size:13px"><span style="' + num + '">3</span><span>Toque em <b>Conectar um aparelho</b> e aponte a câmera para o QR Code ao lado.</span></div>' +
+                        '<div style="font-size:11px;color:#64748b">O QR Code é renovado sozinho. Se a leitura falhar, gere um novo.</div>' +
+                      '</div>' +
+                    '</div>' +
+                    '<div id="wa-pair-panel" style="display:none;margin-top:16px;padding:14px;border-radius:12px;border:1px solid #1e293b;background:#020617">' +
+                      '<div style="font-weight:700;font-size:13px;margin-bottom:6px">Sem câmera? Conecte com um código</div>' +
+                      '<div style="font-size:12px;color:#94a3b8;margin-bottom:8px">Informe o número do WhatsApp que será conectado (DDD + número). No celular, em <b>Conectar um aparelho</b>, escolha <b>Conectar com número de telefone</b> e digite o código que aparecer aqui.</div>' +
+                      '<div style="display:flex;gap:8px;flex-wrap:wrap"><input id="wa-in-phone" type="text" placeholder="Ex.: 11999998888" style="' + inp + 'flex:1 1 180px;width:auto"><button type="button" id="wa-pair-go" style="' + btn + 'background:#4f46e5">Gerar código</button></div>' +
+                      '<div id="wa-pair-code" style="margin-top:10px;font-size:22px;font-weight:800;letter-spacing:3px;color:#a5b4fc"></div>' +
+                    '</div>' +
+                    '<div id="wa-note" style="margin-top:12px;font-size:12px;color:#94a3b8"></div>' +
+                    '<div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap">' +
+                      '<button type="button" id="wa-regen" style="' + btn + 'background:#4f46e5">Gerar novo QR Code</button>' +
+                      '<button type="button" id="wa-pair-toggle" style="' + btn + 'background:#334155">Conectar por código</button>' +
+                      '<button type="button" id="wa-qr-close" style="' + btn + 'background:#475569">Fechar</button>' +
+                    '</div>';
+                document.body.appendChild(d);
+                d.querySelector('#wa-qr-close').onclick = function () { d.close(); };
+                d.querySelector('#wa-regen').onclick = function () { d.querySelector('#wa-pair-code').textContent = ''; waStart(''); };
+                d.querySelector('#wa-pair-toggle').onclick = function () { var p = d.querySelector('#wa-pair-panel'); p.style.display = (p.style.display === 'none') ? '' : 'none'; };
+                d.querySelector('#wa-pair-go').onclick = function () {
+                    var ph = d.querySelector('#wa-in-phone').value.replace(/\D/g, '');
+                    if (ph.length < 10) { d.querySelector('#wa-note').textContent = 'Número inválido. Informe DDD + número.'; return; }
+                    if (ph.length <= 11) ph = '55' + ph;
+                    waStart(ph);
+                };
+                d.addEventListener('close', function () { if (__waTimer) { clearInterval(__waTimer); __waTimer = null; } waPollStatus(); });
+                __waDlg = d; return d;
+            }
+            function waLive(color, txt) {
+                var d = waDialog(); d.querySelector('#wa-live span').style.background = color; d.querySelector('#wa-live-txt').textContent = txt;
+            }
+            function waStart(phone) {
+                var d = waDialog(), box = d.querySelector('#wa-qr-box'), note = d.querySelector('#wa-note'), warn = d.querySelector('#wa-warn');
+                warn.style.display = 'none'; note.textContent = '';
+                box.innerHTML = 'Criando o canal e gerando o QR Code…'; waLive('#f59e0b', 'Preparando…');
+                if (__waTimer) { clearInterval(__waTimer); __waTimer = null; }
+                var token = ++__waBusy;
+                var body = waForm(); body.name = 'Atendimento'; if (phone) body.phone = phone;
+                waJson('uazapi_connect', body).then(function (j) {
+                    if (token !== __waBusy) return;
+                    if (!j.success) { box.innerHTML = '—'; waLive('#f43f5e', 'Não conectou'); warn.textContent = '⚠️ ' + (j.error || 'Não foi possível conectar.'); warn.style.display = ''; return; }
+                    if (j.webhook_private) { note.textContent = 'Aviso: este painel está em rede interna; as respostas da pesquisa de satisfação só chegam se o endereço dele for acessível pela internet.'; }
+                    else if (!j.webhook) { note.textContent = 'Aviso: não foi possível registrar o recebimento de respostas (' + (j.webhook_error || 'erro') + '). Depois use "Registrar recebimento de respostas" nas opções avançadas.'; }
+                    var tick = function () {
+                        waPollStatus().then(function (s) {
+                            if (token !== __waBusy) return;
+                            if (s.state === 'connected') {
+                                clearInterval(__waTimer); __waTimer = null;
+                                box.innerHTML = '<div style="color:#059669;font-weight:800;font-size:16px">✅ WhatsApp conectado<div style="font-weight:400;font-size:12px;color:#475569;margin-top:6px">' + (s.name || '') + '</div></div>';
+                                waLive('#10b981', 'Conectado! As mensagens do painel já saem por este WhatsApp.');
+                                setTimeout(function () { if (d.open) d.close(); }, 2500); return;
+                            }
+                            if (s.qr) { var im = box.querySelector('img'); if (!im) { box.innerHTML = ''; im = document.createElement('img'); im.alt = 'QR Code do WhatsApp'; im.style.cssText = 'width:100%;height:100%;object-fit:contain'; box.appendChild(im); } im.src = s.qr; waLive('#f59e0b', 'Aguardando você ler o QR Code…'); }
+                            if (s.paircode) { d.querySelector('#wa-pair-panel').style.display = ''; d.querySelector('#wa-pair-code').textContent = s.paircode; waLive('#f59e0b', 'Aguardando você digitar o código no celular…'); }
+                        });
+                    };
+                    tick(); __waTimer = setInterval(tick, 3000);
+                }).catch(function () { if (token !== __waBusy) return; box.innerHTML = '—'; waLive('#f43f5e', 'Falha de comunicação'); warn.textContent = '⚠️ Falha de comunicação com o painel.'; warn.style.display = ''; });
+            }
+            function waOpenQr() {
+                var f = waForm(), d = waDialog();
+                var needs = (__waState === 'not_configured' || __waState === 'unknown') && f.token === '' && f.mode === 'own' && f.url === '';
+                if (needs) {
+                    var box = document.getElementById('wa-server-box'); if (box) { box.open = true; var u = document.querySelector('[name="uazapi_url"]'); if (u) u.focus(); }
+                    alert('Antes de conectar, informe o endereço do servidor e o token de administração em "Dados do servidor".');
+                    return;
+                }
+                if (!d.open) d.showModal();
+                d.querySelector('#wa-pair-panel').style.display = 'none'; d.querySelector('#wa-pair-code').textContent = '';
+                waStart('');
+            }
+            function waDisconnect() {
+                var d = document.createElement('dialog');
+                d.style.cssText = 'border:1px solid #334155;border-radius:16px;background:#0f172a;color:#e2e8f0;padding:22px;max-width:380px;width:92%;';
+                d.innerHTML = '<style>dialog::backdrop{background:rgba(0,0,0,.65);backdrop-filter:blur(4px)}</style><div style="font-weight:700;margin-bottom:8px">Desconectar este WhatsApp?</div><div style="font-size:12px;color:#94a3b8;margin-bottom:14px">Os avisos e pesquisas deixam de sair até você conectar de novo (você poderá ler o QR Code com outro número).</div><div style="display:flex;gap:8px"><button type="button" id="wd-ok" style="white-space:nowrap;flex-shrink:0;padding:8px 14px;border-radius:10px;background:#be123c;color:#fff;font-weight:700;font-size:12px">Desconectar</button><button type="button" id="wd-no" style="white-space:nowrap;flex-shrink:0;padding:8px 14px;border-radius:10px;background:#475569;color:#fff;font-weight:700;font-size:12px">Cancelar</button></div>';
+                document.body.appendChild(d); d.showModal();
+                d.querySelector('#wd-no').onclick = function () { d.close(); d.remove(); };
+                d.querySelector('#wd-ok').onclick = function () {
+                    waJson('uazapi_disconnect', {}).then(function (j) { d.close(); d.remove(); if (!j.success) { alert('Não foi possível desconectar: ' + (j.error || '')); } waPollStatus(); });
+                };
+            }
+            function waRegisterWebhook() {
+                waJson('uazapi_webhook', {}).then(function (j) { alert(j.success ? ('Recebimento de respostas registrado.' + (j.private ? ' Atenção: este painel está em rede interna; as respostas só chegam se o endereço dele for acessível pela internet.' : '')) : 'Não foi possível registrar: ' + (j.error || 'erro desconhecido')); });
+            }
+            </script>
+        </div>
+    </div>
+
+    <!-- CONTEÚDO ABA 4: AVISOS E TESTE DE ENVIO (valem para o servidor em uso) -->
+    <div id="tab-content-avisos" class="space-y-4 tab-pane hidden">
+        <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+            <div class="border-b border-slate-800 pb-3 flex flex-col md:flex-row md:items-center justify-between gap-3">
+                <div class="flex items-center gap-3">
+                    <div class="p-3 bg-indigo-500/10 rounded-xl border border-indigo-500/20 text-indigo-400"><i class="fa-solid fa-bell text-xl"></i></div>
+                    <div>
+                        <h3 class="text-base font-bold text-slate-100">Avisos e teste de envio</h3>
+                        <p class="text-xs text-slate-400">Valem para qualquer servidor de envio: chamadas perdidas, tronco fora do ar, links de gravação e teste de disparo.</p>
+                    </div>
+                </div>
+                <span style="white-space:nowrap" class="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-200 text-xs font-bold">Enviando por: <?php echo waProvider() === 'uazapi' ? 'WhatsApp direto (QR Code)' : 'API Prismabot'; ?></span>
+            </div>
             <!-- URL PÚBLICA DO PAINEL (links assinados de gravação) -->
             <div class="pt-4 border-t border-slate-800/80">
                 <form method="POST" action="" class="bg-slate-950/80 p-4 rounded-2xl border border-cyan-500/30 space-y-2">
@@ -866,7 +962,7 @@ if (empty($currentPbxToken) && !empty($currentPbxPass) && $_SERVER['REQUEST_METH
                         <i class="fa-solid fa-triangle-exclamation text-rose-400 text-base"></i>
                         <strong class="text-white text-xs">Alerta de tronco fora do ar (WhatsApp)</strong>
                     </div>
-                    <p class="text-[11px] text-slate-400">Avisa uma única vez quando uma linha ficar desconectada por mais de 1 minuto e avisa de novo quando ela voltar. Use o servidor de envio WhatsApp configurado acima.</p>
+                    <p class="text-[11px] text-slate-400">Avisa uma única vez quando uma linha ficar desconectada por mais de 1 minuto e avisa de novo quando ela voltar. Usa o servidor de envio que estiver em uso (indicado no topo desta aba).</p>
                     <label class="flex items-center gap-2 text-xs text-slate-300"><input type="checkbox" name="trunk_alert_enabled" value="1" <?php echo getSetting('trunk_alert_enabled') === '1' ? 'checked' : ''; ?>> Ativar alerta de tronco</label>
                     <input type="text" name="trunk_alert_numbers" value="<?php echo htmlspecialchars((string)getSetting('trunk_alert_numbers')); ?>" placeholder="Números que recebem o alerta (DDD + telefone), separados por vírgula" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white font-mono">
                     <div class="flex items-center gap-2 justify-end">
@@ -996,7 +1092,7 @@ function switchApiTab(tabName) {
     const btnClassInactive = "px-4 py-2.5 rounded-xl transition flex items-center gap-2 text-slate-400 hover:text-white hover:bg-slate-800/50";
     const btnClassActive   = "px-4 py-2.5 rounded-xl transition flex items-center gap-2 bg-brand-600 text-white font-extrabold shadow-lg shadow-brand-600/30 border border-brand-500/40";
 
-    ['pbxapi', 'prismabot', 'mysql', 'reset'].forEach(function(t) {
+    ['pbxapi', 'prismabot', 'uazapi', 'avisos', 'mysql', 'reset'].forEach(function(t) {
         var btn = document.getElementById('btn-tab-' + t);
         if (btn) {
             btn.className = (t === tabName) ? btnClassActive : btnClassInactive;
@@ -1008,6 +1104,7 @@ function switchApiTab(tabName) {
     if (targetPane) {
         targetPane.classList.remove('hidden');
     }
+    if (tabName === 'uazapi' && typeof waPollStatus === 'function') waPollStatus();
 }
 
 // Inicializar aba ativa
