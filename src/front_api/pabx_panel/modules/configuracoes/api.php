@@ -705,7 +705,7 @@ if (empty($currentPbxToken) && !empty($currentPbxPass) && $_SERVER['REQUEST_METH
                 <?php endif; ?>
 
                 <details id="wa-server-box" <?php echo $__needServer ? 'open' : ''; ?> class="rounded-xl border border-slate-800 bg-slate-950/60">
-                    <summary class="cursor-pointer select-none px-4 py-3 font-bold text-slate-200"><?php echo $__admin ? 'Opções avançadas (servidor próprio e recebimento de respostas)' : 'Dados do servidor'; ?></summary>
+                    <summary class="cursor-pointer select-none px-4 py-3 font-bold text-slate-200"><?php echo $__admin ? 'Opções avançadas (servidor próprio)' : 'Dados do servidor'; ?></summary>
                     <div class="px-4 pb-4 space-y-3">
                         <?php if ($__admin): ?>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -732,11 +732,6 @@ if (empty($currentPbxToken) && !empty($currentPbxPass) && $_SERVER['REQUEST_METH
                             <div>
                                 <button type="submit" name="action_save_uazapi" style="<?php echo $__btn; ?>" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white font-bold rounded-xl"><i class="fa-solid fa-floppy-disk mr-1"></i> Salvar dados do servidor</button>
                             </div>
-                        </div>
-                        <div class="pt-2 border-t border-slate-800 space-y-2">
-                            <div class="font-bold text-slate-300">Respostas da pesquisa de satisfação</div>
-                            <p class="text-slate-400">É assim que o painel recebe a nota (1 a 5) que o cliente responde na pesquisa de satisfação. O registro é feito sozinho ao conectar; use o botão abaixo só se as notas pararem de chegar (por exemplo, se o endereço do painel mudou). Endereço: <code class="text-slate-300 break-all"><?php echo htmlspecialchars($__wh_url); ?></code></p>
-                            <button type="button" onclick="waRegisterWebhook()" style="<?php echo $__btn; ?>" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white font-bold rounded-xl"><i class="fa-solid fa-inbox mr-1"></i> Registrar recebimento de respostas</button>
                         </div>
                     </div>
                 </details>
@@ -869,8 +864,6 @@ if (empty($currentPbxToken) && !empty($currentPbxPass) && $_SERVER['REQUEST_METH
                 waJson('uazapi_connect', body).then(function (j) {
                     if (token !== __waBusy) return;
                     if (!j.success) { box.innerHTML = '—'; waLive('#f43f5e', 'Não conectou'); warn.textContent = '⚠️ ' + (j.error || 'Não foi possível conectar.'); warn.style.display = ''; return; }
-                    if (j.webhook_private) { note.textContent = 'Aviso: este painel está em rede interna; as respostas da pesquisa de satisfação só chegam se o endereço dele for acessível pela internet.'; }
-                    else if (!j.webhook) { note.textContent = 'Aviso: não foi possível registrar o recebimento de respostas (' + (j.webhook_error || 'erro') + '). Depois use "Registrar recebimento de respostas" nas opções avançadas.'; }
                     var tick = function () {
                         waPollStatus().then(function (s) {
                             if (token !== __waBusy) return;
@@ -908,9 +901,6 @@ if (empty($currentPbxToken) && !empty($currentPbxPass) && $_SERVER['REQUEST_METH
                 d.querySelector('#wd-ok').onclick = function () {
                     waJson('uazapi_disconnect', {}).then(function (j) { d.close(); d.remove(); if (!j.success) { alert('Não foi possível desconectar: ' + (j.error || '')); } waPollStatus(); });
                 };
-            }
-            function waRegisterWebhook() {
-                waJson('uazapi_webhook', {}).then(function (j) { alert(j.success ? ('Recebimento de respostas registrado.' + (j.private ? ' Atenção: este painel está em rede interna; as respostas só chegam se o endereço dele for acessível pela internet.' : '')) : 'Não foi possível registrar: ' + (j.error || 'erro desconhecido')); });
             }
             </script>
         </div>

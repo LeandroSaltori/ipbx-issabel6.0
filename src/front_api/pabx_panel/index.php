@@ -184,9 +184,8 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
             if ($r['error'] !== '') { echo json_encode(['success' => false, 'error' => $r['error']], JSON_UNESCAPED_UNICODE); exit; }
             if ($r['http'] === 401 || $r['http'] === 403) { echo json_encode(['success' => false, 'error' => 'Token da conexão recusado. Confira o token.']); exit; }
             if ($r['http'] < 200 || $r['http'] >= 300) { echo json_encode(['success' => false, 'error' => 'O servidor respondeu HTTP ' . $r['http'] . '. Confira o endereço.']); exit; }
-            $wh = uazapiConfigureWebhook();
             logUserAction("Conectar WhatsApp direto", $ph !== '' ? 'código de pareamento' : 'QR Code', "CONFIG");
-            echo json_encode(['success' => true, 'created' => !$had, 'webhook' => $wh['ok'], 'webhook_error' => $wh['error'], 'webhook_private' => !empty($wh['private'])], JSON_UNESCAPED_UNICODE);
+            echo json_encode(['success' => true, 'created' => !$had], JSON_UNESCAPED_UNICODE);
             exit;
         }
         if ($action === 'uazapi_disconnect') {
