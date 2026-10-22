@@ -969,7 +969,9 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
         if (ob_get_level()) ob_end_clean();
         header('Content-Type: application/json; charset=utf-8');
         $ext = preg_replace('/[^0-9A-Za-z_\-]/', '', (string)($_GET['ext'] ?? ''));
-        $out = ['success' => true, 'has_data' => false, 'dias' => 30, 'n' => 0, 'media' => null, 'pos' => 0, 'neu' => 0, 'neg' => 0, 'sim' => 0, 'nao_res' => 0, 'recent' => ['pos' => [], 'neu' => [], 'neg' => []]];
+        $dv = function ($k, $def) { $v = (string)($_GET[$k] ?? ''); return preg_match('/^\d{4}-\d{2}-\d{2}$/', $v) ? $v : $def; };
+        $p_ini = $dv('start', date('Y-m-d', strtotime('-30 days'))); $p_fim = $dv('end', date('Y-m-d'));
+        $out = ['success' => true, 'has_data' => false, 'ini' => $p_ini, 'fim' => $p_fim, 'n' => 0, 'media' => null, 'pos' => 0, 'neu' => 0, 'neg' => 0, 'sim' => 0, 'nao_res' => 0, 'recent' => ['pos' => [], 'neu' => [], 'neg' => []]];
         $pq = null;
         $c = function_exists('getAsteriskPdoConnection') ? getAsteriskPdoConnection('asteriskcdrdb') : null;
         if ($c) { try { if ($c->query("SELECT 1 FROM pesquisa LIMIT 1") !== false) $pq = $c; } catch (Throwable $e) {} }
@@ -977,8 +979,8 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
         if ($pq && $ext !== '') {
             $map = ['EXCELENTE' => 5, 'OTIMO' => 5, 'ÓTIMO' => 5, '5' => 5, 'MUITO BOM' => 4, '4' => 4, 'BOM' => 3, 'MEDIO' => 3, 'MÉDIO' => 3, 'REGULAR' => 3, '3' => 3, 'RUIM' => 2, '2' => 2, 'PESSIMO' => 1, 'PÉSSIMO' => 1, '1' => 1];
             try {
-                $st = $pq->prepare("SELECT data, hora, telefone, avaliacao, solucao FROM pesquisa WHERE operador = ? AND data >= ? ORDER BY data DESC, hora DESC");
-                $st->execute([$ext, date('Y-m-d', strtotime('-30 days'))]);
+                $st = $pq->prepare("SELECT data, hora, telefone, avaliacao, solucao FROM pesquisa WHERE operador = ? AND data >= ? AND data <= ? ORDER BY data DESC, hora DESC");
+                $st->execute([$ext, $p_ini, $p_fim]);
                 $sum = 0;
                 foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
                     $n = $map[mb_strtoupper(trim((string)$r['avaliacao']))] ?? 0;
@@ -1660,7 +1662,7 @@ if ($__wp_u && userHasWebphone($__wp_u)
                     <!-- Tom de Voz & Cordialidade -->
                     <div class="bg-slate-950/80 border border-purple-500/30 rounded-2xl p-4 flex flex-col justify-between space-y-2">
                         <div class="flex items-center justify-between text-slate-400">
-                            <span class="font-bold text-[10px] uppercase tracking-wider text-purple-400">Avaliações (30 dias)</span>
+                            <span class="font-bold text-[10px] uppercase tracking-wider text-purple-400">Avaliações no período</span>
                             <i class="fa-solid fa-face-smile text-purple-400"></i>
                         </div>
                         <div class="flex items-baseline gap-2">
@@ -1864,20 +1866,26 @@ if ($__wp_u && userHasWebphone($__wp_u)
             const atend = parseInt(atendidas) || 0, tot = parseInt(total) || 0;
             $('ia-modal-op-name').innerText = name || ('Ramal ' + ext);
             $('ia-modal-ramal-badge').innerText = 'Ramal ' + ext;
-            ['score', 'fcr', 'empathy', 'sent-pos', 'sent-neu', 'sent-neg'].forEach(k => { $('ia-modal-' + k).innerText = '--'; const b = $('ia-modal-' + k + '-bar'); if (b) b.style.width = '0%'; });
-            $('ia-modal-score-sub').innerText = '--'; $('ia-modal-fcr-sub').innerText = '--';
+            ['score', 'fcr', 'empathy', 'sent-pos', 'sent-neu', 'sent-neg'].forEach(k => { $('ia-modal-' + k).innerText = '...'; const b = $('ia-modal-' + k + '-bar'); if (b) b.style.width = '0%'; });
+            $('ia-modal-score-sub').innerText = ''; $('ia-modal-fcr-sub').innerText = '';
             $('ia-modal-summary').innerText = 'Carregando dados reais da pesquisa...';
-            $('ia-modal-insights').innerHTML = '<li class="text-slate-500">--</li>';
+            $('ia-modal-insights').innerHTML = '<li class="text-slate-500">Carregando...</li>';
             window.__opSurvey = null;
             openModal('modal-operator-ia');
             let d = null;
-            try { d = await (await fetch('index.php?api_action=operator_survey_stats&ext=' + encodeURIComponent(ext))).json(); } catch (e) {}
+            const per = window.__dashPeriod || {};
+            const br = (x) => x ? x.split('-').reverse().join('/') : '';
+            let qs = ''; if (per.start && per.end) qs = '&start=' + per.start + '&end=' + per.end;
+            const perTxt = (per.start && per.end) ? (per.start === per.end ? br(per.start) : br(per.start) + ' a ' + br(per.end)) : 'últimos 30 dias';
+            try { d = await (await fetch('index.php?api_action=operator_survey_stats&ext=' + encodeURIComponent(ext) + qs)).json(); } catch (e) {}
             window.__opSurvey = d;
             const taxaAt = tot > 0 ? Math.round(atend / tot * 100) : null;
             const tmaTxt = tma ? ` TMA ${tma}.` : '';
             if (!d || !d.has_data) {
-                $('ia-modal-summary').innerText = `Ramal ${ext} (${name}): ainda não há avaliações da pesquisa de satisfação nos últimos 30 dias.` + (tot > 0 ? ` No período do dashboard: ${atend} atendidas de ${tot} chamadas.${tmaTxt}` : '');
-                $('ia-modal-insights').innerHTML = '<li class="text-slate-400">Sem notas para analisar. A pesquisa é feita por ligação, ao final do atendimento.</li>';
+                $('ia-modal-summary').innerText = `Ramal ${ext} (${name}): nenhum cliente avaliou no período selecionado (${perTxt}).` + (tot > 0 ? ` No mesmo período: ${atend} atendidas de ${tot} chamadas.${tmaTxt}` : '');
+                ['score', 'fcr', 'empathy', 'sent-pos', 'sent-neu', 'sent-neg'].forEach(k => { $('ia-modal-' + k).innerText = 'Sem avaliação'; });
+                $('ia-modal-score-sub').innerText = 'no período'; $('ia-modal-fcr-sub').innerText = 'no período';
+                $('ia-modal-insights').innerHTML = '<li class="text-slate-400">Sem avaliação no período. A pesquisa é feita por ligação, ao final do atendimento.</li>';
                 return;
             }
             const pct = (v) => Math.round(v / d.n * 100);
@@ -1886,12 +1894,13 @@ if ($__wp_u && userHasWebphone($__wp_u)
             $('ia-modal-score-sub').innerText = pct(d.pos) + '% positivas';
             $('ia-modal-score-bar').style.width = (d.media / 5 * 100) + '%';
             $('ia-modal-fcr').innerText = res ? Math.round(d.sim / res * 100) + '%' : '--';
-            $('ia-modal-fcr-sub').innerText = res ? d.sim + ' de ' + res + ' respostas' : 'sem respostas';
+            $('ia-modal-fcr-sub').innerText = res ? d.sim + ' de ' + res + ' respostas' : 'sem resposta';
+            if (!res) $('ia-modal-fcr').innerText = 'Sem avaliação';
             $('ia-modal-fcr-bar').style.width = (res ? d.sim / res * 100 : 0) + '%';
             $('ia-modal-empathy').innerText = d.n;
             $('ia-modal-empathy-bar').style.width = '100%';
             [['pos', d.pos], ['neu', d.neu], ['neg', d.neg]].forEach(([k, v]) => { $('ia-modal-sent-' + k).innerText = pct(v) + '% (' + v + ')'; $('ia-modal-sent-' + k + '-bar').style.width = pct(v) + '%'; });
-            $('ia-modal-summary').innerText = `Ramal ${ext} (${name}), últimos 30 dias: ${d.n} avaliações, média ${d.media.toFixed(1).replace('.', ',')} de 5; ${pct(d.pos)}% positivas, ${pct(d.neu)}% neutras e ${pct(d.neg)}% negativas.` + (res ? ` Problema resolvido em ${Math.round(d.sim / res * 100)}% das respostas.` : '');
+            $('ia-modal-summary').innerText = `Ramal ${ext} (${name}), período ${perTxt}: ${d.n} avaliações, média ${d.media.toFixed(1).replace('.', ',')} de 5; ${pct(d.pos)}% positivas, ${pct(d.neu)}% neutras e ${pct(d.neg)}% negativas.` + (res ? ` Problema resolvido em ${Math.round(d.sim / res * 100)}% das respostas.` : '');
             const li = [];
             if (d.neg > 0) li.push(`<i class="fa-solid fa-triangle-exclamation text-rose-400"></i> ${d.neg} nota(s) 1 ou 2: vale ouvir essas gravações em Pesquisa de Satisfação.`);
             if (d.nao_res > 0) li.push(`<i class="fa-solid fa-circle-xmark text-amber-400"></i> ${d.nao_res} cliente(s) disseram que o problema não foi resolvido.`);
@@ -1922,7 +1931,7 @@ if ($__wp_u && userHasWebphone($__wp_u)
                     <span class="text-slate-300">${notaTxt[r.nota] || ''} (${r.nota})</span>
                     <span class="text-slate-400 font-mono">${r.data} ${r.hora || ''}</span>
                 </div>`).join('') + `<a href="index.php?module=relatorios&action=pesquisa" class="block text-center text-brand-400 font-bold hover:underline text-xs pt-2">Ver relatório completo e ouvir gravações</a>`
-                : '<div class="p-3 text-slate-400 text-xs">Nenhuma chamada nesta categoria nos últimos 30 dias.</div>';
+                : '<div class="p-3 text-slate-400 text-xs">Nenhuma chamada nesta categoria no período selecionado.</div>';
 
             if (container) container.innerHTML = html;
             openModal('modal-sentiment-details');

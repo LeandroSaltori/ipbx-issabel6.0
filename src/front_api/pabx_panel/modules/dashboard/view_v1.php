@@ -1504,3 +1504,4 @@ function filterKpiModalTable() {
     });
 }
 </script>
+<script>window.__dashPeriod = {start: '<?php echo date('Y-m-d', strtotime($start_date)); ?>', end: '<?php echo date('Y-m-d', strtotime($end_date)); ?>'};</script>
