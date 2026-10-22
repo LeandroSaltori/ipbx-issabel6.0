@@ -730,16 +730,12 @@ if (empty($currentPbxToken) && !empty($currentPbxPass) && $_SERVER['REQUEST_METH
                                 <p class="text-[11px] text-slate-500 mt-1">Com o endereço e este token, o painel cria a conexão sozinho ao clicar em "Conectar WhatsApp".</p>
                             </div>
                             <div>
-                                <label class="block font-bold text-slate-300 mb-1.5 uppercase tracking-wider text-[11px]">Token da conexão <span class="font-normal normal-case text-slate-500">(só se você já criou a conexão no servidor)</span></label>
-                                <input type="password" name="uazapi_token" value="" placeholder="<?php echo !empty($settings['uazapi_token']) ? '•••••••• (salvo — deixe em branco para manter)' : 'Normalmente deixe em branco'; ?>" autocomplete="off" class="w-full px-3 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono focus:border-emerald-500 focus:outline-none">
-                            </div>
-                            <div>
                                 <button type="submit" name="action_save_uazapi" style="<?php echo $__btn; ?>" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white font-bold rounded-xl"><i class="fa-solid fa-floppy-disk mr-1"></i> Salvar dados do servidor</button>
                             </div>
                         </div>
                         <div class="pt-2 border-t border-slate-800 space-y-2">
                             <div class="font-bold text-slate-300">Respostas da pesquisa de satisfação</div>
-                            <p class="text-slate-400">Ao conectar, o painel registra sozinho o recebimento das respostas. Se precisar, registre de novo ou configure à mão com o endereço <code class="text-slate-300 break-all"><?php echo htmlspecialchars($__wh_url); ?></code></p>
+                            <p class="text-slate-400">É assim que o painel recebe a nota (1 a 5) que o cliente responde na pesquisa de satisfação. O registro é feito sozinho ao conectar; use o botão abaixo só se as notas pararem de chegar (por exemplo, se o endereço do painel mudou). Endereço: <code class="text-slate-300 break-all"><?php echo htmlspecialchars($__wh_url); ?></code></p>
                             <button type="button" onclick="waRegisterWebhook()" style="<?php echo $__btn; ?>" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white font-bold rounded-xl"><i class="fa-solid fa-inbox mr-1"></i> Registrar recebimento de respostas</button>
                         </div>
                     </div>
@@ -754,7 +750,7 @@ if (empty($currentPbxToken) && !empty($currentPbxPass) && $_SERVER['REQUEST_METH
                     <div class="flex flex-wrap gap-2">
                         <button type="button" id="wa-btn-connect" onclick="waOpenQr()" style="<?php echo $__btn; ?>" class="px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-sm"><i class="fa-solid fa-qrcode mr-1"></i> Conectar WhatsApp</button>
                         <button type="button" id="wa-btn-disc" onclick="waDisconnect()" style="<?php echo $__btn; ?>display:none;" class="px-5 py-3 bg-rose-700 hover:bg-rose-600 text-white font-bold rounded-xl text-sm"><i class="fa-solid fa-link-slash mr-1"></i> Desconectar / trocar número</button>
-                        <button type="submit" name="action_test_uazapi" style="<?php echo $__btn; ?>" class="px-5 py-3 bg-slate-700 hover:bg-slate-600 text-white font-bold rounded-xl text-sm"><i class="fa-solid fa-plug mr-1"></i> Testar conexão</button>
+                        <button type="button" onclick="waTest(this)" style="<?php echo $__btn; ?>" class="px-5 py-3 bg-slate-700 hover:bg-slate-600 text-white font-bold rounded-xl text-sm"><i class="fa-solid fa-plug mr-1"></i> Testar conexão</button>
                     </div>
                 </div>
 
@@ -794,6 +790,17 @@ if (empty($currentPbxToken) && !empty($currentPbxPass) && $_SERVER['REQUEST_METH
                     waSetBadge(j.state || 'error', det);
                     return j;
                 }).catch(function () { waSetBadge('error', 'Não foi possível consultar o servidor.'); return {}; });
+            }
+            function waTest(btn) {
+                var d = document.getElementById('wa-state-detail'); if (d) d.textContent = 'Testando…';
+                waJson('uazapi_status').then(function (j) {
+                    waPollStatus().then(function () {
+                        var d2 = document.getElementById('wa-state-detail');
+                        if (j.state === 'connected') d2.textContent = '✅ Teste ok: WhatsApp conectado e respondendo.';
+                        else if (j.state === 'error') d2.textContent = '⚠️ O servidor não respondeu. Confira o endereço e o token.';
+                        else d2.textContent = '⚠️ Servidor ok, mas o WhatsApp não está conectado. Clique em "Conectar WhatsApp".';
+                    });
+                });
             }
             function waForm() {
                 var g = function (n) { var e = document.querySelector('[name="' + n + '"]'); return e ? e.value.trim() : ''; };
