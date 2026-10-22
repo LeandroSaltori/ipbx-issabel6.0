@@ -1,82 +1,61 @@
 <?php
 /**
- * IPbx Prisma - Cron Job / Runner para envio de Relatórios Agendados (E-mail / WhatsApp)
- * Pode ser chamado no crontab do Linux ou via tarefas agendadas do sistema.
- * Exemplo de Crontab: 0 * * * * php /var/www/html/pabx_panel/cron/send_scheduled_reports.php
+ * IPbx Prisma - Cron: Relatórios Agendados (E-mail e/ou WhatsApp)
+ * Executar a cada minuto (instalado em /etc/cron.d/ipbx-front-api pelo instalar-front-api.sh):
+ *   * * * * * asterisk php /var/www/html/front_api/pabx_panel/cron/send_scheduled_reports.php
+ * Cada agendamento dispara UMA vez por dia, a partir do horário escolhido (diário; semanal = segunda; mensal = dia 1º).
  */
+if (PHP_SAPI !== 'cli') { http_response_code(404); exit; }
 
 require_once __DIR__ . '/../includes/functions.php';
+cronHeartbeat('send_scheduled_reports');
 
 $jsonSmtpFile     = __DIR__ . '/../config/smtp_settings.json';
 $jsonScheduleFile = __DIR__ . '/../config/scheduled_reports.json';
 $jsonLogsFile     = __DIR__ . '/../config/smtp_logs.json';
 
-if (!file_exists($jsonScheduleFile)) {
-    exit("Nenhum agendamento encontrado.\n");
-}
+if (!file_exists($jsonScheduleFile)) exit("Nenhum agendamento encontrado.\n");
+$schedules = json_decode((string)file_get_contents($jsonScheduleFile), true);
+if (empty($schedules) || !is_array($schedules)) exit("Nenhum agendamento ativo.\n");
 
-$schedules = json_decode(file_get_contents($jsonScheduleFile), true);
-if (empty($schedules) || !is_array($schedules)) {
-    exit("Nenhum agendamento ativo.\n");
-}
+$smtpConfig = file_exists($jsonSmtpFile) ? (json_decode((string)file_get_contents($jsonSmtpFile), true) ?: []) : [];
+$dispatchLogs = file_exists($jsonLogsFile) ? (json_decode((string)file_get_contents($jsonLogsFile), true) ?: []) : [];
 
-$smtpConfig = [];
-if (file_exists($jsonSmtpFile)) {
-    $rawSmtp = file_get_contents($jsonSmtpFile);
-    if ($rawSmtp) {
-        $smtpConfig = json_decode($rawSmtp, true) ?: [];
-    }
-}
-
-$dispatchLogs = [];
-if (file_exists($jsonLogsFile)) {
-    $rawLogs = file_get_contents($jsonLogsFile);
-    if ($rawLogs) {
-        $dispatchLogs = json_decode($rawLogs, true) ?: [];
-    }
-}
-
-$currentTime = date('H:i');
-$currentDay  = date('Y-m-d');
-$currentWDay = date('N'); // 1 = Segunda, 7 = Domingo
-$currentMDay = date('j'); // 1 a 31
-
-echo "[IPbx Prisma Cron] Iniciando verificação de disparos agendados em {$currentDay} {$currentTime}...\n";
+$now = date('H:i'); $today = date('Y-m-d'); $wday = (int)date('N'); $mday = (int)date('j');
+$changed = false;
 
 foreach ($schedules as &$s) {
     if (isset($s['status']) && $s['status'] !== 'active') continue;
-
-    $shouldSend = false;
     $freq = strtolower($s['frequency'] ?? 'diario');
+    $dayOk = $freq === 'diario' || ($freq === 'semanal' && $wday === 1) || ($freq === 'mensal' && $mday === 1);
+    if (!$dayOk) continue;
+    $at = preg_match('/^\d{2}:\d{2}$/', (string)($s['send_time'] ?? '')) ? $s['send_time'] : '08:00';
+    if ($now < $at) continue;                                              // ainda não chegou a hora
+    if (substr((string)($s['last_sent'] ?? ''), 0, 10) === $today) continue; // já enviado hoje
 
-    if ($freq === 'diario') {
-        $shouldSend = true;
-    } elseif ($freq === 'semanal' && $currentWDay == 1) { // Toda Segunda-feira
-        $shouldSend = true;
-    } elseif ($freq === 'mensal' && $currentMDay == 1) { // Todo dia 1º
-        $shouldSend = true;
+    $s['last_sent'] = date('Y-m-d H:i:s'); $changed = true;
+    $channel = $s['channel'] ?? 'email';
+    echo " -> Executando '{$s['title']}' ({$channel})...\n";
+    $payload = buildScheduledReportPayload($s['title'], $s['report_type']);
+
+    if (in_array($channel, ['email', 'ambos'], true) && !empty($s['email_to']) && !empty($smtpConfig)) {
+        $res = sendSmtpEmailNative($smtpConfig, $s['email_to'], "📊 [Agendado] " . $s['title'], $payload['body_html'], $payload['attachments']);
+        echo "    E-mail: " . ($res['success'] ? 'OK' : 'FALHOU ' . $res['error']) . "\n";
+        if (function_exists('addDispatchLogRecord')) addDispatchLogRecord($smtpConfig['from_email'] ?: ($smtpConfig['user'] ?? ''), $s['email_to'], $s['title'], 'E-MAIL', $res['success'] ? 'Sucesso' : 'Falha', $jsonLogsFile, $dispatchLogs);
     }
-
-    if ($shouldSend) {
-        echo " -> Executando disparo do agendamento '{$s['title']}'...\n";
-        $s['last_sent'] = date('Y-m-d H:i:s');
-
-        // Disparar via E-mail se houver destinatário e configuração SMTP
-        if (!empty($s['email_to']) && !empty($smtpConfig)) {
-            $subject = "📊 [Agendado] " . $s['title'];
-            $payload = buildScheduledReportPayload($s['title'], $s['report_type']);
-            
-            $sendRes = sendSmtpEmailNative($smtpConfig, $s['email_to'], $subject, $payload['body_html'], $payload['attachments']);
-            
-            $statusStr = $sendRes['success'] ? 'Sucesso' : 'Falha';
-            echo "    -> E-mail " . ($sendRes['success'] ? "entregue com SUCESSO e anexo CSV para {$s['email_to']}" : "FALHOU: {$sendRes['error']}") . "\n";
-            
-            if (function_exists('addDispatchLogRecord')) {
-                addDispatchLogRecord($smtpConfig['from_email'] ?: $smtpConfig['user'], $s['email_to'], $s['title'], 'E-MAIL', $statusStr, $jsonLogsFile, $dispatchLogs);
-            }
+    if (in_array($channel, ['whatsapp', 'ambos'], true) && !empty($s['whatsapp_to'])) {
+        $sm = aiChatExecTool('period_summary', ['days' => 1]);
+        $fmt = function ($v) { return sprintf('%d:%02d', intdiv((int)$v, 60), (int)$v % 60); };
+        $txt = "📊 *{$s['title']}*\n" . (isset($sm['error']) ? '' :
+              "Hoje (chamadas externas): {$sm['total']} | Atendidas: {$sm['atendidas']} | Não atendidas: {$sm['nao_atendidas']}\nTMA: " . $fmt($sm['tma_seg']) . " | TME: " . $fmt($sm['tme_seg']));
+        $r = sendWhatsAppAPI($s['whatsapp_to'], $txt, 'REL_AGENDADO', 'GERAL', 'RELATORIO_AGENDADO');
+        echo "    WhatsApp: " . (!empty($r['success']) ? 'OK' : 'FALHOU') . "\n";
+        if (!empty($r['success']) && !empty($payload['attachments'][0]['content'])) {
+            $a = $payload['attachments'][0];
+            sendWhatsAppFile($s['whatsapp_to'], $a['name'], $a['content'], $a['type'] ?? 'text/csv', $s['title'], 'REL_AGENDADO', 'GERAL', 'RELATORIO_AGENDADO_ARQUIVO');
         }
     }
 }
-
-file_put_contents($jsonScheduleFile, json_encode($schedules, JSON_PRETTY_PRINT));
-echo "[IPbx Prisma Cron] Verificação concluída com sucesso.\n";
+unset($s);
+if ($changed) { file_put_contents($jsonScheduleFile, json_encode($schedules, JSON_PRETTY_PRINT)); panelRevBump('schedules'); panelRevBump('wa_sends'); }
+echo "[IPbx Prisma Cron] Verificação concluída.\n";

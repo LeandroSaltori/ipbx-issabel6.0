@@ -5943,11 +5943,23 @@ function aiChatToolDefs() {
             'notify_busy'     => ['type' => 'boolean', 'description' => 'Avisar o cliente quando o ramal está ocupado'],
             'send_ai_summary' => ['type' => 'boolean', 'description' => 'Enviar resumo por IA ao atendente'],
         ], ['extension']),
-        $fn('send_report', 'Envia por WhatsApp o resumo do período (chamadas, atendidas, TMA, TME) para um número. SÓ chame depois de o usuário confirmar explicitamente o número de destino.', [
-            'phone' => ['type' => 'string', 'description' => 'Número com DDD (ex.: 11999998888)'],
-            'days'  => ['type' => 'integer', 'description' => 'Últimos N dias (1 = hoje). Padrão 1'],
-            'note'  => ['type' => 'string', 'description' => 'Texto opcional a acrescentar ao relatório'],
+        $fn('propose_whatsapp_send', 'Propõe enviar uma mensagem de WhatsApp (agora ou agendada) para um contato CADASTRADO. Com report_days>0 o texto é o resumo real do período (chamadas, atendidas, TMA, TME). NÃO envia: o usuário confirma pelo cartão. Aparece em Disparos e no Histórico de envios.', [
+            'phone'       => ['type' => 'string', 'description' => 'Número com DDD (ex.: 11999998888)'],
+            'message'     => ['type' => 'string', 'description' => 'Texto da mensagem (ou observação extra quando report_days for usado)'],
+            'send_at'     => ['type' => 'string', 'description' => 'Opcional: quando enviar, AAAA-MM-DD HH:MM (fuso do servidor). Vazio = agora'],
+            'report_days' => ['type' => 'integer', 'description' => 'Opcional: envia o resumo dos últimos N dias (1 = hoje)'],
         ], ['phone']),
+        $fn('propose_report_schedule', 'Propõe agendar um relatório recorrente (mesma tela Relatórios Agendados). NÃO agenda: o usuário confirma pelo cartão. report_type: Relatório Completo de Filas, Resumo de Filas PABX, Relatórios Gráficos, Relatório Geral & Heatmap ou IA Analytics.', [
+            'report_type' => ['type' => 'string'],
+            'frequency'   => ['type' => 'string', 'enum' => ['diario', 'semanal', 'mensal'], 'description' => 'semanal = toda segunda; mensal = todo dia 1º'],
+            'send_time'   => ['type' => 'string', 'description' => 'HH:MM'],
+            'channel'     => ['type' => 'string', 'enum' => ['email', 'whatsapp', 'ambos']],
+            'email_to'    => ['type' => 'string'],
+            'whatsapp_to' => ['type' => 'string', 'description' => 'Contato cadastrado, DDD + número'],
+            'title'       => ['type' => 'string', 'description' => 'Opcional'],
+        ], ['report_type', 'frequency', 'send_time', 'channel']),
+        $fn('list_scheduled', 'Lista os WhatsApps e relatórios agendados (com os IDs para cancelar).', []),
+        $fn('propose_cancel_schedule', 'Propõe cancelar um agendamento pelo id retornado em list_scheduled. NÃO cancela: o usuário confirma pelo cartão.', ['id' => ['type' => 'string']], ['id']),
     ];
 }
 
@@ -6025,27 +6037,10 @@ function aiChatExecTool($name, $a) {
         if ($name === 'propose_extension_edit') {
             return aiProposeExtensionEdit($a);
         }
-        if ($name === 'send_report') {
-            if (!hasUserPermission('send_whatsapp')) return ['error' => 'Este usuário não tem permissão para enviar WhatsApp.'];
-            $ph = preg_replace('/\D/', '', (string)($a['phone'] ?? ''));
-            if (strlen($ph) < 10 || strlen($ph) > 13) return ['error' => 'Número inválido. Informe DDD + número.'];
-            if (strlen($ph) <= 11) $ph = '55' . $ph;
-            $hk = 'ai_report_hour_' . date('YmdH');
-            $cnt = (int)getSetting($hk);
-            if ($cnt >= 10) return ['error' => 'Limite de 10 envios por hora atingido.'];
-            $sm = aiChatExecTool('period_summary', ['days' => $a['days'] ?? 1]);
-            if (isset($sm['error'])) return $sm;
-            $fmt = function ($s) { return sprintf('%d:%02d', intdiv((int)$s, 60), (int)$s % 60); };
-            $msg = "📊 *Relatório PABX* (" . ($sm['periodo_dias'] == 1 ? 'hoje' : 'últimos ' . $sm['periodo_dias'] . ' dias') . ")\n"
-                 . "Chamadas: {$sm['total']}\nAtendidas: {$sm['atendidas']}\nNão atendidas: {$sm['nao_atendidas']}\n"
-                 . "TMA: " . $fmt($sm['tma_seg']) . " | TME: " . $fmt($sm['tme_seg']);
-            $note = trim((string)($a['note'] ?? ''));
-            if ($note !== '') $msg .= "\n\n" . mb_substr($note, 0, 500);
-            $ok = sendWhatsAppAPI($ph, $msg, 'AI_CHAT', 'GERAL', 'RELATORIO_CHAT');
-            if (!$ok) return ['error' => 'Falha ao enviar pelo WhatsApp. Verifique a integração em Status da Integração.'];
-            saveSetting($hk, (string)($cnt + 1));
-            return ['enviado' => true, 'para' => $ph];
-        }
+        if ($name === 'propose_whatsapp_send') return aiProposeWaSend($a);
+        if ($name === 'propose_report_schedule') return aiProposeReportSchedule($a);
+        if ($name === 'list_scheduled') return aiListScheduled();
+        if ($name === 'propose_cancel_schedule') return aiProposeCancelSchedule($a);
         if ($name === 'recording_link') {
             if (!hasUserPermission('listen_recordings')) return ['error' => 'Este usuário não tem permissão para gravações.'];
             $uid = trim((string)($a['uniqueid'] ?? ''));
@@ -6260,10 +6255,225 @@ function applyExtensionEdit($ext, $ch) {
     return ['success' => true];
 }
 
+// =========================================================================
+// AÇÕES DO CHAT (envio e agendamento) — usam as MESMAS tabelas/telas do painel e refletem em tempo real
+// =========================================================================
+/** Marca que uma área do painel mudou; as telas abertas se atualizam sozinhas (ver api_action=panel_rev). */
+function panelRevBump($area) {
+    try { saveSetting('panel_rev_' . preg_replace('/[^a-z_]/', '', (string)$area), (string)round(microtime(true) * 1000)); } catch (Throwable $e) {}
+}
+function panelRevAll() {
+    $o = [];
+    foreach (['schedules', 'wa_sends', 'extensions'] as $a) $o[$a] = (string)getSetting('panel_rev_' . $a);
+    return $o;
+}
+function waSchedEnsure() {
+    global $db;
+    $db->exec("CREATE TABLE IF NOT EXISTS wa_scheduled (id INTEGER PRIMARY KEY AUTOINCREMENT, phone TEXT NOT NULL, contact_name TEXT DEFAULT '', message TEXT NOT NULL, send_at DATETIME NOT NULL, status TEXT DEFAULT 'pending', source TEXT DEFAULT 'Painel', created_by TEXT DEFAULT '', created_at DATETIME DEFAULT CURRENT_TIMESTAMP, sent_at DATETIME, error TEXT DEFAULT '')");
+}
+/** Normaliza celular BR (DDD + número, com ou sem 55). '' se inválido. */
+function aiNormPhone($p) {
+    $p = preg_replace('/\D/', '', (string)$p);
+    if (strlen($p) >= 10 && strlen($p) <= 11) $p = '55' . $p;
+    return (strlen($p) >= 12 && strlen($p) <= 13) ? $p : '';
+}
+/** Nome do contato cadastrado (Agenda & Contatos ou celular de um ramal) para este número; '' se não cadastrado. */
+function aiRegisteredContact($phone) {
+    global $db;
+    $tail = substr(preg_replace('/\D/', '', (string)$phone), -9);
+    if (strlen($tail) < 8) return '';
+    try {
+        $st = $db->query("SELECT name, phone FROM crm_contacts");
+        if ($st) foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $c) if (substr(preg_replace('/\D/', '', (string)$c['phone']), -9) === $tail) return (string)$c['name'];
+    } catch (Throwable $e) {}
+    try {
+        $st = $db->query("SELECT agent_name, whatsapp_number FROM extensions_config WHERE whatsapp_number <> ''");
+        if ($st) foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $c) if (substr(preg_replace('/\D/', '', (string)$c['whatsapp_number']), -9) === $tail) return (string)($c['agent_name'] ?: 'Atendente');
+    } catch (Throwable $e) {}
+    return '';
+}
+function aiDailyCapLeft() {
+    $cap = (int)(getSetting('ai_wa_daily_cap') ?: 50);
+    return max(0, $cap - (int)getSetting('ai_wa_day_' . date('Ymd')));
+}
+function aiDailyCapUse() { $k = 'ai_wa_day_' . date('Ymd'); saveSetting($k, (string)((int)getSetting($k) + 1)); }
+
+function aiNewProposal($field, $value, $resumo) {
+    global $db;
+    aiHistoryEnsure();
+    $id = bin2hex(random_bytes(8));
+    $db->prepare("INSERT INTO ai_pending_actions (id, username, ext, field, value, resumo, status, created_at) VALUES (?,?,?,?,?,?,'pending',?)")
+       ->execute([$id, aiChatUser(), '', $field, json_encode($value, JSON_UNESCAPED_UNICODE), $resumo, time()]);
+    $GLOBALS['__ai_proposals'][] = ['id' => $id, 'resumo' => $resumo];
+    return ['proposta_criada' => true, 'resumo' => $resumo, 'instrucao' => 'NADA foi feito ainda. Diga ao usuário para clicar em Confirmar no cartão exibido abaixo da sua resposta.'];
+}
+function aiParseWhen($s) {
+    $s = trim((string)$s);
+    if ($s === '') return '';
+    $t = strtotime(str_replace('T', ' ', $s));
+    return $t ? date('Y-m-d H:i:00', $t) : false;
+}
+
+/** Propõe envio de WhatsApp (agora ou agendado). Só para contatos cadastrados. NÃO envia. */
+function aiProposeWaSend($a) {
+    if (!hasUserPermission('send_whatsapp')) return ['error' => 'Este usuário não tem permissão para enviar WhatsApp.'];
+    $ph = aiNormPhone($a['phone'] ?? '');
+    if ($ph === '') return ['error' => 'Número inválido. Informe DDD + número.'];
+    $nm = aiRegisteredContact($ph);
+    if ($nm === '') return ['error' => 'Este número não está cadastrado. Por segurança, só envio para contatos cadastrados em Agenda & Contatos (ou celular de ramal). Cadastre o contato e peça de novo.'];
+    $days = (int)($a['report_days'] ?? 0);
+    $msg = trim((string)($a['message'] ?? ''));
+    if ($days > 0) {
+        $sm = aiChatExecTool('period_summary', ['days' => $days]);
+        if (isset($sm['error'])) return $sm;
+        $fmt = function ($s) { return sprintf('%d:%02d', intdiv((int)$s, 60), (int)$s % 60); };
+        $head = "📊 *Relatório PABX* (" . ($sm['periodo_dias'] == 1 ? 'hoje' : 'últimos ' . $sm['periodo_dias'] . ' dias') . ", chamadas externas)\n"
+              . "Chamadas: {$sm['total']}\nAtendidas: {$sm['atendidas']}\nNão atendidas: {$sm['nao_atendidas']}\nTMA: " . $fmt($sm['tma_seg']) . " | TME: " . $fmt($sm['tme_seg']);
+        $msg = $head . ($msg !== '' ? "\n\n" . mb_substr($msg, 0, 500) : '');
+        $isReport = true;
+    } else {
+        if ($msg === '') return ['error' => 'Informe o texto da mensagem (ou report_days para enviar o relatório).'];
+        $isReport = false;
+    }
+    if (mb_strlen($msg) > 1000) return ['error' => 'Mensagem longa demais (máx. 1000 caracteres).'];
+    $when = aiParseWhen($a['send_at'] ?? '');
+    if ($when === false) return ['error' => 'Data/hora inválida. Use AAAA-MM-DD HH:MM.'];
+    if ($when !== '' && strtotime($when) < time() - 60) return ['error' => 'A data/hora informada já passou.'];
+    if ($when !== '' && strtotime($when) > time() + 90 * 86400) return ['error' => 'Só agendo até 90 dias à frente.'];
+    if (aiDailyCapLeft() < 1) return ['error' => 'Limite diário de envios pelo Chat IA atingido. Tente amanhã ou envie pela tela Disparos.'];
+    $resumo = ($isReport ? 'Enviar relatório' : 'Enviar WhatsApp') . " para $nm ($ph)" . ($when !== '' ? ' em ' . date('d/m/Y H:i', strtotime($when)) : ' agora') . ': "' . mb_substr($msg, 0, 120) . (mb_strlen($msg) > 120 ? '…' : '') . '"';
+    return aiNewProposal('wa_send', ['phone' => $ph, 'name' => $nm, 'message' => $msg, 'send_at' => $when, 'report' => $isReport], $resumo);
+}
+
+$GLOBALS['AI_REPORT_TYPES'] = ['Relatório Completo de Filas', 'Resumo de Filas PABX', 'Relatórios Gráficos', 'Relatório Geral & Heatmap', 'IA Analytics'];
+/** Propõe agendamento recorrente de relatório (mesma tela Relatórios Agendados). */
+function aiProposeReportSchedule($a) {
+    if (!hasUserPermission('schedule_reports')) return ['error' => 'Este usuário não tem permissão para agendar relatórios.'];
+    $type = trim((string)($a['report_type'] ?? ''));
+    $found = '';
+    foreach ($GLOBALS['AI_REPORT_TYPES'] as $t) if (mb_strtolower($t) === mb_strtolower($type) || ($type !== '' && mb_stripos($t, $type) !== false)) { $found = $t; break; }
+    if ($found === '') return ['error' => 'Relatório inválido. Opções: ' . implode('; ', $GLOBALS['AI_REPORT_TYPES']) . '.'];
+    $freq = strtolower((string)($a['frequency'] ?? 'diario'));
+    if (!in_array($freq, ['diario', 'semanal', 'mensal'], true)) return ['error' => 'Frequência inválida: use diario, semanal (segunda-feira) ou mensal (dia 1).'];
+    $time = (string)($a['send_time'] ?? '08:00');
+    if (!preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $time)) return ['error' => 'Horário inválido. Use HH:MM.'];
+    $ch = strtolower((string)($a['channel'] ?? 'whatsapp'));
+    if (!in_array($ch, ['email', 'whatsapp', 'ambos'], true)) return ['error' => 'Canal inválido: email, whatsapp ou ambos.'];
+    $email = trim((string)($a['email_to'] ?? '')); $wa = '';
+    if (in_array($ch, ['email', 'ambos'], true) && !filter_var($email, FILTER_VALIDATE_EMAIL)) return ['error' => 'Informe um e-mail válido para o canal escolhido.'];
+    $nm = '';
+    if (in_array($ch, ['whatsapp', 'ambos'], true)) {
+        $wa = aiNormPhone($a['whatsapp_to'] ?? '');
+        if ($wa === '') return ['error' => 'Informe o WhatsApp de destino (DDD + número).'];
+        $nm = aiRegisteredContact($wa);
+        if ($nm === '') return ['error' => 'Este WhatsApp não está cadastrado em Agenda & Contatos (ou como celular de ramal). Cadastre e peça de novo.'];
+    }
+    if ($ch === 'whatsapp') $email = '';
+    if ($ch === 'email') $wa = '';
+    $title = trim((string)($a['title'] ?? '')) ?: $found;
+    $fl = ['diario' => 'todos os dias', 'semanal' => 'toda segunda-feira', 'mensal' => 'todo dia 1º'][$freq];
+    $dest = trim(($email !== '' ? $email : '') . ($email !== '' && $wa !== '' ? ' e ' : '') . ($wa !== '' ? "$nm ($wa)" : ''));
+    return aiNewProposal('report_schedule', ['title' => mb_substr($title, 0, 80), 'report_type' => $found, 'frequency' => $freq, 'send_time' => $time, 'channel' => $ch, 'email_to' => $email, 'whatsapp_to' => $wa],
+        "Agendar \"$found\" $fl às $time por " . ['email' => 'e-mail', 'whatsapp' => 'WhatsApp', 'ambos' => 'e-mail e WhatsApp'][$ch] . " para $dest");
+}
+
+/** Lista o que está agendado (WhatsApp e relatórios) com os IDs para cancelar. */
+function aiListScheduled() {
+    global $db;
+    waSchedEnsure();
+    $out = ['whatsapp_agendados' => [], 'relatorios_agendados' => []];
+    foreach ($db->query("SELECT id, phone, contact_name, message, send_at, status, source FROM wa_scheduled WHERE status = 'pending' ORDER BY send_at LIMIT 30")->fetchAll(PDO::FETCH_ASSOC) as $r)
+        $out['whatsapp_agendados'][] = ['id' => 'wa' . $r['id'], 'para' => trim($r['contact_name'] . ' ' . $r['phone']), 'quando' => $r['send_at'], 'texto' => mb_substr($r['message'], 0, 80)];
+    $f = __DIR__ . '/../config/scheduled_reports.json';
+    $sch = is_file($f) ? (json_decode((string)file_get_contents($f), true) ?: []) : [];
+    foreach ($sch as $s) if (($s['status'] ?? 'active') === 'active')
+        $out['relatorios_agendados'][] = ['id' => $s['id'], 'titulo' => $s['title'], 'frequencia' => $s['frequency'], 'horario' => $s['send_time'], 'canal' => $s['channel']];
+    return $out;
+}
+function aiProposeCancelSchedule($a) {
+    if (!hasUserPermission('send_whatsapp') && !hasUserPermission('schedule_reports')) return ['error' => 'Sem permissão.'];
+    $id = trim((string)($a['id'] ?? ''));
+    $l = aiListScheduled();
+    foreach ($l['whatsapp_agendados'] as $w) if ($w['id'] === $id) { if (!hasUserPermission('send_whatsapp')) return ['error' => 'Sem permissão para WhatsApp.']; return aiNewProposal('cancel_schedule', ['id' => $id], 'Cancelar o envio agendado de WhatsApp para ' . $w['para'] . ' (' . date('d/m/Y H:i', strtotime($w['quando'])) . ')'); }
+    foreach ($l['relatorios_agendados'] as $r) if ($r['id'] === $id) { if (!hasUserPermission('schedule_reports')) return ['error' => 'Sem permissão para relatórios agendados.']; return aiNewProposal('cancel_schedule', ['id' => $id], 'Cancelar o relatório agendado "' . $r['titulo'] . '" (' . $r['frequencia'] . ' às ' . $r['horario'] . ')'); }
+    return ['error' => 'Agendamento não encontrado. Use list_scheduled para ver os IDs.'];
+}
+
+/** Executa a ação confirmada. Devolve ['success'=>bool,'error'=>..]. */
+function aiApplyAction($field, $v) {
+    global $db;
+    if ($field === 'wa_send') {
+        if (!hasUserPermission('send_whatsapp')) return ['success' => false, 'error' => 'Sem permissão para enviar WhatsApp.'];
+        if (aiDailyCapLeft() < 1) return ['success' => false, 'error' => 'Limite diário de envios pelo Chat IA atingido.'];
+        if (aiRegisteredContact($v['phone']) === '') return ['success' => false, 'error' => 'Contato não está mais cadastrado.'];
+        if (!empty($v['send_at'])) {
+            waSchedEnsure();
+            $db->prepare("INSERT INTO wa_scheduled (phone, contact_name, message, send_at, source, created_by) VALUES (?,?,?,?,?,?)")->execute([$v['phone'], $v['name'], $v['message'], $v['send_at'], 'Chat IA', aiChatUser()]);
+            aiDailyCapUse(); panelRevBump('wa_sends');
+            return ['success' => true];
+        }
+        $r = sendWhatsAppAPI($v['phone'], $v['message'], 'AI_CHAT', 'GERAL', !empty($v['report']) ? 'RELATORIO_CHAT' : 'ENVIO_CHAT');
+        $ok = is_array($r) ? !empty($r['success']) : (bool)$r;
+        if (!$ok) return ['success' => false, 'error' => 'Falha ao enviar pelo WhatsApp: ' . (is_array($r) ? ($r['error'] ?? 'verifique a integração') : 'verifique a integração')];
+        aiDailyCapUse(); panelRevBump('wa_sends');
+        return ['success' => true];
+    }
+    if ($field === 'report_schedule') {
+        if (!hasUserPermission('schedule_reports')) return ['success' => false, 'error' => 'Sem permissão para agendar relatórios.'];
+        $f = __DIR__ . '/../config/scheduled_reports.json';
+        $sch = is_file($f) ? (json_decode((string)file_get_contents($f), true) ?: []) : [];
+        $sch[] = ['id' => uniqid('sch_'), 'title' => $v['title'], 'report_type' => $v['report_type'], 'frequency' => $v['frequency'], 'send_time' => $v['send_time'], 'channel' => $v['channel'],
+                  'email_to' => $v['email_to'], 'whatsapp_to' => $v['whatsapp_to'], 'status' => 'active', 'created_at' => date('Y-m-d H:i:s'), 'last_sent' => '-', 'source' => 'Chat IA', 'created_by' => aiChatUser()];
+        if (@file_put_contents($f, json_encode($sch, JSON_PRETTY_PRINT)) === false) return ['success' => false, 'error' => 'Não foi possível gravar o agendamento (permissão da pasta config).'];
+        panelRevBump('schedules');
+        return ['success' => true];
+    }
+    if ($field === 'cancel_schedule') {
+        $id = (string)$v['id'];
+        if (strpos($id, 'wa') === 0 && ctype_digit(substr($id, 2))) {
+            if (!hasUserPermission('send_whatsapp')) return ['success' => false, 'error' => 'Sem permissão.'];
+            waSchedEnsure();
+            $n = $db->prepare("UPDATE wa_scheduled SET status = 'cancelled' WHERE id = ? AND status = 'pending'"); $n->execute([(int)substr($id, 2)]);
+            panelRevBump('wa_sends');
+            return $n->rowCount() ? ['success' => true] : ['success' => false, 'error' => 'Esse envio já foi feito ou cancelado.'];
+        }
+        if (!hasUserPermission('schedule_reports')) return ['success' => false, 'error' => 'Sem permissão.'];
+        $f = __DIR__ . '/../config/scheduled_reports.json';
+        $sch = is_file($f) ? (json_decode((string)file_get_contents($f), true) ?: []) : [];
+        $new = array_values(array_filter($sch, function ($s) use ($id) { return ($s['id'] ?? '') !== $id; }));
+        if (count($new) === count($sch)) return ['success' => false, 'error' => 'Agendamento não encontrado.'];
+        @file_put_contents($f, json_encode($new, JSON_PRETTY_PRINT)); panelRevBump('schedules');
+        return ['success' => true];
+    }
+    return ['success' => false, 'error' => 'Ação desconhecida.'];
+}
+
+/** Envia os WhatsApps agendados que já venceram (cron a cada minuto). Atrasos de até 24h ainda enviam; depois disso viram "expirado". */
+function processWaScheduled() {
+    global $db;
+    waSchedEnsure();
+    $out = ['sent' => 0, 'failed' => 0];
+    $rows = $db->query("SELECT * FROM wa_scheduled WHERE status = 'pending' AND send_at <= datetime('now','localtime') ORDER BY send_at LIMIT 20")->fetchAll(PDO::FETCH_ASSOC);
+    foreach ($rows as $r) {
+        $claim = $db->prepare("UPDATE wa_scheduled SET status = 'sending' WHERE id = ? AND status = 'pending'"); $claim->execute([$r['id']]);
+        if (!$claim->rowCount()) continue;
+        if (strtotime($r['send_at']) < time() - 86400) {
+            $db->prepare("UPDATE wa_scheduled SET status = 'failed', error = ? WHERE id = ?")->execute(['Expirado: passou mais de 24h do horário agendado.', $r['id']]);
+            $out['failed']++; continue;
+        }
+        $res = sendWhatsAppAPI($r['phone'], $r['message'], 'AGENDADO', 'GERAL', 'ENVIO_AGENDADO');
+        $ok = is_array($res) ? !empty($res['success']) : (bool)$res;
+        $db->prepare("UPDATE wa_scheduled SET status = ?, sent_at = datetime('now','localtime'), error = ? WHERE id = ?")
+           ->execute([$ok ? 'sent' : 'failed', $ok ? '' : (is_array($res) ? (string)($res['error'] ?? 'Falha no envio') : 'Falha no envio'), $r['id']]);
+        $ok ? $out['sent']++ : $out['failed']++;
+    }
+    if ($out['sent'] || $out['failed']) panelRevBump('wa_sends');
+    return $out;
+}
+
 /** Confirma ou cancela uma proposta do próprio usuário (válida por 10 min). */
 function aiProposalResolve($id, $accept) {
     global $db;
-    if (!hasUserPermission('manage_settings')) return ['success' => false, 'error' => 'Sem permissão.'];
     aiHistoryEnsure();
     $st = $db->prepare("SELECT * FROM ai_pending_actions WHERE id = ? AND username = ? AND status = 'pending'");
     $st->execute([(string)$id, aiChatUser()]);
@@ -6277,10 +6487,16 @@ function aiProposalResolve($id, $accept) {
         $db->prepare("UPDATE ai_pending_actions SET status = 'cancelled' WHERE id = ?")->execute([$p['id']]);
         return ['success' => true, 'message' => 'Cancelado. Nada foi alterado.'];
     }
-    if ($p['field'] === 'edit') {
+    if (in_array($p['field'], ['wa_send', 'report_schedule', 'cancel_schedule'], true)) {
+        $r = aiApplyAction($p['field'], (array)json_decode((string)$p['value'], true));
+    } elseif (!hasUserPermission('manage_settings')) {
+        $r = ['success' => false, 'error' => 'Sem permissão para alterar ramais.'];
+    } elseif ($p['field'] === 'edit') {
         $r = applyExtensionEdit($p['ext'], (array)json_decode((string)$p['value'], true));
+        if (!empty($r['success'])) panelRevBump('extensions');
     } else
     $r = setExtensionFeature($p['ext'], $p['field'], $p['field'] === 'dnd' ? (bool)$p['value'] : $p['value']);
+    if (!empty($r['success']) && in_array($p['field'], ['dnd', 'cf', 'cfb', 'cfu'], true)) panelRevBump('extensions');
     $db->prepare("UPDATE ai_pending_actions SET status = ? WHERE id = ?")->execute([!empty($r['success']) ? 'done' : 'failed', $p['id']]);
     if (function_exists('logUserAction')) logUserAction('Chat IA: ' . $p['resumo'], !empty($r['success']) ? 'confirmado' : ('falhou: ' . ($r['error'] ?? '')), 'CONFIG');
     return !empty($r['success']) ? ['success' => true, 'message' => '✅ ' . $p['resumo'] . ' — feito.'] : ['success' => false, 'error' => $r['error'] ?? 'Falha ao aplicar.'];
@@ -6292,7 +6508,7 @@ function aiChatRun($history) {
     if ($cfg['key'] === '' || !$cfg['enabled']) return ['ok' => false, 'error' => 'IA não configurada. Configure em Configurações > Inteligência Artificial.'];
     $sys = "Você é o assistente do IPbx Prisma, a central telefônica da Prisma Telecom. Hoje é " . date('d/m/Y H:i') . ". "
          . "Responda em português, curto e objetivo. Para QUALQUER pergunta sobre chamadas, ramais, filas, números ou gravações, consulte SEMPRE uma ferramenta antes de responder; nunca responda de memória nem estime. Use SOMENTE dados retornados pelas ferramentas; nunca invente números, ramais ou ligações. Quando falar de quantidade de chamadas, deixe claro se são externas (clientes), internas (ramal a ramal) ou todas: por padrão fale das externas, como o Dashboard, e cite as internas à parte. Se nenhuma ferramenta responder, diga que não encontrou o dado. "
-         . "Se faltar informação (ex.: qual ramal), pergunte. Você só consulta; as únicas ações são: send_report (resumo por WhatsApp, só após o usuário confirmar o número), propose_extension_feature (Não Perturbe e desvios) e propose_extension_edit (nome do atendente, celular e avisos por WhatsApp do ramal; você NÃO altera senha de ramal). Ambas apenas PROPÕEM: o usuário confirma por um botão e você nunca diz que foi feito antes disso. Para tabelas use markdown. Para gravações use recording_link e entregue o link em markdown [Ouvir gravação](url). "
+         . "Se faltar informação (ex.: qual ramal), pergunte. Você consulta e PROPÕE ações; as ações são: propose_whatsapp_send (WhatsApp agora ou agendado, só para contatos cadastrados; com report_days envia o relatório real), propose_report_schedule (relatório recorrente), list_scheduled e propose_cancel_schedule, propose_extension_feature (Não Perturbe e desvios) e propose_extension_edit (nome do atendente, celular e avisos por WhatsApp do ramal; você NÃO altera senha de ramal). Ambas apenas PROPÕEM: o usuário confirma por um botão e você nunca diz que foi feito antes disso. Para tabelas use markdown. Para gravações use recording_link e entregue o link em markdown [Ouvir gravação](url). "
          . "Nunca cite nomes de softwares de terceiros da central telefônica nem do serviço de WhatsApp: o produto se chama IPbx Prisma e o serviço de WhatsApp se chama Prismabot. Se precisar falar da tecnologia, diga apenas \"o sistema\" ou \"a central\". "
          . "NUNCA invente links ou endereços: use somente links devolvidos pelas ferramentas (ex.: recording_link). Se a ferramenta devolver erro, explique o erro ao usuário. "
          . "Se o usuário pedir algo fora do escopo do PABX, explique educadamente o que você pode fazer.";
@@ -6497,7 +6713,7 @@ function integrationStatusChecks() {
     } catch (Exception $e) { $add('Telefonia', 'Troncos', 'warn', 'Não foi possível consultar.'); }
 
     // --- Crons
-    foreach (['send_missed_calls' => 'Aviso de chamada perdida', 'send_queue_abandon' => 'Aviso de abandono de fila', 'send_call_summaries' => 'Resumo/gravação ao atendente', 'check_trunks' => 'Alerta de tronco'] as $k => $lbl) {
+    foreach (['send_missed_calls' => 'Aviso de chamada perdida', 'send_queue_abandon' => 'Aviso de abandono de fila', 'send_call_summaries' => 'Resumo/gravação ao atendente', 'check_trunks' => 'Alerta de tronco', 'send_wa_scheduled' => 'WhatsApps agendados', 'send_scheduled_reports' => 'Relatórios agendados'] as $k => $lbl) {
         $t = (int)getSetting('cron_last_' . $k);
         if ($t <= 0) $add('Tarefas automáticas', $lbl, 'warn', 'Ainda não registrou execução (aguarde 1-2 minutos após atualizar).');
         else { $age = time() - $t; $add('Tarefas automáticas', $lbl, $age <= 180 ? 'ok' : 'fail', 'Última execução há ' . ($age < 90 ? $age . 's' : round($age / 60) . ' min') . ($age <= 180 ? '.' : ' — cron parado? verifique /etc/cron.d/ipbx-front-api.')); }

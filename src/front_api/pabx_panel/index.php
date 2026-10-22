@@ -49,7 +49,7 @@ try {
 // =========================================================================
 // AUTENTICAÇÃO (portão único do painel)
 // =========================================================================
-$__api_action_names = ['get_logs', 'get_fop_extensions', 'get_trunks_status', 'get_queues_realtime', 'get_parking_lots', 'fop_action', 'originate_call', 'save_contact', 'test_llm_connection', 'analyze_pabx_insights', 'operator_survey_stats', 'generate_ai_insights', 'get_ai_insights_history', 'delete_ai_insight', 'transcribe_audio', 'get_kpi_calls_detail', 'get_active_calls', 'get_time_groups', 'get_time_group_rules', 'save_time_group_rule', 'delete_time_group_rule', 'get_announcements_list', 'update_announcement_audio', 'sync_assets', 'ai_chat', 'ai_chat_info', 'ai_chat_history', 'ai_chat_clear', 'ai_chat_confirm', 'ext_features_get', 'ext_features_set', 'console_exec'];
+$__api_action_names = ['get_logs', 'get_fop_extensions', 'get_trunks_status', 'get_queues_realtime', 'get_parking_lots', 'fop_action', 'originate_call', 'save_contact', 'test_llm_connection', 'analyze_pabx_insights', 'operator_survey_stats', 'panel_rev', 'generate_ai_insights', 'get_ai_insights_history', 'delete_ai_insight', 'transcribe_audio', 'get_kpi_calls_detail', 'get_active_calls', 'get_time_groups', 'get_time_group_rules', 'save_time_group_rule', 'delete_time_group_rule', 'get_announcements_list', 'update_announcement_audio', 'sync_assets', 'ai_chat', 'ai_chat_info', 'ai_chat_history', 'ai_chat_clear', 'ai_chat_confirm', 'ext_features_get', 'ext_features_set', 'console_exec'];
 if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['action'], $__api_action_names, true))) {
     authGate('json');
 } else {
@@ -61,7 +61,7 @@ $__perf_marks['login/permissões'] = microtime(true) - $__perf_t0;
 // =========================================================================
 // HANDLER DE ENDPOINTS DE API (JSON)
 // =========================================================================
-if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['action'], ['get_logs', 'get_fop_extensions', 'get_trunks_status', 'get_queues_realtime', 'get_parking_lots', 'fop_action', 'originate_call', 'save_contact', 'test_llm_connection', 'analyze_pabx_insights', 'operator_survey_stats', 'generate_ai_insights', 'get_ai_insights_history', 'delete_ai_insight', 'transcribe_audio', 'get_kpi_calls_detail', 'get_active_calls', 'get_time_groups', 'get_time_group_rules', 'save_time_group_rule', 'delete_time_group_rule', 'get_announcements_list', 'update_announcement_audio', 'sync_assets', 'ai_chat', 'ai_chat_info', 'ai_chat_history', 'ai_chat_clear', 'ai_chat_confirm', 'ext_features_get', 'ext_features_set', 'console_exec', 'whatsapp_webhook']))) {
+if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['action'], ['get_logs', 'get_fop_extensions', 'get_trunks_status', 'get_queues_realtime', 'get_parking_lots', 'fop_action', 'originate_call', 'save_contact', 'test_llm_connection', 'analyze_pabx_insights', 'operator_survey_stats', 'panel_rev', 'generate_ai_insights', 'get_ai_insights_history', 'delete_ai_insight', 'transcribe_audio', 'get_kpi_calls_detail', 'get_active_calls', 'get_time_groups', 'get_time_group_rules', 'save_time_group_rule', 'delete_time_group_rule', 'get_announcements_list', 'update_announcement_audio', 'sync_assets', 'ai_chat', 'ai_chat_info', 'ai_chat_history', 'ai_chat_clear', 'ai_chat_confirm', 'ext_features_get', 'ext_features_set', 'console_exec', 'whatsapp_webhook']))) {
     $action = $_GET['api_action'] ?? $_GET['action'];
     if (function_exists('auditRequest')) auditRequest('', '', true, (string)$action);
     // Consultas de atualização automática (só leitura) soltam a sessão já: o PHP trava o arquivo de sessão durante a requisição inteira,
@@ -965,6 +965,11 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
         exit;
     }
 
+    if ($action === 'panel_rev') {
+        if (ob_get_level()) ob_end_clean();
+        header('Content-Type: application/json; charset=utf-8'); header('Cache-Control: no-store');
+        echo json_encode(['success' => true, 'rev' => panelRevAll()]); exit;
+    }
     if ($action === 'operator_survey_stats') {
         if (ob_get_level()) ob_end_clean();
         header('Content-Type: application/json; charset=utf-8');
@@ -3310,6 +3315,7 @@ dialog#ai-chat-dialog::backdrop{background:rgba(0,0,0,.65);backdrop-filter:blur(
         var r = await fetch('index.php?api_action=ai_chat_confirm', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({id:p.id, accept:b.getAttribute('data-ok')==='1'})});
         var d = await r.json();
         c.innerHTML = d.success ? esc(d.message || 'Feito.') : '⚠️ ' + esc(d.error || 'Falha.');
+        if (d.success && window.ipbxLiveCheck) setTimeout(function () { window.ipbxLiveCheck(true); }, 600);   // a tela por trás do chat também se atualiza
       } catch(e){ c.innerHTML = '⚠️ ' + esc(e.message); }
     }; });
   }
@@ -3340,6 +3346,35 @@ dialog#ai-chat-dialog::backdrop{background:rgba(0,0,0,.65);backdrop-filter:blur(
 })();
 </script>
 <?php endif; ?>
+<script>
+/* Tempo real: quando o Chat IA (ou outro usuário) altera agendamentos, envios ou ramais, a tela aberta se atualiza sozinha. */
+(function () {
+  var mod = <?php echo json_encode($module . ':' . $action); ?>;
+  var map = {'configuracoes:smtp': ['schedules', 'wa_sends'], 'whatsapp:disparos': ['schedules', 'wa_sends'], 'whatsapp:historico': ['wa_sends'],
+             'ramais:editar_nome': ['extensions'], 'ramais:fop': ['extensions'], 'dashboard:view_v1': ['extensions'], 'whatsapp:contatos': ['extensions']};
+  var areas = map[mod] || [];
+  var base = null, busy = false;
+  window.ipbxLiveCheck = async function (force) {
+    if (!areas.length || busy) return;
+    busy = true;
+    try {
+      var r = await (await fetch('index.php?api_action=panel_rev', {cache: 'no-store'})).json();
+      if (!r || !r.rev) return;
+      if (base === null) { base = r.rev; return; }
+      var changed = areas.some(function (a) { return (r.rev[a] || '') !== (base[a] || ''); });
+      if (!changed) return;
+      var typing = document.activeElement && /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName);
+      var modal = document.querySelector('dialog[open], .modal-open');
+      if (!force && (typing || modal)) return;   // não interrompe quem está digitando; tenta no próximo ciclo
+      if (force) { try { sessionStorage.setItem('ipbx_chat_reopen', '1'); } catch (e) {} }
+      location.reload();
+    } catch (e) {} finally { busy = false; }
+  };
+  window.ipbxLiveBase = function () { base = null; return window.ipbxLiveCheck(); };
+  if (areas.length) { window.ipbxLiveCheck(); setInterval(function () { window.ipbxLiveCheck(); }, 8000); }
+  document.addEventListener('DOMContentLoaded', function () { try { if (sessionStorage.getItem('ipbx_chat_reopen') === '1') { sessionStorage.removeItem('ipbx_chat_reopen'); if (window.aiChatOpen) setTimeout(window.aiChatOpen, 300); } } catch (e) {} });
+})();
+</script>
 <script>
 /* Histórico de análises de IA (por tela). Usa <dialog> nativo na Top Layer. */
 /* Executa a análise de IA de uma tela usando SOMENTE números reais enviados pela própria tela. */
