@@ -706,8 +706,9 @@ class paloSantoPesquisa {
             $total = $cdrTotalPesquisa;
             $nao_avaliou = $total - $avaliadosDB;
         } else {
-            $nao_avaliou = (int)round($avaliadosDB * 0.18);
-            $total = $avaliadosDB + $nao_avaliou;
+            // Sem registros de quem desligou sem avaliar: não estima nada, mostra só o que foi realmente avaliado
+            $nao_avaliou = 0;
+            $total = $avaliadosDB;
         }
 
         $avaliadosTotal = $total - $nao_avaliou;

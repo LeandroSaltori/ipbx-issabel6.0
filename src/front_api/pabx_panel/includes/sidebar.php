@@ -181,6 +181,10 @@ function isGroupActive($modules_array) {
                     <i class="fa-solid fa-fire-flame-curved w-4 text-center text-amber-400"></i>
                     <span>Relatório Geral & Heatmap</span>
                 </a>
+                <a href="index.php?module=relatorios&action=pesquisa" class="flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all <?php echo isNavActive('relatorios', 'pesquisa') ? 'bg-brand-500/20 text-brand-400 border border-brand-500/30 font-bold' : 'text-slate-300 hover:bg-slate-800/60 hover:text-white'; ?>">
+                    <i class="fa-solid fa-star w-4 text-center text-amber-400"></i>
+                    <span>Pesquisa de Satisfação</span>
+                </a>
                 <a href="index.php?module=relatorios&action=ia_analytics" class="flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all <?php echo isNavActive('relatorios', 'ia_analytics') ? 'bg-purple-600/30 text-purple-300 border border-purple-500/40 font-bold shadow-lg shadow-purple-900/30' : 'text-purple-300/80 hover:bg-slate-800/60 hover:text-purple-200'; ?>">
                     <i class="fa-solid fa-sparkles w-4 text-center text-purple-400 animate-pulse"></i>
                     <span>Relatórios de IA</span>
