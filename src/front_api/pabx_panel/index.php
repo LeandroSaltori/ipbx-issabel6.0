@@ -722,6 +722,7 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
         if ($msg === '' || mb_strlen($msg) > 4000) { echo json_encode(['success' => false, 'error' => 'Mensagem vazia ou maior que 4000 caracteres.']); exit; }
         $warning = '';
         if ($uid !== '') {
+            if (strpos($msg, 'IPbx Prisma') !== 0) $msg = "*IPbx Prisma*\n\n" . $msg;
             if (!hasUserPermission('listen_recordings')) { echo json_encode(['success' => false, 'error' => 'Sem permissão para compartilhar gravações.']); exit; }
             $link = audioSignedUrl($uid, 604800, true);   // só com URL pública cadastrada; o arquivo já vai anexo
             if ($link !== '') $msg .= "\n\n🎧 Gravação (link válido por 7 dias): " . $link;
