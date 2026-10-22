@@ -1,6 +1,6 @@
 <?php
 /**
- * IPbx Prisma - Módulo Regras WhatsApp URA & NPS v2.1
+ * IPbx Prisma - Módulo Regras WhatsApp URA & Transbordo v2.1
  * Gerenciamento de templates editáveis com valores padrões de fábrica, variáveis interativas e Sandbox de Teste Real.
  */
 
@@ -11,7 +11,6 @@ $DEFAULT_TEMPLATES = [
     'missed_agent_msg'          => "⚠️ *Notificação de Chamada Perdida*\n\nOlá *{ATENDENTE}*! O cliente número *{CLIENTE}* tentou ligar no seu ramal *{RAMAL}* às *{DATA_HORA}* e a chamada não foi atendida.",
     'missed_client_msg'         => "🎙️ *Notificação de Chamada - IPbx Prisma*\n\nInformações da ligação:\n• Cliente: *{CLIENTE}*\n• Atendente: *{ATENDENTE}* (Ramal *{RAMAL}*)\n• Data/Hora: *{DATA_HORA}*\n\nO registro de áudio/gravação da chamada está disponível no sistema.",
     'audio_msg'                 => "🎙️ *Gravação da sua chamada - IPbx Prisma*\n\nOlá! Segue o registro da sua ligação com *{ATENDENTE}* (Ramal *{RAMAL}*) em *{DATA_HORA}*:\n{LINK_GRAVACAO}",
-    'nps_msg'                   => "⭐ *Pesquisa de Satisfação - IPbx Prisma*\n\nOlá! Como você avalia o atendimento recebido pelo atendente *{ATENDENTE}* (Ramal *{RAMAL}*) às *{DATA_HORA}*?\n\nResponda com uma nota de 1 (Péssimo) a 5 (Excelente)."
 ];
 
 $msg = '';
@@ -24,9 +23,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'queue_exit_whatsapp_msg'  => trim($_POST['queue_exit_whatsapp_msg'] ?? ''),
             'missed_agent_msg'          => trim($_POST['missed_agent_msg'] ?? ''),
             'missed_client_msg'         => trim($_POST['missed_client_msg'] ?? ''),
-            'audio_msg'                 => trim($_POST['audio_msg'] ?? ''),
-            'nps_enabled'               => isset($_POST['nps_enabled']) ? '1' : '0',
-            'nps_msg'                   => trim($_POST['nps_msg'] ?? '')
+            'audio_msg'                 => trim($_POST['audio_msg'] ?? '')
         ];
 
         $stmt_r = $db->prepare("INSERT OR REPLACE INTO integration_rules (key_name, value_val) VALUES (:key, :val)");
@@ -46,7 +43,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         if (function_exists('pabx_log')) {
-            pabx_log('whatsapp', 'INFO', "Regras de Mensagens URA & NPS salvas com sucesso", $rules_to_save);
+            pabx_log('whatsapp', 'INFO', "Regras de Mensagens URA salvas com sucesso", $rules_to_save);
         }
     } elseif (isset($_POST['action_restore_defaults'])) {
         $stmt_r = $db->prepare("INSERT OR REPLACE INTO integration_rules (key_name, value_val) VALUES (:key, :val)");
@@ -126,8 +123,6 @@ $rule_exit_wa = getRule('queue_exit_whatsapp_msg')  ?: $DEFAULT_TEMPLATES['queue
 $rule_agent   = getRule('missed_agent_msg')          ?: $DEFAULT_TEMPLATES['missed_agent_msg'];
 $rule_client  = getRule('missed_client_msg')         ?: $DEFAULT_TEMPLATES['missed_client_msg'];
 $rule_audio   = getRule('audio_msg')                 ?: $DEFAULT_TEMPLATES['audio_msg'];
-$nps_enabled  = getRule('nps_enabled') === '0' ? '0' : '1';
-$nps_msg      = getRule('nps_msg')                   ?: $DEFAULT_TEMPLATES['nps_msg'];
 ?>
 
 <div class="space-y-6">
@@ -250,26 +245,6 @@ $nps_msg      = getRule('nps_msg')                   ?: $DEFAULT_TEMPLATES['nps_
             </div>
         </div>
 
-        <!-- Regras NPS -->
-        <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-5 shadow-xl space-y-4">
-            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
-                <div>
-                    <h3 class="text-sm font-bold text-white flex items-center gap-2">
-                        <i class="fa-solid fa-star text-amber-400"></i> Pesquisa de Satisfação NPS Pós-Atendimento
-                    </h3>
-                    <span class="text-xs text-slate-400">Mensagem enviada no encerramento da chamada ou Custom Destination <code class="text-slate-300">ext-prisma-nps</code></span>
-                </div>
-                <label class="flex items-center gap-2 text-xs font-bold text-slate-300 cursor-pointer bg-slate-950 border border-slate-800 px-3 py-1.5 rounded-lg">
-                    <input type="checkbox" name="nps_enabled" value="1" <?php echo $nps_enabled === '1' ? 'checked' : ''; ?> class="accent-brand-500 rounded w-4 h-4">
-                    <span>Ativar Envio de NPS</span>
-                </label>
-            </div>
-
-            <div class="space-y-2 text-xs">
-                <textarea id="txt_nps_msg" name="nps_msg" rows="3" class="w-full px-3 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white focus:border-brand-500 focus:outline-none font-sans leading-relaxed"><?php echo htmlspecialchars($nps_msg); ?></textarea>
-            </div>
-        </div>
-
         <div class="flex items-center justify-end gap-3">
             <button type="submit" class="px-6 py-3 bg-brand-600 hover:bg-brand-500 text-white font-bold rounded-xl transition shadow-lg shadow-brand-500/20 text-xs flex items-center gap-2">
                 <i class="fa-solid fa-floppy-disk"></i>
@@ -344,7 +319,6 @@ $nps_msg      = getRule('nps_msg')                   ?: $DEFAULT_TEMPLATES['nps_
                     <option value="missed_agent_msg">⚠️ Notificação ao Atendente do Ramal</option>
                     <option value="missed_client_msg">📵 Aviso ao Cliente - Ramal Não Atendeu</option>
                     <option value="audio_msg">🎙️ Envio de Gravação (ext-prisma-audio)</option>
-                    <option value="nps_msg">⭐ Pesquisa de Satisfação NPS (ext-prisma-nps)</option>
                 </select>
             </div>
 

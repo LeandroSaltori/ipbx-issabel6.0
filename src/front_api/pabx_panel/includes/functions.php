@@ -400,10 +400,6 @@ function autoInjectPABXDialplan() {
             "exten => s,1,NoOp(=== PRISMA - NOTIFICACAO CHAMADA PERDIDA ===)\n" .
             "exten => s,n,AGI(/var/www/html/front_api/whatsapp_agi.php,\${CALLERID(num)},no_answer,\${NODEST})\n" .
             "exten => s,n,Hangup()\n\n" .
-            "[ext-prisma-nps]\n" .
-            "exten => s,1,NoOp(=== PRISMA - PESQUISA NPS ===)\n" .
-            "exten => s,n,AGI(/var/www/html/front_api/whatsapp_agi.php,\${CALLERID(num)},nps,\${NODEST})\n" .
-            "exten => s,n,Hangup()\n\n" .
             "[ext-prisma-transbordo]\n" .
             "exten => s,1,NoOp(=== PRISMA - TRANSBORDO URA ===)\n" .
             "exten => s,n,AGI(/var/www/html/front_api/whatsapp_agi.php,\${CALLERID(num)},transbordo,\${NODEST})\n" .
@@ -2118,22 +2114,6 @@ function panelPublicBaseUrl() {
     $host  = (string)($_SERVER['HTTP_HOST'] ?? '');
     if ($host === '') return '';
     return ($https ? 'https://' : 'http://') . $host . rtrim(dirname($_SERVER['SCRIPT_NAME'] ?? '/front_api/index.php'), '/\\');
-}
-
-/** Registra no servidor o endereço que recebe as respostas dos clientes (NPS) e o estado da conexão. */
-function uazapiConfigureWebhook() {
-    $tok = getSetting('webhook_token');
-    if (empty($tok)) { $tok = bin2hex(random_bytes(16)); saveSetting('webhook_token', $tok); }
-    $base = panelPublicBaseUrl();
-    if ($base === '') return ['ok' => false, 'error' => 'Não foi possível descobrir o endereço do painel.', 'url' => ''];
-    $url = $base . '/index.php?api_action=whatsapp_webhook&token=' . $tok;
-    $r = uazapiRequest('POST', '/webhook', ['enabled' => true, 'url' => $url, 'events' => ['messages', 'connection'], 'excludeMessages' => ['wasSentByApi', 'fromMeYes'], 'addUrlEvents' => false, 'addUrlTypesMessages' => false]);
-    $ok = ($r['error'] === '' && $r['http'] >= 200 && $r['http'] < 300);
-    // Endereço interno (rede privada/localhost): o servidor de WhatsApp na internet não consegue entregar as respostas
-    $h = (string)parse_url($url, PHP_URL_HOST);
-    $private = ($h === 'localhost' || strpos($h, '.') === false)
-        || (filter_var($h, FILTER_VALIDATE_IP) && !filter_var($h, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE));
-    return ['ok' => $ok, 'error' => $ok ? '' : ($r['error'] ?: 'HTTP ' . $r['http']), 'url' => $url, 'private' => $private];
 }
 
 /** Estado da conexão: ['state'=>connected|connecting|disconnected|error, 'qr','paircode','name','phone','error']. */
@@ -4683,7 +4663,6 @@ function syncCustomDestinationsWithAsterisk() {
     }
 
     $msg_no_answer  = (function_exists('getRule') && getRule('queue_abandon_msg_default')) ? getRule('queue_abandon_msg_default') : (getSetting('prismabot_msg_no_answer') ?: 'Olá! Vimos que você tentou ligar para nosso setor {NOME_FILA} no número {CLIENTE} às {DATA_HORA} e não conseguiu aguardar. Como podemos te ajudar por aqui?');
-    $msg_nps        = (function_exists('getRule') && getRule('nps_msg')) ? getRule('nps_msg') : (getSetting('prismabot_msg_nps') ?: 'Olá! Obrigado por seu contato com o atendente {ATENDENTE} no número {CLIENTE} às {DATA_HORA}. De 1 a 5, qual nota você dá para o atendimento recebido?');
     $msg_transbordo = (function_exists('getRule') && getRule('queue_exit_whatsapp_msg')) ? getRule('queue_exit_whatsapp_msg') : (getSetting('prismabot_msg_transbordo') ?: 'Olá! Vimos que você optou por não aguardar na linha da fila {NOME_FILA} no número {CLIENTE} às {DATA_HORA}. Já iniciamos seu atendimento VIP por aqui!');
     $msg_audio      = (function_exists('getRule') && getRule('audio_msg')) ? getRule('audio_msg') : (getSetting('prismabot_msg_audio') ?: 'Olá! O atendente {ATENDENTE} (Ramal {RAMAL}) está temporariamente indisponível. Recebemos sua chamada do número {CLIENTE} às {DATA_HORA}. Deixe sua mensagem por aqui!');
 
@@ -4692,11 +4671,6 @@ function syncCustomDestinationsWithAsterisk() {
             'custom_destination' => 'ext-prisma-no-answer,s,1',
             'description'        => 'Prisma - Notificação Chamada Perdida',
             'notes'              => $msg_no_answer
-        ],
-        [
-            'custom_destination' => 'ext-prisma-nps,s,1',
-            'description'        => 'Prisma - Pesquisa de Satisfação NPS',
-            'notes'              => $msg_nps
         ],
         [
             'custom_destination' => 'ext-prisma-transbordo,s,1',
@@ -6493,7 +6467,6 @@ function integrationStatusChecks() {
         $stt = is_array($d) ? (string)($d['instance']['status'] ?? $d['status'] ?? '') : '';
         $add('WhatsApp', 'Conexão WhatsApp direto', ($u['error'] === '' && $u['http'] === 200 && stripos($stt, 'connected') !== false) ? 'ok' : 'warn', $u['error'] !== '' ? $u['error'] : ('Estado: ' . ($stt !== '' ? $stt : 'HTTP ' . $u['http'])));
     }
-    $add('WhatsApp', 'Respostas de pesquisa (NPS)', getSetting('webhook_token') ? 'ok' : 'warn', getSetting('webhook_token') ? 'Webhook com token gerado.' : 'Webhook ainda não gerado.');
     $tr = getSetting('trunk_alert_enabled') === '1';
     $add('WhatsApp', 'Alerta de tronco', $tr ? (count(trunkAlertNumbers()) ? 'ok' : 'warn') : 'off', $tr ? (count(trunkAlertNumbers()) . ' número(s) cadastrado(s).') : 'Desativado.');
 

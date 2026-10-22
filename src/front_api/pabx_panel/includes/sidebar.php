@@ -129,7 +129,7 @@ function isGroupActive($modules_array) {
             <div id="grp-whatsapp" class="space-y-1 pl-1 mt-1 <?php echo $grp3_active ? '' : 'hidden'; ?>">
                 <a href="index.php?module=whatsapp&action=regras" class="flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all <?php echo isNavActive('whatsapp', 'regras') ? 'bg-brand-500/20 text-brand-400 border border-brand-500/30 font-bold' : 'text-slate-300 hover:bg-slate-800/60 hover:text-white'; ?>">
                     <i class="fa-solid fa-wand-magic-sparkles w-4 text-center"></i>
-                    <span>Regras URA, Transbordo & NPS</span>
+                    <span>Regras URA & Transbordo</span>
                 </a>
                 <a href="index.php?module=whatsapp&action=historico" class="flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all <?php echo isNavActive('whatsapp', 'historico') ? 'bg-brand-500/20 text-brand-400 border border-brand-500/30 font-bold' : 'text-slate-300 hover:bg-slate-800/60 hover:text-white'; ?>">
                     <i class="fa-solid fa-clock-rotate-left w-4 text-center"></i>

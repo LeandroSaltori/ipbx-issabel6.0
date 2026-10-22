@@ -735,8 +735,8 @@ if ($ast_db) {
 
     </div>
 
-    <!-- BLOCO 2: MONITORAMENTO DE FILAS REAIS + AUTOMAÇÃO WHATSAPP & NPS -->
-    <div class="grid grid-cols-1 lg:grid-cols-4 gap-4">
+    <!-- BLOCO 2: MONITORAMENTO DE FILAS REAIS + AUTOMAÇÃO WHATSAPP -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
         <!-- Filas Reais do PABX (Exibe as filas cadastradas no PABX) -->
         <?php if (!empty($real_queues)): ?>
@@ -823,32 +823,6 @@ if ($ast_db) {
             </div>
         </div>
 
-        <!-- Card Pesquisa de Satisfação NPS (Dados Reais do SQLite) -->
-        <div class="bg-slate-900/90 border border-slate-800 p-4 rounded-2xl shadow-xl flex flex-col justify-between space-y-3">
-            <div class="flex items-center justify-between">
-                <span class="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                    <i class="fa-solid fa-star text-amber-400"></i> Avaliação NPS
-                </span>
-                <span class="px-2 py-0.5 bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded text-[10px] font-bold">Pesquisa</span>
-            </div>
-            <div>
-                <?php
-                $stmt_nps = $db->query("SELECT AVG(score) as avg_score, COUNT(*) as count_nps FROM nps_responses");
-                $nps_data = $stmt_nps ? $stmt_nps->fetch(PDO::FETCH_ASSOC) : ['avg_score' => 0, 'count_nps' => 0];
-                $avg_nps = round((float)($nps_data['avg_score'] ?: 0), 1);
-                $count_nps = (int)($nps_data['count_nps'] ?: 0);
-                ?>
-                <span class="text-2xl font-black text-amber-400 tracking-tight font-mono"><?php echo $avg_nps; ?> <span class="text-xs font-semibold text-slate-400">/ 5.0</span></span>
-                <div class="text-[10px] font-bold text-slate-300 mt-1 flex items-center gap-1">
-                    <i class="fa-solid fa-thumbs-up text-amber-400"></i> <?php echo $count_nps; ?> <span class="text-slate-400 font-normal">avaliações</span>
-                </div>
-            </div>
-            <div class="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px] font-bold">
-                <a href="index.php?module=whatsapp&action=regras" class="text-amber-400 hover:text-amber-300 transition flex items-center gap-1">
-                    Regras NPS <i class="fa-solid fa-chevron-right text-[8px]"></i>
-                </a>
-            </div>
-        </div>
 
     </div>
 

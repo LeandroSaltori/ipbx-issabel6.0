@@ -151,7 +151,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $bot_url        = trim($_POST['prismabot_url'] ?? '');
         $bot_token      = trim($_POST['prismabot_token'] ?? '');
         $msg_no_answer  = trim($_POST['prismabot_msg_no_answer'] ?? '');
-        $msg_nps        = trim($_POST['prismabot_msg_nps'] ?? '');
         $msg_transbordo = trim($_POST['prismabot_msg_transbordo'] ?? '');
         $msg_audio      = trim($_POST['prismabot_msg_audio'] ?? '');
 
@@ -159,7 +158,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!empty($bot_url))   saveSetting('api_url', $bot_url);
             if (!empty($bot_token)) saveSetting('api_token', $bot_token);
             if ($msg_no_answer !== '')  saveSetting('prismabot_msg_no_answer', $msg_no_answer);
-            if ($msg_nps !== '')        saveSetting('prismabot_msg_nps', $msg_nps);
             if ($msg_transbordo !== '') saveSetting('prismabot_msg_transbordo', $msg_transbordo);
             if ($msg_audio !== '')      saveSetting('prismabot_msg_audio', $msg_audio);
             
@@ -348,7 +346,6 @@ $currentBotUrl   = !empty($settings['api_url'])      ? $settings['api_url']     
 $currentBotToken = !empty($settings['api_token'])    ? $settings['api_token']    : '';
 
 $currentMsgNoAnswer  = !empty($settings['prismabot_msg_no_answer'])  ? $settings['prismabot_msg_no_answer']  : 'Olá {NOME}, identificamos uma chamada não atendida para a empresa no número {NUMERO}. Como podemos te ajudar?';
-$currentMsgNps       = !empty($settings['prismabot_msg_nps'])        ? $settings['prismabot_msg_nps']        : 'Olá {NOME}, obrigado por falar conosco! Em uma escala de 0 a 10, como você avalia nosso atendimento?';
 $currentMsgTransbordo= !empty($settings['prismabot_msg_transbordo']) ? $settings['prismabot_msg_transbordo'] : 'Olá {NOME}, seu atendimento superou o tempo limite de espera. Em instantes um consultor entrará em contato!';
 $currentMsgAudio     = !empty($settings['prismabot_msg_audio'])      ? $settings['prismabot_msg_audio']      : 'Olá {NOME}, segue a gravação da sua chamada realizada em {DATA}.';
 
@@ -529,9 +526,9 @@ if (empty($currentPbxToken) && !empty($currentPbxPass) && $_SERVER['REQUEST_METH
                 </div>
                 <div>
                     <h3 class="text-base font-bold text-slate-100">
-                        API Prismabot (Notificações WhatsApp & NPS)
+                        API Prismabot (Notificações WhatsApp)
                     </h3>
-                    <p class="text-xs text-slate-400">Integração externa para envio de pesquisas NPS e notificações de chamadas</p>
+                    <p class="text-xs text-slate-400">Integração externa para envio das notificações de chamadas</p>
                 </div>
             </div>
 
@@ -558,7 +555,7 @@ if (empty($currentPbxToken) && !empty($currentPbxPass) && $_SERVER['REQUEST_METH
                             </div>
                             <div>
                                 <h4 class="text-sm font-bold text-cyan-200">Custom Destinations do PABX (Sincronização Ativa)</h4>
-                                <p class="text-[11px] text-slate-400">Estes 4 Custom Destinations são gravados na tabela de destinos personalizados do PABX com os modelos de mensagem em tempo real no campo Notes!</p>
+                                <p class="text-[11px] text-slate-400">Estes 3 Custom Destinations são gravados na tabela de destinos personalizados do PABX com os modelos de mensagem em tempo real no campo Notes!</p>
                             </div>
                         </div>
                         <div class="flex items-center gap-2">
@@ -582,19 +579,6 @@ if (empty($currentPbxToken) && !empty($currentPbxPass) && $_SERVER['REQUEST_METH
                             </div>
                             <div class="text-[11px] text-slate-300 bg-slate-900/90 p-2.5 rounded-lg border border-slate-800/80 font-mono italic">
                                 "<?php echo htmlspecialchars($currentMsgNoAnswer); ?>"
-                            </div>
-                        </div>
-
-                        <!-- Custom Destination 2: Pesquisa NPS -->
-                        <div class="bg-slate-950/70 border border-slate-800 rounded-xl p-4 space-y-2">
-                            <div class="flex items-center justify-between border-b border-slate-800 pb-2">
-                                <span class="font-bold text-slate-200 text-xs flex items-center gap-2">
-                                    <span class="px-2 py-0.5 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded font-mono text-[10px]">ext-prisma-nps,s,1</span>
-                                    Pesquisa de Satisfação NPS
-                                </span>
-                            </div>
-                            <div class="text-[11px] text-slate-300 bg-slate-900/90 p-2.5 rounded-lg border border-slate-800/80 font-mono italic">
-                                "<?php echo htmlspecialchars($currentMsgNps); ?>"
                             </div>
                         </div>
 
@@ -641,25 +625,6 @@ if (empty($currentPbxToken) && !empty($currentPbxPass) && $_SERVER['REQUEST_METH
                 </div>
             </form>
 
-            <!-- WEBHOOK DE RESPOSTAS NPS (Prismabot -> PABX) -->
-            <?php
-                $wh_token = getSetting('webhook_token');
-                if (empty($wh_token)) { $wh_token = bin2hex(random_bytes(16)); saveSetting('webhook_token', $wh_token); }
-                $wh_scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-                $wh_dir    = rtrim(dirname($_SERVER['SCRIPT_NAME'] ?? '/front_api/index.php'), '/');
-                $wh_url    = $wh_scheme . '://' . ($_SERVER['HTTP_HOST'] ?? 'IP_DO_PABX') . $wh_dir . '/index.php?api_action=whatsapp_webhook&token=' . $wh_token;
-            ?>
-            <div class="pt-4 border-t border-slate-800/80">
-                <div class="bg-slate-950/80 p-4 rounded-2xl border border-amber-500/30 space-y-2">
-                    <div class="flex items-center gap-2 border-b border-slate-800 pb-2">
-                        <i class="fa-solid fa-star text-amber-400 text-base"></i>
-                        <strong class="text-white text-xs">Webhook de respostas da Pesquisa NPS</strong>
-                    </div>
-                    <p class="text-[11px] text-slate-400">Cadastre esta URL como webhook de mensagens recebidas no Prismabot. Respostas de 1 a 5 a uma pesquisa NPS enviada nas últimas 48h são gravadas no painel.</p>
-                    <input type="text" readonly value="<?php echo htmlspecialchars($wh_url); ?>" onclick="this.select()" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-[11px] font-mono text-amber-200">
-                </div>
-            </div>
-
         </div>
     </div>
 
@@ -669,7 +634,6 @@ if (empty($currentPbxToken) && !empty($currentPbxPass) && $_SERVER['REQUEST_METH
             $__prov  = waProvider();
             $__admin = uazapiFileConf() ? true : false;
             $__mode  = uazapiMode();
-            $__wh_url = panelPublicBaseUrl() . '/index.php?api_action=whatsapp_webhook&token=' . (string)getSetting('webhook_token');
             $__btn = 'white-space:nowrap !important;flex-shrink:0 !important;width:auto !important;overflow:visible !important;text-overflow:clip !important;';
             $__needServer = !$__admin && getSetting('uazapi_token') === '';
         ?>

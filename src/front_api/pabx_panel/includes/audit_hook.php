@@ -143,7 +143,7 @@ function auditRequest($module = '', $page = '', $isApi = false, $apiAction = '')
         $labels = auditApiLabels();
         // Consultas de atualização automática (get_*) geram ruído: só registra a de detalhe de KPI
         if (strpos($apiAction, 'get_') === 0 && $apiAction !== 'get_kpi_calls_detail') return;
-        if (in_array($apiAction, ['log_event', 'whatsapp_webhook', 'filas_stats', 'view'], true)) return;
+        if (in_array($apiAction, ['log_event', 'filas_stats', 'view'], true)) return;
         $what = $labels[$apiAction] ?? ('Executou ação ' . $apiAction);
         $ctx = auditSafeParams($_REQUEST, $safeKeys);
         foreach (['to', 'phone', 'number', 'destino', 'numero'] as $pk) {
