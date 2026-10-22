@@ -241,6 +241,7 @@ ipbx-issabel6.0/
 │   ├── autoupdate.md            # Guia do sistema de Atualização Automática Semanal
 │   ├── asternic_cdr.md          # Guia do módulo Asternic CDR
 │   ├── painel_ipbx.md           # Guia de instalação do Painel IPbx
+│   ├── painel_novo_6_0.md       # Painel Novo 6.0: funções, Chat IA, agendamentos e crons
 │   ├── pesquisa_satisfacao_web.md # Guia da Pesquisa de Satisfação
 │   ├── telegram_monitor.md      # Guia do monitoramento via Telegram
 │   ├── ldap_directory.md        # Guia do servidor LDAP de ramais
@@ -330,6 +331,7 @@ Para instruções detalhadas de configuração de cada recurso, acesse os manuai
 - 🔄 [Atualização Automática Semanal (Auto Update & Logs)](./docs/autoupdate.md)
 - 📊 [Asternic CDR - Relatórios de Chamadas](./docs/asternic_cdr.md)
 - 🎛️ [Painel IPbx - Monitoramento Visual de Ramais](./docs/painel_ipbx.md)
+- 🧭 [Painel Novo 6.0 e Chat IA: tudo o que dá para fazer](./docs/painel_novo_6_0.md)
 - 📝 [Pesquisa de Satisfação WEB & URA](./docs/pesquisa_satisfacao_web.md)
 - 📞 [Instalação TFTP](./docs/tftp_install.md)
 - 🔗 [Alteração de Links no Menu do Issabel](./docs/alterar_link.md)
