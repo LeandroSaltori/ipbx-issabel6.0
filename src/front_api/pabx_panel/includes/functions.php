@@ -5179,6 +5179,8 @@ function aiChatCompletion($system, $user, $timeout = 25, $cfg = null) {
     $cfg = $cfg ?: aiGetConfig('insights');
     if ($cfg['key'] === '') return ['ok' => false, 'text' => '', 'error' => 'API Key de IA não configurada', 'http' => 0];
     if ($cfg['prompt'] !== '') $system = $cfg['prompt'] . "\n\n" . $system;
+    // Padrão de todas as integrações de IA: sempre em português do Brasil (transcrições em inglês ou outro idioma são erro de reconhecimento).
+    $system .= "\n\nIDIOMA: responda SEMPRE em português do Brasil. O áudio e os textos deste sistema são em português; se algum trecho vier em outro idioma, é erro de transcrição, não o traduza nem o trate como inglês.";
     $send = function ($tokenField) use ($cfg, $system, $user, $timeout) {
         $ch = curl_init($cfg['base_url'] . '/chat/completions');
         curl_setopt_array($ch, [
@@ -5393,7 +5395,10 @@ function aiTranscribeFile($path, $cfg = null) {
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_POST           => true,
-        CURLOPT_POSTFIELDS     => ['file' => new CURLFile($path, $mime, $sendName), 'model' => $cfg['audio']],
+        CURLOPT_POSTFIELDS     => ['file' => new CURLFile($path, $mime, $sendName), 'model' => $cfg['audio'],
+            // Idioma fixo (padrão pt = português): sem isso o Whisper detecta errado em áudio de telefone e mistura inglês.
+            'language' => preg_match('/^[a-z]{2,3}$/', (string)getSetting('ai_audio_language')) ? getSetting('ai_audio_language') : 'pt',
+            'prompt' => 'Ligação telefônica de atendimento ao cliente em português do Brasil.', 'temperature' => '0'],
         CURLOPT_HTTPHEADER     => ['Authorization: Bearer ' . $cfg['key']],
         CURLOPT_TIMEOUT        => 90,
         CURLOPT_SSL_VERIFYPEER => (getSetting('ai_ssl_insecure') !== '1'),

@@ -977,7 +977,7 @@ if ($ast_db) {
                             <td class="py-3.5 px-4 text-center font-mono text-slate-300"><?php echo $u['tme']; ?></td>
                             <td class="py-3.5 px-4 text-center font-mono text-slate-300"><?php echo $u['tma']; ?></td>
                             <td class="py-3.5 px-4 text-center">
-                                <button title="Clique para gerar relatório de inteligência artificial com NPS e análise de tom de voz deste operador" 
+                                <button title="Clique para gerar resumo das notas da pesquisa de satisfação deste operador (dados reais)" 
                                         onclick="openOperatorIaModal('<?php echo htmlspecialchars(addslashes($u['name'])); ?>', '<?php echo $u['extension']; ?>', <?php echo ($u['atendidas_receptivas'] + $u['efetuadas_atendidas']); ?>, <?php echo $u['total']; ?>, '<?php echo $u['tma']; ?>', '<?php echo $u['tme']; ?>')" 
                                         class="px-2.5 py-1 bg-purple-600/20 hover:bg-purple-600 text-purple-300 hover:text-white rounded-lg border border-purple-500/30 text-[10px] font-bold transition flex items-center gap-1.5 mx-auto">
                                     <i class="fa-solid fa-sparkles"></i> Analisar Operador

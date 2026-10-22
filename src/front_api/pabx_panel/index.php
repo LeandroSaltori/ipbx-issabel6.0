@@ -49,7 +49,7 @@ try {
 // =========================================================================
 // AUTENTICAÇÃO (portão único do painel)
 // =========================================================================
-$__api_action_names = ['get_logs', 'get_fop_extensions', 'get_trunks_status', 'get_queues_realtime', 'get_parking_lots', 'fop_action', 'originate_call', 'save_contact', 'test_llm_connection', 'analyze_pabx_insights', 'generate_ai_insights', 'get_ai_insights_history', 'delete_ai_insight', 'transcribe_audio', 'get_kpi_calls_detail', 'get_active_calls', 'get_time_groups', 'get_time_group_rules', 'save_time_group_rule', 'delete_time_group_rule', 'get_announcements_list', 'update_announcement_audio', 'sync_assets', 'ai_chat', 'ai_chat_info', 'ai_chat_history', 'ai_chat_clear', 'ai_chat_confirm', 'ext_features_get', 'ext_features_set', 'console_exec'];
+$__api_action_names = ['get_logs', 'get_fop_extensions', 'get_trunks_status', 'get_queues_realtime', 'get_parking_lots', 'fop_action', 'originate_call', 'save_contact', 'test_llm_connection', 'analyze_pabx_insights', 'operator_survey_stats', 'generate_ai_insights', 'get_ai_insights_history', 'delete_ai_insight', 'transcribe_audio', 'get_kpi_calls_detail', 'get_active_calls', 'get_time_groups', 'get_time_group_rules', 'save_time_group_rule', 'delete_time_group_rule', 'get_announcements_list', 'update_announcement_audio', 'sync_assets', 'ai_chat', 'ai_chat_info', 'ai_chat_history', 'ai_chat_clear', 'ai_chat_confirm', 'ext_features_get', 'ext_features_set', 'console_exec'];
 if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['action'], $__api_action_names, true))) {
     authGate('json');
 } else {
@@ -61,7 +61,7 @@ $__perf_marks['login/permissões'] = microtime(true) - $__perf_t0;
 // =========================================================================
 // HANDLER DE ENDPOINTS DE API (JSON)
 // =========================================================================
-if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['action'], ['get_logs', 'get_fop_extensions', 'get_trunks_status', 'get_queues_realtime', 'get_parking_lots', 'fop_action', 'originate_call', 'save_contact', 'test_llm_connection', 'analyze_pabx_insights', 'generate_ai_insights', 'get_ai_insights_history', 'delete_ai_insight', 'transcribe_audio', 'get_kpi_calls_detail', 'get_active_calls', 'get_time_groups', 'get_time_group_rules', 'save_time_group_rule', 'delete_time_group_rule', 'get_announcements_list', 'update_announcement_audio', 'sync_assets', 'ai_chat', 'ai_chat_info', 'ai_chat_history', 'ai_chat_clear', 'ai_chat_confirm', 'ext_features_get', 'ext_features_set', 'console_exec', 'whatsapp_webhook']))) {
+if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['action'], ['get_logs', 'get_fop_extensions', 'get_trunks_status', 'get_queues_realtime', 'get_parking_lots', 'fop_action', 'originate_call', 'save_contact', 'test_llm_connection', 'analyze_pabx_insights', 'operator_survey_stats', 'generate_ai_insights', 'get_ai_insights_history', 'delete_ai_insight', 'transcribe_audio', 'get_kpi_calls_detail', 'get_active_calls', 'get_time_groups', 'get_time_group_rules', 'save_time_group_rule', 'delete_time_group_rule', 'get_announcements_list', 'update_announcement_audio', 'sync_assets', 'ai_chat', 'ai_chat_info', 'ai_chat_history', 'ai_chat_clear', 'ai_chat_confirm', 'ext_features_get', 'ext_features_set', 'console_exec', 'whatsapp_webhook']))) {
     $action = $_GET['api_action'] ?? $_GET['action'];
     if (function_exists('auditRequest')) auditRequest('', '', true, (string)$action);
     // Consultas de atualização automática (só leitura) soltam a sessão já: o PHP trava o arquivo de sessão durante a requisição inteira,
@@ -965,6 +965,37 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
         exit;
     }
 
+    if ($action === 'operator_survey_stats') {
+        if (ob_get_level()) ob_end_clean();
+        header('Content-Type: application/json; charset=utf-8');
+        $ext = preg_replace('/[^0-9A-Za-z_\-]/', '', (string)($_GET['ext'] ?? ''));
+        $out = ['success' => true, 'has_data' => false, 'dias' => 30, 'n' => 0, 'media' => null, 'pos' => 0, 'neu' => 0, 'neg' => 0, 'sim' => 0, 'nao_res' => 0, 'recent' => ['pos' => [], 'neu' => [], 'neg' => []]];
+        $pq = null;
+        $c = function_exists('getAsteriskPdoConnection') ? getAsteriskPdoConnection('asteriskcdrdb') : null;
+        if ($c) { try { if ($c->query("SELECT 1 FROM pesquisa LIMIT 1") !== false) $pq = $c; } catch (Throwable $e) {} }
+        if (!$pq && is_file('/var/www/db/pesquisa.db')) { try { $pq = new PDO('sqlite:/var/www/db/pesquisa.db'); } catch (Throwable $e) {} }
+        if ($pq && $ext !== '') {
+            $map = ['EXCELENTE' => 5, 'OTIMO' => 5, 'ÓTIMO' => 5, '5' => 5, 'MUITO BOM' => 4, '4' => 4, 'BOM' => 3, 'MEDIO' => 3, 'MÉDIO' => 3, 'REGULAR' => 3, '3' => 3, 'RUIM' => 2, '2' => 2, 'PESSIMO' => 1, 'PÉSSIMO' => 1, '1' => 1];
+            try {
+                $st = $pq->prepare("SELECT data, hora, telefone, avaliacao, solucao FROM pesquisa WHERE operador = ? AND data >= ? ORDER BY data DESC, hora DESC");
+                $st->execute([$ext, date('Y-m-d', strtotime('-30 days'))]);
+                $sum = 0;
+                foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
+                    $n = $map[mb_strtoupper(trim((string)$r['avaliacao']))] ?? 0;
+                    $sol = mb_strtoupper(trim((string)$r['solucao']));
+                    if ($n === 0) continue;
+                    $out['n']++; $sum += $n;
+                    if (in_array($sol, ['SIM', '1'], true)) $out['sim']++; elseif (in_array($sol, ['NAO', 'NÃO', '2'], true)) $out['nao_res']++;
+                    $k = $n >= 4 ? 'pos' : ($n === 3 ? 'neu' : 'neg');
+                    $out[$k]++;
+                    if (count($out['recent'][$k]) < 8) $out['recent'][$k][] = ['data' => date('d/m/Y', strtotime($r['data'])), 'hora' => $r['hora'], 'tel' => function_exists('formatPhoneNumber') ? formatPhoneNumber($r['telefone']) : $r['telefone'], 'nota' => $n];
+                }
+                if ($out['n'] > 0) { $out['has_data'] = true; $out['media'] = round($sum / $out['n'], 1); }
+            } catch (Throwable $e) {}
+        }
+        echo json_encode($out, JSON_UNESCAPED_UNICODE); exit;
+    }
+
     if ($action === 'analyze_pabx_insights') {
         if (ob_get_level()) ob_end_clean();
         header('Content-Type: application/json; charset=utf-8');
@@ -1599,45 +1630,45 @@ if ($__wp_u && userHasWebphone($__wp_u)
                     <!-- Satisfação do Cliente (NPS) -->
                     <div class="bg-slate-950/80 border border-amber-500/30 rounded-2xl p-4 flex flex-col justify-between space-y-2">
                         <div class="flex items-center justify-between text-slate-400">
-                            <span class="font-bold text-[10px] uppercase tracking-wider text-amber-400">Satisfação / NPS</span>
+                            <span class="font-bold text-[10px] uppercase tracking-wider text-amber-400">Satisfação (pesquisa por ligação)</span>
                             <i class="fa-solid fa-star text-amber-400"></i>
                         </div>
                         <div class="flex items-baseline gap-2">
-                            <span id="ia-modal-score" class="text-2xl font-black text-white font-mono">96%</span>
-                            <span class="text-[10px] text-amber-300 font-bold">⭐ 4.9/5.0</span>
+                            <span id="ia-modal-score" class="text-2xl font-black text-white font-mono">--</span>
+                            <span id="ia-modal-score-sub" class="text-[10px] text-amber-300 font-bold">--</span>
                         </div>
                         <div class="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
-                            <div id="ia-modal-score-bar" class="bg-gradient-to-r from-amber-500 to-emerald-400 h-full rounded-full" style="width: 96%"></div>
+                            <div id="ia-modal-score-bar" class="bg-gradient-to-r from-amber-500 to-emerald-400 h-full rounded-full" style="width: 0%"></div>
                         </div>
                     </div>
 
                     <!-- Resolução em 1ª Chamada (FCR) -->
                     <div class="bg-slate-950/80 border border-emerald-500/30 rounded-2xl p-4 flex flex-col justify-between space-y-2">
                         <div class="flex items-center justify-between text-slate-400">
-                            <span class="font-bold text-[10px] uppercase tracking-wider text-emerald-400">Resolução 1ª Chamada</span>
+                            <span class="font-bold text-[10px] uppercase tracking-wider text-emerald-400">Problema resolvido</span>
                             <i class="fa-solid fa-circle-check text-emerald-400"></i>
                         </div>
                         <div class="flex items-baseline gap-2">
-                            <span id="ia-modal-fcr" class="text-2xl font-black text-white font-mono">98%</span>
-                            <span class="text-[10px] text-emerald-300 font-bold">Excelente</span>
+                            <span id="ia-modal-fcr" class="text-2xl font-black text-white font-mono">--</span>
+                            <span id="ia-modal-fcr-sub" class="text-[10px] text-emerald-300 font-bold">--</span>
                         </div>
                         <div class="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
-                            <div id="ia-modal-fcr-bar" class="bg-emerald-500 h-full rounded-full" style="width: 98%"></div>
+                            <div id="ia-modal-fcr-bar" class="bg-emerald-500 h-full rounded-full" style="width: 0%"></div>
                         </div>
                     </div>
 
                     <!-- Tom de Voz & Cordialidade -->
                     <div class="bg-slate-950/80 border border-purple-500/30 rounded-2xl p-4 flex flex-col justify-between space-y-2">
                         <div class="flex items-center justify-between text-slate-400">
-                            <span class="font-bold text-[10px] uppercase tracking-wider text-purple-400">Tom & Cordialidade</span>
+                            <span class="font-bold text-[10px] uppercase tracking-wider text-purple-400">Avaliações (30 dias)</span>
                             <i class="fa-solid fa-face-smile text-purple-400"></i>
                         </div>
                         <div class="flex items-baseline gap-2">
-                            <span id="ia-modal-empathy" class="text-2xl font-black text-white font-mono">9.6/10</span>
-                            <span class="text-[10px] text-purple-300 font-bold">Humanizado</span>
+                            <span id="ia-modal-empathy" class="text-2xl font-black text-white font-mono">--</span>
+                            <span class="text-[10px] text-purple-300 font-bold">notas recebidas</span>
                         </div>
                         <div class="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
-                            <div id="ia-modal-empathy-bar" class="bg-purple-500 h-full rounded-full" style="width: 96%"></div>
+                            <div id="ia-modal-empathy-bar" class="bg-purple-500 h-full rounded-full" style="width: 0%"></div>
                         </div>
                     </div>
 
@@ -1647,7 +1678,7 @@ if ($__wp_u && userHasWebphone($__wp_u)
                 <div class="bg-slate-950/90 border border-slate-800 rounded-2xl p-4 space-y-2">
                     <div class="flex items-center justify-between text-slate-400 border-b border-slate-800/80 pb-2">
                         <span class="font-extrabold text-white flex items-center gap-2">
-                            <i class="fa-solid fa-brain text-purple-400"></i> Parecer Sintético da Inteligência Artificial
+                            <i class="fa-solid fa-brain text-purple-400"></i> Resumo da pesquisa de satisfação
                         </span>
                         <span id="ia-modal-ramal-badge" class="px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-mono text-[10px]">Ramal --</span>
                     </div>
@@ -1661,58 +1692,49 @@ if ($__wp_u && userHasWebphone($__wp_u)
                     <!-- Sentimento dos Clientes -->
                     <div class="bg-slate-950/80 border border-slate-800 rounded-2xl p-4 space-y-2">
                         <span class="font-bold text-slate-300 block text-[11px] flex items-center justify-between">
-                            <span>Análise Sentimental das Ligações:</span>
+                            <span>Notas dos clientes (pesquisa por ligação):</span>
                             <span class="text-[9px] text-purple-400 font-normal">Clique para ver chamadas</span>
                         </span>
                         <div class="space-y-1.5">
                             <div onclick="openSentimentDetailsModal('positivo')" class="cursor-pointer hover:bg-slate-900/80 p-1.5 rounded-xl transition flex items-center justify-between text-[11px] group">
                                 <span class="text-emerald-400 font-bold flex items-center gap-1.5">
-                                    <i class="fa-solid fa-face-smile"></i> Positivo
+                                    <i class="fa-solid fa-face-smile"></i> Positivo (notas 4 e 5)
                                     <i class="fa-solid fa-arrow-up-right-from-square text-[9px] opacity-0 group-hover:opacity-100 transition"></i>
                                 </span>
-                                <span id="ia-modal-sent-pos" class="font-mono text-white font-bold">94%</span>
+                                <span id="ia-modal-sent-pos" class="font-mono text-white font-bold">--</span>
                             </div>
                             <div class="w-full bg-slate-800 h-1 rounded-full overflow-hidden">
-                                <div id="ia-modal-sent-pos-bar" class="bg-emerald-500 h-full rounded-full" style="width: 94%"></div>
+                                <div id="ia-modal-sent-pos-bar" class="bg-emerald-500 h-full rounded-full" style="width: 0%"></div>
                             </div>
 
                             <div onclick="openSentimentDetailsModal('neutro')" class="cursor-pointer hover:bg-slate-900/80 p-1.5 rounded-xl transition flex items-center justify-between text-[11px] group pt-1">
                                 <span class="text-amber-400 font-bold flex items-center gap-1.5">
-                                    <i class="fa-solid fa-face-meh"></i> Neutro
+                                    <i class="fa-solid fa-face-meh"></i> Neutro (nota 3)
                                     <i class="fa-solid fa-arrow-up-right-from-square text-[9px] opacity-0 group-hover:opacity-100 transition"></i>
                                 </span>
-                                <span id="ia-modal-sent-neu" class="font-mono text-white font-bold">5%</span>
+                                <span id="ia-modal-sent-neu" class="font-mono text-white font-bold">--</span>
                             </div>
                             <div class="w-full bg-slate-800 h-1 rounded-full overflow-hidden">
-                                <div id="ia-modal-sent-neu-bar" class="bg-amber-400 h-full rounded-full" style="width: 5%"></div>
+                                <div id="ia-modal-sent-neu-bar" class="bg-amber-400 h-full rounded-full" style="width: 0%"></div>
                             </div>
 
                             <div onclick="openSentimentDetailsModal('insatisfeito')" class="cursor-pointer hover:bg-slate-900/80 p-1.5 rounded-xl transition flex items-center justify-between text-[11px] group pt-1">
                                 <span class="text-rose-400 font-bold flex items-center gap-1.5">
-                                    <i class="fa-solid fa-face-frown"></i> Insatisfeito
+                                    <i class="fa-solid fa-face-frown"></i> Insatisfeito (notas 1 e 2)
                                     <i class="fa-solid fa-arrow-up-right-from-square text-[9px] opacity-0 group-hover:opacity-100 transition"></i>
                                 </span>
-                                <span id="ia-modal-sent-neg" class="font-mono text-white font-bold">1%</span>
+                                <span id="ia-modal-sent-neg" class="font-mono text-white font-bold">--</span>
                             </div>
                             <div class="w-full bg-slate-800 h-1 rounded-full overflow-hidden">
-                                <div id="ia-modal-sent-neg-bar" class="bg-rose-500 h-full rounded-full" style="width: 1%"></div>
+                                <div id="ia-modal-sent-neg-bar" class="bg-rose-500 h-full rounded-full" style="width: 0%"></div>
                             </div>
                         </div>
                     </div>
 
                     <!-- Pontos Fortes & Recomendação da IA -->
                     <div class="bg-slate-950/80 border border-slate-800 rounded-2xl p-4 space-y-2">
-                        <span class="font-bold text-slate-300 block text-[11px]">Insights Práticos & Mentoria:</span>
-                        <ul class="space-y-1.5 text-[11px] text-slate-300">
-                            <li class="flex items-start gap-1.5">
-                                <i class="fa-solid fa-bolt text-amber-400 mt-0.5"></i>
-                                <span><strong class="text-white">Ponto Forte:</strong> Clareza na explicação técnica e agilidade no sistema.</span>
-                            </li>
-                            <li class="flex items-start gap-1.5">
-                                <i class="fa-solid fa-bullseye text-purple-400 mt-0.5"></i>
-                                <span><strong class="text-white">Recomendação:</strong> Manter a abordagem empática no encerramento das chamadas.</span>
-                            </li>
-                        </ul>
+                        <span class="font-bold text-slate-300 block text-[11px]">Pontos de atenção (dados reais):</span>
+                        <ul id="ia-modal-insights" class="space-y-1.5 text-[11px] text-slate-300"><li class="text-slate-500">--</li></ul>
                     </div>
                 </div>
 
@@ -1834,51 +1856,47 @@ if ($__wp_u && userHasWebphone($__wp_u)
             setTimeout(() => { toast.classList.add('hidden'); }, 3500);
         }
 
-        function openOperatorIaModal(name, ext, atendidas, total, tma, tme) {
+        window.__opSurvey = null;
+        async function openOperatorIaModal(name, ext, atendidas, total, tma, tme) {
             const modal = document.getElementById('modal-operator-ia');
             if (!modal) return;
-
-            const atend = parseInt(atendidas) || 0;
-            const tot = parseInt(total) || 0;
-
-            let score = 96;
-            let fcr = 98;
-            let empathy = "9.6/10";
-            let sentPos = 94;
-            let sentNeu = 5;
-            let sentNeg = 1;
-
-            if (tot > 0) {
-                const ratio = atend / tot;
-                score = Math.min(99, Math.max(88, Math.round(90 + (ratio * 9))));
-                fcr = Math.min(99, Math.max(85, Math.round(88 + (ratio * 11))));
-                sentPos = Math.min(98, Math.max(80, Math.round(85 + (ratio * 12))));
-                sentNeu = Math.max(2, 100 - sentPos - 1);
-                sentNeg = 100 - sentPos - sentNeu;
-            }
-
-            document.getElementById('ia-modal-op-name').innerText = name || ('Ramal ' + ext);
-            document.getElementById('ia-modal-ramal-badge').innerText = 'Ramal ' + ext;
-            document.getElementById('ia-modal-score').innerText = score + '%';
-            document.getElementById('ia-modal-score-bar').style.width = score + '%';
-            document.getElementById('ia-modal-fcr').innerText = fcr + '%';
-            document.getElementById('ia-modal-fcr-bar').style.width = fcr + '%';
-            document.getElementById('ia-modal-empathy').innerText = empathy;
-            
-            document.getElementById('ia-modal-sent-pos').innerText = sentPos + '%';
-            document.getElementById('ia-modal-sent-pos-bar').style.width = sentPos + '%';
-            document.getElementById('ia-modal-sent-neu').innerText = sentNeu + '%';
-            document.getElementById('ia-modal-sent-neu-bar').style.width = sentNeu + '%';
-            document.getElementById('ia-modal-sent-neg').innerText = sentNeg + '%';
-            document.getElementById('ia-modal-sent-neg-bar').style.width = sentNeg + '%';
-
-            let summary = `"Análise do histórico do operador ${name} (Ramal ${ext}): Nível de satisfação de ${score}%. Excelente polidez, clareza técnica e ótimo controle do tempo médio de atendimento (${tma || '0s'}). Resolução eficiente em primeira chamada!"`;
-            if (tot === 0) {
-                summary = `"Ramal ${ext} (${name}) pronto para operação. Padrão de configuração ativo no servidor de IA com índice esperado de satisfação estimado em ${score}%."`;
-            }
-            document.getElementById('ia-modal-summary').innerText = summary;
-
+            const $ = (id) => document.getElementById(id);
+            const atend = parseInt(atendidas) || 0, tot = parseInt(total) || 0;
+            $('ia-modal-op-name').innerText = name || ('Ramal ' + ext);
+            $('ia-modal-ramal-badge').innerText = 'Ramal ' + ext;
+            ['score', 'fcr', 'empathy', 'sent-pos', 'sent-neu', 'sent-neg'].forEach(k => { $('ia-modal-' + k).innerText = '--'; const b = $('ia-modal-' + k + '-bar'); if (b) b.style.width = '0%'; });
+            $('ia-modal-score-sub').innerText = '--'; $('ia-modal-fcr-sub').innerText = '--';
+            $('ia-modal-summary').innerText = 'Carregando dados reais da pesquisa...';
+            $('ia-modal-insights').innerHTML = '<li class="text-slate-500">--</li>';
+            window.__opSurvey = null;
             openModal('modal-operator-ia');
+            let d = null;
+            try { d = await (await fetch('index.php?api_action=operator_survey_stats&ext=' + encodeURIComponent(ext))).json(); } catch (e) {}
+            window.__opSurvey = d;
+            const taxaAt = tot > 0 ? Math.round(atend / tot * 100) : null;
+            const tmaTxt = tma ? ` TMA ${tma}.` : '';
+            if (!d || !d.has_data) {
+                $('ia-modal-summary').innerText = `Ramal ${ext} (${name}): ainda não há avaliações da pesquisa de satisfação nos últimos 30 dias.` + (tot > 0 ? ` No período do dashboard: ${atend} atendidas de ${tot} chamadas.${tmaTxt}` : '');
+                $('ia-modal-insights').innerHTML = '<li class="text-slate-400">Sem notas para analisar. A pesquisa é feita por ligação, ao final do atendimento.</li>';
+                return;
+            }
+            const pct = (v) => Math.round(v / d.n * 100);
+            const res = d.sim + d.nao_res;
+            $('ia-modal-score').innerText = d.media.toFixed(1).replace('.', ',') + ' / 5';
+            $('ia-modal-score-sub').innerText = pct(d.pos) + '% positivas';
+            $('ia-modal-score-bar').style.width = (d.media / 5 * 100) + '%';
+            $('ia-modal-fcr').innerText = res ? Math.round(d.sim / res * 100) + '%' : '--';
+            $('ia-modal-fcr-sub').innerText = res ? d.sim + ' de ' + res + ' respostas' : 'sem respostas';
+            $('ia-modal-fcr-bar').style.width = (res ? d.sim / res * 100 : 0) + '%';
+            $('ia-modal-empathy').innerText = d.n;
+            $('ia-modal-empathy-bar').style.width = '100%';
+            [['pos', d.pos], ['neu', d.neu], ['neg', d.neg]].forEach(([k, v]) => { $('ia-modal-sent-' + k).innerText = pct(v) + '% (' + v + ')'; $('ia-modal-sent-' + k + '-bar').style.width = pct(v) + '%'; });
+            $('ia-modal-summary').innerText = `Ramal ${ext} (${name}), últimos 30 dias: ${d.n} avaliações, média ${d.media.toFixed(1).replace('.', ',')} de 5; ${pct(d.pos)}% positivas, ${pct(d.neu)}% neutras e ${pct(d.neg)}% negativas.` + (res ? ` Problema resolvido em ${Math.round(d.sim / res * 100)}% das respostas.` : '');
+            const li = [];
+            if (d.neg > 0) li.push(`<i class="fa-solid fa-triangle-exclamation text-rose-400"></i> ${d.neg} nota(s) 1 ou 2: vale ouvir essas gravações em Pesquisa de Satisfação.`);
+            if (d.nao_res > 0) li.push(`<i class="fa-solid fa-circle-xmark text-amber-400"></i> ${d.nao_res} cliente(s) disseram que o problema não foi resolvido.`);
+            if (!li.length) li.push('<i class="fa-solid fa-circle-check text-emerald-400"></i> Nenhuma nota baixa nem problema não resolvido no período.');
+            $('ia-modal-insights').innerHTML = li.map(t => '<li class="flex items-start gap-1.5">' + t + '</li>').join('');
         }
 
         function openSentimentDetailsModal(type) {
@@ -1895,21 +1913,16 @@ if ($__wp_u && userHasWebphone($__wp_u)
             const titleEl = document.getElementById('sentiment-details-title');
             if (titleEl) titleEl.innerText = titles[type] || 'Detalhamento de Avaliação';
 
-            let html = `
-                <div class="p-3.5 bg-slate-950 border border-slate-800 rounded-2xl space-y-2">
-                    <div class="flex items-center justify-between text-xs">
-                        <span class="font-bold text-white">Chamada para ${opName} (${ramal})</span>
-                        <span class="text-slate-400 font-mono">Hoje, 14:32</span>
-                    </div>
-                    <p class="text-slate-300 text-xs italic">
-                        ${type === 'insatisfeito' ? '"Cliente relatou insatisfação quanto ao tempo de espera antes da conexão com o operador."' : (type === 'neutro' ? '"Atendimento técnico objetivo e direto sem interações emotivas."' : '"Cliente elogiou a presteza e clareza no atendimento do operador."')}
-                    </p>
-                    <div class="pt-1 flex items-center justify-between text-[11px] border-t border-slate-800/60">
-                        <span class="text-purple-400 font-bold flex items-center gap-1"><i class="fa-solid fa-brain"></i> Avaliado por IA</span>
-                        <a href="index.php?module=relatorios&action=cdr_gravacoes" class="text-brand-400 font-bold hover:underline flex items-center gap-1">Ver Gravações <i class="fa-solid fa-chevron-right text-[8px]"></i></a>
-                    </div>
-                </div>
-            `;
+            const key = type === 'positivo' ? 'pos' : (type === 'neutro' ? 'neu' : 'neg');
+            const rows = (window.__opSurvey && window.__opSurvey.recent && window.__opSurvey.recent[key]) || [];
+            const notaTxt = {5: 'Excelente / Ótimo', 4: 'Muito Bom', 3: 'Bom / Regular', 2: 'Ruim', 1: 'Péssimo'};
+            let html = rows.length ? rows.map(r => `
+                <div class="p-3 bg-slate-950 border border-slate-800 rounded-2xl flex items-center justify-between text-xs">
+                    <span class="font-bold text-white">${r.tel || '-'}</span>
+                    <span class="text-slate-300">${notaTxt[r.nota] || ''} (${r.nota})</span>
+                    <span class="text-slate-400 font-mono">${r.data} ${r.hora || ''}</span>
+                </div>`).join('') + `<a href="index.php?module=relatorios&action=pesquisa" class="block text-center text-brand-400 font-bold hover:underline text-xs pt-2">Ver relatório completo e ouvir gravações</a>`
+                : '<div class="p-3 text-slate-400 text-xs">Nenhuma chamada nesta categoria nos últimos 30 dias.</div>';
 
             if (container) container.innerHTML = html;
             openModal('modal-sentiment-details');
