@@ -1261,7 +1261,7 @@ $allowed_modules = [
     'whatsapp' => ['regras', 'historico', 'disparos', 'contatos'],
     'telefonia' => ['blacklist'],
     'manual' => ['view'],
-    'configuracoes' => ['ami', 'ia', 'api', 'usuarios', 'api_connection', 'smtp', 'logs', 'status', 'seguranca', 'chat_ia', 'console']
+    'configuracoes' => ['ami', 'ia', 'api', 'usuarios', 'api_connection', 'smtp', 'logs', 'status', 'seguranca', 'chat_ia', 'console', 'mapa']
 ];
 
 if (!isset($allowed_modules[$module]) || !in_array($action, $allowed_modules[$module])) {

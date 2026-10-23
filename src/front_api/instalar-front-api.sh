@@ -106,6 +106,18 @@ echo "[+] Copiando arquivos atualizados para $DEST_DIR..."
 mkdir -p "$DEST_DIR"
 /bin/cp -rf "$SOURCE_DIR/"* "$DEST_DIR/"
 
+# Mapa do Sistema: gera a partir do código e do histórico do repositório (se possível) e instala no painel
+REPO_ROOT="$(cd "$SOURCE_DIR/../.." 2>/dev/null && pwd)"
+if [ -f "$REPO_ROOT/scripts/gerar-mapa.py" ]; then
+  if command -v python3 &>/dev/null && command -v git &>/dev/null && [ -d "$REPO_ROOT/.git" ]; then
+    (cd "$REPO_ROOT" && { git rev-parse --is-shallow-repository 2>/dev/null | grep -q true && git fetch --unshallow -q 2>/dev/null; python3 scripts/gerar-mapa.py >/dev/null 2>&1; }) || true
+  fi
+  if [ -f "$REPO_ROOT/docs/mapa-do-ipbx.html" ]; then
+    mkdir -p "$DEST_DIR/pabx_panel/mapa"
+    /bin/cp -f "$REPO_ROOT/docs/mapa-do-ipbx.html" "$DEST_DIR/pabx_panel/mapa/mapa-do-ipbx.html" && echo "[+] Mapa do Sistema atualizado."
+  fi
+fi
+
 # Restaura a base e os logs de produção por cima dos arquivos de exemplo
 for rel in ".ht_whatsapp_config.sqlite" "pabx_panel/.ht_whatsapp_config.sqlite"; do
   if [ -f "$KEEP_DIR/$rel" ]; then

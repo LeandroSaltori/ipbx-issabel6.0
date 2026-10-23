@@ -120,4 +120,4 @@ Este documento estabelece as regras e padrões arquiteturais obrigatórios para 
 
 ## 13. MAPA DO IPBX — ATUALIZAÇÃO AUTOMÁTICA
 1. `scripts/gerar-mapa.py` gera `docs/mapa-do-ipbx.html` (cidade, conexões e histórico de entregas) a partir do código e do git. O hook `.githooks/pre-commit` roda o script a cada commit (ativar uma vez por clone: `git config core.hooksPath .githooks`).
-2. Publicação automática: `.github/workflows/mapa-ipbx.yml` gera o mapa a cada push na `main` e publica no GitHub Pages (https://leandrosaltori.github.io/ipbx-issabel6.0/), sem depender de pessoa nem de IA. Ativação única: Settings > Pages > Source: GitHub Actions.
+2. O instalador (`instalar-front-api.sh`) regenera o mapa a cada atualização no servidor e o instala em `pabx_panel/mapa/`, exibido em Configurações > Mapa do Sistema. Sem Python ou histórico completo, usa o `docs/mapa-do-ipbx.html` já versionado pelo hook.
