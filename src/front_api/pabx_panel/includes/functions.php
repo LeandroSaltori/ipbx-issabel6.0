@@ -6540,6 +6540,7 @@ function processWaScheduled() {
 }
 
 require_once __DIR__ . '/ai_actions_config.php';
+require_once __DIR__ . '/daily_summary.php';
 
 /** Confirma ou cancela uma proposta do próprio usuário (válida por 10 min). */
 function aiProposalResolve($id, $accept) {
@@ -6784,7 +6785,7 @@ function integrationStatusChecks() {
     } catch (Exception $e) { $add('Telefonia', 'Troncos', 'warn', 'Não foi possível consultar.'); }
 
     // --- Crons
-    foreach (['send_missed_calls' => 'Aviso de chamada perdida', 'send_queue_abandon' => 'Aviso de abandono de fila', 'send_call_summaries' => 'Resumo/gravação ao atendente', 'check_trunks' => 'Alerta de tronco', 'send_wa_scheduled' => 'WhatsApps agendados', 'send_scheduled_reports' => 'Relatórios agendados'] as $k => $lbl) {
+    foreach (['send_missed_calls' => 'Aviso de chamada perdida', 'send_queue_abandon' => 'Aviso de abandono de fila', 'send_call_summaries' => 'Resumo/gravação ao atendente', 'check_trunks' => 'Alerta de tronco', 'send_wa_scheduled' => 'WhatsApps agendados', 'send_scheduled_reports' => 'Relatórios agendados', 'send_daily_summary' => 'Resumo diário'] as $k => $lbl) {
         $t = (int)getSetting('cron_last_' . $k);
         if ($t <= 0) $add('Tarefas automáticas', $lbl, 'warn', 'Ainda não registrou execução (aguarde 1-2 minutos após atualizar).');
         else { $age = time() - $t; $add('Tarefas automáticas', $lbl, $age <= 180 ? 'ok' : 'fail', 'Última execução há ' . ($age < 90 ? $age . 's' : round($age / 60) . ' min') . ($age <= 180 ? '.' : ' — cron parado? verifique /etc/cron.d/ipbx-front-api.')); }

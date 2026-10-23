@@ -179,6 +179,7 @@ if [ -d /etc/cron.d ]; then
 # IPbx Prisma - WhatsApps agendados (painel e Chat IA) e relatórios agendados
 * * * * * asterisk $PHP_BIN $DEST_DIR/pabx_panel/cron/send_wa_scheduled.php >/dev/null 2>&1
 * * * * * asterisk $PHP_BIN $DEST_DIR/pabx_panel/cron/send_scheduled_reports.php >/dev/null 2>&1
+* * * * * asterisk $PHP_BIN $DEST_DIR/pabx_panel/cron/send_daily_summary.php >/dev/null 2>&1
 CRON
   chmod 644 /etc/cron.d/ipbx-front-api
   echo "[✓] Crons (abandono de fila, resumo de chamadas, chamadas perdidas, alerta de tronco, envios e relatórios agendados) instalados em /etc/cron.d/ipbx-front-api"
