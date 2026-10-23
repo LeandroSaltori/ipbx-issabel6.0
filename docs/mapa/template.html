@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mapa do IPbx</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: barra de abas no topo, palco de canvas ocupando a largura, painel de detalhe ao lado (empilha no celular) */
+:root{--bg:#f3f4f1;--panel:#ffffff;--ink:#1b2430;--mute:#5d6b7a;--line:#d7dcd6;--accent:#b4570a;--accent-ink:#ffffff;--ground:#e6e9e3;--shade:0;
+--font:'IBM Plex Sans',system-ui,sans-serif;--mono:'IBM Plex Mono',ui-monospace,monospace}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0e141b;--panel:#161e28;--ink:#e6ebf0;--mute:#8fa0b2;--line:#263243;--accent:#f0a24b;--accent-ink:#0e141b;--ground:#121a24;--shade:1;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0e141b;--panel:#161e28;--ink:#e6ebf0;--mute:#8fa0b2;--line:#263243;--accent:#f0a24b;--accent-ink:#0e141b;--ground:#121a24;--shade:1;color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--font);font-size:14px;padding-block:16px 28px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:1280px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:10px}
+h1{font-size:22px;font-weight:600;margin:0;letter-spacing:-.01em;text-wrap:balance}
+.sub{color:var(--mute);margin:2px 0 0;font-size:13px}
+.stats{display:flex;gap:18px;flex-wrap:wrap;font-family:var(--mono);font-size:12px;color:var(--mute)}
+.stats b{color:var(--ink);font-weight:500;font-size:15px;display:block}
+nav{display:flex;gap:4px;border-bottom:1px solid var(--line)}
+nav button{font:inherit;background:none;border:0;color:var(--mute);padding:9px 14px;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap}
+nav button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent);font-weight:600}
+nav button:focus-visible,.chip:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.stage{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:14px;align-items:start}
+@media(max-width:860px){.stage{grid-template-columns:minmax(0,1fr)}}
+.canvasbox{position:relative;background:var(--ground);border:1px solid var(--line);border-radius:10px;overflow:hidden;height:min(66vh,620px);min-height:380px}
+canvas{display:block;width:100%;height:100%;cursor:grab;touch-action:none}
+canvas.drag{cursor:grabbing}
+.tools{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px}
+.chip{font:inherit;font-size:12px;border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:5px 10px;border-radius:999px;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.chip[aria-pressed="false"]{opacity:.45}
+.chip[aria-pressed="true"].mode{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.dot{width:9px;height:9px;border-radius:2px;display:inline-block}
+aside{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;min-width:0}
+aside h2{font-size:13px;margin:0 0 8px;text-transform:uppercase;letter-spacing:.07em;color:var(--mute);font-weight:600}
+.file{font-family:var(--mono);font-size:12.5px;word-break:break-all}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;margin:10px 0;font-size:13px}
+.kv span:nth-child(odd){color:var(--mute)}
+.list{margin:8px 0 0;padding:0;list-style:none;display:flex;flex-direction:column;gap:3px;font-family:var(--mono);font-size:12px;max-height:230px;overflow:auto}
+.list li{display:flex;justify-content:space-between;gap:8px}
+.list li span:first-child{min-width:0;word-break:break-all}
+.hint{color:var(--mute);font-size:12px;margin:0}
+.tip{position:absolute;pointer-events:none;background:var(--panel);border:1px solid var(--line);padding:6px 9px;border-radius:6px;font-size:12px;font-family:var(--mono);max-width:260px;box-shadow:0 4px 14px rgb(0 0 0/.18);display:none;z-index:2}
+.hist{display:flex;flex-direction:column;gap:12px;min-width:0}
+.bars{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px;overflow-x:auto}
+.bars svg{display:block;min-width:640px;width:100%;height:190px}
+.clist{background:var(--panel);border:1px solid var(--line);border-radius:10px;max-height:340px;overflow:auto}
+.crow{display:grid;grid-template-columns:70px 84px minmax(0,1fr) auto;gap:10px;padding:7px 12px;border-bottom:1px solid var(--line);font-size:12.5px;align-items:baseline}
+.crow:last-child{border-bottom:0}
+.crow .h{font-family:var(--mono);color:var(--mute)}
+.crow .d{font-family:var(--mono)}
+.crow .n{font-family:var(--mono);color:var(--mute);white-space:nowrap}
+.crow .s{min-width:0;overflow-wrap:anywhere}
+@media(max-width:560px){.crow{grid-template-columns:70px minmax(0,1fr)}.crow .d,.crow .n{display:none}}
+input[type=search]{font:inherit;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:6px 10px;min-width:0;flex:1 1 180px}
+[hidden]{display:none!important}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head><body>
+<div class="wrap">
+<header>
+  <div><h1>Mapa do IPbx</h1><p class="sub">O código do painel e a história das entregas, desenhados a partir do repositório.</p></div>
+  <div class="stats" id="stats"></div>
+</header>
+<nav role="tablist" aria-label="Visões">
+  <button role="tab" id="t-city" aria-selected="true" data-v="city">Cidade</button>
+  <button role="tab" id="t-graph" aria-selected="false" data-v="graph">Conexões</button>
+  <button role="tab" id="t-hist" aria-selected="false" data-v="hist">Histórico</button>
+</nav>
+<div id="v-map">
+  <div class="tools" id="tools"></div>
+  <div class="stage">
+    <div class="canvasbox"><canvas id="cv" aria-label="Mapa do código"></canvas><div class="tip" id="tip"></div></div>
+    <aside id="side"></aside>
+  </div>
+  <p class="hint" style="margin-top:8px" id="maphint"></p>
+</div>
+<div id="v-hist" class="hist" hidden>
+  <div class="bars"><svg id="bars" viewBox="0 0 900 190" preserveAspectRatio="none" role="img" aria-label="Linhas alteradas por dia"></svg></div>
+  <div class="tools"><input type="search" id="q" placeholder="Buscar nas entregas (ex.: fila, IA, relatório)" aria-label="Buscar nas entregas"><span class="hint" id="cnt"></span></div>
+  <div class="clist" id="clist"></div>
+</div>
+</div>
+<script>
+const DATA=__DATA__;
+const N=DATA.nodes,E=DATA.edges,C=DATA.commits;
+const AREA_NAME={painel:'Painel (núcleo)',includes:'Funções e IA',cron:'Tarefas automáticas',instalador:'Instalação',configuracoes:'Configurações',relatorios:'Relatórios',ramais:'Ramais',whatsapp:'WhatsApp',filas:'Filas',dashboard:'Dashboard',manual:'Manual',telefonia:'Telefonia',troncos:'Troncos'};
+const areas=[...new Set(N.map(n=>n.a))].sort((a,b)=>N.filter(n=>n.a===b).reduce((s,n)=>s+n.l,0)-N.filter(n=>n.a===a).reduce((s,n)=>s+n.l,0));
+const hue={};areas.forEach((a,i)=>hue[a]=(i*137.5+20)%360);
+const on=Object.fromEntries(areas.map(a=>[a,true]));
+const dark=()=>{const t=document.documentElement.dataset.theme;return t?t==='dark':matchMedia('(prefers-color-scheme:dark)').matches};
+const col=(a,l=0,al=1)=>`hsl(${hue[a]} ${dark()?55:60}% ${(dark()?62:46)+l}% / ${al})`;
+const fmt=n=>n.toLocaleString('pt-BR');
+const $=id=>document.getElementById(id);
+let view='city',mode='lines',sel=null,hov=null;
+// ---- cabeçalho
+const tl=N.reduce((s,n)=>s+n.l,0);
+$('stats').innerHTML=`<div><b>${N.length}</b>arquivos</div><div><b>${fmt(tl)}</b>linhas</div><div><b>${C.length}</b>entregas</div><div><b>${C.length?C[0].d.split('-').reverse().join('/'):'-'}</b>primeira entrega</div>`;
+// ---- ferramentas
+function buildTools(){
+  const t=$('tools');t.innerHTML='';
+  if(view==='city'){
+    [['lines','Altura por linhas'],['chg','Altura por alterações']].forEach(([m,l])=>{const b=document.createElement('button');b.className='chip mode';b.textContent=l;b.setAttribute('aria-pressed',mode===m);b.onclick=()=>{mode=m;buildTools();layoutCity();draw()};t.appendChild(b)});
+  }
+  areas.forEach(a=>{const b=document.createElement('button');b.className='chip';b.setAttribute('aria-pressed',on[a]);b.innerHTML=`<span class="dot" style="background:${col(a)}"></span>${AREA_NAME[a]||a}`;b.onclick=()=>{on[a]=!on[a];buildTools();if(view==='graph')alpha=.4;draw()};t.appendChild(b)});
+  [['+',1.25],['−',.8]].forEach(([l,f])=>{const b=document.createElement('button');b.className='chip mode';b.setAttribute('aria-label',f>1?'Aproximar':'Afastar');b.textContent=l;b.onclick=()=>{zoomAt(cv.clientWidth/2,cv.clientHeight/2,f)};t.appendChild(b)});
+  const r=document.createElement('button');r.className='chip mode';r.textContent='Centralizar';r.onclick=()=>{fit();draw()};t.appendChild(r);
+}
+// ---- canvas base
+const cv=$('cv'),cx=cv.getContext('2d');let W=0,H=0,dpr=1;const T={x:0,y:0,k:1};
+function resize(){dpr=devicePixelRatio||1;W=cv.clientWidth;H=cv.clientHeight;cv.width=W*dpr;cv.height=H*dpr;draw()}
+addEventListener('resize',resize);
+function zoomAt(px,py,f){const nk=Math.min(6,Math.max(.25,T.k*f));const r=nk/T.k;T.x=px-(px-T.x)*r;T.y=py-(py-T.y)*r;T.k=nk;draw()}
+cv.addEventListener('wheel',e=>{e.preventDefault();const r=cv.getBoundingClientRect();zoomAt(e.clientX-r.left,e.clientY-r.top,e.deltaY<0?1.12:.89)},{passive:false});
+let drag=null;
+cv.addEventListener('pointerdown',e=>{cv.setPointerCapture(e.pointerId);drag={x:e.clientX,y:e.clientY,tx:T.x,ty:T.y,moved:false}});
+cv.addEventListener('pointermove',e=>{const r=cv.getBoundingClientRect();const px=e.clientX-r.left,py=e.clientY-r.top;
+  if(drag){const dx=e.clientX-drag.x,dy=e.clientY-drag.y;if(Math.abs(dx)+Math.abs(dy)>3)drag.moved=true;if(drag.moved){T.x=drag.tx+dx;T.y=drag.ty+dy;cv.classList.add('drag');draw();return}}
+  const h=pick(px,py);if(h!==hov){hov=h;draw()}tip(h,px,py)});
+cv.addEventListener('pointerup',e=>{cv.classList.remove('drag');if(drag&&!drag.moved){const r=cv.getBoundingClientRect();const h=pick(e.clientX-r.left,e.clientY-r.top);sel=h;side();draw()}drag=null});
+cv.addEventListener('pointerleave',()=>{hov=null;$('tip').style.display='none';draw()});
+function tip(h,px,py){const t=$('tip');if(!h){t.style.display='none';return}t.style.display='block';t.textContent=`${h.f} · ${fmt(h.l)} linhas`;t.style.left=Math.min(px+14,W-270)+'px';t.style.top=(py+14)+'px'}
+// ---- cidade (isométrica)
+const TW=44,TH=22;let B=[],DIS=[];
+function layoutCity(){
+  B=[];DIS=[];let ox=0,oy=0,rowH=0;const MAXW=22;
+  areas.forEach(a=>{
+    const fs=N.filter(n=>n.a===a).sort((p,q)=>q.l-p.l);const cols=Math.ceil(Math.sqrt(fs.length)),rows=Math.ceil(fs.length/cols);
+    const w=cols*1.25+.7,d=rows*1.25+.7;if(ox+w>MAXW&&ox>0){ox=0;oy+=rowH+1.4;rowH=0}
+    DIS.push({a,x:ox,y:oy,w,d});
+    fs.forEach((n,i)=>{const gx=ox+.35+(i%cols)*1.25+.12,gy=oy+.35+Math.floor(i/cols)*1.25+.12;
+      const v=mode==='lines'?n.l:n.c*40+n.l*.15;B.push({n,f:n.f,l:n.l,c:n.c,a,gx,gy,h:Math.max(.12,Math.sqrt(v)*.075)})});
+    ox+=w+1.4;rowH=Math.max(rowH,d);
+  });
+  fit();
+}
+const P=(gx,gy,z=0)=>[(gx-gy)*TW/2,(gx+gy)*TH/2-z*TH*1.6];
+function fit(){
+  if(view==='city'){let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;DIS.forEach(d=>[[d.x,d.y],[d.x+d.w,d.y],[d.x,d.y+d.d],[d.x+d.w,d.y+d.d]].forEach(([a,b])=>{const [px,py]=P(a,b);x0=Math.min(x0,px);x1=Math.max(x1,px);y0=Math.min(y0,py);y1=Math.max(y1,py)}));
+    B.forEach(b=>{const [,py]=P(b.gx,b.gy,b.h);y0=Math.min(y0,py)});
+    const k=Math.min((W-40)/(x1-x0||1),(H-40)/(y1-y0||1));T.k=Math.min(2.5,k||1);T.x=W/2-(x0+x1)/2*T.k;T.y=H/2-(y0+y1)/2*T.k;
+  }else{T.k=1;T.x=W/2;T.y=H/2}
+}
+function poly(pts){cx.beginPath();pts.forEach(([x,y],i)=>i?cx.lineTo(x,y):cx.moveTo(x,y));cx.closePath()}
+function bpts(b){const s=.78;const bp=[P(b.gx,b.gy),P(b.gx+s,b.gy),P(b.gx+s,b.gy+s),P(b.gx,b.gy+s)];const tp=[P(b.gx,b.gy,b.h),P(b.gx+s,b.gy,b.h),P(b.gx+s,b.gy+s,b.h),P(b.gx,b.gy+s,b.h)];return {bp,tp}}
+function drawCity(){
+  DIS.forEach(d=>{if(!on[d.a])return;const q=[P(d.x,d.y),P(d.x+d.w,d.y),P(d.x+d.w,d.y+d.d),P(d.x,d.y+d.d)];poly(q);cx.fillStyle=col(d.a,dark()?-38:30,dark()?.35:.22);cx.fill();cx.strokeStyle=col(d.a,0,.5);cx.lineWidth=1/T.k;cx.stroke();
+    const [lx,ly]=P(d.x,d.y+d.d);cx.fillStyle=col(d.a,dark()?10:-8);cx.font=`${600} ${11/T.k}px IBM Plex Sans, sans-serif`;cx.fillText((AREA_NAME[d.a]||d.a).toUpperCase(),lx+6/T.k,ly-(-12)/T.k)});
+  B.filter(b=>on[b.a]).sort((p,q)=>(p.gx+p.gy)-(q.gx+q.gy)).forEach(b=>{
+    const {bp,tp}=bpts(b);const hi=b===sel||b===hov;
+    poly([bp[3],bp[2],tp[2],tp[3]]);cx.fillStyle=col(b.a,dark()?-12:-10);cx.fill();
+    poly([bp[1],bp[2],tp[2],tp[1]]);cx.fillStyle=col(b.a,dark()?-22:-20);cx.fill();
+    poly(tp);cx.fillStyle=hi?(dark()?'#fff':'#222'):col(b.a,dark()?8:6);cx.fill();
+    cx.strokeStyle=hi?col(b.a,0):col(b.a,-30,.6);cx.lineWidth=(hi?2:.6)/T.k;poly([tp[3],bp[3],bp[2],bp[1],tp[1],tp[0]]);cx.stroke();
+  });
+}
+function pickCity(px,py){const x=(px-T.x)/T.k,y=(py-T.y)/T.k;
+  const bs=B.filter(b=>on[b.a]).sort((p,q)=>(q.gx+q.gy)-(p.gx+p.gy));
+  for(const b of bs){const {bp,tp}=bpts(b);const pg=[tp[0],tp[1],bp[1],bp[2],bp[3],tp[3]];if(inPoly(x,y,pg))return b}return null}
+function inPoly(x,y,pg){let c=false;for(let i=0,j=pg.length-1;i<pg.length;j=i++){const [xi,yi]=pg[i],[xj,yj]=pg[j];if((yi>y)!==(yj>y)&&x<(xj-xi)*(y-yi)/(yj-yi)+xi)c=!c}return c}
+// ---- grafo de conexões
+let G=[],GE=[],alpha=1;
+function layoutGraph(){
+  const ac={};areas.forEach((a,i)=>{const t=i/areas.length*Math.PI*2;ac[a]=[Math.cos(t)*260,Math.sin(t)*200]});
+  G=N.map(n=>({n,f:n.f,l:n.l,c:n.c,a:n.a,id:n.id,x:ac[n.a][0]+Math.random()*60-30,y:ac[n.a][1]+Math.random()*60-30,vx:0,vy:0,r:4+Math.sqrt(n.l)/3.2,deg:0}));
+  const seen=new Set();GE=[];E.forEach(([s,t,k,w])=>{const key=s+'-'+t;if(seen.has(key))return;seen.add(key);GE.push({s:G[s],t:G[t],k,w:w||1});G[s].deg++;G[t].deg++});
+  GE=GE.filter(e=>e.k==='inclui'||e.w>=2);
+  alpha=1;T.k=.9;T.x=W/2;T.y=H/2;
+}
+function stepGraph(){
+  if(alpha<.005)return false;
+  const ac={};areas.forEach((a,i)=>{const t=i/areas.length*Math.PI*2;ac[a]=[Math.cos(t)*230,Math.sin(t)*180]});
+  const vis=G.filter(g=>on[g.a]);
+  for(let i=0;i<vis.length;i++){const a=vis[i];
+    for(let j=i+1;j<vis.length;j++){const b=vis[j];let dx=a.x-b.x,dy=a.y-b.y,d2=dx*dx+dy*dy+.01;const min=(a.r+b.r+10);const f=Math.min(2200/d2,6);const d=Math.sqrt(d2);dx/=d;dy/=d;a.vx+=dx*f*alpha;a.vy+=dy*f*alpha;b.vx-=dx*f*alpha;b.vy-=dy*f*alpha;if(d<min){const p=(min-d)*.04;a.vx+=dx*p;a.vy+=dy*p;b.vx-=dx*p;b.vy-=dy*p}}
+    a.vx+=(ac[a.a][0]-a.x)*.012*alpha;a.vy+=(ac[a.a][1]-a.y)*.012*alpha}
+  GE.forEach(e=>{if(!on[e.s.a]||!on[e.t.a])return;const dx=e.t.x-e.s.x,dy=e.t.y-e.s.y,d=Math.sqrt(dx*dx+dy*dy)||1;const f=(d-90)*.006*Math.min(1.5,.5+e.w*.12)*alpha;e.s.vx+=dx/d*f;e.s.vy+=dy/d*f;e.t.vx-=dx/d*f;e.t.vy-=dy/d*f});
+  vis.forEach(g=>{g.vx*=.82;g.vy*=.82;g.x+=g.vx;g.y+=g.vy});alpha*=.985;return true;
+}
+function drawGraph(){
+  const focus=sel||hov;const nb=new Set();if(focus)GE.forEach(e=>{if(e.s===focus)nb.add(e.t);if(e.t===focus)nb.add(e.s)});
+  GE.forEach(e=>{if(!on[e.s.a]||!on[e.t.a])return;const act=focus&&(e.s===focus||e.t===focus);cx.beginPath();cx.moveTo(e.s.x,e.s.y);cx.lineTo(e.t.x,e.t.y);
+    cx.strokeStyle=act?col(e.s.a,0,.95):(dark()?'rgba(160,180,200,.14)':'rgba(40,60,80,.14)');cx.lineWidth=(act?1.6:Math.min(2,.5+e.w*.08))/T.k;if(e.k==='inclui')cx.setLineDash([4/T.k,3/T.k]);else cx.setLineDash([]);cx.stroke()});
+  cx.setLineDash([]);
+  G.filter(g=>on[g.a]).forEach(g=>{const dim=focus&&g!==focus&&!nb.has(g);cx.beginPath();cx.arc(g.x,g.y,g.r,0,7);cx.fillStyle=col(g.a,0,dim?.25:1);cx.fill();
+    if(g===focus){cx.lineWidth=2.5/T.k;cx.strokeStyle=dark()?'#fff':'#111';cx.stroke()}
+    if(g.r>9||g===focus||nb.has(g)){cx.fillStyle=dark()?'#e6ebf0':'#1b2430';cx.globalAlpha=dim?.3:1;cx.font=`${11/T.k}px IBM Plex Mono, monospace`;cx.fillText(g.f.split('/').pop(),g.x+g.r+3/T.k,g.y+3/T.k);cx.globalAlpha=1}});
+}
+function pickGraph(px,py){const x=(px-T.x)/T.k,y=(py-T.y)/T.k;let best=null,bd=1e9;G.forEach(g=>{if(!on[g.a])return;const d=Math.hypot(g.x-x,g.y-y);if(d<g.r+4/T.k&&d<bd){bd=d;best=g}});return best}
+const pick=(x,y)=>view==='city'?pickCity(x,y):pickGraph(x,y);
+let raf=0;
+function draw(){cancelAnimationFrame(raf);raf=requestAnimationFrame(()=>{
+  cx.setTransform(dpr,0,0,dpr,0,0);cx.clearRect(0,0,W,H);cx.translate(T.x,T.y);cx.scale(T.k,T.k);
+  if(view==='city')drawCity();else{const moving=stepGraph();drawGraph();if(moving)draw()}
+})}
+// ---- painel lateral
+function side(){
+  const s=$('side');
+  if(!sel){const tot=areas.map(a=>[a,N.filter(n=>n.a===a)]);
+    s.innerHTML=`<h2>Áreas</h2><ul class="list">${tot.map(([a,f])=>`<li><span><span class="dot" style="background:${col(a)}"></span> ${AREA_NAME[a]||a}</span><span>${fmt(f.reduce((x,n)=>x+n.l,0))}</span></li>`).join('')}</ul><p class="hint" style="margin-top:10px">Clique em um prédio ou ponto para ver o arquivo e quem se liga a ele.</p>`;return}
+  const id=sel.n.id,ins=E.filter(e=>e[1]===id).map(e=>N[e[0]]),outs=E.filter(e=>e[0]===id).map(e=>N[e[1]]);
+  const li=(arr)=>arr.length?`<ul class="list">${arr.slice(0,40).map(n=>`<li><span>${n.f}</span><span>${fmt(n.l)}</span></li>`).join('')}</ul>`:'<p class="hint">Nenhum.</p>';
+  s.innerHTML=`<h2>${AREA_NAME[sel.a]||sel.a}</h2><div class="file">${sel.f}</div><div class="kv"><span>Linhas</span><span>${fmt(sel.l)}</span><span>Entregas que mexeram</span><span>${sel.c}</span><span>Usa</span><span>${outs.length} arquivos</span><span>É usado por</span><span>${ins.length} arquivos</span></div><h2 style="margin-top:12px">É usado por</h2>${li(ins)}<h2 style="margin-top:12px">Usa</h2>${li(outs)}`;
+}
+// ---- histórico
+function hist(){
+  const by={};C.forEach(c=>{(by[c.d]=by[c.d]||{d:c.d,n:0,v:0}).n++;by[c.d].v+=c.ins+c.del});
+  const days=Object.values(by).sort((a,b)=>a.d<b.d?-1:1);const mx=Math.max(1,...days.map(d=>d.v));
+  const w=900,h=190,pl=44,pb=24,pt=10,bw=Math.max(3,(w-pl-8)/days.length-2);
+  let s='';for(let i=0;i<=3;i++){const v=mx*i/3,y=h-pb-(h-pb-pt)*i/3;s+=`<line x1="${pl}" x2="${w}" y1="${y}" y2="${y}" stroke="var(--line)" stroke-width="1"/><text x="${pl-6}" y="${y+4}" text-anchor="end" font-size="10" font-family="IBM Plex Mono" fill="var(--mute)">${v>=1000?Math.round(v/1000)+'k':Math.round(v)}</text>`}
+  days.forEach((d,i)=>{const x=pl+i*((w-pl-8)/days.length),bh=(h-pb-pt)*d.v/mx;s+=`<rect x="${x}" y="${h-pb-bh}" width="${bw}" height="${bh}" fill="var(--accent)" rx="1"><title>${d.d.split('-').reverse().join('/')}: ${d.n} entregas, ${fmt(d.v)} linhas alteradas</title></rect>`;
+    if(i%Math.ceil(days.length/8)===0)s+=`<text x="${x}" y="${h-6}" font-size="10" font-family="IBM Plex Mono" fill="var(--mute)">${d.d.slice(8)}/${d.d.slice(5,7)}</text>`});
+  s+=`<text x="${pl}" y="8" font-size="10" font-family="IBM Plex Sans" fill="var(--mute)">linhas alteradas por dia</text>`;
+  $('bars').innerHTML=s;listCommits('');
+}
+function listCommits(q){const ql=q.toLowerCase();const rows=C.slice().reverse().filter(c=>!ql||c.s.toLowerCase().includes(ql));
+  $('cnt').textContent=`${rows.length} de ${C.length} entregas`;
+  $('clist').innerHTML=rows.map(c=>`<div class="crow"><span class="h">${c.h}</span><span class="d">${c.d.split('-').reverse().join('/')}</span><span class="s">${c.s.replace(/</g,'&lt;')}</span><span class="n">+${fmt(c.ins)} −${fmt(c.del)}</span></div>`).join('')||'<div class="crow"><span class="s">Nenhuma entrega encontrada.</span></div>'}
+$('q').addEventListener('input',e=>listCommits(e.target.value));
+// ---- abas
+function go(v){view=v;sel=null;hov=null;
+  document.querySelectorAll('nav button').forEach(b=>b.setAttribute('aria-selected',b.dataset.v===v));
+  $('v-map').hidden=v==='hist';$('v-hist').hidden=v!=='hist';
+  if(v==='hist'){hist();return}
+  $('maphint').textContent=v==='city'?'Cada prédio é um arquivo: a altura mostra o tamanho e a cor mostra a área. Arraste para mover, role para aproximar.':'Cada ponto é um arquivo e as linhas mostram quem usa quem (tracejado: inclusão direta). Arquivos muito ligados ficam no centro.';
+  buildTools();resize();if(v==='city')layoutCity();else layoutGraph();side();draw()}
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>go(b.dataset.v));
+matchMedia('(prefers-color-scheme:dark)').addEventListener('change',()=>{buildTools();draw()});
+new MutationObserver(()=>{buildTools();draw()}).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+go('city');
+</script>
+
+</body></html>

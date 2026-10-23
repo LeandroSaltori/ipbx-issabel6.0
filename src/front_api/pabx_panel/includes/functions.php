@@ -2452,33 +2452,33 @@ function getAsteriskQueueFullDetails($q_num, $ast_db = null) {
         'max_wait_time_label' => '—',
         'max_wait_mode' => '—',
         'agent_timeout' => '—',
-        'agent_timeout_restart' => 'Não',
+        'agent_timeout_restart' => '—',
         'retry' => '—',
         'wrap_up_time' => '—',
-        'member_delay' => '0 segundos',
-        'agent_announcement' => 'Nenhum',
-        'report_hold_time' => 'Não',
-        'auto_pause' => 'Não',
-        'auto_pause_busy' => 'Sim',
-        'auto_pause_unavail' => 'Sim',
-        'auto_pause_delay' => '0s',
+        'member_delay' => '—',
+        'agent_announcement' => '—',
+        'report_hold_time' => '—',
+        'auto_pause' => '—',
+        'auto_pause_busy' => '—',
+        'auto_pause_unavail' => '—',
+        'auto_pause_delay' => '—',
         'max_callers' => '—',
         'join_empty' => '—',
         'leave_empty' => '—',
-        'penalty_members_limit' => 'Honor Penalties',
+        'penalty_members_limit' => '—',
         'announce_frequency' => '—',
-        'announce_position' => 'Sim',
-        'announce_hold_time' => 'Sim',
-        'ivr_breakout' => 'Nenhum',
-        'repeat_frequency' => '0s',
-        'event_when_called' => 'Sim',
-        'member_status_event' => 'Sim',
-        'service_level' => '1 minute (60s)',
+        'announce_position' => '—',
+        'announce_hold_time' => '—',
+        'ivr_breakout' => '—',
+        'repeat_frequency' => '—',
+        'event_when_called' => '—',
+        'member_status_event' => '—',
+        'service_level' => '—',
         'recording' => '—',
         'recording_mode' => '—',
-        'caller_vol' => 'Sem Ajuste',
-        'agent_vol' => 'Sem Ajuste',
-        'mark_answered_elsewhere' => 'Sim',
+        'caller_vol' => '—',
+        'agent_vol' => '—',
+        'mark_answered_elsewhere' => '—',
         'members' => [],
         'failover_dest' => '',
         'failover_label' => 'Não configurado'
@@ -2892,8 +2892,8 @@ function resolveAsteriskDestinationTree($dest, $ast_db = null, $ext_names = [], 
 
         $rg_title = "Grupo de Ramais #$rg_num";
         $rg_list = [];
-        $rg_strategy = 'ringall';
-        $rg_time = '20';
+        $rg_strategy = '';
+        $rg_time = '';
         $postdest = '';
 
         if ($ast_db && $rg_num) {
@@ -2940,10 +2940,10 @@ function resolveAsteriskDestinationTree($dest, $ast_db = null, $ext_names = [], 
             'type' => 'ringgroup',
             'group_num' => $rg_num,
             'title' => "Grupo de Ramais (Ring Group): $rg_title (#$rg_num)",
-            'desc' => "Estratégia: " . ($strategy_labels[$rg_strategy] ?? $rg_strategy) . " | Tempo de Toque: {$rg_time}s",
+            'desc' => "Estratégia: " . ($rg_strategy === '' ? 'Não informada' : ($strategy_labels[$rg_strategy] ?? $rg_strategy)) . " | Tempo de Toque: " . ($rg_time === '' ? 'Não informado' : "{$rg_time}s"),
             'badge' => 'Grupo de Chamada',
             'color' => 'indigo',
-            'strategy_label' => $strategy_labels[$rg_strategy] ?? $rg_strategy,
+            'strategy_label' => $rg_strategy === '' ? 'Não informada' : ($strategy_labels[$rg_strategy] ?? $rg_strategy),
             'ring_time' => $rg_time,
             'members' => $rg_list,
             'postdest' => $postdest,
@@ -3034,9 +3034,9 @@ function resolveAsteriskDestinationTree($dest, $ast_db = null, $ext_names = [], 
         $ivr_title = $ivr_id ? "URA #$ivr_id" : "Menu de Opções URA";
         $entries = [];
         $audio_file = "";
-        $timeout = "5s";
-        $invalid_loops = "3";
-        $directdial = "Desativada";
+        $timeout = "—";
+        $invalid_loops = "—";
+        $directdial = "—";
         $invalid_dest = "";
         $timeout_dest = "";
 
@@ -3055,6 +3055,7 @@ function resolveAsteriskDestinationTree($dest, $ast_db = null, $ext_names = [], 
                 if (isset($ivr_row['invalid_loops']) && $ivr_row['invalid_loops'] !== '') {
                     $invalid_loops = $ivr_row['invalid_loops'] . "x";
                 }
+                $directdial = 'Desativada';
                 if (!empty($ivr_row['directdial']) && strtolower($ivr_row['directdial']) !== 'disabled') {
                     $directdial = "Permitida (" . strtoupper($ivr_row['directdial']) . ")";
                 }

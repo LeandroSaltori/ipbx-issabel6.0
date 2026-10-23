@@ -1,0 +1,4 @@
+#!/bin/sh
+# Atualiza o Mapa do IPbx a cada commit (não bloqueia o commit se falhar)
+python3 "$(git rev-parse --show-toplevel)/scripts/gerar-mapa.py" >/dev/null 2>&1 && git add docs/mapa-do-ipbx.html
+exit 0

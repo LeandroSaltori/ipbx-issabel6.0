@@ -115,3 +115,9 @@ Este documento estabelece as regras e padrões arquiteturais obrigatórios para 
 1. Atualizar o sistema **não pode remover nem redefinir** chaves de API, tokens, URLs de servidor e integrações já configuradas (Prismabot, WhatsApp direto, IA, REST API do PABX, SMTP, Telegram, webhooks etc.), para o cliente não precisar reconfigurar.
 2. A base viva `.ht_whatsapp_config.sqlite` e os arquivos de configuração fora da pasta do painel (ex.: `/etc/ipbx/*.conf`) são preservados pelo instalador; migrações de esquema só acrescentam colunas/tabelas, e valores padrão só são gravados na primeira execução.
 3. Só se remove uma credencial quando for **extremamente necessário** (ex.: provedor descontinuado), e isso deve ser dito ao usuário antes de publicar.
+
+---
+
+## 13. MAPA DO IPBX — ATUALIZAÇÃO AUTOMÁTICA
+1. `scripts/gerar-mapa.py` gera `docs/mapa-do-ipbx.html` (cidade, conexões e histórico de entregas) a partir do código e do git. O hook `.githooks/pre-commit` roda o script a cada commit (ativar uma vez por clone: `git config core.hooksPath .githooks`).
+2. A versão publicada como página (Artifact "Mapa do IPbx") é republicada a cada entrega pelo Claude, sem o usuário precisar pedir.
