@@ -229,7 +229,7 @@ if ($ast_db) {
                         </a>
                     </div>
 
-                    <?php echo cdrDedupCheckbox(); ?>
+                    <?php echo cdrDedupCheckbox(); ?><script>window.__ipbxCallType="<?php echo $include_internal ? "all" : "external"; ?>";</script>
                     <!-- Checkbox de Chamadas Internas -->
                     <label class="flex items-center gap-2 text-xs text-slate-300 font-bold cursor-pointer bg-slate-950 px-3 py-1.5 rounded-xl border border-slate-800 hover:border-slate-700 transition" title="Marque para somar ligações entre ramais no total geral e mapa de calor">
                         <input type="checkbox" name="include_internal" value="1" <?php echo $include_internal ? 'checked' : ''; ?> onchange="this.form.submit()" class="rounded border-slate-700 bg-slate-900 text-brand-500 focus:ring-brand-500 w-3.5 h-3.5 cursor-pointer">

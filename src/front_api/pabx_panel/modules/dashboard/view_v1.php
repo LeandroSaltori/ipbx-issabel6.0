@@ -390,6 +390,7 @@ if ($ast_db) {
             <input type="hidden" name="period" value="personalizado">
             <input type="hidden" name="call_type" value="<?php echo htmlspecialchars($call_type_filter); ?>">
             <?php echo cdrDedupCheckbox(); ?>
+            <script>window.__ipbxCallType="<?php echo htmlspecialchars($call_type_filter); ?>";</script>
 
             <!-- Filtro de Período -->
             <div class="bg-slate-950/80 border border-slate-800 p-1 rounded-xl flex items-center gap-1 text-xs font-bold">
@@ -1144,7 +1145,7 @@ async function triggerAiInsightsAnalysis() {
         const tmaSec = <?php echo (int)$tma_medio_geral; ?>;
         const tmeSec = <?php echo (int)$tme_medio_geral; ?>;
 
-        const res = await fetch('index.php?api_action=analyze_pabx_insights'+(window.__ipbxDedup===undefined?'':'&dedup='+window.__ipbxDedup)+'', {
+        const res = await fetch('index.php?api_action=analyze_pabx_insights'+(window.__ipbxDedup===undefined?'':'&dedup='+window.__ipbxDedup)+(window.__ipbxCallType===undefined?'':'&call_type='+window.__ipbxCallType)+'', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ total, atendidas, tmaSec, tmeSec, module: 'Dashboard', periodo: '<?php echo date('d/m/Y', strtotime($start_date)) . ' a ' . date('d/m/Y', strtotime($end_date)); ?>', extras: { 'Tipo de chamadas': '<?php echo $call_type_filter === 'external' ? 'somente externas (clientes)' : ($call_type_filter === 'internal' ? 'somente internas (ramal a ramal)' : 'todas (externas e internas)'); ?>' } })

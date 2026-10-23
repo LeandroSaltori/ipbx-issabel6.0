@@ -1038,7 +1038,7 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
             $pct = $atend !== null ? round(($atend / $tot) * 100, 1) : null;
             $r = aiChatCompletion(
                 'Você é analista de PABX IP. Retorne apenas JSON puro no formato {"insights": ["...","...","..."]}, com no máximo 3 itens curtos, objetivos e em português. Use somente os números informados; não invente dados.',
-                "Módulo: $module." . (isset($_GET['dedup']) ? ($_GET['dedup'] === '0' ? ' Filtro da tela: SEM ocultar chamadas repetidas (contagem bruta da telefonia, cada ramal que tocou conta).' : ' Filtro da tela: chamadas repetidas OCULTADAS (ligação que tocou em vários ramais conta uma vez só, a de maior duração).') : '') . ($periodo !== '' ? " Período: $periodo." : '') . " Chamadas: $tot" . ($atend !== null ? "; atendidas: $atend ($pct%)" : '') . ($tma !== null ? "; TMA (conversa): {$tma}s" : '') . ($tme !== null ? "; TME (espera): {$tme}s" : '') . '.' . ($extras ? ' Outros dados reais: ' . implode('; ', $extras) . '.' : '') . ' Se um indicador não foi informado, não comente sobre ele.',
+                "Módulo: $module." . (isset($_GET['call_type']) ? ' Tipo de chamadas na tela: ' . cdrTypeLabel(cdrTypeSel()) . '.' : '') . (isset($_GET['dedup']) ? ($_GET['dedup'] === '0' ? ' Filtro da tela: SEM ocultar chamadas repetidas (todos os registros da telefonia, cada ramal que tocou conta).' : ' Filtro da tela: chamadas repetidas OCULTADAS (ligação que tocou em vários ramais conta uma vez só, a de maior duração).') : '') . ($periodo !== '' ? " Período: $periodo." : '') . " Chamadas: $tot" . ($atend !== null ? "; atendidas: $atend ($pct%)" : '') . ($tma !== null ? "; TMA (conversa): {$tma}s" : '') . ($tme !== null ? "; TME (espera): {$tme}s" : '') . '.' . ($extras ? ' Outros dados reais: ' . implode('; ', $extras) . '.' : '') . ' Se um indicador não foi informado, não comente sobre ele.',
                 20, $cfg
             );
             if ($r['ok']) {
@@ -3393,7 +3393,7 @@ window.ipbxIaRun = async function (o) {
   if (btn) { btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Analisando...'; btn.disabled = true; }
   var esc = function (t) { return String(t == null ? '' : t).replace(/[&<>"]/g, function (c) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); };
   try {
-    var r = await fetch('index.php?api_action=analyze_pabx_insights'+(window.__ipbxDedup===undefined?'':'&dedup='+window.__ipbxDedup)+'', { method: 'POST', headers: {'Content-Type': 'application/json'},
+    var r = await fetch('index.php?api_action=analyze_pabx_insights'+(window.__ipbxDedup===undefined?'':'&dedup='+window.__ipbxDedup)+(window.__ipbxCallType===undefined?'':'&call_type='+window.__ipbxCallType)+'', { method: 'POST', headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({ module: o.module, periodo: o.periodo || '', total: o.total, atendidas: o.atendidas, tmaSec: o.tmaSec, tmeSec: o.tmeSec, extras: o.extras || {} }) });
     var d = await r.json();
     if (!d.success) throw new Error(d.error || 'Falha na análise');

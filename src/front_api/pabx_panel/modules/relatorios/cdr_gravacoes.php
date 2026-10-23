@@ -76,6 +76,7 @@ if ($ast_db) {
         if ($hide_zero && $min_duration < 1) $min_duration = 1;
         if ($min_duration > 0) { $where_clauses[] = "billsec >= :md"; $params[':md'] = $min_duration; }
         $where_clauses[] = cdrDedupCond();
+        $where_clauses[] = cdrTypeCond();
         if ($only_recorded) $where_clauses[] = "recordingfile IS NOT NULL AND recordingfile <> ''";
 
         if ($status_filter !== 'ALL') {
@@ -188,6 +189,7 @@ if (isset($_GET['export']) && in_array($_GET['export'], ['csv', 'xlsx', 'pdf'], 
                 </select>
                 <input type="text" name="queue_filter" value="<?php echo htmlspecialchars($queue_filter); ?>" placeholder="Fila/Grupo" class="w-24 px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:border-brand-500 focus:outline-none">
                 <input type="number" min="0" name="min_duration" value="<?php echo $min_duration ?: ''; ?>" placeholder="Dur. mín (s)" class="w-28 px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:border-brand-500 focus:outline-none">
+                <?php echo cdrTypeSelect(); ?>
                 <?php echo cdrDedupCheckbox(); ?>
                 <label class="flex items-center gap-1 text-xs text-slate-300"><input type="checkbox" name="hide_zero" value="1" <?php echo $hide_zero ? 'checked' : ''; ?>> Ocultar zeradas</label>
                 <label class="flex items-center gap-1 text-xs text-slate-300"><input type="checkbox" name="only_recorded" value="1" <?php echo $only_recorded ? 'checked' : ''; ?>> Só com gravação</label>
@@ -517,7 +519,7 @@ function exportToCSV() {
         btn.disabled = true;
 
         try {
-            const res = await fetch('index.php?api_action=analyze_pabx_insights'+(window.__ipbxDedup===undefined?'':'&dedup='+window.__ipbxDedup)+'', {
+            const res = await fetch('index.php?api_action=analyze_pabx_insights'+(window.__ipbxDedup===undefined?'':'&dedup='+window.__ipbxDedup)+(window.__ipbxCallType===undefined?'':'&call_type='+window.__ipbxCallType)+'', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({ total: <?php echo (int)$cdr_total; ?>, atendidas: <?php echo (int)$cdr_ans; ?>, tmaSec: <?php echo (int)$cdr_tma; ?>, tmeSec: <?php echo (int)$cdr_tme; ?>, module: 'Gravações CDR', periodo: '<?php echo date('d/m/Y H:i', strtotime($date_start)) . ' a ' . date('d/m/Y H:i', strtotime($date_end)); ?>', extras: { 'Tipo de chamadas': '<?php echo $type_filter === 'INTERNAL' ? 'somente internas (ramal a ramal)' : ($type_filter === 'EXTERNAL' ? 'somente externas (clientes)' : 'todas (externas e internas)'); ?>' }, periodo: '<?php echo date('d/m/Y', strtotime($date_start)) . ' a ' . date('d/m/Y', strtotime($date_end)); ?>' })

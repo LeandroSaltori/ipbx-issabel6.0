@@ -79,6 +79,8 @@ if ($type_filter === 'INTERNAL') {
 }
 
 $where_sql_raw = implode(' AND ', $where_clauses);
+$where_clauses[] = cdrTypeCond();
+$where_sql_raw = implode(' AND ', $where_clauses);
 $where_clauses[] = cdrDedupCond();
 $where_sql = implode(' AND ', $where_clauses);
 
@@ -264,7 +266,7 @@ $topic_rules = array_values(array_filter($rules_all, function ($r) { return $r['
         <form method="GET" action="index.php" class="flex flex-col gap-3 pt-3 border-t border-slate-800/80 text-xs font-semibold relative z-10">
             <input type="hidden" name="module" value="relatorios">
             <input type="hidden" name="action" value="ia_analytics">
-            <div><?php echo cdrDedupCheckbox(); ?></div>
+            <div class="flex items-center gap-3"><?php echo cdrTypeSelect(); ?> <?php echo cdrDedupCheckbox(); ?></div>
 
             <div class="flex flex-wrap items-center gap-2 w-full">
                 <input type="hidden" name="preset" id="preset_input" value="<?php echo htmlspecialchars($filter_preset); ?>">
@@ -783,7 +785,7 @@ async function runGlobalAiAnalysis() {
         const tma = <?php echo $avg_tma; ?>;
         const tme = <?php echo $avg_tme; ?>;
 
-        const res = await fetch('index.php?api_action=analyze_pabx_insights'+(window.__ipbxDedup===undefined?'':'&dedup='+window.__ipbxDedup)+'', {
+        const res = await fetch('index.php?api_action=analyze_pabx_insights'+(window.__ipbxDedup===undefined?'':'&dedup='+window.__ipbxDedup)+(window.__ipbxCallType===undefined?'':'&call_type='+window.__ipbxCallType)+'', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ total, atendidas: atend, tmaSec: tma, tmeSec: tme, module: 'Auditoria de IA', periodo: '<?php echo date('d/m/Y', strtotime($start_date)) . ' a ' . date('d/m/Y', strtotime($end_date)); ?>', extras: { 'Tipo de chamadas': '<?php echo $type_filter === 'INTERNAL' ? 'somente internas (ramal a ramal)' : ($type_filter === 'EXTERNAL' ? 'somente externas (clientes)' : 'todas (externas e internas)'); ?>' } })
