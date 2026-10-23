@@ -49,3 +49,7 @@ Instalados por `instalar-front-api.sh` em `/etc/cron.d/ipbx-front-api` (a cada m
 ## Regras de dados
 
 Relatórios e chat nunca usam números inventados; sem dado, a tela mostra "Sem avaliação"/"Sem registros". Toda análise de IA usa o período do filtro da tela. Atualizações não removem chaves de API nem integrações já configuradas.
+
+## Banco de dados sem digitar senha
+
+O painel lê a senha do MySQL de `/etc/issabel.conf` (ou `/etc/amportal.conf`) e tenta as credenciais conhecidas em `getAsteriskPdoConnection()`. Nada de senha em tela ou no Git. Diagnóstico em `includes/db_diagnose.php`: `dbDiagnose()` (MySQL no ar? arquivos legíveis? qual banco responde?), `dbRepair()` (não apaga ajustes manuais; ajusta permissões da pasta `config`) e `supportReportText()` (relatório sem segredos). Expostos em Configurações > Status (`status_repair`, `status_report`) e no fim do instalador (`cron/db_check.php`).

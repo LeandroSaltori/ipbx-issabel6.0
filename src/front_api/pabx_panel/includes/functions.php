@@ -3687,6 +3687,8 @@ function syncPabxCallsToContacts() {
 /**
  * Retorna uma conexão PDO ativa com o MySQL do Asterisk (Local ou Remoto)
  */
+require_once __DIR__ . '/db_diagnose.php';
+
 function getAsteriskPdoConnection($dbname = 'asteriskcdrdb') {
     $db_host = getSetting('asterisk_db_host') ?: '127.0.0.1';
     $db_port = getSetting('asterisk_db_port') ?: '3306';
@@ -6681,7 +6683,7 @@ function integrationStatusChecks() {
             $last = $cdr->query("SELECT MAX(calldate) FROM cdr")->fetchColumn();
             $add('Bancos de dados', 'CDR (registro de chamadas)', 'ok', $last ? 'Última chamada registrada: ' . $last : 'Conectado, sem chamadas ainda.');
         } catch (Exception $e) { $add('Bancos de dados', 'CDR (registro de chamadas)', 'warn', 'Conectado, mas a tabela cdr não respondeu.'); }
-    } else { $add('Bancos de dados', 'CDR (registro de chamadas)', 'fail', 'Não foi possível conectar ao MySQL.'); }
+    } else { $__dd = dbDiagnose(); $add('Bancos de dados', 'CDR (registro de chamadas)', 'fail', ($__dd['dica'] ?: 'Não foi possível conectar ao MySQL.') . ' Use o botão "Tentar consertar sozinho" acima.'); }
     try { queueLogImportFromFile(); } catch (Throwable $e) {}
     $qdb = function_exists('getAsteriskDBConnection') ? getAsteriskDBConnection() : null;
     if ($qdb) {
