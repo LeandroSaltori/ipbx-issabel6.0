@@ -3878,6 +3878,8 @@ function deleteSystemUser($id) {
 }
 
 function getLoggedUser() {
+    // Assistente por WhatsApp: número da lista permitida atua como gestor, sem sessão web
+    if (!empty($GLOBALS['__wa_assistant_user'])) return $GLOBALS['__wa_assistant_user'];
     // Na web só vale o usuário da sessão; o padrão administrador é apenas para CLI (AGI/cron)
     $user_id = $_SESSION['logged_user_id'] ?? (PHP_SAPI === 'cli' ? 1 : 0);
     // Login desligado (set_auth.php off): atua como o primeiro Administrador ativo
@@ -6349,7 +6351,7 @@ function panelRevBump($area) {
 }
 function panelRevAll() {
     $o = [];
-    foreach (['schedules', 'wa_sends', 'extensions', 'contacts', 'rules', 'daily', 'blacklist'] as $a) $o[$a] = (string)getSetting('panel_rev_' . $a);
+    foreach (['schedules', 'wa_sends', 'extensions', 'contacts', 'rules', 'daily', 'blacklist', 'wa_asst'] as $a) $o[$a] = (string)getSetting('panel_rev_' . $a);
     return $o;
 }
 function waSchedEnsure() {
@@ -6560,6 +6562,7 @@ function processWaScheduled() {
 
 require_once __DIR__ . '/ai_actions_config.php';
 require_once __DIR__ . '/daily_summary.php';
+require_once __DIR__ . '/wa_assistant.php';
 
 /** Confirma ou cancela uma proposta do próprio usuário (válida por 10 min). */
 function aiProposalResolve($id, $accept) {
