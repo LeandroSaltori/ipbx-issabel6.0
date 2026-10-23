@@ -122,6 +122,69 @@ function aiProposeQueueAbandon($a) {
 }
 
 /** Aplica ações de configuração confirmadas. Devolve null se o campo não for desta família. */
+/* ===== Resumo diário, bloqueio de números e leitura das rotas do Issabel ===== */
+function aiProposeDailySummary($a) {
+    if (!hasUserPermission('manage_settings')) return ['error' => 'Este usuário não tem permissão para alterar configurações.'];
+    $v = []; $lines = [];
+    if (array_key_exists('enabled', $a)) {
+        $on = filter_var($a['enabled'], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+        if ($on !== null && (int)$on !== (int)(getSetting('daily_summary_enabled') === '1')) { $v['enabled'] = (int)$on; $lines[] = $on ? 'ligar o resumo diário' : 'desligar o resumo diário'; }
+    }
+    if (!empty($a['time'])) {
+        if (!preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', (string)$a['time'])) return ['error' => 'Horário inválido. Use HH:MM (ex.: 08:00).'];
+        if ($a['time'] !== (getSetting('daily_summary_time') ?: '08:00')) { $v['time'] = $a['time']; $lines[] = 'enviar às ' . $a['time']; }
+    }
+    if (array_key_exists('whatsapp', $a)) {
+        $nums = []; foreach (preg_split('/[,;\n]+/', (string)$a['whatsapp'], -1, PREG_SPLIT_NO_EMPTY) as $n) { $n = aiNormPhone(trim($n)); if ($n === '') return ['error' => 'Número de WhatsApp inválido.']; $nums[] = $n; }
+        $str = implode(', ', $nums);
+        if ($str !== trim((string)getSetting('daily_summary_wa'))) { $v['wa'] = $str; $lines[] = $str === '' ? 'remover os números de WhatsApp' : 'enviar por WhatsApp para ' . $str; }
+    }
+    if (array_key_exists('email', $a)) {
+        $e = trim((string)$a['email']);
+        if ($e !== '' && !filter_var($e, FILTER_VALIDATE_EMAIL)) return ['error' => 'E-mail inválido.'];
+        if ($e !== trim((string)getSetting('daily_summary_email'))) { $v['email'] = $e; $lines[] = $e === '' ? 'remover o e-mail' : 'enviar por e-mail para ' . $e; }
+    }
+    if (!$v) return ['error' => 'Nada a alterar: o resumo diário já está assim.'];
+    return aiNewProposal('daily_summary', $v, 'Resumo diário: ' . implode('; ', $lines));
+}
+function aiProposeBlacklist($a) {
+    if (!hasUserPermission('manage_settings')) return ['error' => 'Este usuário não tem permissão para bloquear números.'];
+    $num = preg_replace('/\D/', '', (string)($a['number'] ?? ''));
+    if (strlen($num) < 8) return ['error' => 'Informe o número completo com DDD.'];
+    $act = ($a['action'] ?? 'add') === 'remove' ? 'remove' : 'add';
+    $cur = asteriskBlacklistList();
+    if (!$cur['success']) return ['error' => 'Não consegui ler a lista de bloqueio do PABX agora: ' . $cur['error']];
+    $has = false; foreach ($cur['items'] as $it) if ($it['number'] === $num) $has = true;
+    if ($act === 'add' && $has) return ['error' => "O número $num já está bloqueado."];
+    if ($act === 'remove' && !$has) return ['error' => "O número $num não está na lista de bloqueio."];
+    $desc = mb_substr(trim((string)($a['description'] ?? '')), 0, 60);
+    return aiNewProposal('blacklist', ['number' => $num, 'action' => $act, 'description' => $desc], ($act === 'add' ? "Bloquear o número $num" . ($desc !== '' ? " ($desc)" : '') . ' (o PABX passa a rejeitar as chamadas dele)' : "Desbloquear o número $num"));
+}
+function aiListBlacklist() {
+    $r = asteriskBlacklistList();
+    if (!$r['success']) return ['error' => 'Não consegui ler a lista de bloqueio do PABX: ' . $r['error']];
+    return ['total' => count($r['items']), 'numeros' => array_slice($r['items'], 0, 100)];
+}
+/** Leitura das rotas de entrada exatamente como estão no Issabel (o painel não altera nada ali). */
+function aiInboundRoutes($a) {
+    $flows = function_exists('getPABXInboundCallFlows') ? getPABXInboundCallFlows() : [];
+    if (!$flows) return ['error' => $GLOBALS['__flows_status'] ?? 'Nenhuma rota de entrada encontrada no PABX.'];
+    $walk = function ($n, $d = 0) use (&$walk) {
+        if (!is_array($n) || $d > 5) return [];
+        $line = ($n['title'] ?? '') . (empty($n['desc']) ? '' : ' | ' . $n['desc']);
+        if (!empty($n['timegroup']['rules'])) $line .= ' | Horários: ' . implode('; ', $n['timegroup']['rules']);
+        if (!empty($n['members'])) $line .= ' | Membros: ' . implode(', ', array_map(function ($m) { return $m['extension'] . ' (' . $m['name'] . ')'; }, $n['members']));
+        $out = [$line];
+        foreach (['true_node' => 'Dentro do horário', 'false_node' => 'Fora do horário', 'next_node' => 'Depois', 'failover_node' => 'Se ninguém atender', 'invalid_node' => 'Opção inválida', 'timeout_node' => 'Sem resposta'] as $k => $lbl)
+            if (!empty($n[$k])) foreach ($walk($n[$k], $d + 1) as $l) $out[] = "$lbl → $l";
+        if (!empty($n['entries'])) foreach ($n['entries'] as $opt => $e) foreach ($walk($e, $d + 1) as $l) $out[] = "Tecla $opt → $l";
+        return $out;
+    };
+    $res = [];
+    foreach ($flows as $f) $res[] = ['numero_de_entrada' => $f['did'], 'descricao' => $f['description'], 'caminho' => $walk($f['tree'] ?? null)];
+    return ['fonte' => 'Configuração do Issabel (somente leitura; horários, URA, filas e grupos se alteram no Issabel)', 'rotas' => $res];
+}
+
 function aiApplyConfigAction($field, $v) {
     global $db;
     if ($field === 'contact_save') {
@@ -160,6 +223,22 @@ function aiApplyConfigAction($field, $v) {
         $db->prepare("UPDATE queues_config SET " . implode(', ', $sets) . ", updated_at = CURRENT_TIMESTAMP WHERE queue_number = :q")->execute($par);
         if (function_exists('pabx_log')) pabx_log('whatsapp', 'INFO', "Abandono da fila {$v['queue']} alterado pelo Chat IA (confirmado pelo usuário)");
         panelRevBump('rules');
+        return ['success' => true];
+    }
+    if ($field === 'daily_summary') {
+        if (!hasUserPermission('manage_settings')) return ['success' => false, 'error' => 'Sem permissão para alterar configurações.'];
+        if (array_key_exists('enabled', $v)) saveSetting('daily_summary_enabled', $v['enabled'] ? '1' : '0');
+        if (isset($v['time']))  saveSetting('daily_summary_time', $v['time']);
+        if (array_key_exists('wa', $v))    saveSetting('daily_summary_wa', $v['wa']);
+        if (array_key_exists('email', $v)) saveSetting('daily_summary_email', $v['email']);
+        panelRevBump('daily');
+        return ['success' => true];
+    }
+    if ($field === 'blacklist') {
+        if (!hasUserPermission('manage_settings')) return ['success' => false, 'error' => 'Sem permissão para bloquear números.'];
+        $r = $v['action'] === 'remove' ? asteriskBlacklistDelete($v['number']) : asteriskBlacklistAdd($v['number'], $v['description'] ?? '');
+        if (empty($r['success'])) return ['success' => false, 'error' => $r['error'] ?? 'O PABX não aceitou a alteração.'];
+        panelRevBump('blacklist');
         return ['success' => true];
     }
     return null;
