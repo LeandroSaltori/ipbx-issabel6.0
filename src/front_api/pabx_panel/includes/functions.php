@@ -2425,7 +2425,15 @@ function resolveAsteriskDestLabel($dest, $ast_db = null) {
         }
         return "Destino Personalizado" . ($md_name !== '' ? ": $md_name" : " #$dnum");
     }
-    if (strpos($dest, 'ext-meetme') === 0 || strpos($dest, 'conferences') === 0) return "Sala de Conferência #$dnum";
+    if (strpos($dest, 'ext-meetme') === 0 || strpos($dest, 'conferences') === 0) {
+        $cf_name = '';
+        if ($ast_db && $dnum !== '') {
+            foreach (['meetme', 'conferences'] as $__cft) {
+                try { $st = $ast_db->prepare("SELECT description FROM `$__cft` WHERE exten = :e OR confno = :e LIMIT 1"); $st->execute([':e' => $dnum]); $cf_name = trim((string)$st->fetchColumn()); if ($cf_name !== '') break; } catch (Exception $e) {}
+            }
+        }
+        return "Sala de Conferência #$dnum" . ($cf_name !== '' ? " ($cf_name)" : '');
+    }
     if (strpos($dest, 'app-pbdirectory') === 0) return "Diretório por Nome";
     if (strpos($dest, 'ext-trunk') === 0) return "Saída por Tronco #$dnum";
 
