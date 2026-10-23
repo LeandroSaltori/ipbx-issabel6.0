@@ -5958,6 +5958,23 @@ function aiChatToolDefs() {
             'whatsapp_to' => ['type' => 'string', 'description' => 'Contato cadastrado, DDD + número'],
             'title'       => ['type' => 'string', 'description' => 'Opcional'],
         ], ['report_type', 'frequency', 'send_time', 'channel']),
+        $fn('list_contacts', 'Busca contatos da Agenda & Contatos por nome, empresa, etiqueta ou parte do telefone (sem filtro lista os primeiros).', [
+            'query' => ['type' => 'string'], 'limit' => ['type' => 'integer', 'description' => 'Máx. 25'],
+        ]),
+        $fn('propose_contact_save', 'Propõe cadastrar ou alterar um contato (se o celular já existir, altera). NÃO grava: o usuário confirma pelo cartão. Informe só o que muda.', [
+            'id' => ['type' => 'integer', 'description' => 'Id do contato (de list_contacts) para editar; vazio para criar'],
+            'name' => ['type' => 'string'], 'phone' => ['type' => 'string', 'description' => 'DDD + número'], 'email' => ['type' => 'string'],
+            'company' => ['type' => 'string'], 'tag' => ['type' => 'string'], 'notes' => ['type' => 'string'],
+        ]),
+        $fn('propose_contact_delete', 'Propõe excluir UM contato pelo id (de list_contacts). NÃO exclui: o usuário confirma pelo cartão.', ['id' => ['type' => 'integer']], ['id']),
+        $fn('list_rules', 'Mostra as mensagens de aviso/URA/transbordo atuais, as variáveis permitidas e a configuração de abandono de cada fila.', []),
+        $fn('propose_rule_set', 'Propõe alterar o texto de uma mensagem de aviso (regras URA & transbordo). NÃO grava: o usuário confirma. Use só as variáveis de list_rules. rule: queue_abandon_msg_default, queue_exit_whatsapp_msg, missed_agent_msg, missed_client_msg ou audio_msg.', [
+            'rule' => ['type' => 'string'], 'text' => ['type' => 'string'],
+        ], ['rule', 'text']),
+        $fn('propose_queue_abandon', 'Propõe ligar/desligar o aviso de abandono de uma fila, trocar o WhatsApp do supervisor ou a mensagem própria da fila. NÃO grava: o usuário confirma. Informe só o que muda.', [
+            'queue' => ['type' => 'string', 'description' => 'Número da fila'], 'enabled' => ['type' => 'boolean'],
+            'supervisor_whatsapp' => ['type' => 'string', 'description' => 'DDD + número; vazio remove'], 'message' => ['type' => 'string', 'description' => 'Vazio = usa a mensagem padrão'],
+        ], ['queue']),
         $fn('list_scheduled', 'Lista os WhatsApps e relatórios agendados (com os IDs para cancelar).', []),
         $fn('propose_cancel_schedule', 'Propõe cancelar um agendamento pelo id retornado em list_scheduled. NÃO cancela: o usuário confirma pelo cartão.', ['id' => ['type' => 'string']], ['id']),
     ];
@@ -6040,6 +6057,12 @@ function aiChatExecTool($name, $a) {
         if ($name === 'propose_whatsapp_send') return aiProposeWaSend($a);
         if ($name === 'propose_report_schedule') return aiProposeReportSchedule($a);
         if ($name === 'list_scheduled') return aiListScheduled();
+        if ($name === 'list_contacts') return aiListContacts($a);
+        if ($name === 'propose_contact_save') return aiProposeContactSave($a);
+        if ($name === 'propose_contact_delete') return aiProposeContactDelete($a);
+        if ($name === 'list_rules') return aiListRules();
+        if ($name === 'propose_rule_set') return aiProposeRuleSet($a);
+        if ($name === 'propose_queue_abandon') return aiProposeQueueAbandon($a);
         if ($name === 'propose_cancel_schedule') return aiProposeCancelSchedule($a);
         if ($name === 'recording_link') {
             if (!hasUserPermission('listen_recordings')) return ['error' => 'Este usuário não tem permissão para gravações.'];
@@ -6264,7 +6287,7 @@ function panelRevBump($area) {
 }
 function panelRevAll() {
     $o = [];
-    foreach (['schedules', 'wa_sends', 'extensions'] as $a) $o[$a] = (string)getSetting('panel_rev_' . $a);
+    foreach (['schedules', 'wa_sends', 'extensions', 'contacts', 'rules'] as $a) $o[$a] = (string)getSetting('panel_rev_' . $a);
     return $o;
 }
 function waSchedEnsure() {
@@ -6445,6 +6468,8 @@ function aiApplyAction($field, $v) {
         @file_put_contents($f, json_encode($new, JSON_PRETTY_PRINT)); panelRevBump('schedules');
         return ['success' => true];
     }
+    $cfgRes = aiApplyConfigAction($field, $v);
+    if ($cfgRes !== null) return $cfgRes;
     return ['success' => false, 'error' => 'Ação desconhecida.'];
 }
 
@@ -6471,6 +6496,8 @@ function processWaScheduled() {
     return $out;
 }
 
+require_once __DIR__ . '/ai_actions_config.php';
+
 /** Confirma ou cancela uma proposta do próprio usuário (válida por 10 min). */
 function aiProposalResolve($id, $accept) {
     global $db;
@@ -6487,7 +6514,7 @@ function aiProposalResolve($id, $accept) {
         $db->prepare("UPDATE ai_pending_actions SET status = 'cancelled' WHERE id = ?")->execute([$p['id']]);
         return ['success' => true, 'message' => 'Cancelado. Nada foi alterado.'];
     }
-    if (in_array($p['field'], ['wa_send', 'report_schedule', 'cancel_schedule'], true)) {
+    if (in_array($p['field'], ['wa_send', 'report_schedule', 'cancel_schedule', 'contact_save', 'contact_delete', 'rule_set', 'queue_abandon'], true)) {
         $r = aiApplyAction($p['field'], (array)json_decode((string)$p['value'], true));
     } elseif (!hasUserPermission('manage_settings')) {
         $r = ['success' => false, 'error' => 'Sem permissão para alterar ramais.'];
@@ -6508,7 +6535,7 @@ function aiChatRun($history) {
     if ($cfg['key'] === '' || !$cfg['enabled']) return ['ok' => false, 'error' => 'IA não configurada. Configure em Configurações > Inteligência Artificial.'];
     $sys = "Você é o assistente do IPbx Prisma, a central telefônica da Prisma Telecom. Hoje é " . date('d/m/Y H:i') . ". "
          . "Responda em português, curto e objetivo. Para QUALQUER pergunta sobre chamadas, ramais, filas, números ou gravações, consulte SEMPRE uma ferramenta antes de responder; nunca responda de memória nem estime. Use SOMENTE dados retornados pelas ferramentas; nunca invente números, ramais ou ligações. Quando falar de quantidade de chamadas, deixe claro se são externas (clientes), internas (ramal a ramal) ou todas: por padrão fale das externas, como o Dashboard, e cite as internas à parte. Se nenhuma ferramenta responder, diga que não encontrou o dado. "
-         . "Se faltar informação (ex.: qual ramal), pergunte. Você consulta e PROPÕE ações; as ações são: propose_whatsapp_send (WhatsApp agora ou agendado, só para contatos cadastrados; com report_days envia o relatório real), propose_report_schedule (relatório recorrente), list_scheduled e propose_cancel_schedule, propose_extension_feature (Não Perturbe e desvios) e propose_extension_edit (nome do atendente, celular e avisos por WhatsApp do ramal; você NÃO altera senha de ramal). Ambas apenas PROPÕEM: o usuário confirma por um botão e você nunca diz que foi feito antes disso. Para tabelas use markdown. Para gravações use recording_link e entregue o link em markdown [Ouvir gravação](url). "
+         . "Se faltar informação (ex.: qual ramal), pergunte. Você consulta e PROPÕE ações; as ações são: propose_whatsapp_send (WhatsApp agora ou agendado, só para contatos cadastrados; com report_days envia o relatório real), propose_report_schedule (relatório recorrente), list_scheduled e propose_cancel_schedule, list_contacts/propose_contact_save/propose_contact_delete (agenda), list_rules/propose_rule_set/propose_queue_abandon (mensagens de aviso, URA, transbordo e abandono de fila), propose_extension_feature (Não Perturbe e desvios) e propose_extension_edit (nome do atendente, celular e avisos por WhatsApp do ramal; você NÃO altera senha de ramal). Ambas apenas PROPÕEM: o usuário confirma por um botão e você nunca diz que foi feito antes disso. Para tabelas use markdown. Para gravações use recording_link e entregue o link em markdown [Ouvir gravação](url). "
          . "Nunca cite nomes de softwares de terceiros da central telefônica nem do serviço de WhatsApp: o produto se chama IPbx Prisma e o serviço de WhatsApp se chama Prismabot. Se precisar falar da tecnologia, diga apenas \"o sistema\" ou \"a central\". "
          . "NUNCA invente links ou endereços: use somente links devolvidos pelas ferramentas (ex.: recording_link). Se a ferramenta devolver erro, explique o erro ao usuário. "
          . "Se o usuário pedir algo fora do escopo do PABX, explique educadamente o que você pode fazer.";
