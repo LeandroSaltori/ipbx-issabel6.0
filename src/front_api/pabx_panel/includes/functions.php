@@ -2910,9 +2910,11 @@ function resolveAsteriskDestinationTree($dest, $ast_db = null, $ext_names = [], 
                     foreach ($raw_exts as $e_item) {
                         $e_item = trim($e_item);
                         if (!empty($e_item)) {
+                            $is_ext_num = substr($e_item, -1) === '#';
+                            $e_clean = rtrim($e_item, '#');
                             $rg_list[] = [
-                                'extension' => $e_item,
-                                'name' => $ext_names[$e_item] ?? "Ramal $e_item"
+                                'extension' => $e_clean,
+                                'name' => $is_ext_num ? 'Número externo' : ($ext_names[$e_clean] ?? "Ramal $e_clean")
                             ];
                         }
                     }
@@ -2922,6 +2924,12 @@ function resolveAsteriskDestinationTree($dest, $ast_db = null, $ext_names = [], 
 
         $strategy_labels = [
             'ringall' => 'Tocar Todos os Ramais Simultaneamente',
+            'ringallv2' => 'Tocar Todos os Ramais Simultaneamente',
+            'ringallv2-prim' => 'Tocar Todos Simultaneamente (primeiro o principal)',
+            'random' => 'Tocar em Ordem Aleatória',
+            'rrmemory' => 'Revezamento com Memória',
+            'rrordered' => 'Revezamento em Ordem',
+            'linear' => 'Tocar em Sequência (Linear)',
             'hunt' => 'Tocar Sequencialmente (Caça)',
             'memoryhunt' => 'Tocar Sequencialmente com Memória',
             'firstavailable' => 'Tocar no Primeiro Ramal Disponível',
@@ -3018,6 +3026,11 @@ function resolveAsteriskDestinationTree($dest, $ast_db = null, $ext_names = [], 
             $ivr_id = isset($parts[1]) ? preg_replace('/\D/', '', $parts[1]) : preg_replace('/\D/', '', $parts[0]);
         }
 
+        static $__ivr_stack = [];
+        if ($ivr_id !== '' && isset($__ivr_stack[$ivr_id])) {
+            return ['type' => 'dest', 'title' => "Volta ao menu da URA #$ivr_id", 'desc' => 'Repete o menu (a URA pede a opção de novo)', 'badge' => 'Repete o Menu', 'color' => 'cyan'];
+        }
+        if ($ivr_id !== '') $__ivr_stack[$ivr_id] = true;
         $ivr_title = $ivr_id ? "URA #$ivr_id" : "Menu de Opções URA";
         $entries = [];
         $audio_file = "";
@@ -3072,7 +3085,7 @@ function resolveAsteriskDestinationTree($dest, $ast_db = null, $ext_names = [], 
             }
         }
 
-        return [
+        $__ivr_node = [
             'type' => 'ivr',
             'id' => $ivr_id,
             'title' => "URA / Menu de Atendimento: $ivr_title",
@@ -3089,6 +3102,8 @@ function resolveAsteriskDestinationTree($dest, $ast_db = null, $ext_names = [], 
             'timeout_node' => !empty($timeout_dest) ? resolveAsteriskDestinationTree($timeout_dest, $ast_db, $ext_names, $depth + 1) : null,
             'entries' => $entries
         ];
+        unset($__ivr_stack[$ivr_id]);
+        return $__ivr_node;
     }
 
     // 4.9 Caixa postal via ext-local,vmb200,1 (vmb=ocupado, vmu=indisponível, vms=sem saudação)

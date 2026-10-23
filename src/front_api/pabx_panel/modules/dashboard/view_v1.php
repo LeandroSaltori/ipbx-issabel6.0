@@ -1420,7 +1420,7 @@ async function openKpiDetailModal(kpiType) {
     const endDate   = '<?php echo htmlspecialchars($end_date); ?>';
 
     if (cdrLink) {
-        cdrLink.href = `index.php?module=relatorios&action=cdr_gravacoes&start_date=${startDate}&end_date=${endDate}`;
+        cdrLink.href = `index.php?module=relatorios&action=cdr_gravacoes&start_date=${startDate}&end_date=${endDate}&dedup=${window.__ipbxDedup===undefined?1:window.__ipbxDedup}&call_type=${window.__ipbxCallType||'external'}`;
     }
 
     try {

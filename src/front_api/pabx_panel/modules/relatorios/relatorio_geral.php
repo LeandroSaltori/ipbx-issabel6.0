@@ -187,6 +187,10 @@ if ($ast_db) {
         }
     } catch (Exception $e_hm) {}
 }
+// Ordena por hora e mostra a faixa 08-18h ampliada se houver chamadas fora dela
+ksort($hours_heatmap);
+$hm_max = max(1, max($hours_heatmap));
+$hm_total = array_sum($hours_heatmap);
 ?>
 
 <div class="space-y-6">
@@ -434,10 +438,11 @@ if ($ast_db) {
         <div class="grid grid-cols-5 sm:grid-cols-10 gap-2 font-mono text-center">
             <?php foreach ($hours_heatmap as $hr => $val): 
                 $hrNum = intval(substr($hr, 0, 2));
-                $pct_hr = round(($val / 18) * 100, 0);
+                $pct_hr = $hm_total > 0 ? round(($val / $hm_total) * 100, 0) : 0;
                 $bg_intensity = 'bg-slate-950 text-slate-400 border-slate-800 hover:border-cyan-500/60';
-                if ($val > 15) $bg_intensity = 'bg-rose-500/20 text-rose-300 border-rose-500/40 font-bold shadow-lg shadow-rose-500/10 hover:border-rose-400';
-                elseif ($val > 10) $bg_intensity = 'bg-amber-500/20 text-amber-300 border-amber-500/40 font-bold hover:border-amber-400';
+                $rel = $val / $hm_max;
+                if ($val > 0 && $rel >= 0.75) $bg_intensity = 'bg-rose-500/20 text-rose-300 border-rose-500/40 font-bold shadow-lg shadow-rose-500/10 hover:border-rose-400';
+                elseif ($val > 0 && $rel >= 0.4) $bg_intensity = 'bg-amber-500/20 text-amber-300 border-amber-500/40 font-bold hover:border-amber-400';
                 elseif ($val > 0) $bg_intensity = 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:border-emerald-400';
             ?>
                 <div onclick="openKpiCallsModal('hour_<?php echo $hrNum; ?>', 'Chamadas do Horário de Pico das <?php echo $hr; ?>')"
@@ -445,7 +450,7 @@ if ($ast_db) {
                      title="Clique para ver as <?php echo $val; ?> chamadas do horário das <?php echo $hr; ?>">
                     <span class="text-[10px] text-slate-400 block"><?php echo $hr; ?></span>
                     <span class="text-sm block font-extrabold"><?php echo $val; ?></span>
-                    <span class="text-[9px] block font-bold opacity-80"><?php echo $pct_hr; ?>% pico</span>
+                    <span class="text-[9px] block font-bold opacity-80"><?php echo $pct_hr; ?>% do total</span>
                 </div>
             <?php endforeach; ?>
         </div>
@@ -615,7 +620,7 @@ async function openKpiCallsModal(kpiType, customTitle = '') {
     const endDate   = '<?php echo htmlspecialchars($end_date); ?>';
 
     if (cdrLink) {
-        cdrLink.href = `index.php?module=relatorios&action=cdr_gravacoes&start_date=${startDate}&end_date=${endDate}`;
+        cdrLink.href = `index.php?module=relatorios&action=cdr_gravacoes&start_date=${startDate}&end_date=${endDate}&dedup=${window.__ipbxDedup===undefined?1:window.__ipbxDedup}&call_type=${window.__ipbxCallType||'external'}`;
     }
 
     try {

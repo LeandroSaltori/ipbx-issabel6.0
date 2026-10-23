@@ -711,7 +711,7 @@ function openKpiCallsModal(kpiType, customTitle = '', startDate = '<?php echo $s
         </tr>
     `;
 
-    fetch(`index.php?action=get_kpi_calls_detail&kpi_type=${encodeURIComponent(kpiType)}&start_date=${startDate}&end_date=${endDate}`)
+    fetch(`index.php?action=get_kpi_calls_detail&kpi_type=${encodeURIComponent(kpiType)}&start_date=${startDate}&end_date=${endDate}&dedup=${window.__ipbxDedup===undefined?1:window.__ipbxDedup}&call_type=${window.__ipbxCallType||'external'}`)
         .then(res => res.json())
         .then(data => {
             if (data.success) {

@@ -410,6 +410,11 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
             $title_label = "Chamadas com Tempo de Espera (TME / TPR)";
         }
 
+        // Mesmos filtros da tela de origem (repetidas ocultas e tipo de chamada), para o detalhe bater com o número clicado
+        $where_clause .= ' AND ' . cdrDedupCond();
+        if (in_array($kpi_type, ['int', 'internal'], true)) $where_clause .= ' AND ' . cdrTypeCond('internal');
+        elseif (strpos($kpi_type, 'ext_') !== 0) $where_clause .= ' AND ' . cdrTypeCond();
+
         $ast_db = function_exists('getAsteriskPdoConnection') ? getAsteriskPdoConnection('asteriskcdrdb') : null;
         $calls = [];
 
