@@ -563,16 +563,21 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
             exit;
         }
         $from = isset($_GET['from']) ? preg_replace('/[^0-9]/', '', $_GET['from']) : '';
-        $to   = isset($_GET['to']) ? preg_replace('/[^0-9]/', '', $_GET['to']) : '';
-        if (empty($from) || empty($to)) {
-            echo json_encode(['success' => false, 'error' => 'Origem e destino são obrigatórios']);
+        $to   = isset($_GET['to']) ? preg_replace('/[^0-9+*#]/', '', $_GET['to']) : '';
+        if ($from === '') { $__lu = getLoggedUser(); $from = preg_replace('/[^0-9]/', '', (string)($__lu['extension'] ?? '')); }
+        if (empty($from)) {
+            echo json_encode(['success' => false, 'message' => 'Escolha o seu ramal para fazer a ligação.', 'error' => 'Escolha o seu ramal para fazer a ligação.']);
+            exit;
+        }
+        if (empty($to)) {
+            echo json_encode(['success' => false, 'message' => 'Número de destino não informado.', 'error' => 'Número de destino não informado.']);
             exit;
         }
         
         // Disparo direto no Asterisk (PJSIP / SIP / Local)
         $ami_res = executeClickToCall($from, $to);
         if ($ami_res['success']) {
-            echo json_encode(['success' => true, 'message' => "Chamada originada com sucesso! O ramal $from está tocando."]);
+            echo json_encode(['success' => true, 'from' => $from, 'message' => "O seu ramal $from vai tocar. Atenda para completar a ligação para $to."]);
             exit;
         }
 
@@ -581,8 +586,8 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
         $apiClient = new PbxApiClient($db);
         $apiRes = $apiClient->originateCall($from, $to);
         echo json_encode([
-            'success' => $apiRes['success'], 
-            'message' => $apiRes['success'] ? "Chamada disparada via REST API do ramal $from para $to!" : ($ami_res['error'] ?: 'Falha ao conectar no PABX')
+            'success' => $apiRes['success'], 'from' => $from,
+            'message' => $apiRes['success'] ? "O seu ramal $from vai tocar. Atenda para completar a ligação para $to." : ($ami_res['error'] ?: 'Não foi possível ligar agora. Verifique se o ramal está registrado.')
         ]);
         exit;
     }
@@ -2611,27 +2616,46 @@ if ($__wp_u && userHasWebphone($__wp_u)
             setInterval(updateQueuesRealtime, 5000);
         });
 
+        window.__myExt = <?php $__lu2 = function_exists('getLoggedUser') ? getLoggedUser() : null; echo json_encode((string)($__lu2['extension'] ?? '')); ?>;
+        window.__extList = <?php $__el = []; try { foreach ($db->query("SELECT extension, agent_name FROM extensions_config ORDER BY CAST(extension AS UNSIGNED) ASC") as $__r) $__el[] = [$__r['extension'], $__r['agent_name']]; } catch (Throwable $e) {} echo json_encode($__el, JSON_UNESCAPED_UNICODE); ?>;
         async function originateCall(destNum, destName = '') {
-            let myExt = localStorage.getItem('pabx_user_exten');
-            if (!myExt) {
-                myExt = prompt("Para usar o 'Click to Call', digite o SEU ramal:", "1000");
-                if (myExt) {
-                    localStorage.setItem('pabx_user_exten', myExt);
-                } else {
-                    return; // Cancelou
-                }
-            }
-            
-            if (confirm(`Deseja ligar de ${myExt} para ${destName ? destName + ' ('+destNum+')' : destNum}?`)) {
+            // Escolha do ramal: o do usuário logado (se houver), senão o último usado neste navegador
+            let saved = ''; try { saved = localStorage.getItem('pabx_user_exten') || ''; } catch (e) {}
+            const mine = window.__myExt || saved;
+            let dlg = document.getElementById('dlg-click-to-call');
+            if (dlg) dlg.remove();
+            dlg = document.createElement('dialog'); dlg.id = 'dlg-click-to-call';
+            dlg.style.cssText = 'background:#1c1b2f;color:#e2e8f0;border:1px solid #334155;border-radius:18px;padding:22px;max-width:420px;width:92vw';
+            const esc = (t) => String(t == null ? '' : t).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+            const opts = window.__extList.map(([e, n]) => `<option value="${esc(e)}" ${e === mine ? 'selected' : ''}>${esc(e)}${n && n !== e ? ' - ' + esc(n) : ''}</option>`).join('');
+            dlg.innerHTML = `<style>#dlg-click-to-call::backdrop{background:rgba(0,0,0,.65);backdrop-filter:blur(4px)}</style>
+              <div style="font-weight:800;font-size:16px;margin-bottom:6px"><i class="fa-solid fa-phone-volume" style="color:#34d399"></i> Ligar agora</div>
+              <p style="font-size:13px;color:#94a3b8;margin:0 0 12px">Primeiro o seu ramal toca. Quando você atender, o sistema liga para <b style="color:#fff">${esc(destName || destNum)}</b>${destName ? ' (' + esc(destNum) + ')' : ''}. Não precisa ser WebRTC.</p>
+              <label style="font-size:12px;color:#94a3b8">Seu ramal</label>
+              ${opts ? `<select id="c2c-ext" style="width:100%;margin:4px 0 14px;padding:9px;border-radius:10px;background:#0f172a;color:#fff;border:1px solid #334155">${opts}</select>` : `<input id="c2c-ext" value="${esc(mine)}" placeholder="Ex.: 201" style="width:100%;margin:4px 0 14px;padding:9px;border-radius:10px;background:#0f172a;color:#fff;border:1px solid #334155">`}
+              <div id="c2c-msg" style="font-size:12px;min-height:16px;margin-bottom:10px"></div>
+              <div style="display:flex;gap:10px;justify-content:flex-end">
+                <button type="button" id="c2c-cancel" style="white-space:nowrap !important;flex-shrink:0 !important;width:auto !important;padding:9px 14px;border-radius:10px;background:#334155;color:#fff;border:0;cursor:pointer">Cancelar</button>
+                <button type="button" id="c2c-go" style="white-space:nowrap !important;flex-shrink:0 !important;width:auto !important;padding:9px 16px;border-radius:10px;background:#059669;color:#fff;border:0;font-weight:800;cursor:pointer"><i class="fa-solid fa-phone"></i> Ligar</button>
+              </div>`;
+            document.body.appendChild(dlg); dlg.showModal();
+            dlg.querySelector('#c2c-cancel').onclick = () => { dlg.close(); dlg.remove(); };
+            dlg.addEventListener('cancel', () => setTimeout(() => dlg.remove(), 0));
+            dlg.querySelector('#c2c-go').onclick = async () => {
+                const ext = (dlg.querySelector('#c2c-ext').value || '').replace(/\D/g, '');
+                const msg = dlg.querySelector('#c2c-msg');
+                if (!ext) { msg.style.color = '#fda4af'; msg.textContent = 'Escolha o seu ramal.'; return; }
+                msg.style.color = '#94a3b8'; msg.textContent = 'Chamando o seu ramal...';
                 try {
-                    const res = await fetch(`index.php?api_action=originate_call&from=${encodeURIComponent(myExt)}&to=${encodeURIComponent(destNum)}`);
+                    const res = await fetch(`index.php?api_action=originate_call&from=${encodeURIComponent(ext)}&to=${encodeURIComponent(destNum)}`);
                     const data = await res.json();
-                    if (typeof showIaToast === 'function') showIaToast(data.message);
-                    else alert(data.message);
-                } catch(e) {
-                    alert('Erro na requisição: ' + e.message);
-                }
-            }
+                    if (data.success) {
+                        try { localStorage.setItem('pabx_user_exten', ext); } catch (e) {}
+                        dlg.close(); dlg.remove();
+                        if (typeof showIaToast === 'function') showIaToast(data.message, true);
+                    } else { msg.style.color = '#fda4af'; msg.textContent = data.message || data.error || 'Não foi possível ligar agora.'; }
+                } catch (e) { msg.style.color = '#fda4af'; msg.textContent = 'Sem resposta do painel. Tente de novo.'; }
+            };
         }
 
         // Global Contact Modal Logic

@@ -192,6 +192,12 @@ function executeClickToCall($from_ext, $destination_num) {
     fwrite($socket, "Action: Logoff\r\n\r\n");
     fclose($socket);
 
+    // Só vale como sucesso se o PABX aceitou o pedido (Response: Success); senão devolve o motivo real
+    if (stripos($orig_response, 'Response: Success') === false) {
+        $why = '';
+        if (preg_match('/Message:\s*(.+)/i', $orig_response, $mm)) $why = trim($mm[1]);
+        return ['success' => false, 'raw' => $orig_response, 'channel' => $channel, 'error' => 'O PABX não aceitou a chamada' . ($why !== '' ? " ($why)" : '') . '. Confira se o ramal ' . $from_ext . ' está registrado.'];
+    }
     return ['success' => true, 'raw' => $orig_response, 'channel' => $channel];
 }
 
