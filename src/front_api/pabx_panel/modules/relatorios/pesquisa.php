@@ -351,7 +351,7 @@ async function runPqAi() {
     var orig = btn.innerHTML; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Processando...'; btn.disabled = true;
     var esc = function (t) { var d = document.createElement('div'); d.textContent = t; return d.innerHTML; };
     try {
-        var res = await fetch('index.php?api_action=analyze_pabx_insights', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({
+        var res = await fetch('index.php?api_action=analyze_pabx_insights'+(window.__ipbxDedup===undefined?'':'&dedup='+window.__ipbxDedup)+'', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({
             total: <?php echo (int)$total; ?>, atendidas: <?php echo (int)$avaliados; ?>, module: 'Pesquisa de Satisfação',
             periodo: <?php echo json_encode($ds !== '' ? date('d/m/Y', strtotime($ds)) . ' a ' . date('d/m/Y', strtotime($de)) : 'todo o histórico'); ?>,
             extras: {'Média de satisfação (1 a 5)': '<?php echo $avaliados ? number_format($media, 1, '.', '') : 'sem avaliações'; ?>', 'Satisfação positiva': '<?php echo $avaliados ? $taxa_sat . '%' : 'sem avaliações'; ?>', 'Taxa de resolução': '<?php echo ($stats['sim'] + $stats['nao_res']) ? $taxa_res . '%' : 'sem respostas'; ?>', 'Desligaram sem avaliar': '<?php echo (int)$nao_av; ?>', 'Notas 1 e 2': '<?php echo (int)($stats['lvl'][1] + $stats['lvl'][2]); ?>'}

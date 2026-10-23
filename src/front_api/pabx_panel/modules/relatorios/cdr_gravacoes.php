@@ -517,7 +517,7 @@ function exportToCSV() {
         btn.disabled = true;
 
         try {
-            const res = await fetch('index.php?api_action=analyze_pabx_insights', {
+            const res = await fetch('index.php?api_action=analyze_pabx_insights'+(window.__ipbxDedup===undefined?'':'&dedup='+window.__ipbxDedup)+'', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({ total: <?php echo (int)$cdr_total; ?>, atendidas: <?php echo (int)$cdr_ans; ?>, tmaSec: <?php echo (int)$cdr_tma; ?>, tmeSec: <?php echo (int)$cdr_tme; ?>, module: 'Gravações CDR', periodo: '<?php echo date('d/m/Y H:i', strtotime($date_start)) . ' a ' . date('d/m/Y H:i', strtotime($date_end)); ?>', extras: { 'Tipo de chamadas': '<?php echo $type_filter === 'INTERNAL' ? 'somente internas (ramal a ramal)' : ($type_filter === 'EXTERNAL' ? 'somente externas (clientes)' : 'todas (externas e internas)'); ?>' }, periodo: '<?php echo date('d/m/Y', strtotime($date_start)) . ' a ' . date('d/m/Y', strtotime($date_end)); ?>' })

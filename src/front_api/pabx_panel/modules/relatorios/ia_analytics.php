@@ -783,7 +783,7 @@ async function runGlobalAiAnalysis() {
         const tma = <?php echo $avg_tma; ?>;
         const tme = <?php echo $avg_tme; ?>;
 
-        const res = await fetch('index.php?api_action=analyze_pabx_insights', {
+        const res = await fetch('index.php?api_action=analyze_pabx_insights'+(window.__ipbxDedup===undefined?'':'&dedup='+window.__ipbxDedup)+'', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ total, atendidas: atend, tmaSec: tma, tmeSec: tme, module: 'Auditoria de IA', periodo: '<?php echo date('d/m/Y', strtotime($start_date)) . ' a ' . date('d/m/Y', strtotime($end_date)); ?>', extras: { 'Tipo de chamadas': '<?php echo $type_filter === 'INTERNAL' ? 'somente internas (ramal a ramal)' : ($type_filter === 'EXTERNAL' ? 'somente externas (clientes)' : 'todas (externas e internas)'); ?>' } })

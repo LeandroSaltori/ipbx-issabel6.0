@@ -5241,7 +5241,7 @@ function aiTodayMetrics() {
     $pdo = function_exists('getAsteriskPdoConnection') ? getAsteriskPdoConnection('asteriskcdrdb') : null;
     if (!$pdo) return $m;
     try {
-        $r = $pdo->query("SELECT COUNT(*) t, SUM(disposition='ANSWERED') a, AVG(CASE WHEN disposition='ANSWERED' THEN billsec END) tma, AVG(GREATEST(duration-billsec,0)) tme FROM cdr WHERE calldate >= CURRENT_DATE()")->fetch(PDO::FETCH_ASSOC);
+        $r = $pdo->query("SELECT COUNT(*) t, SUM(disposition='ANSWERED') a, AVG(CASE WHEN disposition='ANSWERED' THEN billsec END) tma, AVG(GREATEST(duration-billsec,0)) tme FROM cdr WHERE calldate >= CURRENT_DATE() AND " . cdrDedupCond(60, true))->fetch(PDO::FETCH_ASSOC);
         $m = ['total' => (int)$r['t'], 'atendidas' => (int)$r['a'], 'tma' => (int)round((float)$r['tma']), 'tme' => (int)round((float)$r['tme']), 'ok' => true];
     } catch (Exception $e) {}
     return $m;
@@ -5918,13 +5918,16 @@ function aiChatToolDefs() {
             'days'        => ['type' => 'integer', 'description' => 'Últimos N dias (1 = hoje). Padrão 1, máx. 90'],
             'disposition' => ['type' => 'string', 'enum' => ['ANSWERED', 'NO ANSWER', 'BUSY', 'FAILED'], 'description' => 'Filtro de status'],
             'limit'       => ['type' => 'integer', 'description' => 'Máx. de linhas (padrão 15, máx. 30)'],
+            'ocultar_repetidas' => ['type' => 'boolean', 'description' => 'Padrão true: ligação que tocou em vários ramais conta uma vez só (igual aos relatórios do painel). false = contagem bruta da telefonia'],
         ]),
         $fn('count_calls_by_number', 'Conta quantas vezes um número ligou/foi chamado nos últimos dias, com total por dia.', [
             'number' => ['type' => 'string', 'description' => 'Número de telefone'],
             'days'   => ['type' => 'integer', 'description' => 'Últimos N dias (padrão 7, máx. 90)'],
+            'ocultar_repetidas' => ['type' => 'boolean', 'description' => 'Padrão true: ligação que tocou em vários ramais conta uma vez só (igual aos relatórios do painel). false = contagem bruta da telefonia'],
         ], ['number']),
         $fn('period_summary', 'Totais do período separados em externas (clientes), internas (ramal a ramal) e todas, com atendidas, não atendidas, TMA (conversa) e TME (espera).', [
             'days' => ['type' => 'integer', 'description' => 'Últimos N dias (1 = hoje). Padrão 1'],
+            'ocultar_repetidas' => ['type' => 'boolean', 'description' => 'Padrão true: ligação que tocou em vários ramais conta uma vez só (igual aos relatórios do painel). false = contagem bruta da telefonia'],
         ]),
         $fn('extensions_status', 'Status em tempo real dos ramais (Livre, Em Chamada, Tocando, Indisponível) com nomes.', []),
         $fn('queues_status', 'Status em tempo real das filas: espera, atendidas, abandonadas e agentes (inclui pausados).', []),
@@ -5982,6 +5985,10 @@ function aiChatToolDefs() {
     ];
 }
 
+function aiDedupNote($on) {
+    return $on ? 'Chamadas repetidas ocultadas (quando a mesma ligação toca em vários ramais, conta uma vez só, a de maior duração; padrão do painel). Se o usuário quiser o bruto da telefonia, chame de novo com ocultar_repetidas=false.'
+               : 'Sem ocultar repetidas: contagem bruta da telefonia (cada ramal que tocou conta como um registro).';
+}
 function aiChatDays($v, $def) { return max(1, min(90, (int)($v ?: $def))); }
 
 function aiChatExecTool($name, $a) {
@@ -6001,6 +6008,8 @@ function aiChatExecTool($name, $a) {
             if (!empty($a['extension'])) { $w[] = '(src = :e OR dst = :e)'; $p[':e'] = preg_replace('/\D/', '', (string)$a['extension']); }
             if (!empty($a['number']))    { $w[] = '(src LIKE :n OR dst LIKE :n)'; $p[':n'] = '%' . substr(preg_replace('/\D/', '', (string)$a['number']), -9); }
             if (!empty($a['disposition']) && in_array($a['disposition'], ['ANSWERED', 'NO ANSWER', 'BUSY', 'FAILED'], true)) { $w[] = 'disposition = :d'; $p[':d'] = $a['disposition']; }
+            $dd = !(isset($a['ocultar_repetidas']) && ($a['ocultar_repetidas'] === false || $a['ocultar_repetidas'] === 'false' || $a['ocultar_repetidas'] === 0));
+            $w[] = cdrDedupCond(60, $dd);
             $where = implode(' AND ', $w);
             $st = $cdr->prepare("SELECT COUNT(*) t, SUM(disposition='ANSWERED') a FROM cdr WHERE $where"); $st->execute($p); $tot = $st->fetch(PDO::FETCH_ASSOC);
             $st = $cdr->prepare("SELECT calldate, src, dst, disposition, billsec, uniqueid, (recordingfile <> '') AS rec FROM cdr WHERE $where ORDER BY calldate DESC LIMIT $lim");
@@ -6011,23 +6020,25 @@ function aiChatExecTool($name, $a) {
                     'destino' => $r['dst'] . (isset($ext2name[$r['dst']]) ? ' (' . $ext2name[$r['dst']] . ')' : ''),
                     'status' => $r['disposition'], 'duracao_seg' => (int)$r['billsec'], 'uniqueid' => $r['uniqueid'], 'tem_gravacao' => (bool)$r['rec']];
             }
-            return ['periodo_dias' => $days, 'total_encontrado' => (int)$tot['t'], 'atendidas' => (int)$tot['a'], 'mostrando' => count($rows), 'ligacoes' => $rows];
+            return ['filtro_aplicado' => aiDedupNote($dd), 'periodo_dias' => $days, 'total_encontrado' => (int)$tot['t'], 'atendidas' => (int)$tot['a'], 'mostrando' => count($rows), 'ligacoes' => $rows];
         }
         if ($name === 'count_calls_by_number') {
             $days = aiChatDays($a['days'] ?? 7, 7);
             $n = '%' . substr(preg_replace('/\D/', '', (string)($a['number'] ?? '')), -9);
             if (strlen($n) < 5) return ['error' => 'Número inválido.'];
-            $st = $cdr->prepare("SELECT DATE(calldate) d, COUNT(*) t, SUM(disposition='ANSWERED') a FROM cdr WHERE calldate >= :s AND (src LIKE :n OR dst LIKE :n) GROUP BY DATE(calldate) ORDER BY d DESC");
+            $dd = !(isset($a['ocultar_repetidas']) && ($a['ocultar_repetidas'] === false || $a['ocultar_repetidas'] === 'false' || $a['ocultar_repetidas'] === 0));
+            $st = $cdr->prepare("SELECT DATE(calldate) d, COUNT(*) t, SUM(disposition='ANSWERED') a FROM cdr WHERE calldate >= :s AND (src LIKE :n OR dst LIKE :n) AND " . cdrDedupCond(60, $dd) . " GROUP BY DATE(calldate) ORDER BY d DESC");
             $st->execute([':s' => $since($days), ':n' => $n]);
             $per = []; $tot = 0; $ans = 0;
             foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) { $per[] = ['dia' => $r['d'], 'chamadas' => (int)$r['t'], 'atendidas' => (int)$r['a']]; $tot += (int)$r['t']; $ans += (int)$r['a']; }
-            return ['periodo_dias' => $days, 'total' => $tot, 'atendidas' => $ans, 'por_dia' => $per];
+            return ['filtro_aplicado' => aiDedupNote($dd), 'periodo_dias' => $days, 'total' => $tot, 'atendidas' => $ans, 'por_dia' => $per];
         }
         if ($name === 'period_summary') {
             $days = aiChatDays($a['days'] ?? 1, 1);
             $ext  = "NOT (LENGTH(src) <= 4 AND LENGTH(dst) <= 4)"; // mesma regra do Dashboard: externa = envolve número que não é ramal
-            $q = function ($cond) use ($cdr, $since, $days) {
-                $st = $cdr->prepare("SELECT COUNT(*) t, SUM(disposition='ANSWERED') a, AVG(CASE WHEN disposition='ANSWERED' THEN billsec END) tma, AVG(GREATEST(duration-billsec,0)) tme FROM cdr WHERE calldate >= :s AND $cond");
+            $dd = !(isset($a['ocultar_repetidas']) && ($a['ocultar_repetidas'] === false || $a['ocultar_repetidas'] === 'false' || $a['ocultar_repetidas'] === 0));
+            $q = function ($cond) use ($cdr, $since, $days, $dd) {
+                $st = $cdr->prepare("SELECT COUNT(*) t, SUM(disposition='ANSWERED') a, AVG(CASE WHEN disposition='ANSWERED' THEN billsec END) tma, AVG(GREATEST(duration-billsec,0)) tme FROM cdr WHERE calldate >= :s AND $cond AND " . cdrDedupCond(60, $dd));
                 $st->execute([':s' => $since($days)]); $r = $st->fetch(PDO::FETCH_ASSOC);
                 return ['total' => (int)$r['t'], 'atendidas' => (int)$r['a'], 'nao_atendidas' => (int)$r['t'] - (int)$r['a'], 'tma_seg' => (int)round((float)$r['tma']), 'tme_seg' => (int)round((float)$r['tme'])];
             };
@@ -6538,6 +6549,7 @@ function aiChatRun($history) {
     $sys = "Você é o assistente do IPbx Prisma, a central telefônica da Prisma Telecom. Hoje é " . date('d/m/Y H:i') . ". "
          . "Responda em português, curto e objetivo. Para QUALQUER pergunta sobre chamadas, ramais, filas, números ou gravações, consulte SEMPRE uma ferramenta antes de responder; nunca responda de memória nem estime. Use SOMENTE dados retornados pelas ferramentas; nunca invente números, ramais ou ligações. Quando falar de quantidade de chamadas, deixe claro se são externas (clientes), internas (ramal a ramal) ou todas: por padrão fale das externas, como o Dashboard, e cite as internas à parte. Se nenhuma ferramenta responder, diga que não encontrou o dado. "
          . "Se faltar informação (ex.: qual ramal), pergunte. Você consulta e PROPÕE ações; as ações são: propose_whatsapp_send (WhatsApp agora ou agendado, só para contatos cadastrados; com report_days envia o relatório real), propose_report_schedule (relatório recorrente), list_scheduled e propose_cancel_schedule, list_contacts/propose_contact_save/propose_contact_delete (agenda), list_rules/propose_rule_set/propose_queue_abandon (mensagens de aviso, URA, transbordo e abandono de fila), propose_extension_feature (Não Perturbe e desvios) e propose_extension_edit (nome do atendente, celular e avisos por WhatsApp do ramal; você NÃO altera senha de ramal). Ambas apenas PROPÕEM: o usuário confirma por um botão e você nunca diz que foi feito antes disso. Para tabelas use markdown. Para gravações use recording_link e entregue o link em markdown [Ouvir gravação](url). "
+         . "FILTROS: por padrão os números ocultam chamadas repetidas (ligação que tocou em vários ramais de um grupo conta uma vez só, igual aos relatórios do painel); o resultado das ferramentas traz filtro_aplicado. Sempre diga em uma frase qual período e qual filtro usou e, se fizer sentido, ofereça a contagem bruta (ocultar_repetidas=false). Se o período for ambíguo (ex.: 'como foi o mês?'), pergunte ou declare o período assumido. "
          . "Nunca cite nomes de softwares de terceiros da central telefônica nem do serviço de WhatsApp: o produto se chama IPbx Prisma e o serviço de WhatsApp se chama Prismabot. Se precisar falar da tecnologia, diga apenas \"o sistema\" ou \"a central\". "
          . "NUNCA invente links ou endereços: use somente links devolvidos pelas ferramentas (ex.: recording_link). Se a ferramenta devolver erro, explique o erro ao usuário. "
          . "Se o usuário pedir algo fora do escopo do PABX, explique educadamente o que você pode fazer.";
@@ -6944,8 +6956,9 @@ function cdrDedupOn() {
     return isset($_GET['dedup']) ? ($_GET['dedup'] !== '0') : true; // ligado por padrão
 }
 /** Condição SQL: mantém só a perna de maior duração de cada chamada externa (mesmo número, janela de $win s). */
-function cdrDedupCond($win = 60) {
-    if (!cdrDedupOn()) return '1=1';
+function cdrDedupCond($win = 60, $force = null) {
+    $on = $force === null ? cdrDedupOn() : (bool)$force;
+    if (!$on) return '1=1';
     $w = max(5, (int)$win);
     return "(LENGTH(cdr.src) <= 4 OR NOT EXISTS (SELECT 1 FROM cdr d WHERE d.src = cdr.src AND d.uniqueid <> cdr.uniqueid"
          . " AND d.calldate BETWEEN cdr.calldate - INTERVAL $w SECOND AND cdr.calldate + INTERVAL $w SECOND"
@@ -6955,5 +6968,5 @@ function cdrDedupCond($win = 60) {
 function cdrDedupCheckbox() {
     $c = cdrDedupOn() ? 'checked' : '';
     return '<label class="inline-flex items-center gap-2 text-xs font-semibold text-slate-300 cursor-pointer" title="Quando a mesma chamada toca em vários ramais, conta só uma vez (a de maior duração). Desmarque para ver tudo.">'
-         . '<input type="hidden" name="dedup" value="0"><input type="checkbox" name="dedup" value="1" ' . $c . ' onchange="this.form.submit()"> Ocultar chamadas repetidas</label>';
+         . '<script>window.__ipbxDedup=' . (cdrDedupOn() ? 1 : 0) . ';</script><input type="hidden" name="dedup" value="0"><input type="checkbox" name="dedup" value="1" ' . $c . ' onchange="this.form.submit()"> Ocultar chamadas repetidas</label>';
 }

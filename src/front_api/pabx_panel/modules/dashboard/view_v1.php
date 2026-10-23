@@ -1144,7 +1144,7 @@ async function triggerAiInsightsAnalysis() {
         const tmaSec = <?php echo (int)$tma_medio_geral; ?>;
         const tmeSec = <?php echo (int)$tme_medio_geral; ?>;
 
-        const res = await fetch('index.php?api_action=analyze_pabx_insights', {
+        const res = await fetch('index.php?api_action=analyze_pabx_insights'+(window.__ipbxDedup===undefined?'':'&dedup='+window.__ipbxDedup)+'', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ total, atendidas, tmaSec, tmeSec, module: 'Dashboard', periodo: '<?php echo date('d/m/Y', strtotime($start_date)) . ' a ' . date('d/m/Y', strtotime($end_date)); ?>', extras: { 'Tipo de chamadas': '<?php echo $call_type_filter === 'external' ? 'somente externas (clientes)' : ($call_type_filter === 'internal' ? 'somente internas (ramal a ramal)' : 'todas (externas e internas)'); ?>' } })
