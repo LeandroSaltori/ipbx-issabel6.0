@@ -195,11 +195,13 @@ function aiApplyConfigAction($field, $v) {
             $db->prepare("INSERT INTO crm_contacts (name, phone, email, company, tag, source, notes) VALUES (:n,:p,:e,:co,:t,'Chat IA',:no)")
                ->execute([':n' => $v['name'], ':p' => $v['phone'], ':e' => $v['email'], ':co' => $v['company'], ':t' => $v['tag'], ':no' => $v['notes']]);
         }
+        try { AddressBookSync::reconcile($db, true); } catch (Throwable $e_abs) {}
         panelRevBump('contacts');
         return ['success' => true];
     }
     if ($field === 'contact_delete') {
         $db->prepare("DELETE FROM crm_contacts WHERE id = ?")->execute([(int)$v['id']]);
+        try { AddressBookSync::reconcile($db, true); } catch (Throwable $e_abs) {}
         panelRevBump('contacts');
         return ['success' => true];
     }

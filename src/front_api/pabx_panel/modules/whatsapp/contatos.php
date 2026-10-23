@@ -201,6 +201,9 @@ if ($req && isset($_POST['action_sync_pabx_calls'])) {
     $msg_status = $added > 0 ? "✅ $added novas chamadas do PABX cadastradas como contatos para você nomear!" : "Todas as chamadas do PABX já estão salvas na agenda de contatos.";
 }
 
+// Mantém a agenda do painel clássico igual à deste painel (e vice-versa)
+try { AddressBookSync::reconcile($db, true); } catch (Throwable $e_abs) {}
+
 // ─── Carregar dados do SQLite ──────────────────────────────────────────────────
 $tags_list    = $db->query("SELECT * FROM contact_tags ORDER BY name ASC")->fetchAll(PDO::FETCH_ASSOC);
 $contacts_list= $db->query("SELECT * FROM crm_contacts ORDER BY name ASC")->fetchAll(PDO::FETCH_ASSOC);
