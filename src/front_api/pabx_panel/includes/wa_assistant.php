@@ -17,11 +17,27 @@ function waAsstSecret() {
     return $s;
 }
 function waAsstEnabled() { return getSetting('wa_asst_enabled') === '1'; }
-function waAsstBase() { return rtrim((string)getSetting('public_base_url'), '/'); }
-/** Endereço que a Prisma/UAZAPI chama quando chega mensagem. '' se a URL pública do painel não estiver cadastrada. */
+/** Endereço do painel que o servidor de WhatsApp consegue alcançar. Descoberto sozinho a partir de como o painel está sendo acessado (nada a preencher). */
+function waAsstHostIsPublic($host) {
+    $h = strtolower(preg_replace('/:\d+$/', '', (string)$host));
+    if ($h === '' || $h === 'localhost' || substr($h, -6) === '.local' || substr($h, -9) === '.internal' || substr($h, -4) === '.lan') return false;
+    if (filter_var($h, FILTER_VALIDATE_IP)) return (bool)filter_var($h, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE);
+    return strpos($h, '.') !== false;
+}
+function waAsstDetectBase() {
+    $cfg = rtrim((string)getSetting('public_base_url'), '/');
+    if ($cfg !== '') return $cfg;
+    if (PHP_SAPI !== 'cli' && function_exists('panelPublicBaseUrl')) {
+        $b = panelPublicBaseUrl();
+        if ($b !== '' && waAsstHostIsPublic(parse_url($b, PHP_URL_HOST))) { saveSetting('wa_asst_base', $b); return $b; }
+    }
+    return rtrim((string)getSetting('wa_asst_base'), '/');
+}
+function waAsstBase() { return waAsstDetectBase(); }
+/** Endereço que o servidor de WhatsApp chama quando chega mensagem. '' se o painel ainda não foi acessado por um endereço público. */
 function waAsstWebhookUrl() {
     $b = waAsstBase();
-    return $b === '' ? '' : $b . '/pabx_panel/wa_inbound.php?t=' . waAsstSecret();
+    return $b === '' ? '' : $b . '/wa_inbound.php?t=' . waAsstSecret();
 }
 function waAsstNorm($p) {
     $d = preg_replace('/\D/', '', (string)$p);
@@ -172,7 +188,7 @@ function waAsstHandle($payload) {
 /** Cadastra o aviso de mensagem recebida no servidor de WhatsApp, sem apagar outro webhook já existente. */
 function waAsstRegister($force = false) {
     $url = waAsstWebhookUrl();
-    if ($url === '') return ['success' => false, 'error' => 'Cadastre a "URL pública do painel" em Configurações > API antes de ativar o assistente.'];
+    if ($url === '') return ['success' => false, 'error' => 'Para receber as mensagens, o WhatsApp precisa alcançar o painel pela internet. Abra o painel pelo seu endereço com domínio (ex.: https://pbx.suaempresa.com.br) e ligue o assistente de novo; o painel descobre o resto sozinho.'];
     if (waProvider() !== 'uazapi') return ['success' => false, 'error' => 'O assistente por WhatsApp precisa do WhatsApp direto (QR Code) conectado em Configurações > API.'];
     $cur = uazapiRequest('GET', '/webhook', null, 10);
     $d = json_decode($cur['resp'], true);

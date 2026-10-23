@@ -417,6 +417,7 @@ $displayPassword = $isPrismaProvider ? '' : decryptSmtpPassword($smtpConfig['pas
                             <option value="Relatórios Gráficos">📉 Relatórios Gráficos (Ramais/Filas)</option>
                             <option value="Relatório Geral & Heatmap">🔥 Relatório Geral & Heatmap</option>
                             <option value="IA Analytics">✨ Analytics de Inteligência Artificial</option>
+                            <option value="Resumo Diário">📰 Resumo Diário (ligações de ontem)</option>
                         </select>
                     </div>
                     <div class="space-y-1">

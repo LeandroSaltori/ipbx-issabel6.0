@@ -9,6 +9,7 @@ if (PHP_SAPI !== 'cli') { http_response_code(404); exit; }
 
 require_once __DIR__ . '/../includes/functions.php';
 cronHeartbeat('send_scheduled_reports');
+if (function_exists('dsMigrateToSchedule')) dsMigrateToSchedule();
 
 $jsonSmtpFile     = __DIR__ . '/../config/smtp_settings.json';
 $jsonScheduleFile = __DIR__ . '/../config/scheduled_reports.json';
@@ -44,6 +45,7 @@ foreach ($schedules as &$s) {
         if (function_exists('addDispatchLogRecord')) addDispatchLogRecord($smtpConfig['from_email'] ?: ($smtpConfig['user'] ?? ''), $s['email_to'], $s['title'], 'E-MAIL', $res['success'] ? 'Sucesso' : 'Falha', $jsonLogsFile, $dispatchLogs);
     }
     if (in_array($channel, ['whatsapp', 'ambos'], true) && !empty($s['whatsapp_to'])) {
+        if (!empty($payload['wa_text'])) { $r0 = sendWhatsAppAPI($s['whatsapp_to'], $payload['wa_text'], 'REL_AGENDADO', 'GERAL', 'RELATORIO_AGENDADO'); echo "    WhatsApp: " . (!empty($r0['success']) ? 'OK' : 'FALHOU') . "\n"; continue; }
         $sm = aiChatExecTool('period_summary', ['days' => 1]);
         $fmt = function ($v) { return sprintf('%d:%02d', intdiv((int)$v, 60), (int)$v % 60); };
         $txt = "📊 *{$s['title']}*\n" . (isset($sm['error']) ? '' :

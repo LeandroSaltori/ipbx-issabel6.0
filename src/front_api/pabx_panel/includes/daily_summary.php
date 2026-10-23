@@ -38,24 +38,27 @@ function dsText($m) {
     return $t . "\n_Chamadas repetidas (que tocaram em vários ramais) contadas uma vez._";
 }
 
-/** Envia o resumo do dia indicado. $force ignora a trava de "já enviado hoje" (botão de teste). */
-function dsSend($date, $force = false) {
-    $out = ['wa' => null, 'email' => null];
-    $m = dsMetrics($date); $txt = dsText($m);
-    $wa = trim((string)(getSetting('daily_summary_wa') !== '' ? getSetting('daily_summary_wa') : ''));
-    $em = trim((string)(getSetting('daily_summary_email') !== '' ? getSetting('daily_summary_email') : ''));
-    foreach (preg_split('/[\s,;]+/', $wa, -1, PREG_SPLIT_NO_EMPTY) as $num) {
-        $r = sendWhatsAppAPI($num, $txt, 'RESUMO_DIARIO', 'GERAL', 'RESUMO_DIARIO');
-        $out['wa'][$num] = !empty($r['success']);
+/** Conteúdo do Resumo Diário (ontem) para os Relatórios Agendados: texto de WhatsApp e corpo de e-mail. */
+function dsSchedulePayload() {
+    $txt = dsText(dsMetrics(date('Y-m-d', strtotime('-1 day'))));
+    $html = '<div style="font-family:Arial,sans-serif;font-size:14px">' . nl2br(htmlspecialchars(str_replace(['*', '_'], '', $txt))) . '</div>';
+    return ['body_html' => $html, 'attachments' => [], 'wa_text' => $txt];
+}
+
+/** Quem tinha ligado o Resumo Diário na versão anterior passa a ter um agendamento comum em Relatórios Agendados (uma vez só). */
+function dsMigrateToSchedule() {
+    if (getSetting('daily_summary_enabled') !== '1' || getSetting('daily_summary_migrated') === '1') return;
+    $f = __DIR__ . '/../config/scheduled_reports.json';
+    $sch = is_file($f) ? (json_decode((string)file_get_contents($f), true) ?: []) : [];
+    $wa = trim((string)getSetting('daily_summary_wa')); $em = trim((string)getSetting('daily_summary_email'));
+    $nums = preg_split('/[\s,;]+/', $wa, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+    $ch = ($nums && $em !== '') ? 'ambos' : ($em !== '' ? 'email' : 'whatsapp');
+    if (!$nums && $em === '') { saveSetting('daily_summary_migrated', '1'); return; }
+    $time = getSetting('daily_summary_time') ?: '08:00';
+    $last = getSetting('daily_summary_last') === date('Y-m-d') ? date('Y-m-d H:i:s') : '-';
+    foreach ($nums ?: [''] as $k => $n) {
+        $sch[] = ['id' => uniqid('sch_'), 'title' => 'Resumo Diário', 'report_type' => 'Resumo Diário', 'frequency' => 'diario', 'send_time' => $time, 'channel' => $k === 0 ? $ch : 'whatsapp',
+                  'email_to' => $k === 0 ? $em : '', 'whatsapp_to' => $n, 'status' => 'active', 'created_at' => date('Y-m-d H:i:s'), 'last_sent' => $last, 'source' => 'Migrado'];
     }
-    $cfgFile = __DIR__ . '/../config/smtp_settings.json';
-    if ($em !== '' && file_exists($cfgFile)) {
-        $smtp = json_decode((string)file_get_contents($cfgFile), true) ?: [];
-        if (!empty($smtp)) {
-            $html = '<div style="font-family:Arial,sans-serif;font-size:14px">' . nl2br(htmlspecialchars(str_replace(['*', '_'], '', $txt))) . '</div>';
-            $r = sendSmtpEmailNative($smtp, $em, 'Resumo diário IPbx Prisma - ' . date('d/m/Y', strtotime($date)), $html, []);
-            $out['email'] = !empty($r['success']);
-        }
-    }
-    return $out;
+    if (@file_put_contents($f, json_encode($sch, JSON_PRETTY_PRINT)) !== false) { saveSetting('daily_summary_migrated', '1'); saveSetting('daily_summary_enabled', '0'); }
 }

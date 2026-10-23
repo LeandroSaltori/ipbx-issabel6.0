@@ -28,6 +28,7 @@ $__base = waAsstBase();
 $__log = $db->query("SELECT at, phone, dir, text, status FROM wa_asst_log ORDER BY id DESC LIMIT 30")->fetchAll(PDO::FETCH_ASSOC);
 $__raw = $db->query("SELECT at, body FROM wa_asst_raw ORDER BY id DESC LIMIT 3")->fetchAll(PDO::FETCH_ASSOC);
 $__prov = waProvider() === 'uazapi';
+$__last = (string)$db->query("SELECT at FROM wa_asst_raw ORDER BY id DESC LIMIT 1")->fetchColumn();
 ?>
 <div class="max-w-3xl space-y-5">
     <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-5">
@@ -35,7 +36,7 @@ $__prov = waProvider() === 'uazapi';
         <p class="text-xs text-slate-400 mt-1">Converse com o IPbx Prisma pelo WhatsApp: pergunte sobre ligações, ramais e filas e receba respostas com dados reais. O assistente só responde aos números da lista abaixo. Qualquer alteração pede a sua confirmação com <b>SIM</b>. É opcional e vem desligado.</p>
     </div>
     <?php if (!$__prov): ?><div class="p-3 rounded-xl text-sm border bg-amber-500/10 border-amber-500/30 text-amber-300">Para usar o assistente, conecte o WhatsApp por QR Code em Configurações &gt; API.</div><?php endif; ?>
-    <?php if ($__base === ''): ?><div class="p-3 rounded-xl text-sm border bg-amber-500/10 border-amber-500/30 text-amber-300">Falta cadastrar a "URL pública do painel" em Configurações &gt; API. Sem ela o WhatsApp não consegue avisar o painel de que chegou uma mensagem.</div><?php endif; ?>
+    <?php if ($__base === ''): ?><div class="p-3 rounded-xl text-sm border bg-amber-500/10 border-amber-500/30 text-amber-300">Para o WhatsApp avisar o painel de cada mensagem, abra o painel pelo seu endereço com domínio (ex.: https://pbx.suaempresa.com.br) e ligue o assistente. O painel descobre o endereço sozinho; você não precisa digitar nada. Acessando por IP interno (como 192.168...), o WhatsApp não consegue chegar até o painel.</div><?php endif; ?>
     <?php if ($__msg): ?><div class="p-3 rounded-xl text-sm border <?php echo $__ok ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300' : 'bg-rose-500/10 border-rose-500/30 text-rose-300'; ?>"><?php echo htmlspecialchars($__msg); ?></div><?php endif; ?>
     <form method="POST" class="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 space-y-4">
         <input type="hidden" name="action_type" value="save_asst">
@@ -51,11 +52,19 @@ $__prov = waProvider() === 'uazapi';
         </div>
     </form>
     <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-5">
-        <div class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Últimas conversas</div>
-        <?php if (!$__log): ?><p class="text-sm text-slate-400">Nenhuma mensagem ainda.</p><?php else: ?>
-        <div class="space-y-1.5 max-h-96 overflow-auto">
-        <?php foreach ($__log as $l): ?>
-            <div class="text-xs text-slate-300 border-b border-slate-800/70 pb-1.5"><span class="text-slate-500"><?php echo htmlspecialchars(date('d/m H:i', strtotime($l['at']))); ?></span> <b class="<?php echo $l['dir'] === 'in' ? 'text-sky-300' : 'text-emerald-300'; ?>"><?php echo $l['dir'] === 'in' ? 'Recebida de' : 'Enviada para'; ?> <?php echo htmlspecialchars($l['phone']); ?></b> <span class="text-slate-500">(<?php echo htmlspecialchars($l['status']); ?>)</span><br><?php echo nl2br(htmlspecialchars(mb_substr($l['text'], 0, 300))); ?></div>
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+            <div class="text-xs font-bold uppercase tracking-wider text-slate-400">Conversa ao vivo</div>
+            <span class="text-[11px] text-slate-500"><?php echo $__last ? 'Último aviso do WhatsApp recebido em ' . htmlspecialchars(date('d/m H:i', strtotime($__last))) : 'Nenhum aviso do WhatsApp recebido ainda'; ?></span>
+        </div>
+        <?php if (!$__log): ?><p class="text-sm text-slate-400">Nenhuma mensagem ainda. Quando um número autorizado escrever para o WhatsApp conectado, a conversa aparece aqui.</p><?php else: ?>
+        <div class="space-y-2 max-h-[28rem] overflow-auto pr-1">
+        <?php foreach (array_reverse($__log) as $l): $in = $l['dir'] === 'in'; ?>
+            <div class="flex <?php echo $in ? 'justify-start' : 'justify-end'; ?>">
+                <div class="max-w-[85%] rounded-2xl px-3 py-2 text-sm <?php echo $in ? 'bg-slate-800 text-slate-100 rounded-bl-sm' : 'bg-emerald-600/90 text-white rounded-br-sm'; ?>">
+                    <div class="text-[10px] opacity-70 mb-0.5"><?php echo $in ? htmlspecialchars($l['phone']) : 'Assistente'; ?> · <?php echo htmlspecialchars(date('d/m H:i', strtotime($l['at']))); ?><?php echo in_array($l['status'], ['recebida', 'ok'], true) ? '' : ' · ' . htmlspecialchars($l['status']); ?></div>
+                    <?php echo nl2br(htmlspecialchars(mb_substr($l['text'], 0, 600))); ?>
+                </div>
+            </div>
         <?php endforeach; ?></div><?php endif; ?>
     </div>
     <?php if ($__raw): ?><details class="bg-slate-900/90 border border-slate-800 rounded-2xl p-5"><summary class="text-xs font-bold uppercase tracking-wider text-slate-400 cursor-pointer">Diagnóstico: últimos avisos recebidos do WhatsApp</summary>

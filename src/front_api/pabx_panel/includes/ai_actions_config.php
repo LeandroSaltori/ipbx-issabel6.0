@@ -124,28 +124,9 @@ function aiProposeQueueAbandon($a) {
 /** Aplica ações de configuração confirmadas. Devolve null se o campo não for desta família. */
 /* ===== Resumo diário, bloqueio de números e leitura das rotas do Issabel ===== */
 function aiProposeDailySummary($a) {
-    if (!hasUserPermission('manage_settings')) return ['error' => 'Este usuário não tem permissão para alterar configurações.'];
-    $v = []; $lines = [];
-    if (array_key_exists('enabled', $a)) {
-        $on = filter_var($a['enabled'], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
-        if ($on !== null && (int)$on !== (int)(getSetting('daily_summary_enabled') === '1')) { $v['enabled'] = (int)$on; $lines[] = $on ? 'ligar o resumo diário' : 'desligar o resumo diário'; }
-    }
-    if (!empty($a['time'])) {
-        if (!preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', (string)$a['time'])) return ['error' => 'Horário inválido. Use HH:MM (ex.: 08:00).'];
-        if ($a['time'] !== (getSetting('daily_summary_time') ?: '08:00')) { $v['time'] = $a['time']; $lines[] = 'enviar às ' . $a['time']; }
-    }
-    if (array_key_exists('whatsapp', $a)) {
-        $nums = []; foreach (preg_split('/[,;\n]+/', (string)$a['whatsapp'], -1, PREG_SPLIT_NO_EMPTY) as $n) { $n = aiNormPhone(trim($n)); if ($n === '') return ['error' => 'Número de WhatsApp inválido.']; $nums[] = $n; }
-        $str = implode(', ', $nums);
-        if ($str !== trim((string)getSetting('daily_summary_wa'))) { $v['wa'] = $str; $lines[] = $str === '' ? 'remover os números de WhatsApp' : 'enviar por WhatsApp para ' . $str; }
-    }
-    if (array_key_exists('email', $a)) {
-        $e = trim((string)$a['email']);
-        if ($e !== '' && !filter_var($e, FILTER_VALIDATE_EMAIL)) return ['error' => 'E-mail inválido.'];
-        if ($e !== trim((string)getSetting('daily_summary_email'))) { $v['email'] = $e; $lines[] = $e === '' ? 'remover o e-mail' : 'enviar por e-mail para ' . $e; }
-    }
-    if (!$v) return ['error' => 'Nada a alterar: o resumo diário já está assim.'];
-    return aiNewProposal('daily_summary', $v, 'Resumo diário: ' . implode('; ', $lines));
+    $wa = trim((string)($a['whatsapp'] ?? '')); $em = trim((string)($a['email'] ?? ''));
+    $ch = ($wa !== '' && $em !== '') ? 'ambos' : ($em !== '' ? 'email' : 'whatsapp');
+    return aiProposeReportSchedule(['report_type' => 'Resumo Diário', 'frequency' => 'diario', 'send_time' => (string)($a['time'] ?? '08:00'), 'channel' => $ch, 'email_to' => $em, 'whatsapp_to' => $wa, 'title' => 'Resumo Diário']);
 }
 function aiProposeBlacklist($a) {
     if (!hasUserPermission('manage_settings')) return ['error' => 'Este usuário não tem permissão para bloquear números.'];
@@ -225,15 +206,6 @@ function aiApplyConfigAction($field, $v) {
         $db->prepare("UPDATE queues_config SET " . implode(', ', $sets) . ", updated_at = CURRENT_TIMESTAMP WHERE queue_number = :q")->execute($par);
         if (function_exists('pabx_log')) pabx_log('whatsapp', 'INFO', "Abandono da fila {$v['queue']} alterado pelo Chat IA (confirmado pelo usuário)");
         panelRevBump('rules');
-        return ['success' => true];
-    }
-    if ($field === 'daily_summary') {
-        if (!hasUserPermission('manage_settings')) return ['success' => false, 'error' => 'Sem permissão para alterar configurações.'];
-        if (array_key_exists('enabled', $v)) saveSetting('daily_summary_enabled', $v['enabled'] ? '1' : '0');
-        if (isset($v['time']))  saveSetting('daily_summary_time', $v['time']);
-        if (array_key_exists('wa', $v))    saveSetting('daily_summary_wa', $v['wa']);
-        if (array_key_exists('email', $v)) saveSetting('daily_summary_email', $v['email']);
-        panelRevBump('daily');
         return ['success' => true];
     }
     if ($field === 'blacklist') {

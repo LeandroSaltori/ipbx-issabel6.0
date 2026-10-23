@@ -1266,7 +1266,7 @@ $allowed_modules = [
     'whatsapp' => ['regras', 'historico', 'disparos', 'contatos'],
     'telefonia' => ['blacklist'],
     'manual' => ['view'],
-    'configuracoes' => ['ami', 'ia', 'api', 'usuarios', 'api_connection', 'smtp', 'logs', 'status', 'seguranca', 'chat_ia', 'console', 'mapa', 'resumo_diario', 'assistente_whatsapp']
+    'configuracoes' => ['ami', 'ia', 'api', 'usuarios', 'api_connection', 'smtp', 'logs', 'status', 'seguranca', 'chat_ia', 'console', 'mapa', 'assistente_whatsapp']
 ];
 
 if (!isset($allowed_modules[$module]) || !in_array($action, $allowed_modules[$module])) {
@@ -3390,7 +3390,7 @@ dialog#ai-chat-dialog::backdrop{background:rgba(0,0,0,.65);backdrop-filter:blur(
 (function () {
   var mod = <?php echo json_encode($module . ':' . $action); ?>;
   var map = {'configuracoes:smtp': ['schedules', 'wa_sends'], 'whatsapp:disparos': ['schedules', 'wa_sends'], 'whatsapp:historico': ['wa_sends'],
-             'ramais:editar_nome': ['extensions'], 'ramais:fop': ['extensions'], 'dashboard:view_v1': ['extensions'], 'whatsapp:contatos': ['extensions', 'contacts'], 'whatsapp:regras': ['rules'], 'configuracoes:resumo_diario': ['daily'], 'configuracoes:assistente_whatsapp': ['wa_asst'], 'telefonia:blacklist': ['blacklist']};
+             'ramais:editar_nome': ['extensions'], 'ramais:fop': ['extensions'], 'dashboard:view_v1': ['extensions'], 'whatsapp:contatos': ['extensions', 'contacts'], 'whatsapp:regras': ['rules'], 'configuracoes:assistente_whatsapp': ['wa_asst'], 'telefonia:blacklist': ['blacklist']};
   var areas = map[mod] || [];
   var base = null, busy = false;
   window.ipbxLiveCheck = async function (force) {

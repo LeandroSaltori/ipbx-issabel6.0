@@ -231,10 +231,6 @@ function isGroupActive($modules_array) {
                     <i class="fa-solid fa-shield-halved w-4 text-center text-rose-400"></i>
                     <span>Painel de Segurança</span>
                 </a>
-                <a href="index.php?module=configuracoes&action=resumo_diario" class="flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all <?php echo isNavActive('configuracoes', 'resumo_diario') ? 'bg-brand-500/20 text-brand-400 border border-brand-500/30 font-bold' : 'text-slate-300 hover:bg-slate-800/60 hover:text-white'; ?>">
-                    <i class="fa-solid fa-newspaper w-4 text-center text-emerald-400"></i>
-                    <span>Resumo Diário</span>
-                </a>
                 <a href="index.php?module=configuracoes&action=assistente_whatsapp" class="flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all <?php echo isNavActive('configuracoes', 'assistente_whatsapp') ? 'bg-brand-500/20 text-brand-400 border border-brand-500/30 font-bold' : 'text-slate-300 hover:bg-slate-800/60 hover:text-white'; ?>">
                     <i class="fa-brands fa-whatsapp w-4 text-center text-emerald-400"></i>
                     <span>Assistente WhatsApp</span>

@@ -3956,6 +3956,7 @@ if (!function_exists('decryptSmtpPassword')) {
  * Gera o corpo de e-mail HTML estilizado e o arquivo CSV em anexo com dados reais do PABX
  */
 function buildScheduledReportPayload($reportTitle, $reportType) {
+    if ($reportType === 'Resumo Diário' && function_exists('dsSchedulePayload')) return dsSchedulePayload();
     $todayStr = date('d/m/Y H:i:s');
     $dateFilter = date('Y-m-d');
     
@@ -6015,9 +6016,8 @@ function aiChatToolDefs() {
             'queue' => ['type' => 'string', 'description' => 'Número da fila'], 'enabled' => ['type' => 'boolean'],
             'supervisor_whatsapp' => ['type' => 'string', 'description' => 'DDD + número; vazio remove'], 'message' => ['type' => 'string', 'description' => 'Vazio = usa a mensagem padrão'],
         ], ['queue']),
-        $fn('propose_daily_summary', 'Propõe ligar/desligar ou alterar o Resumo Diário (relatório curto de ontem enviado por WhatsApp/e-mail). NÃO grava: o usuário confirma. Informe só o que muda.', [
-            'enabled' => ['type' => 'boolean'], 'time' => ['type' => 'string', 'description' => 'HH:MM'],
-            'whatsapp' => ['type' => 'string', 'description' => 'Números (DDD+número) separados por vírgula; vazio remove'], 'email' => ['type' => 'string', 'description' => 'Vazio remove'],
+        $fn('propose_daily_summary', 'Propõe agendar o Resumo Diário (relatório curto de ontem) em Relatórios Agendados, por WhatsApp e/ou e-mail. NÃO grava: o usuário confirma. Para desligar use list_scheduled e propose_cancel_schedule.', [
+            'time' => ['type' => 'string', 'description' => 'HH:MM'], 'whatsapp' => ['type' => 'string', 'description' => 'Número (DDD+número) cadastrado na Agenda'], 'email' => ['type' => 'string'],
         ]),
         $fn('list_blacklist', 'Lista os números bloqueados no PABX (blacklist do Issabel).', []),
         $fn('propose_blacklist', 'Propõe bloquear (add) ou desbloquear (remove) UM número na blacklist do PABX. NÃO grava: o usuário confirma.', [
@@ -6351,7 +6351,7 @@ function panelRevBump($area) {
 }
 function panelRevAll() {
     $o = [];
-    foreach (['schedules', 'wa_sends', 'extensions', 'contacts', 'rules', 'daily', 'blacklist', 'wa_asst'] as $a) $o[$a] = (string)getSetting('panel_rev_' . $a);
+    foreach (['schedules', 'wa_sends', 'extensions', 'contacts', 'rules', 'blacklist', 'wa_asst'] as $a) $o[$a] = (string)getSetting('panel_rev_' . $a);
     return $o;
 }
 function waSchedEnsure() {
@@ -6432,7 +6432,7 @@ function aiProposeWaSend($a) {
     return aiNewProposal('wa_send', ['phone' => $ph, 'name' => $nm, 'message' => $msg, 'send_at' => $when, 'report' => $isReport], $resumo);
 }
 
-$GLOBALS['AI_REPORT_TYPES'] = ['Relatório Completo de Filas', 'Resumo de Filas PABX', 'Relatórios Gráficos', 'Relatório Geral & Heatmap', 'IA Analytics'];
+$GLOBALS['AI_REPORT_TYPES'] = ['Relatório Completo de Filas', 'Resumo de Filas PABX', 'Relatórios Gráficos', 'Relatório Geral & Heatmap', 'IA Analytics', 'Resumo Diário'];
 /** Propõe agendamento recorrente de relatório (mesma tela Relatórios Agendados). */
 function aiProposeReportSchedule($a) {
     if (!hasUserPermission('schedule_reports')) return ['error' => 'Este usuário não tem permissão para agendar relatórios.'];
@@ -6581,7 +6581,7 @@ function aiProposalResolve($id, $accept) {
         $db->prepare("UPDATE ai_pending_actions SET status = 'cancelled' WHERE id = ?")->execute([$p['id']]);
         return ['success' => true, 'message' => 'Cancelado. Nada foi alterado.'];
     }
-    if (in_array($p['field'], ['wa_send', 'report_schedule', 'cancel_schedule', 'contact_save', 'contact_delete', 'rule_set', 'queue_abandon', 'daily_summary', 'blacklist'], true)) {
+    if (in_array($p['field'], ['wa_send', 'report_schedule', 'cancel_schedule', 'contact_save', 'contact_delete', 'rule_set', 'queue_abandon', 'blacklist'], true)) {
         $r = aiApplyAction($p['field'], (array)json_decode((string)$p['value'], true));
     } elseif (!hasUserPermission('manage_settings')) {
         $r = ['success' => false, 'error' => 'Sem permissão para alterar ramais.'];
@@ -6808,7 +6808,7 @@ function integrationStatusChecks() {
     } catch (Exception $e) { $add('Telefonia', 'Troncos', 'warn', 'Não foi possível consultar.'); }
 
     // --- Crons
-    foreach (['send_missed_calls' => 'Aviso de chamada perdida', 'send_queue_abandon' => 'Aviso de abandono de fila', 'send_call_summaries' => 'Resumo/gravação ao atendente', 'check_trunks' => 'Alerta de tronco', 'send_wa_scheduled' => 'WhatsApps agendados', 'send_scheduled_reports' => 'Relatórios agendados', 'send_daily_summary' => 'Resumo diário', 'sync_address_book' => 'Agenda (painel clássico)'] as $k => $lbl) {
+    foreach (['send_missed_calls' => 'Aviso de chamada perdida', 'send_queue_abandon' => 'Aviso de abandono de fila', 'send_call_summaries' => 'Resumo/gravação ao atendente', 'check_trunks' => 'Alerta de tronco', 'send_wa_scheduled' => 'WhatsApps agendados', 'send_scheduled_reports' => 'Relatórios agendados', 'sync_address_book' => 'Agenda (painel clássico)'] as $k => $lbl) {
         $t = (int)getSetting('cron_last_' . $k);
         if ($t <= 0) $add('Tarefas automáticas', $lbl, 'warn', 'Ainda não registrou execução (aguarde 1-2 minutos após atualizar).');
         else { $age = time() - $t; $add('Tarefas automáticas', $lbl, $age <= 180 ? 'ok' : 'fail', 'Última execução há ' . ($age < 90 ? $age . 's' : round($age / 60) . ' min') . ($age <= 180 ? '.' : ' — cron parado? verifique /etc/cron.d/ipbx-front-api.')); }
