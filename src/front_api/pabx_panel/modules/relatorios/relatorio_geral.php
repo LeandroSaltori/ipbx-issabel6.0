@@ -61,7 +61,7 @@ if ($ast_db) {
             SUM(CASE WHEN NOT src REGEXP '^[0-9]{3,4}$' THEN billsec ELSE 0 END) as inc_sec,
             SUM(CASE WHEN src REGEXP '^[0-9]{3,4}$' AND NOT dst REGEXP '^[0-9]{3,4}$' THEN billsec ELSE 0 END) as out_sec,
             SUM(CASE WHEN dst REGEXP '^[0-9]{3,4}$' AND src REGEXP '^[0-9]{3,4}$' THEN billsec ELSE 0 END) as int_sec
-            FROM cdr WHERE calldate BETWEEN :sd AND :ed");
+            FROM cdr WHERE calldate BETWEEN :sd AND :ed AND ".cdrDedupCond());
         $stmt_cnt->execute([':sd' => "$start_date 00:00:00", ':ed' => "$end_date 23:59:59"]);
         $r_cnt = $stmt_cnt->fetch(PDO::FETCH_ASSOC);
 
@@ -121,7 +121,7 @@ if ($ast_db) {
             SUM(CASE WHEN dst REGEXP '^[0-9]{3,4}$' AND NOT src REGEXP '^[0-9]{3,4}$' THEN billsec ELSE 0 END) as inc_sec,
             SUM(CASE WHEN src REGEXP '^[0-9]{3,4}$' THEN billsec ELSE 0 END) as out_sec
             FROM cdr 
-            WHERE calldate BETWEEN :sd AND :ed
+            WHERE calldate BETWEEN :sd AND :ed AND ".cdrDedupCond()."
             GROUP BY ext_num
             ORDER BY ext_num ASC");
         $stmt_ext->execute([':sd' => "$start_date 00:00:00", ':ed' => "$end_date 23:59:59"]);
@@ -173,7 +173,7 @@ if ($ast_db) {
     try {
         $sql_hm = "SELECT HOUR(calldate) as call_hour, COUNT(*) as total
             FROM cdr 
-            WHERE calldate BETWEEN :sd AND :ed";
+            WHERE calldate BETWEEN :sd AND :ed AND ".cdrDedupCond();
         if (!$include_internal) {
             $sql_hm .= " AND NOT (LENGTH(src) <= 4 AND LENGTH(dst) <= 4)";
         }
@@ -229,6 +229,7 @@ if ($ast_db) {
                         </a>
                     </div>
 
+                    <?php echo cdrDedupCheckbox(); ?>
                     <!-- Checkbox de Chamadas Internas -->
                     <label class="flex items-center gap-2 text-xs text-slate-300 font-bold cursor-pointer bg-slate-950 px-3 py-1.5 rounded-xl border border-slate-800 hover:border-slate-700 transition" title="Marque para somar ligações entre ramais no total geral e mapa de calor">
                         <input type="checkbox" name="include_internal" value="1" <?php echo $include_internal ? 'checked' : ''; ?> onchange="this.form.submit()" class="rounded border-slate-700 bg-slate-900 text-brand-500 focus:ring-brand-500 w-3.5 h-3.5 cursor-pointer">

@@ -78,6 +78,8 @@ if ($type_filter === 'INTERNAL') {
     $where_clauses[] = "(LENGTH(src) > 4 OR LENGTH(dst) > 4)";
 }
 
+$where_sql_raw = implode(' AND ', $where_clauses);
+$where_clauses[] = cdrDedupCond();
 $where_sql = implode(' AND ', $where_clauses);
 
 // Buscar métricas reais do CDR
@@ -141,7 +143,7 @@ $fcr_pct = null; $fcr_base = 0;
 if ($ast_db) {
     try {
         $lim = date('Y-m-d H:i:s', time() - 86400);
-        $q = $ast_db->query("SELECT src, UNIX_TIMESTAMP(calldate) ts, disposition FROM cdr WHERE $where_sql AND LENGTH(src) > 4 ORDER BY calldate LIMIT 20000");
+        $q = $ast_db->query("SELECT src, UNIX_TIMESTAMP(calldate) ts, disposition FROM cdr WHERE $where_sql_raw AND LENGTH(src) > 4 ORDER BY calldate LIMIT 20000");
         $by = [];
         foreach ($q ? $q->fetchAll(PDO::FETCH_ASSOC) : [] as $r) $by[$r['src']][] = [(int)$r['ts'], $r['disposition']];
         $ok = 0;
@@ -262,6 +264,7 @@ $topic_rules = array_values(array_filter($rules_all, function ($r) { return $r['
         <form method="GET" action="index.php" class="flex flex-col gap-3 pt-3 border-t border-slate-800/80 text-xs font-semibold relative z-10">
             <input type="hidden" name="module" value="relatorios">
             <input type="hidden" name="action" value="ia_analytics">
+            <div><?php echo cdrDedupCheckbox(); ?></div>
 
             <div class="flex flex-wrap items-center gap-2 w-full">
                 <input type="hidden" name="preset" id="preset_input" value="<?php echo htmlspecialchars($filter_preset); ?>">

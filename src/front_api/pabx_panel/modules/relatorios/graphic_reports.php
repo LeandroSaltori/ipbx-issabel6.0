@@ -79,7 +79,7 @@ if ($ast_db) {
         if ($report_type === 'extensions') {
             $sql = "SELECT COUNT(*) as total, SUM(billsec) as total_sec, 
                            CASE WHEN src REGEXP '^[0-9]{3,4}$' THEN 'OUT' ELSE 'INC' END as call_dir
-                    FROM cdr WHERE calldate BETWEEN :sd AND :ed";
+                    FROM cdr WHERE calldate BETWEEN :sd AND :ed AND ".cdrDedupCond();
             if ($selected_ext !== 'ALL') {
                 $sql .= " AND (src = :ext OR dst = :ext)";
             }
@@ -176,7 +176,7 @@ if (!empty($db_queues)) {
     if ($ast_db && !empty($q_numbers)) {
         try {
             $in_clause = "'" . implode("','", array_map('addslashes', $q_numbers)) . "'";
-            $sql_q = "SELECT dst, COUNT(*) as total FROM cdr WHERE calldate BETWEEN :sd AND :ed AND dst IN ($in_clause) GROUP BY dst";
+            $sql_q = "SELECT dst, COUNT(*) as total FROM cdr WHERE calldate BETWEEN :sd AND :ed AND dst IN ($in_clause) AND ".cdrDedupCond()." GROUP BY dst";
             $stmt_q = $ast_db->prepare($sql_q);
             $stmt_q->execute([':sd' => "$start_date 00:00:00", ':ed' => "$end_date 23:59:59"]);
             while ($r = $stmt_q->fetch(PDO::FETCH_ASSOC)) {
@@ -243,6 +243,7 @@ if (empty($queue_stats)) {
                 <input type="hidden" name="module" value="relatorios">
                 <input type="hidden" name="action" value="graphic_reports">
                 <input type="hidden" name="type" value="<?php echo htmlspecialchars($report_type); ?>">
+                <?php echo cdrDedupCheckbox(); ?>
 
                 <div class="flex items-center gap-3 flex-wrap">
                     <div class="flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs font-bold gap-1 flex-wrap">

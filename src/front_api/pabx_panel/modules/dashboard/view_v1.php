@@ -30,6 +30,7 @@ if ($call_type_filter === 'external') {
 } elseif ($call_type_filter === 'internal') {
     $sql_call_type_condition = " AND (LENGTH(src) <= 4 AND LENGTH(dst) <= 4)";
 }
+$sql_call_type_condition .= " AND " . cdrDedupCond();
 
 $show_all_ramais = isset($_GET['show_all_ramais']) && $_GET['show_all_ramais'] == '1';
 
@@ -388,6 +389,7 @@ if ($ast_db) {
             <input type="hidden" name="action" value="view_v1">
             <input type="hidden" name="period" value="personalizado">
             <input type="hidden" name="call_type" value="<?php echo htmlspecialchars($call_type_filter); ?>">
+            <?php echo cdrDedupCheckbox(); ?>
 
             <!-- Filtro de Período -->
             <div class="bg-slate-950/80 border border-slate-800 p-1 rounded-xl flex items-center gap-1 text-xs font-bold">

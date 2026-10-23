@@ -75,6 +75,7 @@ if ($ast_db) {
         }
         if ($hide_zero && $min_duration < 1) $min_duration = 1;
         if ($min_duration > 0) { $where_clauses[] = "billsec >= :md"; $params[':md'] = $min_duration; }
+        $where_clauses[] = cdrDedupCond();
         if ($only_recorded) $where_clauses[] = "recordingfile IS NOT NULL AND recordingfile <> ''";
 
         if ($status_filter !== 'ALL') {
@@ -187,6 +188,7 @@ if (isset($_GET['export']) && in_array($_GET['export'], ['csv', 'xlsx', 'pdf'], 
                 </select>
                 <input type="text" name="queue_filter" value="<?php echo htmlspecialchars($queue_filter); ?>" placeholder="Fila/Grupo" class="w-24 px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:border-brand-500 focus:outline-none">
                 <input type="number" min="0" name="min_duration" value="<?php echo $min_duration ?: ''; ?>" placeholder="Dur. mín (s)" class="w-28 px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:border-brand-500 focus:outline-none">
+                <?php echo cdrDedupCheckbox(); ?>
                 <label class="flex items-center gap-1 text-xs text-slate-300"><input type="checkbox" name="hide_zero" value="1" <?php echo $hide_zero ? 'checked' : ''; ?>> Ocultar zeradas</label>
                 <label class="flex items-center gap-1 text-xs text-slate-300"><input type="checkbox" name="only_recorded" value="1" <?php echo $only_recorded ? 'checked' : ''; ?>> Só com gravação</label>
 

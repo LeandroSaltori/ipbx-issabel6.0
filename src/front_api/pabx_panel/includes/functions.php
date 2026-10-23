@@ -6938,3 +6938,22 @@ function queueLogImportFromFile($path = '/var/log/asterisk/queue_log') {
     $r['imported'] = $n;
     return $r;
 }
+
+/* ===== Ocultar chamadas repetidas (a mesma chamada que tocou em vários ramais) ===== */
+function cdrDedupOn() {
+    return isset($_GET['dedup']) ? ($_GET['dedup'] !== '0') : true; // ligado por padrão
+}
+/** Condição SQL: mantém só a perna de maior duração de cada chamada externa (mesmo número, janela de $win s). */
+function cdrDedupCond($win = 60) {
+    if (!cdrDedupOn()) return '1=1';
+    $w = max(5, (int)$win);
+    return "(LENGTH(cdr.src) <= 4 OR NOT EXISTS (SELECT 1 FROM cdr d WHERE d.src = cdr.src AND d.uniqueid <> cdr.uniqueid"
+         . " AND d.calldate BETWEEN cdr.calldate - INTERVAL $w SECOND AND cdr.calldate + INTERVAL $w SECOND"
+         . " AND (d.billsec > cdr.billsec OR (d.billsec = cdr.billsec AND d.uniqueid < cdr.uniqueid))))";
+}
+/** Caixinha para os filtros (ligada por padrão; desmarcada mostra o relatório completo). */
+function cdrDedupCheckbox() {
+    $c = cdrDedupOn() ? 'checked' : '';
+    return '<label class="inline-flex items-center gap-2 text-xs font-semibold text-slate-300 cursor-pointer" title="Quando a mesma chamada toca em vários ramais, conta só uma vez (a de maior duração). Desmarque para ver tudo.">'
+         . '<input type="hidden" name="dedup" value="0"><input type="checkbox" name="dedup" value="1" ' . $c . ' onchange="this.form.submit()"> Ocultar chamadas repetidas</label>';
+}
