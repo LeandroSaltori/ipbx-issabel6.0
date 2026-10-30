@@ -44,7 +44,7 @@ $h = function($s) { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); };
                 <?php endif; ?>
                 <?php if (!empty($it['campos'])): ?>
                 <div class="mt-2 text-sm"><div class="font-bold text-slate-200 mb-1">Campos</div>
-                <?php foreach ($it['campos'] as $c => $x): ?><div class="text-slate-400"><b class="text-slate-200"><?php echo $h($c); ?>:</b> <?php echo $h($x); ?></div><?php endforeach; ?></div>
+                <?php foreach ($it['campos'] as $c => $x): if (is_array($x)) { $c = (string)($x[0] ?? ''); $x = (string)($x[1] ?? ''); } ?><div class="text-slate-400"><b class="text-slate-200"><?php echo $h($c); ?>:</b> <?php echo $h($x); ?></div><?php endforeach; ?></div>
                 <?php endif; ?>
                 <?php if (!empty($it['dica'])): ?><div class="mt-2 text-sm rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 p-2"><i class="fa-solid fa-lightbulb mr-1"></i><?php echo $h($it['dica']); ?></div><?php endif; ?>
                 <?php if (!empty($it['aviso'])): ?><div class="mt-2 text-sm rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-300 p-2"><i class="fa-solid fa-triangle-exclamation mr-1"></i><?php echo $h($it['aviso']); ?></div><?php endif; ?>
