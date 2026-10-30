@@ -146,7 +146,7 @@ function aiListBlacklist() {
     if (!$r['success']) return ['error' => 'Não consegui ler a lista de bloqueio do PABX: ' . $r['error']];
     return ['total' => count($r['items']), 'numeros' => array_slice($r['items'], 0, 100)];
 }
-/** Leitura das rotas de entrada exatamente como estão no Issabel (o painel não altera nada ali). */
+/** Leitura das rotas de entrada exatamente como estão na central (o painel não altera nada ali). */
 /** Narra, em português e passo a passo, o que acontece com uma chamada a partir de um nó da árvore de destinos. */
 function aiFlowNarrate($n, $d = 0) {
     if (!is_array($n) || $d > 7) return [];
@@ -207,7 +207,7 @@ function aiInboundRoutes($a) {
         $res[] = ['numero_de_entrada' => $f['did'], 'descricao' => $f['description'], 'passo_a_passo' => array_merge(['A ligação externa chega no número ' . $f['did'] . '.'], aiFlowNarrate($f['tree'] ?? null, 0))];
     }
     if (!$res) return ['error' => 'Nenhuma rota de entrada encontrada para o número ' . $want . '.'];
-    return ['fonte' => 'Configuração do Issabel (somente leitura; horários, feriados, URA, filas e grupos se alteram no Issabel)', 'instrucao' => 'Conte o caminho ao cliente em ordem, usando só os dados abaixo; o que estiver como "Não informado" diga que não está configurado. Não invente quantidade de toques: informe os segundos configurados.', 'rotas' => $res];
+    return ['fonte' => 'Configuração da central (somente leitura; horários, feriados, URA, filas e grupos se alteram na configuração da central)', 'instrucao' => 'Conte o caminho ao cliente em ordem, usando só os dados abaixo; o que estiver como "Não informado" diga que não está configurado. Não invente quantidade de toques: informe os segundos configurados.', 'rotas' => $res];
 }
 
 function aiApplyConfigAction($field, $v) {
