@@ -171,7 +171,7 @@ function waAsstHandle($payload) {
     $h->execute([$m['phone']]); $rows = array_reverse($h->fetchAll(PDO::FETCH_ASSOC));
     $hist = []; foreach ($rows as $r) $hist[] = ['role' => $r['dir'] === 'in' ? 'user' : 'assistant', 'content' => preg_replace('/^🎙️ /u', '', $r['text'])];
     if (!$hist || end($hist)['role'] !== 'user') $hist[] = ['role' => 'user', 'content' => $text];
-    $GLOBALS['__ai_proposals'] = [];
+    $GLOBALS['__ai_proposals'] = []; $GLOBALS['__ai_recordings'] = [];
     $res = aiChatRun($hist);
     if (empty($res['ok'])) { waAsstReply($m['phone'], 'Não consegui responder agora: ' . ($res['error'] ?? 'erro')); return 'ia falhou'; }
     $out = $res['text'];
@@ -180,7 +180,20 @@ function waAsstHandle($payload) {
         $out .= "\n\n" . ($n === 1 ? "Para confirmar: *" . $GLOBALS['__ai_proposals'][0]['resumo'] . "*\nResponda *SIM* para aplicar ou *NÃO* para cancelar (vale por 10 minutos)."
                                   : "Ações aguardando confirmação:\n" . implode("\n", array_map(function ($p, $i) { return ($i + 1) . ') ' . $p['resumo']; }, $GLOBALS['__ai_proposals'], array_keys($GLOBALS['__ai_proposals']))) . "\nResponda *SIM 1*, *SIM 2*… ou *NÃO 1* (vale por 10 minutos).");
     }
+    // Gravações pedidas: manda o ÁUDIO direto na conversa (o link só vale no navegador)
+    $out = preg_replace('~https?://\S+audio\S*~i', '(áudio enviado abaixo)', $out);
     waAsstReply($m['phone'], $out);
+    $sent = [];
+    foreach (array_slice($GLOBALS['__ai_recordings'] ?? [], 0, 3) as $rc) {
+        if (isset($sent[$rc['uniqueid']])) continue; $sent[$rc['uniqueid']] = 1;
+        $path = findRecordingPath($rc['file'], $rc['calldate']);
+        if ($path === '') { waAsstReply($m['phone'], 'Não encontrei o arquivo de áudio da chamada ' . $rc['uniqueid'] . ' no servidor.'); continue; }
+        if (filesize($path) > 15 * 1024 * 1024) { waAsstReply($m['phone'], 'A gravação da chamada ' . $rc['uniqueid'] . ' é grande demais para o WhatsApp (mais de 15 MB). Ouça pelo painel.'); continue; }
+        $ext = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+        $mime = ['wav' => 'audio/wav', 'mp3' => 'audio/mpeg', 'gsm' => 'audio/x-gsm', 'ogg' => 'audio/ogg'][$ext] ?? 'audio/wav';
+        $r = sendWhatsAppFile($m['phone'], 'gravacao-' . $rc['uniqueid'] . '.' . $ext, file_get_contents($path), $mime, 'Gravação da chamada', 'ASSISTENTE_WA', 'GERAL', 'ASSISTENTE_WA', 'auto');
+        waAsstLog($m['phone'], 'out', '🔊 áudio da gravação ' . $rc['uniqueid'], !empty($r['success']) ? 'ok' : 'falhou');
+    }
     aiChatLog($text, $res['tools'] ?? [], true);
     return 'respondida';
 }

@@ -147,23 +147,67 @@ function aiListBlacklist() {
     return ['total' => count($r['items']), 'numeros' => array_slice($r['items'], 0, 100)];
 }
 /** Leitura das rotas de entrada exatamente como estão no Issabel (o painel não altera nada ali). */
+/** Narra, em português e passo a passo, o que acontece com uma chamada a partir de um nó da árvore de destinos. */
+function aiFlowNarrate($n, $d = 0) {
+    if (!is_array($n) || $d > 7) return [];
+    $pad = str_repeat('   ', $d);
+    $t = $n['type'] ?? '';
+    $L = [];
+    $ni = function ($v) { $v = trim((string)$v); return ($v === '' || $v === '—') ? 'Não informado' : $v; };
+    $nm = function ($m) { return $m['extension'] . ' (' . $m['name'] . ')' . (!empty($m['penalty']) ? ' [penalidade ' . $m['penalty'] . ']' : ''); };
+    if ($t === 'timecondition') {
+        $tg = $n['timegroup'] ?? [];
+        $regras = !empty($tg['rules']) ? implode('; ', $tg['rules']) : 'Não informado';
+        $L[] = $pad . 'Verifica o horário (' . ($tg['name'] ?? 'grupo de horário') . '). Regras do grupo (inclui feriados/datas se estiverem cadastrados no grupo): ' . $regras . '.';
+        $L[] = $pad . '→ Se ESTIVER dentro do grupo de horário:';
+        foreach (aiFlowNarrate($n['true_node'] ?? null, $d + 1) as $l) $L[] = $l;
+        $L[] = $pad . '→ Se estiver FORA do grupo de horário:';
+        foreach (aiFlowNarrate($n['false_node'] ?? null, $d + 1) as $l) $L[] = $l;
+    } elseif ($t === 'ringgroup') {
+        $mem = !empty($n['members']) ? implode(', ', array_map($nm, $n['members'])) : 'Não informado';
+        $L[] = $pad . 'Toca o grupo de ramais "' . preg_replace('/^.*?:\s*/', '', (string)($n['title'] ?? '')) . '". Estratégia: ' . ($n['strategy_label'] ?? 'Não informada') . '. Ramais: ' . $mem . '. Tempo de toque configurado: ' . (($n['ring_time'] ?? '') === '' ? 'Não informado' : $n['ring_time'] . ' segundos') . '.';
+        if (!empty($n['failover_node'])) { $L[] = $pad . '→ Se ninguém atender:'; foreach (aiFlowNarrate($n['failover_node'], $d + 1) as $l) $L[] = $l; }
+        else $L[] = $pad . '→ Se ninguém atender: Não informado.';
+    } elseif ($t === 'queue') {
+        $q = $n['details'] ?? [];
+        $mem = !empty($q['members']) ? implode(', ', array_map($nm, $q['members'])) : 'Não informado';
+        $L[] = $pad . 'Entra na fila "' . ($q['queue_name'] ?? '') . '" (#' . ($n['queue_num'] ?? '') . '). Estratégia: ' . $ni($q['strategy_label'] ?? $q['strategy'] ?? '') . '. Ramais/agentes: ' . $mem . '. Tempo de toque em cada agente: ' . $ni($q['agent_timeout'] ?? '') . '; intervalo entre tentativas: ' . $ni($q['retry'] ?? '') . '; espera máxima na fila: ' . $ni($q['max_wait_time_label'] ?? '') . '.';
+        if (!empty($n['failover_node'])) { $L[] = $pad . '→ Depois da espera máxima / sem atendimento:'; foreach (aiFlowNarrate($n['failover_node'], $d + 1) as $l) $L[] = $l; }
+        else $L[] = $pad . '→ Depois da espera máxima: Não informado.';
+    } elseif ($t === 'ivr') {
+        $L[] = $pad . 'Atende a URA/menu "' . preg_replace('/^.*?:\s*/', '', (string)($n['title'] ?? '')) . '"' . (!empty($n['audio_file']) ? ' (áudio: ' . $n['audio_file'] . ')' : '') . '. Espera a resposta por ' . $ni($n['timeout'] ?? '') . '; repete em caso de opção inválida: ' . $ni($n['invalid_loops'] ?? '') . '.';
+        foreach (($n['entries'] ?? []) as $opt => $e) { $L[] = $pad . '→ Se o cliente digitar ' . $opt . ':'; foreach (aiFlowNarrate($e, $d + 1) as $l) $L[] = $l; }
+        if (!empty($n['invalid_node'])) { $L[] = $pad . '→ Se digitar opção inválida (após as repetições):'; foreach (aiFlowNarrate($n['invalid_node'], $d + 1) as $l) $L[] = $l; }
+        if (!empty($n['timeout_node'])) { $L[] = $pad . '→ Se não digitar nada:'; foreach (aiFlowNarrate($n['timeout_node'], $d + 1) as $l) $L[] = $l; }
+    } elseif ($t === 'announcement') {
+        $L[] = $pad . 'Toca o anúncio "' . preg_replace('/^.*?:\s*/', '', (string)($n['title'] ?? '')) . '"' . (!empty($n['audio_file']) ? ' (áudio: ' . $n['audio_file'] . ')' : '') . '.';
+        if (!empty($n['next_node'])) { $L[] = $pad . '→ Depois do anúncio:'; foreach (aiFlowNarrate($n['next_node'], $d + 1) as $l) $L[] = $l; }
+    } elseif ($t === 'extension') {
+        $L[] = $pad . 'Toca direto no ramal ' . ($n['extension'] ?? '') . ' — ' . preg_replace('/^.*?\(/', '(', (string)($n['title'] ?? '')) . '.';
+    } elseif ($t === 'voicemail') {
+        $L[] = $pad . 'Envia para a caixa postal' . (!empty($n['extension']) ? ' do ramal ' . $n['extension'] : '') . '.';
+    } elseif ($t === 'hangup') {
+        $L[] = $pad . ($n['title'] ?? 'Encerra a chamada') . '.';
+    } else {
+        $L[] = $pad . ($n['title'] ?? 'Destino') . (empty($n['desc']) ? '' : ' — ' . $n['desc']) . '.';
+    }
+    return $L;
+}
+
 function aiInboundRoutes($a) {
     $flows = function_exists('getPABXInboundCallFlows') ? getPABXInboundCallFlows() : [];
     if (!$flows) return ['error' => $GLOBALS['__flows_status'] ?? 'Nenhuma rota de entrada encontrada no PABX.'];
-    $walk = function ($n, $d = 0) use (&$walk) {
-        if (!is_array($n) || $d > 5) return [];
-        $line = ($n['title'] ?? '') . (empty($n['desc']) ? '' : ' | ' . $n['desc']);
-        if (!empty($n['timegroup']['rules'])) $line .= ' | Horários: ' . implode('; ', $n['timegroup']['rules']);
-        if (!empty($n['members'])) $line .= ' | Membros: ' . implode(', ', array_map(function ($m) { return $m['extension'] . ' (' . $m['name'] . ')'; }, $n['members']));
-        $out = [$line];
-        foreach (['true_node' => 'Dentro do horário', 'false_node' => 'Fora do horário', 'next_node' => 'Depois', 'failover_node' => 'Se ninguém atender', 'invalid_node' => 'Opção inválida', 'timeout_node' => 'Sem resposta'] as $k => $lbl)
-            if (!empty($n[$k])) foreach ($walk($n[$k], $d + 1) as $l) $out[] = "$lbl → $l";
-        if (!empty($n['entries'])) foreach ($n['entries'] as $opt => $e) foreach ($walk($e, $d + 1) as $l) $out[] = "Tecla $opt → $l";
-        return $out;
-    };
+    $want = preg_replace('/\D/', '', (string)($a['numero'] ?? ''));
     $res = [];
-    foreach ($flows as $f) $res[] = ['numero_de_entrada' => $f['did'], 'descricao' => $f['description'], 'caminho' => $walk($f['tree'] ?? null)];
-    return ['fonte' => 'Configuração do Issabel (somente leitura; horários, URA, filas e grupos se alteram no Issabel)', 'rotas' => $res];
+    foreach ($flows as $f) {
+        if ($want !== '') {
+            $did = preg_replace('/\D/', '', (string)($f['did'] ?? ''));
+            if ($did === '' || (substr($did, -strlen($want)) !== $want && substr($want, -strlen($did)) !== $did)) continue;
+        }
+        $res[] = ['numero_de_entrada' => $f['did'], 'descricao' => $f['description'], 'passo_a_passo' => array_merge(['A ligação externa chega no número ' . $f['did'] . '.'], aiFlowNarrate($f['tree'] ?? null, 0))];
+    }
+    if (!$res) return ['error' => 'Nenhuma rota de entrada encontrada para o número ' . $want . '.'];
+    return ['fonte' => 'Configuração do Issabel (somente leitura; horários, feriados, URA, filas e grupos se alteram no Issabel)', 'instrucao' => 'Conte o caminho ao cliente em ordem, usando só os dados abaixo; o que estiver como "Não informado" diga que não está configurado. Não invente quantidade de toques: informe os segundos configurados.', 'rotas' => $res];
 }
 
 function aiApplyConfigAction($field, $v) {
