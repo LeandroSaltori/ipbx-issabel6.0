@@ -31,6 +31,21 @@ log_success() { echo -e "${GREEN}[SUCESSO]${NC} $1"; }
 log_warn() { echo -e "${YELLOW}[AVISO]${NC} $1"; }
 log_error() { echo -e "${RED}[ERRO]${NC} $1"; }
 
+# Guarda a ORIGINAL de cada modulo nativo como <modulo>_old (uma vez so) e depois traz a versao nova por cima.
+# Nunca apaga modulo: se precisar consultar ou voltar, a original esta em <modulo>_old.
+deploy_modules_from_repo() {
+    local d name dest
+    for d in "$REPO_DIR/src/modules/"*/; do
+        name="$(basename "$d")"
+        dest="/var/www/html/modules/$name"
+        case "$name" in *_OLD|*_old|*_ORIGINAL) /bin/cp -rn "$d" /var/www/html/modules/ 2>/dev/null || true; continue ;; esac
+        if [ -d "$dest" ] && [ ! -e "${dest}_old" ]; then
+            /bin/cp -rpf "$dest" "${dest}_old" 2>/dev/null || true
+        fi
+        /bin/cp -rf "$d" /var/www/html/modules/
+    done
+}
+
 # --- VERIFICAÇÃO DE PERMISSÃO ROOT ---
 if [ "$EUID" -ne 0 ]; then
     log_error "Este script precisa ser executado como root!"
@@ -406,7 +421,7 @@ if [ -d "$REPO_DIR/src/modules" ]; then
         log_info "Backup criado: /var/www/html/modules -> /var/www/html/modules_old"
         /bin/cp -rf /var/www/html/modules /var/www/html/modules_old
     fi
-    /bin/cp -rf "$REPO_DIR/src/modules/"* /var/www/html/modules/
+    deploy_modules_from_repo
     if [ -d "$REPO_DIR/src/modules/asternic_cdr" ]; then
         mkdir -p /var/www/html/admin/modules/asternic_cdr
         /bin/cp -rf "$REPO_DIR/src/modules/asternic_cdr/"* /var/www/html/admin/modules/asternic_cdr/ 2>/dev/null || true
@@ -1246,7 +1261,7 @@ fi
 # 2. Copia exatamente os arquivos corrigidos para /var/www/html/modules/
 for MOD in build_module delete_module language_admin; do
     if [ -d "$REPO_DIR/src/modules/$MOD" ]; then
-        : # nunca remove modulo existente; os arquivos novos sao copiados por cima
+        [ -d "/var/www/html/modules/$MOD" ] && [ ! -e "/var/www/html/modules/${MOD}_old" ] && /bin/cp -rpf "/var/www/html/modules/$MOD" "/var/www/html/modules/${MOD}_old" 2>/dev/null
         /bin/cp -rf "$REPO_DIR/src/modules/$MOD" /var/www/html/modules/
         chown -R asterisk:asterisk "/var/www/html/modules/$MOD"
         chmod -R 755 "/var/www/html/modules/$MOD"
@@ -1259,9 +1274,9 @@ log_success "Ferramentas Web Developer instaladas com os arquivos corrigidos."
 # ==============================================================================
 log_info "17/20 - Instalando Favicon e Tema Prisma v5..."
 if [ -f "$REPO_DIR/src/favicon.ico" ]; then
+    [ -f /var/www/html/favicon.ico ] && [ ! -e /var/www/html/favicon_old.ico ] && cp -p /var/www/html/favicon.ico /var/www/html/favicon_old.ico
     cp -f "$REPO_DIR/src/favicon.ico" /var/www/html/favicon.ico
-    mkdir -p /var/www/html/themes/tenant/images /var/www/html/themes/prisma_v5/images
-    cp -f "$REPO_DIR/src/favicon.ico" /var/www/html/themes/tenant/images/favicon.ico 2>/dev/null || true
+    mkdir -p /var/www/html/themes/prisma_v5/images
     cp -f "$REPO_DIR/src/favicon.ico" /var/www/html/themes/prisma_v5/images/favicon.ico 2>/dev/null || true
 fi
 
