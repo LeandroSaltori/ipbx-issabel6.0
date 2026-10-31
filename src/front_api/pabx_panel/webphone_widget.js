@@ -43,6 +43,15 @@ main{padding:12px;display:flex;flex-direction:column;gap:10px}
 .q{display:flex;align-items:center;justify-content:center;gap:6px;font-size:11px;color:#94a3b8;margin-top:7px}.dot{width:9px;height:9px;border-radius:50%;background:#94a3b8}
 #tabs{display:flex;gap:6px}.tab{flex:1;padding:10px 0;font-size:16px!important;line-height:1;border-radius:10px;border:1px solid #334155;background:#1c1b2f;color:#94a3b8;font-weight:800;font-size:12px;cursor:pointer;white-space:nowrap!important}
 .tab.on{background:linear-gradient(135deg,#7c3aed,#6366f1);border-color:#6366f1;color:#fff}
+#dsspane{display:none}#dsspane.show{display:block}
+.dss-g{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.dk{position:relative;display:flex;flex-direction:column;align-items:flex-start;gap:1px;padding:9px 9px 9px 22px;border-radius:12px;background:#252440;border:1px solid #334155;color:#fff;cursor:pointer;text-align:left;min-height:46px;min-width:0}
+.dk:hover{background:#312e5a}.dk b{font-size:12px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dk span{font-size:10.5px;color:#94a3b8}
+.dk i{position:absolute;left:8px;top:13px;width:9px;height:9px;border-radius:50%;background:#64748b}
+.dk.free i{background:#10b981}.dk.busy i{background:#ef4444}.dk.ring i{background:#f59e0b;animation:pl 1s infinite}.dk.off{opacity:.55}
+@keyframes pl{50%{opacity:.25}}
+.dk.empty{border-style:dashed;color:#64748b;align-items:center;justify-content:center}
+.dss-e{display:flex;gap:6px;margin-bottom:6px}.dss-e input{min-width:0;background:#0b1220;border:1px solid #334155;border-radius:8px;color:#fff;padding:7px;font-size:12px}.dss-e input:first-child{flex:1.3}.dss-e input:last-child{flex:1}
 #agenda,#hpane{display:none}#agenda.show,#hpane.show{display:block}#tab-dial.hide{display:none}
 #ag-q{width:100%;background:#0b1220;border:1px solid #334155;border-radius:12px;color:#fff;padding:9px 11px;font-size:13px}#ag-q:focus{outline:none;border-color:#6366f1}
 #ag-list{margin-top:8px;max-height:330px;overflow:auto}
@@ -70,12 +79,13 @@ h4{margin:0 0 6px;font-size:10.5px;text-transform:uppercase;letter-spacing:.6px;
       <div id="xfer"><input id="xnum" placeholder="Ramal ou número" inputmode="tel"><button class="btn call" data-act="transfer">OK</button></div>
       <div class="lvl" title="Nível do seu microfone"><i id="lv"></i></div><div class="q"><span class="dot" id="qd"></span><span id="qt">Qualidade: medindo...</span></div>
       <div class="row"><button class="btn hang" data-act="hangup"><i class="fa-solid fa-phone-slash"></i> Desligar</button></div></div>
-    <div id="tabs" role="tablist"><button class="tab on" data-act="tab" data-k="dial" title="Teclado" aria-label="Teclado"><i class="fa-solid fa-table-cells"></i></button><button class="tab" data-act="tab" data-k="agenda" title="Agenda" aria-label="Agenda"><i class="fa-regular fa-address-book"></i></button><button class="tab" data-act="tab" data-k="hist" title="Últimas chamadas" aria-label="Últimas chamadas"><i class="fa-solid fa-clock-rotate-left"></i></button></div>
+    <div id="tabs" role="tablist"><button class="tab on" data-act="tab" data-k="dial" title="Teclado" aria-label="Teclado"><i class="fa-solid fa-table-cells"></i></button><button class="tab" data-act="tab" data-k="agenda" title="Agenda" aria-label="Agenda"><i class="fa-regular fa-address-book"></i></button><button class="tab" data-act="tab" data-k="dss" title="Teclas rápidas" aria-label="Teclas rápidas"><i class="fa-solid fa-grip"></i></button><button class="tab" data-act="tab" data-k="hist" title="Últimas chamadas" aria-label="Últimas chamadas"><i class="fa-solid fa-clock-rotate-left"></i></button></div>
     <div class="box" id="agenda"><input id="ag-q" type="search" placeholder="Buscar ramal ou contato..." autocomplete="off"><div id="ag-list"></div><div class="sub" id="ag-st" style="margin-top:6px"></div></div>
     <div id="tab-dial"><div class="box"><input id="disp" placeholder="Número ou ramal" inputmode="tel" autocomplete="off">
       <div class="pad">${KEYS.map(k => `<button data-act="key" data-k="${k}">${k}</button>`).join('')}</div>
       <div class="row"><button class="btn call" id="b-call" data-act="dial"><i class="fa-solid fa-phone"></i> Ligar</button><button class="btn sec" data-act="del"><i class="fa-solid fa-delete-left"></i> Apagar</button></div></div>
 </div>
+    <div class="box" id="dsspane"><div class="dss-g" id="dss-g"></div><div id="dss-ed" style="display:none"></div><div class="row"><button class="btn sec" data-act="dssedit" id="dss-b">Editar teclas</button><button class="btn call" data-act="dsssave" id="dss-s" style="display:none">Salvar</button></div><div class="sub" id="dss-st" style="margin-top:6px"></div></div>
     <div class="box" id="hpane"><h4>Últimas chamadas deste navegador</h4><div id="hist"></div></div>
   </main>
 </div>
@@ -190,9 +200,10 @@ h4{margin:0 0 6px;font-size:10.5px;text-transform:uppercase;letter-spacing:.6px;
   let agItems = [], agTimer = null, agLoaded = 0, tabAtual = 'dial';
   function showTab(k) {
     tabAtual = k;
-    $('agenda').classList.toggle('show', k === 'agenda'); $('hpane').classList.toggle('show', k === 'hist'); $('tab-dial').classList.toggle('hide', k !== 'dial');
+    $('agenda').classList.toggle('show', k === 'agenda'); $('hpane').classList.toggle('show', k === 'hist'); $('dsspane').classList.toggle('show', k === 'dss'); $('tab-dial').classList.toggle('hide', k !== 'dial');
     root.querySelectorAll('.tab').forEach(b => b.classList.toggle('on', b.dataset.k === k));
     if (k === 'agenda') { loadAgenda(); $('ag-q').focus(); } else { clearTimeout(agTimer); }
+    if (k === 'dss') { dssLoad(); } else { clearTimeout(dssTimer); }
   }
   function renderAgenda() {
     const q = $('ag-q').value.trim().toLowerCase(), box = $('ag-list'); box.textContent = '';
@@ -240,6 +251,56 @@ h4{margin:0 0 6px;font-size:10.5px;text-transform:uppercase;letter-spacing:.6px;
     }
   }
 
+
+  // ---- teclas rápidas (DSS) com luz de ocupado/livre (BLF), por usuário ----
+  let dssKeys = [], dssTimer = null, dssEdit = false, dssStat = {};
+  const dssCls = st => { st = String(st || '').toLowerCase(); return /indispon|offline|unavail/.test(st) ? 'off' : /toc|chamando|ring/.test(st) ? 'ring' : /chamada|ocup|busy|conversa/.test(st) ? 'busy' : st ? 'free' : ''; };
+  const dssTxt = c => ({free: 'livre', busy: 'em chamada', ring: 'tocando', off: 'indisponível'}[c] || '');
+  function dssRender() {
+    const g = $('dss-g'), ed = $('dss-ed'); g.textContent = ''; ed.textContent = '';
+    g.style.display = dssEdit ? 'none' : 'grid'; ed.style.display = dssEdit ? 'block' : 'none';
+    if (dssEdit) {
+      for (let i = 0; i < 20; i++) {
+        const k = dssKeys[i] || {label: '', number: ''}, r = document.createElement('div'); r.className = 'dss-e';
+        const a = document.createElement('input'); a.placeholder = 'Nome'; a.maxLength = 24; a.value = k.label || ''; a.dataset.f = 'l';
+        const b = document.createElement('input'); b.placeholder = 'Ramal/número'; b.inputMode = 'tel'; b.value = k.number || ''; b.dataset.f = 'n';
+        r.append(a, b); ed.appendChild(r);
+      }
+      return;
+    }
+    if (!dssKeys.length) { const s = document.createElement('div'); s.className = 'sub'; s.textContent = 'Nenhuma tecla ainda. Toque em "Editar teclas" e cadastre ramais ou números de uso frequente.'; g.style.display = 'block'; g.appendChild(s); return; }
+    dssKeys.forEach(k => {
+      const c = dssCls(dssStat[k.number]), b = document.createElement('button'); b.className = 'dk ' + c; b.title = (k.label || k.number) + (c ? ' · ' + dssTxt(c) : '');
+      const d = document.createElement('i'), n = document.createElement('b'), m = document.createElement('span');
+      n.textContent = k.label || k.number; m.textContent = k.label ? k.number : '';
+      b.append(d, n, m); b.addEventListener('click', () => { showTab('dial'); dial(k.number); }); g.appendChild(b);
+    });
+  }
+  async function dssStatus() {
+    try {
+      const rs = await fetch('index.php?api_action=get_fop_extensions', {cache: 'no-store', credentials: 'same-origin'}); const ls = rs.ok ? await rs.json() : null;
+      if (Array.isArray(ls)) { dssStat = {}; ls.forEach(x => { dssStat[String(x.id)] = String(x.status || ''); }); }
+    } catch (e) {}
+    if (!dssEdit) dssRender();
+    $('dss-st').textContent = dssEdit ? '' : 'Ramais: verde livre, vermelho em chamada, amarelo tocando · atualizado ' + new Date().toLocaleTimeString('pt-BR');
+    clearTimeout(dssTimer); dssTimer = setTimeout(() => { if (tabAtual === 'dss' && isOpen()) dssStatus(); }, 4000);
+  }
+  async function dssLoad() {
+    try {
+      const r = await fetch(url('webphone.php?dss=1'), {credentials: 'same-origin', cache: 'no-store'}); const j = await r.json();
+      if (j && j.success) dssKeys = j.keys || []; else $('dss-st').textContent = (j && j.error) || 'Não foi possível carregar as teclas.';
+    } catch (e) { $('dss-st').textContent = 'Não foi possível carregar as teclas.'; }
+    dssRender(); dssStatus();
+  }
+  async function dssSave() {
+    const rows = [...$('dss-ed').querySelectorAll('.dss-e')].map(r => ({label: r.querySelector('[data-f=l]').value.trim(), number: r.querySelector('[data-f=n]').value.replace(/[^0-9*#+]/g, '')})).filter(k => k.number);
+    try {
+      const r = await fetch(url('webphone.php?dss=1'), {method: 'POST', credentials: 'same-origin', headers: {'X-Webphone': '1', 'Content-Type': 'application/json'}, body: JSON.stringify({keys: rows})}); const j = await r.json();
+      if (!j || !j.success) throw new Error((j && j.error) || 'erro'); dssKeys = j.keys || [];
+    } catch (e) { $('dss-st').textContent = 'Não consegui salvar as teclas (' + e.message + ').'; return; }
+    dssEdit = false; $('dss-b').textContent = 'Editar teclas'; $('dss-s').style.display = 'none'; dssRender(); dssStatus();
+  }
+
   // ---- ações ----
   function dial(n) {
     showErr(''); n = num(n != null ? n : $('disp').value);
@@ -264,6 +325,8 @@ h4{margin:0 0 6px;font-size:10.5px;text-transform:uppercase;letter-spacing:.6px;
     hold: () => { if (!cur) return; held = !held; held ? cur.hold() : cur.unhold(); $('b-hold').classList.toggle('on', held); },
     xfer: () => $('xfer').classList.toggle('show'),
     tab: k => showTab(k),
+    dssedit: () => { dssEdit = !dssEdit; $('dss-b').textContent = dssEdit ? 'Cancelar' : 'Editar teclas'; $('dss-s').style.display = dssEdit ? '' : 'none'; dssRender(); if (!dssEdit) dssStatus(); },
+    dsssave: () => dssSave(),
     transfer: () => { const n = num($('xnum').value); if (!cur || !n) return; try { cur.refer('sip:' + n + '@' + cfg.host); $('ic-state').textContent = 'Transferindo para ' + n + '...'; $('xnum').value = ''; $('xfer').classList.remove('show'); } catch (e) { showErr('Não foi possível transferir.'); } },
     answer: () => { if (!pend) return; ring(false); const s = pend, who = pendWho; pend = null; bind(s, 'in', who); s.answer({mediaConstraints: {audio: true, video: false}, pcConfig: cfg.pc, eventHandlers: {peerconnection: e => attachAudio(e.peerconnection)}}); },
     reject: () => { if (!pend) return; ring(false); const s = pend; pend = null; try { s.terminate({status_code: 486, reason_phrase: 'Busy Here'}); } catch (e) {} ui(); },

@@ -20,6 +20,38 @@ if (isset($_GET['js'])) {
     exit;
 }
 
+// ---------- Teclas rápidas (DSS/BLF) do PRÓPRIO usuário ----------
+// GET  ?dss=1 -> {keys:[{label,number}]}   POST ?dss=1 (JSON {keys:[...]}) -> salva (até 20 teclas)
+if (isset($_GET['dss'])) {
+    authGate('json');
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store');
+    $u = getLoggedUser();
+    if (!$u || !userHasWebphone($u)) { echo json_encode(['success' => false, 'error' => 'O Webphone não está habilitado para o seu usuário.']); exit; }
+    $uid = (string)($u['id'] ?? $u['username'] ?? '');
+    if ($uid === '') { echo json_encode(['success' => false, 'error' => 'Usuário não identificado.']); exit; }
+    $db->exec("CREATE TABLE IF NOT EXISTS wp_dss (uid TEXT NOT NULL, slot INTEGER NOT NULL, label TEXT DEFAULT '', number TEXT DEFAULT '', PRIMARY KEY (uid, slot))");
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        if (($_SERVER['HTTP_X_WEBPHONE'] ?? '') !== '1') { http_response_code(400); echo json_encode(['success' => false, 'error' => 'Requisição inválida.']); exit; }
+        $in = json_decode((string)file_get_contents('php://input'), true);
+        $keys = is_array($in['keys'] ?? null) ? array_slice($in['keys'], 0, 20) : [];
+        $db->beginTransaction();
+        $db->prepare("DELETE FROM wp_dss WHERE uid = ?")->execute([$uid]);
+        $ins = $db->prepare("INSERT INTO wp_dss (uid, slot, label, number) VALUES (?, ?, ?, ?)");
+        foreach ($keys as $i => $k) {
+            $num = preg_replace('/[^0-9*#+]/', '', (string)($k['number'] ?? ''));
+            $lbl = mb_substr(trim(strip_tags((string)($k['label'] ?? ''))), 0, 24);
+            if ($num === '' || strlen($num) > 25) continue;
+            $ins->execute([$uid, (int)$i, $lbl, $num]);
+        }
+        $db->commit();
+    }
+    $st = $db->prepare("SELECT label, number FROM wp_dss WHERE uid = ? ORDER BY slot ASC");
+    $st->execute([$uid]);
+    echo json_encode(['success' => true, 'keys' => $st->fetchAll(PDO::FETCH_ASSOC)], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
 // ---------- Credenciais (JSON) ----------
 if (isset($_GET['cred'])) {
     authGate('json');
