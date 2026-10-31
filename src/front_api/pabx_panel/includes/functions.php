@@ -553,7 +553,6 @@ function syncPrismaAssets() {
     $queue_count = 0;
 
     if ($ast_db) {
-        $db->exec("DELETE FROM extensions_config WHERE extension IN ('1001','1002','1003','1004','1005') AND (agent_name LIKE '%Silva%' OR agent_name LIKE '%Oliveira%' OR agent_name LIKE '%Santos%' OR agent_name LIKE '%Lima%' OR agent_name LIKE '%Souza%')");
 
         $extensions_found = [];
         $webrtc_exts = [];

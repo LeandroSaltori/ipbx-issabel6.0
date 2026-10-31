@@ -51,14 +51,14 @@ try {
     } catch (Exception $e) { try { $db->exec('PRAGMA busy_timeout = 15000'); } catch (Exception $e2) {} }
     if (isset($__perf_t0, $__perf_marks)) $__perf_marks['sqlite (abrir/modo WAL)'] = microtime(true) - $__perf_t0;
     $db->exec("PRAGMA encoding = 'UTF-8';");
-    // DeepSeek foi removido do painel: apaga chave/estado salvos e volta funções que o usavam para Automático
-    // (só grava quando ainda existe algo de DeepSeek: evita escrita a cada acesso, que causava "database is locked")
+    // DeepSeek foi removido do painel: funções que o usavam voltam para Automático.
+    // As chaves/integrações já salvas pelo cliente NUNCA são apagadas por atualização.
     try {
-        if ($db->query("SELECT 1 FROM settings WHERE key_name IN ('ai_key_deepseek','ai_key_status_deepseek') OR (key_name='ai_provider' AND value_val='deepseek') LIMIT 1")->fetchColumn()) {
-            $db->exec("DELETE FROM settings WHERE key_name IN ('ai_key_deepseek','ai_key_status_deepseek') OR (key_name='ai_provider' AND value_val='deepseek')");
-        }
         if ($db->query("SELECT 1 FROM settings WHERE key_name LIKE 'ai_role_%_provider' AND value_val='deepseek' LIMIT 1")->fetchColumn()) {
             $db->exec("UPDATE settings SET value_val='' WHERE key_name LIKE 'ai_role_%_provider' AND value_val='deepseek'");
+        }
+        if ($db->query("SELECT 1 FROM settings WHERE key_name='ai_provider' AND value_val='deepseek' LIMIT 1")->fetchColumn()) {
+            $db->exec("UPDATE settings SET value_val='' WHERE key_name='ai_provider' AND value_val='deepseek'");
         }
     } catch (Exception $e) {}
 
