@@ -234,7 +234,7 @@ if [ -d "$REPO_DIR/src/modules/asternic_cdr" ]; then
         if [ ! -d "/var/www/html/admin/modules/asternic_cdr_OLD" ]; then
             mv "$ASTERNIC_DEST" "/var/www/html/admin/modules/asternic_cdr_OLD"
         else
-            rm -rf "$ASTERNIC_DEST"
+            : # nunca remove modulo existente; os arquivos novos sao copiados por cima
         fi
     fi
     mkdir -p "$ASTERNIC_DEST"
@@ -806,7 +806,7 @@ if command -v sqlite3 &>/dev/null; then
     sqlite3 /var/www/db/acl.db "DELETE FROM acl_group_permission WHERE id_resource IN (SELECT id FROM acl_resource WHERE name = 'nome_ramais');" 2>/dev/null || true
     sqlite3 /var/www/db/acl.db "INSERT INTO acl_group_permission (id_action, id_group, id_resource) SELECT 1, g.id, r.id FROM acl_group g CROSS JOIN acl_resource r WHERE r.name = 'nome_ramais';" 2>/dev/null || true
     
-    sqlite3 /var/www/db/menu.db "UPDATE menu SET Link = 'nome_ramais/', Type = 'framed' WHERE id = 'myex_config' OR id = 'ramais';" 2>/dev/null || true
+    # (removido) nunca altera links de menus nativos do sistema
 fi
 
 chown -R asterisk:asterisk /var/www/html/nome_ramais 2>/dev/null || true
@@ -987,7 +987,7 @@ fi
         sqlite3 /var/www/db/menu.db "INSERT INTO menu (id, IdParent, Link, Name, Type, order_no) VALUES ('nome_ramais', 'pbxconfig', 'nome_ramais/', 'Nome Ramais', 'framed', 15);" 2>/dev/null || true
         sqlite3 /var/www/db/acl.db "INSERT OR IGNORE INTO acl_resource (name, description) VALUES ('nome_ramais', 'Nome Ramais');" 2>/dev/null || true
         sqlite3 /var/www/db/acl.db "INSERT OR IGNORE INTO acl_group_permission (id_action, id_group, id_resource) SELECT 1, 1, id FROM acl_resource WHERE name = 'nome_ramais';" 2>/dev/null || true
-        sqlite3 /var/www/db/menu.db "UPDATE menu SET Link = '/admin/config.php?display=blacklist' WHERE id = 'blacklist' OR Link LIKE '%blacklist%';" 2>/dev/null || true
+        # (removido) nunca altera links de menus nativos do sistema
     fi
 
     # Registra o atalho de discagem e transferencia 8996 no Asterisk
@@ -1233,8 +1233,8 @@ log_info "17/20 - Instalando Módulos Web Developer..."
 
 # 1. Limpa entradas duplicadas e reinstala o pacote oficial
 if command -v sqlite3 &>/dev/null; then
-    sqlite3 /var/www/db/menu.db "DELETE FROM menu WHERE id IN ('developer', 'build_module', 'delete_module', 'language_admin', 'web_developer');" 2>/dev/null || true
-    sqlite3 /var/www/db/acl.db "DELETE FROM acl_resource WHERE name IN ('developer', 'build_module', 'delete_module', 'language_admin', 'web_developer');" 2>/dev/null || true
+    # nunca apaga menus/permissoes nativos; o pacote oficial e os arquivos sao apenas atualizados por cima
+    :
 fi
 
 if command -v yum &>/dev/null; then
@@ -1246,7 +1246,7 @@ fi
 # 2. Copia exatamente os arquivos corrigidos para /var/www/html/modules/
 for MOD in build_module delete_module language_admin; do
     if [ -d "$REPO_DIR/src/modules/$MOD" ]; then
-        rm -rf "/var/www/html/modules/$MOD"
+        : # nunca remove modulo existente; os arquivos novos sao copiados por cima
         /bin/cp -rf "$REPO_DIR/src/modules/$MOD" /var/www/html/modules/
         chown -R asterisk:asterisk "/var/www/html/modules/$MOD"
         chmod -R 755 "/var/www/html/modules/$MOD"

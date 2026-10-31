@@ -742,7 +742,7 @@ update_asternic_cdr() {
             if [ ! -d "/var/www/html/admin/modules/asternic_cdr_OLD" ]; then
                 mv "$ASTERNIC_DEST" "/var/www/html/admin/modules/asternic_cdr_OLD"
             else
-                rm -rf "$ASTERNIC_DEST"
+                : # nunca remove modulo existente; os arquivos novos sao copiados por cima
             fi
         fi
         mkdir -p "$ASTERNIC_DEST"
@@ -1337,8 +1337,8 @@ update_autoupdate() {
 update_developer() {
     log_info "Instalando Módulos Web Developer..."
     if command -v sqlite3 &>/dev/null; then
-        sqlite3 /var/www/db/menu.db "DELETE FROM menu WHERE id IN ('developer', 'build_module', 'delete_module', 'language_admin', 'web_developer');" 2>/dev/null || true
-        sqlite3 /var/www/db/acl.db "DELETE FROM acl_resource WHERE name IN ('developer', 'build_module', 'delete_module', 'language_admin', 'web_developer');" 2>/dev/null || true
+        # nunca apaga menus/permissoes nativos; o pacote oficial e os arquivos sao apenas atualizados por cima
+        :
     fi
 
     if command -v yum &>/dev/null; then
@@ -1349,7 +1349,7 @@ update_developer() {
 
     for MOD in build_module delete_module language_admin; do
         if [ -d "$REPO_DIR/src/modules/$MOD" ]; then
-            rm -rf "/var/www/html/modules/$MOD"
+            : # nunca remove modulo existente; os arquivos novos sao copiados por cima
             /bin/cp -rf "$REPO_DIR/src/modules/$MOD" /var/www/html/modules/
             chown -R asterisk:asterisk "/var/www/html/modules/$MOD"
             chmod -R 755 "/var/www/html/modules/$MOD"
