@@ -6,6 +6,7 @@
  */
 return [
     'done' => [
+        ['data' => '2026-11-01', 'mes' => 'Novembro/2026', 'novo' => true, 'icon' => 'fa-image', 'titulo' => 'Central de Ajuda: cada item com sua imagem', 'desc' => 'Quase todos os artigos agora trazem recortes da tela com a parte explicada destacada e numerada, e uma legenda abaixo dizendo o que é cada número (por exemplo, a escolha do painel na tela de login).'],
         ['data' => '2026-11-01', 'mes' => 'Novembro/2026', 'novo' => true, 'icon' => 'fa-image', 'titulo' => 'Central de Ajuda com imagens das telas', 'desc' => 'Os artigos de Dashboard, Painel do Operador, Ramais, Filas, WhatsApp, Agenda, Relatórios e Usuários agora mostram a imagem da própria tela, com legenda, para você achar cada botão mais rápido.'],
         ['data' => '2026-11-01', 'mes' => 'Novembro/2026', 'novo' => true, 'icon' => 'fa-book-open', 'titulo' => 'Manual virou Central de Ajuda', 'desc' => 'O Manual agora tem menu em árvore por assunto, busca (Ctrl+K) em todo o texto, página inicial com cartões, "Nesta página" para ir direto ao passo a passo, botões Anterior/Próximo e a pergunta "Isto foi útil?" em cada artigo.'],
         ['data' => '2026-10-31', 'mes' => 'Outubro/2026', 'novo' => true, 'icon' => 'fa-grip', 'titulo' => 'Webphone com teclas rápidas e luz de ocupado/livre', 'desc' => 'O Webphone ganhou uma aba de teclas rápidas: cadastre até 20 ramais ou números e veja em tempo real quem está livre, em chamada ou tocando. Um toque na tecla liga. As teclas são de cada usuário.'],

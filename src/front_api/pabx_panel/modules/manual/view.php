@@ -2,6 +2,7 @@
 /** IPbx Prisma - Central de Ajuda (manual): menu em árvore, artigo com "Nesta página", busca (Ctrl+K), anterior/próximo e "Isto foi útil?".
  *  Conteúdo em includes/manual.php (REGRA 11 do AGENTS.md). Somente leitura; só grava as respostas de "Isto foi útil?". */
 $__man = @include __DIR__ . '/../../includes/manual.php';
+$__figs = @include __DIR__ . '/../../includes/manual_figuras.php'; if (!is_array($__figs)) $__figs = [];
 if (!is_array($__man)) $__man = [];
 $h = function($s) { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); };
 
@@ -34,7 +35,7 @@ $__img = function ($f) { return (!empty($f) && preg_match('#^[A-Za-z0-9_./-]+$#'
 .mn-art{display:none}.mn-art.on{display:block}
 .mn-art h1{font-size:28px;font-weight:800;color:#fff;margin:0 0 6px}.mn-art h2{font-size:18px;font-weight:800;color:#fff;margin:26px 0 8px;padding-top:6px}
 .mn-lead{color:#cbd5e1;font-size:15px;line-height:1.6}
-.mn-fig{margin:12px 0}.mn-fig img{border-radius:12px;border:1px solid #334155;max-width:100%}.mn-fig figcaption{font-size:12px;color:#94a3b8;margin-top:5px}
+.mn-fig{margin:12px 0}.mn-fig img{border-radius:12px;border:1px solid #334155;max-width:100%}.mn-lg{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:5px}.mn-lg li{display:flex;gap:9px;align-items:flex-start;font-size:13px;color:#cbd5e1}.mn-lg b{flex:none;width:20px;height:20px;border-radius:50%;background:#f59e0b;color:#111;font:800 12px/20px Inter,sans-serif;text-align:center}.mn-fig figcaption{font-size:12px;color:#94a3b8;margin-top:5px}
 .mn-st{counter-reset:p;list-style:none;padding:0;margin:0}.mn-st li{counter-increment:p;position:relative;padding:8px 0 8px 38px;color:#cbd5e1;font-size:14px;line-height:1.55}
 .mn-st li:before{content:counter(p);position:absolute;left:0;top:7px;width:26px;height:26px;border-radius:50%;background:#4f46e5;color:#fff;font-weight:800;font-size:12px;display:flex;align-items:center;justify-content:center}
 .mn-tb{width:100%;border-collapse:collapse;font-size:13px}.mn-tb td{padding:8px 10px;border-top:1px solid #1e293b;vertical-align:top;color:#94a3b8}.mn-tb td:first-child{color:#e2e8f0;font-weight:700;width:32%}
@@ -82,9 +83,9 @@ $__img = function ($f) { return (!empty($f) && preg_match('#^[A-Za-z0-9_./-]+$#'
                 <h1><?php echo $h($it['t']); ?></h1>
                 <p class="mn-lead"><?php echo $h($it['d'] ?? ''); ?></p>
                 <?php if (!empty($it['aviso'])): $toc[] = ['Aviso', 'av']; ?><div class="mn-box mn-aviso" id="<?php echo $f['k']; ?>av"><i class="fa-solid fa-triangle-exclamation mr-1"></i><?php echo $h($it['aviso']); ?></div><?php endif; ?>
-                <?php $__im = []; if ($__img($it['img'] ?? '')) $__im[] = ['f' => $it['img'], 'c' => '']; foreach (($it['imgs'] ?? []) as $im) if (is_array($im) && $__img($im['f'] ?? '')) $__im[] = $im;
+                <?php $__im = []; $__fk = $s['id'] . '|' . $it['t']; if (!empty($__figs[$__fk])) { foreach ($__figs[$__fk] as $im) if ($__img($im['f'] ?? '')) $__im[] = $im; } elseif ($__img($it['img'] ?? '')) $__im[] = ['f' => $it['img'], 'c' => '']; foreach (($it['imgs'] ?? []) as $im) if (is_array($im) && $__img($im['f'] ?? '')) $__im[] = $im;
                 if ($__im): $toc[] = ['Veja na tela', 'im']; ?><h2 id="<?php echo $f['k']; ?>im">Veja na tela</h2>
-                <?php foreach ($__im as $ix => $im): ?><figure class="mn-fig"><img src="<?php echo $h($__img($im['f'])); ?>" alt="<?php echo $h($im['c'] ?: $it['t']); ?>" loading="lazy"><?php if (!empty($im['c'])): ?><figcaption><b class="text-slate-300">Figura <?php echo $ix + 1; ?>.</b> <?php echo $h($im['c']); ?></figcaption><?php endif; ?></figure><?php endforeach; endif; ?>
+                <?php foreach ($__im as $ix => $im): ?><figure class="mn-fig"><img src="<?php echo $h($__img($im['f'])); ?>" alt="<?php echo $h($im['c'] ?: $it['t']); ?>" loading="lazy"><?php if (!empty($im['c'])): ?><figcaption><b class="text-slate-300">Figura <?php echo $ix + 1; ?>.</b> <?php echo $h($im['c']); ?></figcaption><?php endif; ?><?php if (!empty($im['n'])): ?><ol class="mn-lg"><?php foreach ($im['n'] as $ni => $nt): ?><li><b><?php echo $ni + 1; ?></b><span><?php echo $h($nt); ?></span></li><?php endforeach; ?></ol><?php endif; ?></figure><?php endforeach; endif; ?>
                 <?php if (!empty($it['passos'])): $toc[] = ['Passo a passo', 'ps']; ?><h2 id="<?php echo $f['k']; ?>ps">Passo a passo</h2><ol class="mn-st"><?php foreach ($it['passos'] as $p) echo '<li>' . $h($p) . '</li>'; ?></ol><?php endif; ?>
                 <?php if (!empty($it['campos'])): $toc[] = ['Campos', 'cp']; ?><h2 id="<?php echo $f['k']; ?>cp">Campos</h2><table class="mn-tb"><?php foreach ($it['campos'] as $c => $x): if (is_array($x)) { $c = (string)($x[0] ?? ''); $x = (string)($x[1] ?? ''); } ?><tr><td><?php echo $h($c); ?></td><td><?php echo $h($x); ?></td></tr><?php endforeach; ?></table><?php endif; ?>
                 <?php if (!empty($it['dica'])): $toc[] = ['Dica', 'dc']; ?><div class="mn-box mn-dica" id="<?php echo $f['k']; ?>dc"><i class="fa-solid fa-lightbulb mr-1"></i><?php echo $h($it['dica']); ?></div><?php endif; ?>
