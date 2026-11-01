@@ -297,6 +297,37 @@ EMBCONF
     echo "[+] Painel liberado para abrir embutido em outros sites (HTTPS), sem restringir acesso por IP."
   fi
 fi
+# PHP-FPM: o padrão do sistema tem poucos processos (5). Com o painel aberto em várias abas/telas, todos ficam ocupados
+# e as páginas ficam "só carregando" até dar 504. Aqui o limite acompanha a memória do servidor (nunca diminui o que já existe)
+# e liga o log de requisições lentas (mostra em qual linha do PHP uma tela travou): /var/log/php-fpm/ipbx-slow.log
+FPMW=/etc/php-fpm.d/www.conf; FPMZ=/etc/php-fpm.d/zz-ipbx-pool.conf
+if [ -f "$FPMW" ] && command -v php-fpm >/dev/null 2>&1; then
+  MEM_MB=$(awk '/MemTotal/ {printf "%d", $2/1024}' /proc/meminfo 2>/dev/null); MEM_MB=${MEM_MB:-2048}
+  NEWMAX=$(( MEM_MB / 150 )); [ "$NEWMAX" -lt 12 ] && NEWMAX=12; [ "$NEWMAX" -gt 40 ] && NEWMAX=40
+  CURMAX=$(grep -E '^\s*pm\.max_children\s*=' "$FPMW" | tail -1 | sed 's/.*=\s*//' | tr -dc '0-9'); CURMAX=${CURMAX:-0}
+  [ "$CURMAX" -gt "$NEWMAX" ] && NEWMAX=$CURMAX
+  mkdir -p /var/log/php-fpm 2>/dev/null
+  cp -f "$FPMZ" "$FPMZ.bak" 2>/dev/null
+  cat > "$FPMZ" <<FPMCONF
+; IPbx Prisma - ajuste de processos do PHP-FPM (gerado pelo instalador do front_api)
+[www]
+pm = dynamic
+pm.max_children = $NEWMAX
+pm.start_servers = 6
+pm.min_spare_servers = 4
+pm.max_spare_servers = 10
+pm.max_requests = 500
+request_slowlog_timeout = 8s
+slowlog = /var/log/php-fpm/ipbx-slow.log
+FPMCONF
+  if php-fpm -t >/dev/null 2>&1; then
+    (systemctl reload php-fpm 2>/dev/null || service php-fpm reload 2>/dev/null || true) >/dev/null 2>&1
+    echo "[+] PHP-FPM ajustado: até $NEWMAX processos simultâneos (log de telas lentas em /var/log/php-fpm/ipbx-slow.log)."
+  else
+    if [ -f "$FPMZ.bak" ]; then mv -f "$FPMZ.bak" "$FPMZ"; else rm -f "$FPMZ"; fi
+    echo "[!] Ajuste do PHP-FPM não aplicado (configuração não aceita); o painel segue normal."
+  fi
+fi
 # Recarrega o PHP (cache de opcode) sem derrubar conexões: garante que a versão nova seja a servida
 (systemctl reload httpd 2>/dev/null || apachectl graceful 2>/dev/null || service httpd graceful 2>/dev/null || true) >/dev/null 2>&1
 echo "[+] Servidor web recarregado (graceful)."
