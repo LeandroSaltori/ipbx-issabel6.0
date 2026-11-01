@@ -3358,7 +3358,13 @@ function getAsteriskDBConnection() {
 /**
  * Helper global para obter mapeamento de Filas (Número => Nome da Fila)
  */
-function getQueuesMap() {
+/** Mapa de filas guardado na memória durante a requisição: antes cada chamada refazia 4 consultas, uma por origem/destino de cada linha dos relatórios. */
+function getQueuesMap($fresh = false) {
+    static $cache = null;
+    if ($cache === null || $fresh) $cache = getQueuesMapRaw();
+    return $cache;
+}
+function getQueuesMapRaw() {
     global $db;
     $map = [];
     
@@ -3430,7 +3436,13 @@ function getQueuesMap() {
 /**
  * Helper global para obter mapeamento de Ramais (Número => Nome do Atendente)
  */
-function getExtensionsMap() {
+/** Mapa de ramais guardado na memória durante a requisição (ver getQueuesMap). */
+function getExtensionsMap($fresh = false) {
+    static $cache = null;
+    if ($cache === null || $fresh) $cache = getExtensionsMapRaw();
+    return $cache;
+}
+function getExtensionsMapRaw() {
     global $db;
     $map = [];
 
