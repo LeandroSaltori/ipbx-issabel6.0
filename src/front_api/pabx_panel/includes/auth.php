@@ -134,7 +134,8 @@ function authLogin($email, $password) {
     if (!$u || $hash === '' || !$ok || ($u['status'] ?? 'Ativo') !== 'Ativo') {
         authRecordAttempt($email, false);
         authLogFail2ban($email);
-        if (function_exists('pabx_log')) pabx_log('security', 'WARNING', 'Falha de login no painel', ['email' => $email, 'ip' => authClientIp()]); if (function_exists('pabx_log')) pabx_log('user_actions', 'WARNING', '[AUTH] Tentativa de login falhou', ['usuario' => $email]);
+        $_SESSION['user_username'] = (string)$email;   // a falha de login fica registrada em nome de quem tentou
+        if (function_exists('pabx_log')) pabx_log('security', 'WARNING', 'Falha de login no painel', ['email' => $email, 'ip' => authClientIp()]); if (function_exists('pabx_log')) pabx_log('user_actions', 'WARNING', '[AUTH] Tentativa de login falhou', ['usuario' => $email]); unset($_SESSION['user_username']);
         $hint = authFail2banActive()
             ? ' Após várias falhas seu IP é bloqueado pelo Fail2ban do PABX.'
             : '';
