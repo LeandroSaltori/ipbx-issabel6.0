@@ -1276,6 +1276,9 @@ if (!isset($allowed_modules[$module]) || !in_array($action, $allowed_modules[$mo
 
 // Trilha de auditoria: tela/relatório acessado ou formulário enviado
 if (function_exists('auditRequest')) auditRequest($module, $action, false);
+// Login e auditoria já gravaram na sessão; as telas só leem. Solta o arquivo de sessão aqui: se uma tela demorar (AMI, MySQL, API externa),
+// as demais abas/consultas do mesmo login não ficam na fila atrás dela ("fica só carregando").
+if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET' && session_status() === PHP_SESSION_ACTIVE) { @session_write_close(); }
 
 // Permissão por módulo (mesmas regras de exibição do menu)
 $__route_denied = false;
