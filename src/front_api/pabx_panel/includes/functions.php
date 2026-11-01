@@ -6079,6 +6079,7 @@ function aiChatExecTool($name, $a) {
                 if ($r['rec']) {
                     $__ri = count($rows) - 1;
                     if (!hasUserPermission('listen_recordings')) { $rows[$__ri]['gravacao'] = 'este usuário não tem permissão para ouvir gravações'; }
+                    elseif (!empty($GLOBALS['__wa_assistant_user'])) { $GLOBALS['__ai_recordings'][] = ['uniqueid' => $r['uniqueid'], 'file' => '', 'calldate' => $r['calldate']]; $rows[$__ri]['gravacao'] = 'será enviada como áudio direto nesta conversa'; }
                     else {
                         $__lk = audioSignedUrl($r['uniqueid']);
                         if ($__lk !== '') $rows[$__ri]['link_gravacao'] = $__lk;
@@ -6620,6 +6621,25 @@ function aiProposalResolve($id, $accept) {
 }
 
 /** Executa a conversa: $history = [['role'=>'user|assistant','content'=>...], ...]. */
+/** Percorre o resultado de uma ferramenta: guarda links reais permitidos e se alguma chamada tem gravação. */
+function aiChatCollectFacts($res, &$allowed, &$facts) {
+    if (!is_array($res)) return;
+    if (!empty($res['link_gravacao']) && is_string($res['link_gravacao'])) {
+        $facts['recs'][$res['link_gravacao']] = ['data' => (string)($res['data'] ?? ''), 'origem' => (string)($res['origem'] ?? ''), 'destino' => (string)($res['destino'] ?? ''), 'dur' => (int)($res['duracao_seg'] ?? 0), 'link' => $res['link_gravacao']];
+    }
+    foreach ($res as $k => $v) {
+        if (is_array($v)) { aiChatCollectFacts($v, $allowed, $facts); continue; }
+        if (($k === 'link' || $k === 'link_gravacao') && is_string($v) && $v !== '') { $allowed[] = $v; $facts['links'][] = $v; }
+        if ($k === 'tem_gravacao' && $v === true) $facts['rec'] = true;
+    }
+}
+/** Confere a resposta final com o que as ferramentas devolveram. Retorna o problema (texto) ou '' se estiver coerente. */
+function aiChatGroundingProblem($text, $facts) {
+    if (preg_match('/\]\(\s*(url|link|#)?\s*\)|\(\s*url\s*\)/iu', $text)) return 'A resposta tem um link vazio/marcador "(url)". Use somente os links devolvidos pelas ferramentas (campo link_gravacao ou recording_link).';
+    if (!empty($facts['rec']) && preg_match('/n[ãa]o\s+(h[áa]|existem?|tem|possui|possuem|encontr\w+|dispon\w+|foram)[^.\n]{0,60}grava/iu', $text)) return 'A resposta diz que não há gravação, mas as ferramentas devolveram chamadas com tem_gravacao=true. Corrija usando os dados devolvidos.';
+    return '';
+}
+
 function aiChatRun($history) {
     $cfg = aiGetConfig('chat');
     if ($cfg['key'] === '' || !$cfg['enabled']) return ['ok' => false, 'error' => 'IA não configurada. Configure em Configurações > Inteligência Artificial.'];
@@ -6640,18 +6660,52 @@ function aiChatRun($history) {
     foreach ($history as $h) {
         if (($h['role'] ?? '') === 'assistant' && preg_match_all('/https?:\/\/[^\s)<>"\']+/i', (string)($h['content'] ?? ''), $um)) foreach ($um[0] as $u) $allowed[] = rtrim($u, '.,;)');
     }
-    for ($i = 0; $i < 5; $i++) {
+    $facts = ['rec' => false, 'links' => [], 'recs' => []];
+    $lastQ = ''; foreach (array_reverse($history) as $h) { if (($h['role'] ?? '') === 'user' && is_string($h['content'] ?? null)) { $lastQ = $h['content']; break; } }
+    $needTool = (bool)preg_match('/(chamad|liga[çc]|ramal|ramais|fila|grava|n[úu]mero|atendid|perdid|abandon|rota|tronco|quantas|quantos|hoje|ontem)/iu', $lastQ);
+    $retried = false;
+    for ($i = 0; $i < 7; $i++) {
         $r = aiChatRaw($msgs, $cfg);
         if (!$r['ok']) return ['ok' => false, 'error' => $r['error'], 'tools' => $used];
         $m = $r['message'];
-        if (empty($m['tool_calls'])) return ['ok' => true, 'text' => aiLinkScrub(aiBrandScrub(trim(preg_replace('#<think>.*?</think>#is', '', (string)($m['content'] ?? '')))), $allowed), 'tools' => $used];
+        if (empty($m['tool_calls'])) {
+            $txt = trim(preg_replace('#<think>.*?</think>#is', '', (string)($m['content'] ?? '')));
+            // Confere a resposta com o que foi consultado: sem consulta, com link vazio ou contradizendo os dados, não sai ao usuário
+            $wantsRec = (bool)preg_match('/grava|[áa]udio|ouvir|escutar|baixar/iu', $lastQ) && !empty($facts['recs']);
+            if ($wantsRec) $txt = trim(preg_replace('/\[[^\]]*\]\(\s*(url|link|#)?\s*\)/iu', '', $txt));   // tira links vazios: o servidor anexa os reais
+            $why = '';
+            if ($needTool && !$used) $why = 'Você respondeu sem consultar nenhuma ferramenta. Consulte as ferramentas e responda SOMENTE com o que elas devolverem.';
+            elseif ($txt !== '') $why = aiChatGroundingProblem($txt, $facts);
+            if ($why !== '' && $wantsRec && $retried) { $txt = 'Estas são as chamadas com gravação:'; $why = ''; }
+            if ($why === '' && $wantsRec) {
+                // Os links/players das gravações vêm DIRETO dos dados consultados (não dependem de o modelo copiar o endereço)
+                $txt = trim(preg_replace('/^[ \t]*[-*•]?[ \t]*\**Grava[çc][ãa]o\**[ \t]*:?[ \t]*\**[ \t]*(Ouvir grava[çc][ãa]o)?\**[ \t]*$/imu', '', $txt));
+                $blk = '';
+                foreach ($facts['recs'] as $lk => $rc) {
+                    if (strpos($txt, $lk) !== false) continue;
+                    $blk .= "\n\n**" . trim($rc['origem'] . ' → ' . $rc['destino']) . '** · ' . $rc['data'] . ($rc['dur'] ? ' · ' . $rc['dur'] . 's' : '') . "\n[Ouvir gravação](" . $lk . ')';
+                }
+                if ($blk !== '') $txt .= "\n" . $blk;
+                $txt = preg_replace('/\n{3,}/', "\n\n", $txt);
+            }
+            if ($why !== '') {
+                if (!$retried) {
+                    $retried = true;
+                    $msgs[] = ['role' => 'assistant', 'content' => $txt];
+                    $msgs[] = ['role' => 'user', 'content' => '[Verificação automática do sistema] ' . $why . ($facts['links'] ? ' Links válidos desta consulta: ' . implode(' ', array_slice($facts['links'], 0, 10)) : '') . ' Refaça a resposta.'];
+                    continue;
+                }
+                return ['ok' => false, 'error' => 'Não consegui montar uma resposta confiável com os dados consultados. Tente perguntar de outra forma.', 'tools' => $used];
+            }
+            return ['ok' => true, 'text' => aiLinkScrub(aiBrandScrub($txt), $allowed), 'tools' => $used];
+        }
         $msgs[] = ['role' => 'assistant', 'content' => $m['content'] ?? '', 'tool_calls' => $m['tool_calls']];
         foreach ($m['tool_calls'] as $tc) {
             $nm = $tc['function']['name'] ?? ''; $args = json_decode($tc['function']['arguments'] ?? '{}', true) ?: [];
             $used[] = $nm;
             $res = aiChatExecTool($nm, $args);
-            if (is_array($res) && !empty($res['link'])) $allowed[] = $res['link'];
-            $msgs[] = ['role' => 'tool', 'tool_call_id' => $tc['id'] ?? '', 'content' => mb_substr(json_encode($res, JSON_UNESCAPED_UNICODE), 0, 6000)];
+            aiChatCollectFacts($res, $allowed, $facts);
+            $msgs[] = ['role' => 'tool', 'tool_call_id' => $tc['id'] ?? '', 'content' => mb_substr(json_encode($res, JSON_UNESCAPED_UNICODE), 0, 14000)];
         }
     }
     return ['ok' => false, 'error' => 'A consulta ficou longa demais; tente reformular a pergunta.', 'tools' => $used];
