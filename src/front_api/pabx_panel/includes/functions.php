@@ -6662,7 +6662,7 @@ function aiChatRun($history) {
     }
     $facts = ['rec' => false, 'links' => [], 'recs' => []];
     $lastQ = ''; foreach (array_reverse($history) as $h) { if (($h['role'] ?? '') === 'user' && is_string($h['content'] ?? null)) { $lastQ = $h['content']; break; } }
-    $needTool = (bool)preg_match('/(chamad|liga[çc]|ramal|ramais|fila|grava|n[úu]mero|atendid|perdid|abandon|rota|tronco|quantas|quantos|hoje|ontem)/iu', $lastQ);
+    $needTool = (bool)preg_match('/(chamad|liga[çc]|ramal|ramais|fila|grava|n[úu]mero|atendid|perdid|abandon|rota|tronco|quantas|quantos|hoje|ontem|amanh|feriado|hor[áa]rio|time ?condition|condi[çc][ãa]o|ura|anuncio|an[úu]ncio|destino|entrada|blacklist|bloquead|agenda|contato|agendad)/iu', $lastQ);
     $retried = false;
     for ($i = 0; $i < 7; $i++) {
         $r = aiChatRaw($msgs, $cfg);
