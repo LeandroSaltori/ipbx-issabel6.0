@@ -6,12 +6,16 @@
 
 if (session_status() === PHP_SESSION_NONE) {
     if (PHP_SAPI !== 'cli') {
+        // Com HTTPS (domínio) o cookie vale também quando o painel é aberto DENTRO de outro site (app embutido,
+        // ex.: aba de ferramentas de um sistema de atendimento): SameSite=None exige Secure. Pelo IP em HTTP
+        // (conexão direta) usa Lax, que funciona normalmente. Nenhum dos dois restringe o acesso por IP.
+        $__https = !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off';
         session_set_cookie_params([
             'lifetime' => 0,
             'path'     => '/',
-            'secure'   => !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off',
+            'secure'   => $__https,
             'httponly' => true,
-            'samesite' => 'Strict',
+            'samesite' => $__https ? 'None' : 'Lax',
         ]);
     }
     // Nome de cookie próprio: o painel clássico e o IssabelPBX (/admin) usam PHPSESSID no mesmo endereço e,

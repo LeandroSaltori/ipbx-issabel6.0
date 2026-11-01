@@ -277,6 +277,26 @@ fi
 
 echo "=========================================================="
 echo " [✓] front_api instalado com sucesso no PABX!"
+# Permite abrir o painel dentro de outro site (app embutido): cookies do login (painel clássico e novo) com
+# SameSite=None apenas em HTTPS e sem o bloqueio de moldura. Não restringe acesso por IP nem por domínio.
+EMB=/etc/httpd/conf.d/ipbx-embed.conf
+if [ -d /etc/httpd/conf.d ]; then
+  cat > "$EMB" <<'EMBCONF'
+# IPbx Prisma - permite embutir o painel em outro site (gerado pelo instalador do front_api)
+<IfModule mod_headers.c>
+    Header always unset X-Frame-Options
+    <If "%{HTTPS} == 'on'">
+        Header always edit Set-Cookie "^((?!.*SameSite).*)$" "$1; SameSite=None; Secure"
+        Header always edit Set-Cookie "(?i);\s*SameSite=(Lax|Strict)" "; SameSite=None; Secure"
+    </If>
+</IfModule>
+EMBCONF
+  if ! (apachectl configtest >/dev/null 2>&1 || httpd -t >/dev/null 2>&1); then
+    rm -f "$EMB"; echo "[!] Ajuste de moldura não aplicado (configuração do Apache não aceitou); o painel segue normal."
+  else
+    echo "[+] Painel liberado para abrir embutido em outros sites (HTTPS), sem restringir acesso por IP."
+  fi
+fi
 # Recarrega o PHP (cache de opcode) sem derrubar conexões: garante que a versão nova seja a servida
 (systemctl reload httpd 2>/dev/null || apachectl graceful 2>/dev/null || service httpd graceful 2>/dev/null || true) >/dev/null 2>&1
 echo "[+] Servidor web recarregado (graceful)."
