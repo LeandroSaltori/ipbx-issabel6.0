@@ -23,7 +23,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_send_manual_te
         else {
             $u = function_exists('getLoggedUser') ? getLoggedUser() : null;
             $db->prepare("INSERT INTO wa_scheduled (phone, contact_name, message, send_at, source, created_by) VALUES (?,?,?,?,?,?)")
-               ->execute([$ph, aiRegisteredContact($ph), $msg, date('Y-m-d H:i:00', $ts), 'Painel', (string)($u['username'] ?? '')]);
+               ->execute([$ph, aiRegisteredContact($ph), $msg, date('Y-m-d H:i:00', $ts), 'Painel', (string)($u['name'] ?? $u['username'] ?? '')]);
             panelRevBump('wa_sends');
             $test_result = ['success' => true]; $sched_note = 'Mensagem agendada para ' . date('d/m/Y H:i', $ts) . '. Ela aparece na lista abaixo.';
         }

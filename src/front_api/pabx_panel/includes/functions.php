@@ -6205,7 +6205,7 @@ function aiChatLog($question, $tools, $ok) {
         $db->exec("CREATE TABLE IF NOT EXISTS ai_chat_log (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT, question TEXT, tools TEXT, ok INTEGER, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)");
         $u = function_exists('getLoggedUser') ? getLoggedUser() : null;
         $db->prepare("INSERT INTO ai_chat_log (username, question, tools, ok) VALUES (:u,:q,:t,:o)")
-           ->execute([':u' => $u['username'] ?? '', ':q' => mb_substr($question, 0, 500), ':t' => implode(',', $tools), ':o' => $ok ? 1 : 0]);
+           ->execute([':u' => $u['name'] ?? $u['username'] ?? '', ':q' => mb_substr($question, 0, 500), ':t' => implode(',', $tools), ':o' => $ok ? 1 : 0]);
     } catch (Exception $e) {}
 }
 
@@ -6227,7 +6227,8 @@ function aiLinkScrub($text, array $allowed) {
 
 function aiChatUser() {
     $u = function_exists('getLoggedUser') ? getLoggedUser() : null;
-    $n = trim((string)($u['username'] ?? ''));
+    $n = trim((string)($u['name'] ?? $u['username'] ?? ''));
+    if ($n === '') $n = trim((string)($u['email'] ?? ''));
     return $n !== '' ? $n : 'painel';
 }
 function aiHistoryEnsure() {
