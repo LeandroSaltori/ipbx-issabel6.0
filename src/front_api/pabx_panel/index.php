@@ -66,7 +66,7 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
     if (function_exists('auditRequest')) auditRequest('', '', true, (string)$action);
     // Consultas de atualização automática (só leitura) soltam a sessão já: o PHP trava o arquivo de sessão durante a requisição inteira,
     // e essas consultas esperam o AMI por 2-5 s; sem soltar, cada tela aberta ficava na fila atrás delas (navegação lenta).
-    if (in_array($action, ['get_fop_extensions', 'get_trunks_status', 'get_queues_realtime', 'get_parking_lots', 'get_conferences_status', 'get_active_calls', 'get_logs', 'get_kpi_calls_detail'], true) && session_status() === PHP_SESSION_ACTIVE) {
+    if (in_array($action, ['get_fop_extensions', 'get_trunks_status', 'get_queues_realtime', 'get_parking_lots', 'get_conferences_status', 'get_active_calls', 'get_logs', 'get_kpi_calls_detail', 'panel_rev', 'get_time_groups', 'get_announcements_list', 'ai_chat_info', 'ai_chat_history'], true) && session_status() === PHP_SESSION_ACTIVE) {
         @session_write_close();
     }
     while (ob_get_level()) { @ob_end_clean(); }
@@ -3395,9 +3395,11 @@ dialog#ai-chat-dialog::backdrop{background:rgba(0,0,0,.65);backdrop-filter:blur(
   var base = null, busy = false;
   window.ipbxLiveCheck = async function (force) {
     if (!areas.length || busy) return;
+    if (document.hidden && !force) return;   // aba em segundo plano não consulta o servidor
     busy = true;
+    var ctl = new AbortController(), tmo = setTimeout(function () { ctl.abort(); }, 6000);   // consulta lenta nunca fica pendurada
     try {
-      var r = await (await fetch('index.php?api_action=panel_rev', {cache: 'no-store'})).json();
+      var r = await (await fetch('index.php?api_action=panel_rev', {cache: 'no-store', signal: ctl.signal})).json();
       if (!r || !r.rev) return;
       if (base === null) { base = r.rev; return; }
       var changed = areas.some(function (a) { return (r.rev[a] || '') !== (base[a] || ''); });
@@ -3407,7 +3409,7 @@ dialog#ai-chat-dialog::backdrop{background:rgba(0,0,0,.65);backdrop-filter:blur(
       if (!force && (typing || modal)) return;   // não interrompe quem está digitando; tenta no próximo ciclo
       if (force) { try { sessionStorage.setItem('ipbx_chat_reopen', '1'); } catch (e) {} }
       location.reload();
-    } catch (e) {} finally { busy = false; }
+    } catch (e) {} finally { clearTimeout(tmo); busy = false; }
   };
   window.ipbxLiveBase = function () { base = null; return window.ipbxLiveCheck(); };
   if (areas.length) { window.ipbxLiveCheck(); setInterval(function () { window.ipbxLiveCheck(); }, 8000); }
