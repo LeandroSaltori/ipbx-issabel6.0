@@ -108,6 +108,8 @@ Este documento estabelece as regras e padrões arquiteturais obrigatórios para 
 2. Criar o item na seção da tela correspondente (ou nova seção) com `['t' => título, 'd' => texto]`; ajustar o texto de itens existentes quando o comportamento mudar; remover o que deixar de existir.
 3. Texto em português, voltado ao cliente, sem jargão técnico e sem nomes de terceiros (apenas IPbx Prisma e Prismabot).
 4. Nova tela/módulo também entra no manual e no menu lateral. Um commit que entrega função sem atualizar o manual está incompleto.
+5. **Imagens são padrão (decisão do dono, automática, sem ele pedir):** todo item novo do manual leva figura(s) recortadas da tela real, com destaque numerado e legenda. Definir a figura em `scripts/manual-shots/specs_*.py` (chave `(secao, titulo)`), gerar com `python3 scripts/manual-shots/gerar.py specs_p1 ... specs_p5` (cria `img/manual/fig/*.png` e `includes/manual_figuras.php`) e versionar tudo no mesmo commit. Usar só dados de exemplo, nunca de cliente nem chaves reais.
+6. **Mudou a tela, removeu ou renomeou algo?** Regenerar as figuras afetadas, editar o texto do artigo e apagar do manual (e de `specs_*.py`) o que deixou de existir, no mesmo commit.
 
 ---
 

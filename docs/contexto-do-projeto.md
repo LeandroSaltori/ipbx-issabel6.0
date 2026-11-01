@@ -56,3 +56,5 @@ Documento de contexto para qualquer conversa ou projeto novo: o que é o projeto
 - Notas sem explicação no repositório: "Baldussis telecom" e "Registro de Licenças Issabel".
 - Ideias: botão de ligar nos modais de KPI; detalhe nos nós de fluxo de dia/noite e tronco; capturas extras para o manual; campanha de saída estilo 3c+; alerta inteligente diário; API pública.
 - Ambiente de teste do dono: painel acessado por IP interno (192.168.0.251); em clientes há domínio com SSL (ex.: `*.ipbxprisma.cloud`).
+
+- Manual (Central de Ajuda): padrão permanente do dono = todo item com imagens recortadas, destaque numerado e legenda; ao mudar/remover tela, atualizar/remover manual e figuras. Ferramenta: `scripts/manual-shots/` (ver AGENTS.md regra 11, itens 5 e 6). Figuras ainda pendentes: troncos com linhas reais, relatório de filas com dados, Mapa do Sistema.
