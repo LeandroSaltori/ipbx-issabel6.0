@@ -3322,7 +3322,7 @@ dialog#ai-chat-dialog::backdrop{background:rgba(0,0,0,.65);backdrop-filter:blur(
     lines.forEach(function(l){ if (/^\s*\|.*\|\s*$/.test(l)) tbl.push(l); else { flush(); out.push(l); } });
     flush();
     t = out.join('\n').replace(/\n(?=<table)|(<\/table>)\n/g,'$1');
-    t = t.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]*get_audio\.php\?[^\s)]*)\)/g, function(m,l,u){ return '<audio preload="none" controls preload="none" src="'+u+'" style="width:100%;margin:4px 0"></audio><br><a href="'+u+'" target="_blank" rel="noopener">Abrir / baixar áudio</a>'; });
+    t = t.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]*get_audio\.php\?[^\s)]*)\)/g, function(m,l,u){ return '<audio preload="none" controls src="'+u+'" style="width:100%;margin:4px 0"></audio><br><a href="'+u+'" target="_blank" rel="noopener">Abrir / baixar áudio</a>'; });
     t = t.replace(/\*\*(.+?)\*\*/g,'<b>$1</b>')
          .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,'<a href="$2" target="_blank" rel="noopener">$1</a>')
          .replace(/\n/g,'<br>');

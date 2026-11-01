@@ -516,7 +516,7 @@ function setPresetFilter(preset) {
                             </td>
                             <td class="py-3.5 px-4 text-center">
                                 <?php if (!empty($call['has_recording'])): ?>
-                                <audio preload="none" controls preload="none" class="h-7 w-44 inline-block opacity-90">
+                                <audio preload="none" controls class="h-7 w-44 inline-block opacity-90">
                                     <source src="get_audio.php?uid=<?php echo urlencode($call['id']); ?>" type="audio/wav">
                                 </audio>
                                 <?php else: ?><span class="text-slate-500 text-[10px]">Sem gravação</span><?php endif; ?>
