@@ -57,7 +57,7 @@ function dbRepair() {
 
 /** Relatório de suporte em texto, sem senhas, tokens ou chaves. */
 function supportReportText() {
-    $out = ["Relatório IPbx Prisma - " . date('d/m/Y H:i'), 'Versão: ' . (is_file(__DIR__ . '/../../../../VERSION') ? trim((string)file_get_contents(__DIR__ . '/../../../../VERSION')) : '-'), 'PHP: ' . PHP_VERSION, ''];
+    $out = ["Relatório IPbx Prisma - " . date('d/m/Y H:i'), 'Versão: ' . (is_file(__DIR__ . '/../../../../VERSION') ? trim((string)file_get_contents(__DIR__ . '/../../../../VERSION')) : 'Painel IPbx Prisma v6.1'), 'PHP: ' . PHP_VERSION, ''];
     $d = dbDiagnose(); $out[] = '== Banco de dados =='; foreach ($d['linhas'] as $l) $out[] = $l; if ($d['dica']) $out[] = 'Dica: ' . $d['dica'];
     $out[] = ''; $out[] = '== Verificações =='; $nm = ['ok' => 'OK', 'warn' => 'ATENÇÃO', 'fail' => 'FALHA', 'off' => 'DESATIVADO'];
     try { foreach (integrationStatusChecks() as $c) $out[] = '[' . ($nm[$c['estado']] ?? $c['estado']) . '] ' . $c['grupo'] . ' > ' . $c['nome'] . ': ' . preg_replace('/(token|senha|password|key)\s*[:=]\s*\S+/i', '$1=***', (string)$c['detalhe']); } catch (Throwable $e) { $out[] = 'Falha ao montar as verificações: ' . $e->getMessage(); }
