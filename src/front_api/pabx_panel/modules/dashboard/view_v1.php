@@ -890,7 +890,7 @@ if ($ast_db) {
                         </td>
                         <td class="py-3 px-4 text-center font-mono text-slate-300"><?php echo gmdate('i:s', $c['billsec']); ?></td>
                         <td class="py-3 px-4 text-center">
-                            <audio controls class="h-7 w-48 inline-block opacity-90">
+                            <audio preload="none" controls class="h-7 w-48 inline-block opacity-90">
                                 <source src="relatorio_filas.php?action=stream_audio&uid=<?php echo urlencode($c['uniqueid']); ?>" type="audio/wav">
                             </audio>
                         </td>
@@ -1462,7 +1462,7 @@ async function openKpiDetailModal(kpiType) {
                 let audioHTML = '<span class="text-slate-600 font-mono text-[10px]">-</span>';
                 if (c.uniqueid) {
                     audioHTML = `
-                        <audio controls class="h-6 w-44 inline-block opacity-90">
+                        <audio preload="none" controls class="h-6 w-44 inline-block opacity-90">
                             <source src="relatorio_filas.php?action=stream_audio&uid=${encodeURIComponent(c.uniqueid)}" type="audio/wav">
                         </audio>
                     `;

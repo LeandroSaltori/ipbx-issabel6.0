@@ -7045,3 +7045,16 @@ function cdrTypeSelect() {
     return $h . '</select>';
 }
 function cdrTypeLabel($t) { return ['external' => 'externas (clientes)', 'internal' => 'internas (ramal a ramal)', 'all' => 'todas (externas e internas)'][$t] ?? 'externas (clientes)'; }
+
+
+// Cache curto (2 s) das consultas de tempo real ao Asterisk: várias abas/telas pedindo ao mesmo tempo dividem o mesmo resultado
+// em vez de cada uma abrir uma consulta própria (que era o que enchia o PHP e travava o painel).
+function apiCacheServe($key, $ttl = 2) {
+    $f = rtrim(sys_get_temp_dir(), '/') . '/ipbx_api_' . md5($key) . '.json';
+    if (is_file($f) && (time() - (int)@filemtime($f)) < $ttl) { $c = @file_get_contents($f); if ($c !== false && $c !== '') { echo $c; exit; } }
+    return $f;
+}
+function apiCacheSave($f, $json) {
+    if ($json !== false && $json !== '') { $t = $f . '.' . getmypid(); if (@file_put_contents($t, $json) !== false) @rename($t, $f); }
+    echo $json;
+}

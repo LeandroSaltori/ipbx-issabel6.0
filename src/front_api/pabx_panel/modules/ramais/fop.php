@@ -823,12 +823,18 @@ updateConferences();
 updateFOP();
 updateIntegratedPanel();
 
-setInterval(() => {
-    updateParkingLots();
-    updateConferences();
-    updateFOP();
-    updateIntegratedPanel();
-}, 2000);
+// Só inicia nova rodada quando a anterior terminou e a aba está visível (antes: 4 consultas a cada 2 s sem esperar, o que acumulava pedidos no servidor)
+let __fopBusy = false;
+setInterval(async () => {
+    if (__fopBusy || document.hidden) return;
+    __fopBusy = true;
+    try {
+        await Promise.race([
+            Promise.allSettled([updateParkingLots(), updateConferences(), updateFOP(), updateIntegratedPanel()]),
+            new Promise(r => setTimeout(r, 10000))
+        ]);
+    } catch (e) {} finally { __fopBusy = false; }
+}, 3000);
 
 // ─── Modal WhatsApp Atendente ─────────────────────────────────────────────────
 function openFopWaModal(ext, name, phone) {

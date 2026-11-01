@@ -662,7 +662,7 @@ async function openKpiCallsModal(kpiType, customTitle = '') {
                 let audioHTML = '<span class="text-slate-600 font-mono text-[10px]">-</span>';
                 if (c.uniqueid) {
                     audioHTML = `
-                        <audio controls class="h-6 w-44 inline-block opacity-90">
+                        <audio preload="none" controls class="h-6 w-44 inline-block opacity-90">
                             <source src="get_audio.php?uid=${encodeURIComponent(c.uniqueid)}" type="audio/wav">
                         </audio>
                     `;

@@ -385,6 +385,11 @@ loadQueuesRealtime(false);
 
 // Auto-refresh silencioso em segundo plano a cada 3 segundos (sem piscar a tela)
 if (_queueRefreshInterval) clearInterval(_queueRefreshInterval);
-_queueRefreshInterval = setInterval(() => loadQueuesRealtime(true), 3000);
+let __qBusy = false;
+_queueRefreshInterval = setInterval(async () => {
+    if (__qBusy || document.hidden) return;   // não empilha pedidos se o servidor demorar
+    __qBusy = true;
+    try { await Promise.race([loadQueuesRealtime(true), new Promise(r => setTimeout(r, 10000))]); } catch (e) {} finally { __qBusy = false; }
+}, 3000);
 </script>
 

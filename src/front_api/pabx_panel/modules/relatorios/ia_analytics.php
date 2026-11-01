@@ -516,7 +516,7 @@ function setPresetFilter(preset) {
                             </td>
                             <td class="py-3.5 px-4 text-center">
                                 <?php if (!empty($call['has_recording'])): ?>
-                                <audio controls preload="none" class="h-7 w-44 inline-block opacity-90">
+                                <audio preload="none" controls preload="none" class="h-7 w-44 inline-block opacity-90">
                                     <source src="get_audio.php?uid=<?php echo urlencode($call['id']); ?>" type="audio/wav">
                                 </audio>
                                 <?php else: ?><span class="text-slate-500 text-[10px]">Sem gravação</span><?php endif; ?>
@@ -691,7 +691,7 @@ async function openAuditOrAnalyze(data, btn) {
 
         <!-- Rodapé com Player & Ações -->
         <div class="border-t border-slate-800 pt-3 flex flex-col sm:flex-row items-center justify-between gap-3">
-            <audio id="audit-modal-player" controls class="h-8 w-full sm:w-64 opacity-90">
+            <audio id="audit-modal-player" preload="none" controls class="h-8 w-full sm:w-64 opacity-90">
                 <source src="" type="audio/wav">
             </audio>
             <div class="flex items-center gap-2 w-full sm:w-auto justify-end">

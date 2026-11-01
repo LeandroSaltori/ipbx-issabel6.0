@@ -299,6 +299,7 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
     if ($action === 'get_fop_extensions') {
         if (ob_get_level()) ob_end_clean();
         header('Content-Type: application/json');
+        $__cf = apiCacheServe('fop_ext');   // até 2 s compartilhado entre abas: evita fila de consultas ao Asterisk
         $realtime_statuses = getAsteriskRealtimeStatuses();
         $exts = $db->query("SELECT * FROM extensions_config ORDER BY CAST(extension AS UNSIGNED) ASC")->fetchAll(PDO::FETCH_ASSOC);
 
@@ -323,7 +324,7 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
                 'secs' => $lv ? (int)$lv['secs'] : 0
             ];
         }
-        echo json_encode($fop_data);
+        apiCacheSave($__cf, json_encode($fop_data));
         exit;
     }
 
@@ -338,7 +339,8 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
         if (ob_get_level()) ob_end_clean();
         header('Content-Type: application/json');
         $period = isset($_GET['period']) ? trim($_GET['period']) : 'today';
-        echo json_encode(getAsteriskQueuesRealtimeStatus($period));
+        $__cf = apiCacheServe('queues_rt|' . $period);
+        apiCacheSave($__cf, json_encode(getAsteriskQueuesRealtimeStatus($period)));
         exit;
     }
 
@@ -353,14 +355,16 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
     if ($action === 'get_parking_lots') {
         if (ob_get_level()) ob_end_clean();
         header('Content-Type: application/json');
-        echo json_encode(getAsteriskParkingLots());
+        $__cf = apiCacheServe('parking');
+        apiCacheSave($__cf, json_encode(getAsteriskParkingLots()));
         exit;
     }
 
     if ($action === 'get_conferences_status') {
         if (ob_get_level()) ob_end_clean();
         header('Content-Type: application/json');
-        echo json_encode(getAsteriskConferences());
+        $__cf = apiCacheServe('confs');
+        apiCacheSave($__cf, json_encode(getAsteriskConferences()));
         exit;
     }
 
@@ -2609,14 +2613,11 @@ if ($__wp_u && userHasWebphone($__wp_u)
         }
 
         document.addEventListener('DOMContentLoaded', () => {
-            updateDashboardLogs();
-            setInterval(updateDashboardLogs, 5000);
-
-            updateFOP();
-            setInterval(updateFOP, 5000);
-
-            updateQueuesRealtime();
-            setInterval(updateQueuesRealtime, 5000);
+            // Cada atualização só começa quando a anterior terminou (e com a aba visível): sem isso, um servidor lento acumulava pedidos e travava tudo.
+            const __poll = (fn, ms) => { let busy = false; const run = async () => { if (busy || document.hidden) return; busy = true; try { await Promise.race([fn(), new Promise(r => setTimeout(r, 10000))]); } catch (e) {} finally { busy = false; } }; run(); setInterval(run, ms); };
+            __poll(updateDashboardLogs, 6000);
+            __poll(updateFOP, 6000);
+            __poll(updateQueuesRealtime, 6000);
         });
 
         window.__myExt = <?php $__lu2 = function_exists('getLoggedUser') ? getLoggedUser() : null; echo json_encode((string)($__lu2['extension'] ?? '')); ?>;
@@ -3321,7 +3322,7 @@ dialog#ai-chat-dialog::backdrop{background:rgba(0,0,0,.65);backdrop-filter:blur(
     lines.forEach(function(l){ if (/^\s*\|.*\|\s*$/.test(l)) tbl.push(l); else { flush(); out.push(l); } });
     flush();
     t = out.join('\n').replace(/\n(?=<table)|(<\/table>)\n/g,'$1');
-    t = t.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]*get_audio\.php\?[^\s)]*)\)/g, function(m,l,u){ return '<audio controls preload="none" src="'+u+'" style="width:100%;margin:4px 0"></audio><br><a href="'+u+'" target="_blank" rel="noopener">Abrir / baixar áudio</a>'; });
+    t = t.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]*get_audio\.php\?[^\s)]*)\)/g, function(m,l,u){ return '<audio preload="none" controls preload="none" src="'+u+'" style="width:100%;margin:4px 0"></audio><br><a href="'+u+'" target="_blank" rel="noopener">Abrir / baixar áudio</a>'; });
     t = t.replace(/\*\*(.+?)\*\*/g,'<b>$1</b>')
          .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,'<a href="$2" target="_blank" rel="noopener">$1</a>')
          .replace(/\n/g,'<br>');

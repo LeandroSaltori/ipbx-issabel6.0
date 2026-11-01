@@ -738,7 +738,7 @@ function openKpiCallsModal(kpiType, customTitle = '', startDate = '<?php echo $s
                         <td class="py-3 px-4 text-center font-mono text-white font-bold">${c.billsec_fmt}</td>
                         <td class="py-3 px-4 text-center font-mono text-slate-400">${c.tme_fmt}</td>
                         <td class="py-3 px-4 text-center"><span class="px-2 py-0.5 rounded text-[9px] font-extrabold ${dispBadge}">${dispLabel}</span></td>
-                        <td class="py-3 px-4 text-center">${c.uniqueid ? `<audio controls class="h-6 w-44 inline-block"><source src="get_audio.php?uid=${encodeURIComponent(c.uniqueid)}" type="audio/wav"></audio>` : '-'}</td>
+                        <td class="py-3 px-4 text-center">${c.uniqueid ? `<audio preload="none" controls class="h-6 w-44 inline-block"><source src="get_audio.php?uid=${encodeURIComponent(c.uniqueid)}" type="audio/wav"></audio>` : '-'}</td>
                     `;
                     tbody.appendChild(tr);
                 });

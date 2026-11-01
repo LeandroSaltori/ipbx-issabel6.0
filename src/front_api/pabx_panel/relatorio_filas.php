@@ -85,6 +85,8 @@ if ($chkIdx && mysqli_num_rows($chkIdx) == 0) {
 
 // --- Endpoint de &#193;udio: Stream / Download --------------------------------------------------
 if (isset($_GET['action']) && in_array($_GET['action'], array('stream_audio', 'download_audio'))) {
+    // Converter/enviar o áudio demora: solta a sessão para não deixar as demais telas do mesmo login esperando na fila
+    if (function_exists('session_status') && session_status() === PHP_SESSION_ACTIVE) { @session_write_close(); }
     $uid = isset($_GET['uid']) ? preg_replace('/[^a-zA-Z0-9.\-_]/', '', $_GET['uid']) : '';
     if (empty($uid)) {
         http_response_code(400);
