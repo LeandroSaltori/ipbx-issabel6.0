@@ -554,7 +554,7 @@ function exportToCSV() {
 
 <!-- Modal Copiloto IA Prismabot para Análise de Chamadas -->
 <div id="modal-ai-call-summary" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
-    <div class="bg-slate-900 border border-purple-500/30 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4">
+    <div class="bg-slate-900 border border-purple-500/30 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4 max-h-[92vh] flex flex-col">
         <div class="flex items-center justify-between border-b border-slate-800 pb-3">
             <div class="flex items-center gap-2">
                 <div class="w-8 h-8 rounded-full bg-purple-500/20 text-purple-300 flex items-center justify-center text-sm font-bold border border-purple-500/30">
@@ -604,6 +604,13 @@ if (file_exists($jsonSmtpFile)) {
 <script>
     let __aiCall = null;
 
+    // Resumo em linhas "Rótulo: texto": rótulo em destaque, texto normal (leitura fácil mesmo com resumo longo)
+    function aiResumoHtml(t) {
+        return String(t || '').split(/\n+/).filter(l => l.trim() !== '').map(l => {
+            const m = l.match(/^(ATENÇÃO|Motivo do contato|O que foi conversado|Solução \/ desfecho|Pendências|Clima do cliente):\s*(.*)$/);
+            return m ? '<p><strong class="text-purple-300">' + aiEsc(m[1]) + ':</strong> ' + aiEsc(m[2]) + '</p>' : '<p>' + aiEsc(l) + '</p>';
+        }).join('');
+    }
     function aiEsc(v) {
         return String(v == null ? '' : v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     }
@@ -688,7 +695,7 @@ if (file_exists($jsonSmtpFile)) {
                 <div class="space-y-3">
                     <div class="p-3 bg-slate-950 rounded-xl border border-purple-500/30 space-y-1">
                         <span class="text-[10px] font-bold text-purple-400 uppercase tracking-wider block">Resumo do atendimento</span>
-                        <p class="text-white font-medium whitespace-pre-line">${aiEsc(d.resumo)}</p>
+                        <div class="max-h-60 overflow-y-auto custom-scrollbar pr-1 space-y-1.5 text-[13px] leading-relaxed text-slate-100">${aiResumoHtml(d.resumo)}</div>
                     </div>
                     <div class="grid grid-cols-2 gap-2 text-[11px]">
                         <div class="p-2.5 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-300"><strong>Sentimento:</strong> ${aiEsc(d.sentimento || '-')}</div>
