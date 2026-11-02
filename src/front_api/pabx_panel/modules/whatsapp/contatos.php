@@ -60,17 +60,50 @@ $color_palette = [
 // ─── PROCESSAMENTO DE FORMULÁRIOS ─────────────────────────────────────────────
 $req = $_SERVER['REQUEST_METHOD'] === 'POST';
 
-// -- Criar Etiqueta
+// -- Criar / Editar Etiqueta (com edit_tag_id = editar nome e cor)
 if ($req && isset($_POST['action_create_tag'])) {
     $tname = trim($_POST['new_tag_name'] ?? '');
     $tclr  = trim($_POST['new_tag_color'] ?? 'emerald');
-    if (!empty($tname) && isset($color_palette[$tclr])) {
+    $teid  = intval($_POST['edit_tag_id'] ?? 0);
+    if ($tname === '' || !isset($color_palette[$tclr])) {
+        $msg_error = 'Informe o nome e escolha uma cor para a etiqueta.';
+    } elseif ($teid) {
+        try {
+            $st = $db->prepare("SELECT name FROM contact_tags WHERE id = :id"); $st->execute([':id' => $teid]);
+            $old = $st->fetchColumn();
+            $dup = $db->prepare("SELECT COUNT(*) FROM contact_tags WHERE name = :n AND id <> :id"); $dup->execute([':n' => $tname, ':id' => $teid]);
+            if ($old === false) { $msg_error = 'Etiqueta não encontrada.'; }
+            elseif ((int)$dup->fetchColumn() > 0) { $msg_error = "Já existe outra etiqueta chamada '$tname'."; }
+            else {
+                $db->prepare("UPDATE contact_tags SET name = :n, color_key = :c WHERE id = :id")->execute([':n' => $tname, ':c' => $tclr, ':id' => $teid]);
+                if ($old !== $tname) $db->prepare("UPDATE crm_contacts SET tag = :n WHERE tag = :o")->execute([':n' => $tname, ':o' => $old]);   // os contatos acompanham o novo nome
+                if (function_exists('logUserAction')) logUserAction('Etiqueta de contato editada', "$old → $tname", 'CRM');
+                $msg_status = "Etiqueta '$tname' atualizada.";
+            }
+        } catch (Exception $e) { $msg_error = "Erro ao editar etiqueta: " . $e->getMessage(); }
+    } else {
         try {
             $db->prepare("INSERT OR REPLACE INTO contact_tags (name, color_key) VALUES (:n, :c)")
                ->execute([':n' => $tname, ':c' => $tclr]);
+            if (function_exists('logUserAction')) logUserAction('Etiqueta de contato criada', $tname, 'CRM');
             $msg_status = "Etiqueta '$tname' criada com sucesso!";
         } catch (Exception $e) { $msg_error = "Erro ao criar etiqueta: " . $e->getMessage(); }
     }
+}
+
+// -- Apagar Etiqueta (os contatos que a usavam ficam sem etiqueta; nenhum contato é apagado)
+if ($req && isset($_POST['action_delete_tag'])) {
+    $tid = intval($_POST['delete_tag_id'] ?? 0);
+    try {
+        $st = $db->prepare("SELECT name FROM contact_tags WHERE id = :id"); $st->execute([':id' => $tid]);
+        $tn = $st->fetchColumn();
+        if ($tn !== false) {
+            $db->prepare("DELETE FROM contact_tags WHERE id = :id")->execute([':id' => $tid]);
+            $db->prepare("UPDATE crm_contacts SET tag = '' WHERE tag = :n")->execute([':n' => $tn]);
+            if (function_exists('logUserAction')) logUserAction('Etiqueta de contato apagada', $tn, 'CRM');
+            $msg_status = "Etiqueta '$tn' apagada. Os contatos que a usavam ficaram sem etiqueta.";
+        }
+    } catch (Exception $e) { $msg_error = "Erro ao apagar etiqueta: " . $e->getMessage(); }
 }
 
 // -- Criar Contato
@@ -209,16 +242,13 @@ $tags_list    = $db->query("SELECT * FROM contact_tags ORDER BY name ASC")->fetc
 $contacts_list= $db->query("SELECT * FROM crm_contacts ORDER BY name ASC")->fetchAll(PDO::FETCH_ASSOC);
 $quick_msgs   = $db->query("SELECT * FROM quick_messages ORDER BY category ASC, title ASC")->fetchAll(PDO::FETCH_ASSOC);
 
-// Garantir etiquetas padrão
-$default_tags = ['VIP'=>'emerald','Comercial'=>'cyan','Financeiro'=>'amber','Suporte'=>'purple','Inadimplente'=>'rose','Novo Lead'=>'indigo'];
-foreach ($default_tags as $dn => $dc) {
-    $exists = false;
-    foreach ($tags_list as $tl) { if ($tl['name'] === $dn) { $exists = true; break; } }
-    if (!$exists) {
-        try {
-            $db->prepare("INSERT OR IGNORE INTO contact_tags (name, color_key) VALUES (:n,:c)")->execute([':n'=>$dn,':c'=>$dc]);
-        } catch (Exception $e) {}
+// Etiquetas padrão: criadas só na primeira vez (se o cliente apagar uma, ela não volta sozinha)
+if (getSetting('contact_tags_seeded') !== '1') {
+    $default_tags = ['VIP'=>'emerald','Comercial'=>'cyan','Financeiro'=>'amber','Suporte'=>'purple','Inadimplente'=>'rose','Novo Lead'=>'indigo'];
+    foreach ($default_tags as $dn => $dc) {
+        try { $db->prepare("INSERT OR IGNORE INTO contact_tags (name, color_key) VALUES (:n,:c)")->execute([':n'=>$dn,':c'=>$dc]); } catch (Exception $e) {}
     }
+    saveSetting('contact_tags_seeded', '1');
 }
 $tags_list = $db->query("SELECT * FROM contact_tags ORDER BY name ASC")->fetchAll(PDO::FETCH_ASSOC);
 
@@ -581,21 +611,22 @@ $active_tab = isset($_GET['crm_tab']) ? $_GET['crm_tab'] : 'contacts';
 <div id="modal-create-tag" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
     <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-4">
         <div class="flex items-center justify-between border-b border-slate-800 pb-3">
-            <h4 class="text-sm font-extrabold text-white flex items-center gap-2"><i class="fa-solid fa-tags text-amber-400"></i> Criar Nova Etiqueta</h4>
+            <h4 class="text-sm font-extrabold text-white flex items-center gap-2"><i class="fa-solid fa-tags text-amber-400"></i> <span id="tag-modal-title">Criar Nova Etiqueta</span></h4>
             <button onclick="closeModal('modal-create-tag')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
         </div>
         <form method="POST" action="index.php?module=whatsapp&action=contatos" class="space-y-4 text-xs">
             <input type="hidden" name="action_create_tag" value="1">
+            <input type="hidden" name="edit_tag_id" id="edit_tag_id" value="0">
             <div>
                 <label class="font-bold text-slate-300 block mb-1">Nome da Etiqueta</label>
-                <input name="new_tag_name" required placeholder="Ex: Lead Quente, Cliente VIP..." class="w-full px-3 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white focus:border-amber-500 focus:outline-none">
+                <input name="new_tag_name" id="new_tag_name" required placeholder="Ex: Lead Quente, Cliente VIP..." class="w-full px-3 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white focus:border-amber-500 focus:outline-none">
             </div>
             <div>
                 <label class="font-bold text-slate-300 block mb-2">Cor da Etiqueta</label>
                 <div class="grid grid-cols-4 gap-2">
                     <?php foreach ($color_palette as $ck => $cv): ?>
                     <label class="cursor-pointer">
-                        <input type="radio" name="new_tag_color" value="<?php echo $ck; ?>" class="hidden peer" <?php echo $ck === 'emerald' ? 'checked' : ''; ?>>
+                        <input type="radio" name="new_tag_color" id="tagc_<?php echo $ck; ?>" value="<?php echo $ck; ?>" class="hidden peer" <?php echo $ck === 'emerald' ? 'checked' : ''; ?>>
                         <div class="p-2 rounded-xl border-2 border-transparent peer-checked:border-white text-center <?php echo $cv['classes']; ?> flex items-center justify-center gap-1 font-bold text-[10px] transition hover:opacity-80">
                             <span class="w-2.5 h-2.5 rounded-full <?php echo $cv['dot']; ?>"></span>
                             <?php echo $cv['label']; ?>
@@ -604,21 +635,35 @@ $active_tab = isset($_GET['crm_tab']) ? $_GET['crm_tab'] : 'contacts';
                     <?php endforeach; ?>
                 </div>
             </div>
-            <button type="submit" class="w-full py-2.5 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-xl transition">
-                <i class="fa-solid fa-check"></i> Criar Etiqueta
-            </button>
+            <div class="flex gap-2">
+                <button type="button" id="tag-cancel-edit" onclick="cancelEditTag()" class="hidden px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl transition whitespace-nowrap">Cancelar edição</button>
+                <button type="submit" id="tag-submit" class="flex-1 py-2.5 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-xl transition">
+                    <i class="fa-solid fa-check"></i> <span id="tag-submit-txt">Criar Etiqueta</span>
+                </button>
+            </div>
         </form>
 
         <!-- Lista de etiquetas existentes -->
         <?php if (!empty($tags_list)): ?>
         <div class="border-t border-slate-800 pt-3">
-            <span class="text-[10px] text-slate-400 font-bold block mb-2">Etiquetas Existentes:</span>
-            <div class="flex flex-wrap gap-2">
+            <span class="text-[10px] text-slate-400 font-bold block mb-2">Etiquetas existentes (use o lápis para editar e a lixeira para apagar):</span>
+            <div class="flex flex-col gap-1.5 max-h-52 overflow-y-auto">
                 <?php foreach ($tags_list as $tl):
                     $ck = $tl['color_key'];
                     $cls = isset($color_palette[$ck]) ? $color_palette[$ck]['classes'] : 'bg-slate-800 text-slate-400';
+                    $nuse = 0; foreach ($contacts_list as $cc) { if (($cc['tag'] ?? '') === $tl['name']) $nuse++; }
                 ?>
-                <span class="px-2 py-0.5 rounded text-[10px] font-bold border <?php echo $cls; ?>">🏷️ <?php echo htmlspecialchars($tl['name']); ?></span>
+                <div class="flex items-center justify-between gap-2">
+                    <span class="px-2 py-0.5 rounded text-[10px] font-bold border <?php echo $cls; ?>">🏷️ <?php echo htmlspecialchars($tl['name']); ?></span>
+                    <span class="flex items-center gap-1.5">
+                        <span class="text-[10px] text-slate-500"><?php echo $nuse; ?> contato(s)</span>
+                        <button type="button" title="Editar etiqueta" onclick='editTag(<?php echo (int)$tl['id']; ?>, <?php echo json_encode($tl['name'], JSON_UNESCAPED_UNICODE | JSON_HEX_APOS | JSON_HEX_QUOT); ?>, <?php echo json_encode($ck); ?>)' class="w-7 h-7 rounded-lg bg-slate-800 hover:bg-amber-600/30 text-amber-300 border border-slate-700 flex items-center justify-center"><i class="fa-solid fa-pen text-[10px]"></i></button>
+                        <form method="POST" action="index.php?module=whatsapp&action=contatos" class="inline" onsubmit="return confirm('Apagar a etiqueta &quot;<?php echo htmlspecialchars($tl['name'], ENT_QUOTES); ?>&quot;? <?php echo $nuse; ?> contato(s) ficarão sem etiqueta (nenhum contato é apagado).');">
+                            <input type="hidden" name="action_delete_tag" value="1"><input type="hidden" name="delete_tag_id" value="<?php echo (int)$tl['id']; ?>">
+                            <button type="submit" title="Apagar etiqueta" class="w-7 h-7 rounded-lg bg-slate-800 hover:bg-rose-600/30 text-rose-300 border border-slate-700 flex items-center justify-center"><i class="fa-solid fa-trash text-[10px]"></i></button>
+                        </form>
+                    </span>
+                </div>
                 <?php endforeach; ?>
             </div>
         </div>
@@ -626,6 +671,25 @@ $active_tab = isset($_GET['crm_tab']) ? $_GET['crm_tab'] : 'contacts';
     </div>
 </div>
 
+<script>
+function editTag(id, name, color) {
+    document.getElementById('edit_tag_id').value = id;
+    document.getElementById('new_tag_name').value = name;
+    var r = document.getElementById('tagc_' + color); if (r) r.checked = true;
+    document.getElementById('tag-modal-title').textContent = 'Editar Etiqueta';
+    document.getElementById('tag-submit-txt').textContent = 'Salvar alterações';
+    document.getElementById('tag-cancel-edit').classList.remove('hidden');
+    document.getElementById('new_tag_name').focus();
+}
+function cancelEditTag() {
+    document.getElementById('edit_tag_id').value = 0;
+    document.getElementById('new_tag_name').value = '';
+    var r = document.getElementById('tagc_emerald'); if (r) r.checked = true;
+    document.getElementById('tag-modal-title').textContent = 'Criar Nova Etiqueta';
+    document.getElementById('tag-submit-txt').textContent = 'Criar Etiqueta';
+    document.getElementById('tag-cancel-edit').classList.add('hidden');
+}
+</script>
 <!-- Modal: Nova/Editar Mensagem Rápida -->
 <div id="modal-qmsg" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
     <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-4">
