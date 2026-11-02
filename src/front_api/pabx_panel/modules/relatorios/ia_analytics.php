@@ -610,7 +610,8 @@ async function openAuditOrAnalyze(data, btn) {
     try {
         const d = await iaAnalyzeUid(data.id);
         if (d.success) {
-            data.analyzed = true; IA_NEEDS_RELOAD = true;
+            data.analyzed = d.saved !== false; IA_NEEDS_RELOAD = true;
+            if (d.saved === false) alert('A análise foi feita, mas não pôde ser salva (' + (d.save_error || 'erro no banco') + '). Clique em Reauditar para tentar de novo.');
             data.summary_problem = d.resumo; data.summary_action = d.recomendacao || '—';
             data.summary_result = 'Sentimento: ' + (d.sentimento || '—') + ' | Satisfação: ' + (d.satisfacao == null ? 'não inferida' : d.satisfacao + '/5') + ' | IA: ' + d.model;
             data.transcript_text = d.transcript;
@@ -696,6 +697,9 @@ async function openAuditOrAnalyze(data, btn) {
                 <source src="" type="audio/wav">
             </audio>
             <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
+                <button type="button" id="audit-redo-btn" onclick="reauditCurrent(this)" title="Transcreve e analisa a chamada de novo, substituindo a auditoria atual" class="px-3.5 py-2 bg-amber-600/20 hover:bg-amber-600/40 text-amber-300 border border-amber-500/30 rounded-xl text-xs font-bold transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-rotate"></i> Reauditar
+                </button>
                 <button type="button" id="audit-pdf-btn" onclick="downloadIaAuditPdf()" class="px-3.5 py-2 bg-rose-600/20 hover:bg-rose-600/40 text-rose-300 border border-rose-500/30 rounded-xl text-xs font-bold transition flex items-center gap-1.5">
                     <i class="fa-solid fa-file-pdf"></i> Baixar PDF
                 </button>
@@ -710,6 +714,18 @@ async function openAuditOrAnalyze(data, btn) {
 
 <script>
 
+async function reauditCurrent(btn) {
+    var uid = window.__auditUid; if (!uid) return;
+    if (!confirm('Reauditar esta chamada? A IA vai transcrever e analisar o áudio de novo e substituir a auditoria atual.')) return;
+    var orig = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Reauditando...';
+    try {
+        var d = await iaAnalyzeUid(uid);
+        if (!d.success) { alert('Não foi possível reauditar: ' + (d.error || 'erro desconhecido')); }
+        else if (d.saved === false) { alert('A análise foi feita, mas não pôde ser salva (' + (d.save_error || 'erro no banco') + ').'); }
+        else { IA_NEEDS_RELOAD = true; closeModal('modal-full-ia-audit'); }
+    } catch (e) { alert('Falha na requisição: ' + e.message); }
+    btn.disabled = false; btn.innerHTML = orig;
+}
 async function downloadIaAuditPdf() {
     var uid = window.__auditUid; if (!uid) return;
     if (typeof showIaToast === 'function') showIaToast('Gerando PDF da auditoria...', true);
@@ -725,6 +741,7 @@ async function downloadIaAuditPdf() {
 function openFullIaAuditModal(data) {
     window.__auditUid = data.id || '';
     var pb = document.getElementById('audit-pdf-btn'); if (pb) pb.style.display = data.analyzed ? '' : 'none';
+    var rb = document.getElementById('audit-redo-btn'); if (rb) rb.style.display = (data.has_recording) ? '' : 'none';
     document.getElementById('audit-modal-title').innerText = 'Auditoria: ' + (data.client_name || 'Atendimento');
     document.getElementById('audit-modal-subtitle').innerText = (data.operator || '') + ' | Duração: ' + (data.duration || '') + ' | Score QA: ' + (data.qa_score == null ? '—' : data.qa_score + '/100');
 

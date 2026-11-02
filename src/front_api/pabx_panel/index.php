@@ -1005,7 +1005,14 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
             $rules = aiAuditApplyRules($tr['text']);
             aiAuditSaveAnalysis($row, $rules, $result, $cfg);
             $result['topics'] = $rules['topics']; $result['risks'] = $rules['risks']; $result['qa_score'] = $rules['qa_score'];
-        } catch (Throwable $e) { /* persistência é best-effort */ }
+            $chk = $db->prepare("SELECT COUNT(*) FROM call_ai_analysis WHERE uniqueid = :u"); $chk->execute([':u' => $uid]);
+            $result['saved'] = ((int)$chk->fetchColumn() > 0);
+            if (function_exists('logUserAction')) logUserAction('Auditou chamada com IA', $uid, 'RELATORIOS');
+        } catch (Throwable $e) {
+            $result['saved'] = false; $result['save_error'] = $e->getMessage();
+            $result['topics'] = $result['topics'] ?? []; $result['risks'] = $result['risks'] ?? []; $result['qa_score'] = $result['qa_score'] ?? null;
+            error_log('IPbx auditoria IA: falha ao salvar análise ' . $uid . ': ' . $e->getMessage());
+        }
         echo json_encode($result);
         exit;
     }

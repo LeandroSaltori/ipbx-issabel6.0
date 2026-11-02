@@ -5832,6 +5832,16 @@ function aiAuditSaveAnalysis($row, $a, $res, $cfg) {
     global $db;
     aiAuditEnsureSchema();
     if (!$db) return;
+    // várias análises podem rodar ao mesmo tempo (a tela analisa pendentes sozinha): espera o banco liberar em vez de falhar calado
+    try { $db->exec('PRAGMA busy_timeout = 15000'); } catch (Throwable $e) {}
+    $__try = 0;
+    while (true) {
+        try { aiAuditSaveAnalysisOnce($row, $a, $res, $cfg); break; }
+        catch (Throwable $e) { if (++$__try >= 5 || stripos($e->getMessage(), 'lock') === false && stripos($e->getMessage(), 'busy') === false) throw $e; usleep(400000 * $__try); }
+    }
+}
+function aiAuditSaveAnalysisOnce($row, $a, $res, $cfg) {
+    global $db;
     $db->prepare("INSERT OR REPLACE INTO call_ai_analysis
         (uniqueid, calldate, src, dst, billsec, transcript, resumo, sentimento, satisfacao, recomendacao, topics, risks, checklist, qa_score, provider, model, analyzed_at)
         VALUES (:u,:cd,:s,:d,:b,:t,:r,:se,:sa,:re,:to,:ri,:ch,:qa,:p,:m,:at)")->execute([
