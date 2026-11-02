@@ -1593,12 +1593,17 @@ if ($__wp_u && userHasWebphone($__wp_u)
 
     <div class="flex flex-1 min-h-screen">
         <!-- Sidebar Navigation (Menus & Submenus) -->
-        <?php include_once __DIR__ . '/includes/sidebar.php'; ?>
+        <?php if ($module !== 'manual') include_once __DIR__ . '/includes/sidebar.php'; // Manual é página própria, sem menu lateral ?>
 
         <!-- Main Workspace View -->
         <div class="flex-1 flex flex-col min-w-0 bg-slate-950">
             <!-- Header Bar -->
-            <?php include_once __DIR__ . '/includes/header.php'; ?>
+            <?php if ($module === 'manual'): ?>
+            <header class="h-14 shrink-0 flex items-center justify-between px-6 border-b border-slate-800 bg-slate-900/80">
+                <div class="flex items-center gap-2.5 font-bold text-white"><i class="fa-solid fa-book text-brand-400"></i> Manual do IPbx Prisma</div>
+                <a href="index.php?module=dashboard&action=view_v1" onclick="if (window.opener) { window.close(); return false; }" class="px-3 h-9 rounded-lg bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 transition text-xs flex items-center gap-1.5 border border-slate-700 font-bold"><i class="fa-solid fa-xmark"></i> Fechar manual</a>
+            </header>
+            <?php else: include_once __DIR__ . '/includes/header.php'; endif; ?>
 
             <!-- Dynamic Module Content Router -->
             <main class="flex-1 p-6 overflow-y-auto custom-scrollbar">

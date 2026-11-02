@@ -57,10 +57,9 @@
         </button>
         <?php endif; ?>
 
-        <!-- Manual: abre em nova aba para ler ao lado da tela em uso -->
-        <a href="index.php?module=manual&action=view" target="_blank" rel="noopener" title="Abrir o Manual (nova aba)" class="px-3 h-9 rounded-lg bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 transition text-xs flex items-center gap-1.5 border border-slate-700">
-            <i class="fa-solid fa-book text-brand-400"></i>
-            <span class="hidden sm:inline font-bold">Manual</span>
+        <!-- Manual: só o ícone (dica ao passar o mouse); abre em página própria numa nova aba -->
+        <a href="index.php?module=manual&action=view" target="_blank" rel="opener" title="Manual" aria-label="Manual" class="w-9 h-9 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition flex items-center justify-center">
+            <i class="fa-solid fa-book text-[15px]"></i>
         </a>
     </div>
 </header>
