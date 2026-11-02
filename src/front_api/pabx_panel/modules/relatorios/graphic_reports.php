@@ -602,15 +602,11 @@ document.addEventListener("DOMContentLoaded", function() {
 });
 
 function exportReportToCSV() {
-    let csv = "Tipo,Qtd,Porcentagem\n";
-    csv += "Chamadas Recebidas,<?php echo $inc_calls; ?>,<?php echo $inc_pct; ?>%\n";
-    csv += "Chamadas Efetuadas,<?php echo $out_calls; ?>,<?php echo $out_pct; ?>%\n";
-    
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = "relatorio_grafico_pabx.csv";
-    link.click();
+    const __who = <?php $__lu = getLoggedUser(); echo json_encode(trim((string)($__lu['name'] ?? $__lu['email'] ?? '')), JSON_UNESCAPED_UNICODE); ?>;
+    ipbxCsv('relatorio_grafico_pabx_<?php echo $start_date . "_" . $end_date; ?>.csv', ['Relatório gráfico de chamadas', 'Período: ' + <?php echo json_encode(date('d/m/Y', strtotime($start_date)) . ' a ' . date('d/m/Y', strtotime($end_date))); ?>, 'Gerado em ' + new Date().toLocaleString('pt-BR') + (__who ? ' por ' + __who : '') + ' - IPbx Prisma'],
+        [['Tipo', 'Quantidade', 'Porcentagem'],
+         ['Chamadas Recebidas', '<?php echo $inc_calls; ?>', '<?php echo $inc_pct; ?>%'],
+         ['Chamadas Efetuadas', '<?php echo $out_calls; ?>', '<?php echo $out_pct; ?>%']]);
 }
 
 function openSendWhatsAppModal() {

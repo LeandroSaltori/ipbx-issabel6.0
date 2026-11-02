@@ -851,25 +851,14 @@ function copyQuickMsg(body) {
 
 // ─── Exportar CSV ────────────────────────────────────────────────────────────
 function exportContactsToCSV() {
-    let csv = "Nome,Telefone,Email,Empresa,Etiqueta,Origem\n";
+    const __who = <?php $__lu = getLoggedUser(); echo json_encode(trim((string)($__lu['name'] ?? $__lu['email'] ?? '')), JSON_UNESCAPED_UNICODE); ?>;
+    const rows = [['Nome', 'Telefone', 'E-mail', 'Empresa', 'Etiqueta', 'Origem']];
     document.querySelectorAll('#contacts-table-body .contact-row').forEach(row => {
-        const cells = row.querySelectorAll('td');
-        if (cells.length < 6) return;
-        const name    = row.dataset.name || '';
-        const phone   = cells[1]?.innerText?.trim() || '';
-        const email   = cells[2]?.innerText?.trim() || '';
-        const company = cells[3]?.innerText?.trim() || '';
-        const tag     = row.dataset.tag || '';
-        const source  = cells[5]?.innerText?.trim() || '';
-        csv += `"${name}","${phone}","${email}","${company}","${tag}","${source}"\n`;
+        const c = row.querySelectorAll('td');
+        if (c.length < 6) return;
+        rows.push([row.dataset.name || '', c[1]?.innerText || '', c[2]?.innerText || '', c[3]?.innerText || '', row.dataset.tag || '', c[5]?.innerText || '']);
     });
-    const blob = new Blob(["\uFEFF" + csv], {type: 'text/csv;charset=utf-8;'});
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'contatos_prismabot.csv';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    ipbxCsv('contatos_' + new Date().toISOString().slice(0, 10) + '.csv', ['Agenda de contatos', 'Gerado em ' + new Date().toLocaleString('pt-BR') + (__who ? ' por ' + __who : '') + ' - IPbx Prisma'], rows);
 }
 
 // ─── Polling em Tempo Real da Agenda ──────────────────────────────────────────

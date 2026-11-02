@@ -3418,7 +3418,16 @@ dialog#ai-chat-dialog::backdrop{background:rgba(0,0,0,.65);backdrop-filter:blur(
 </style>
 <script>
 // Se o arquivo da gravação não existir mais no servidor, troca o player "morto" por um aviso claro
-function ipbxRecFail(src) { var a = src.closest ? src.closest('audio') : null; if (!a || !a.parentNode) return; var sp = document.createElement('span'); sp.className = 'text-amber-400 text-[10px] italic'; sp.textContent = 'Arquivo da gravação não encontrado'; a.parentNode.replaceChild(sp, a); }
+/* CSV padrão do painel: separador ";" e BOM (abre certo no Excel em português), com título, período e quem gerou */
+        window.ipbxCsv = function (filename, titleLines, rows) {
+            const q = (v) => { v = String(v == null ? '' : v).replace(/\s*\n\s*/g, ' ').trim(); if (/^\d{9,}$/.test(v)) return '="' + v + '"'; return '"' + v.replace(/"/g, '""') + '"'; };
+            let out = (titleLines || []).map(q).join('\n') + ((titleLines || []).length ? '\n\n' : '');
+            out += rows.map(r => r.map(q).join(';')).join('\n') + '\n';
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(new Blob(['\uFEFF' + out], {type: 'text/csv;charset=utf-8;'}));
+            a.download = filename; document.body.appendChild(a); a.click(); a.remove();
+        };
+        function ipbxRecFail(src) { var a = src.closest ? src.closest('audio') : null; if (!a || !a.parentNode) return; var sp = document.createElement('span'); sp.className = 'text-amber-400 text-[10px] italic'; sp.textContent = 'Arquivo da gravação não encontrado'; a.parentNode.replaceChild(sp, a); }
 </script>
 <script>
 // Dica flutuante: qualquer elemento com data-tip mostra o texto ao passar o mouse (não é cortada por janelas com rolagem)

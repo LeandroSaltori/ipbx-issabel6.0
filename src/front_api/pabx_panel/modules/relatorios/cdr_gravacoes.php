@@ -227,23 +227,13 @@ function exportCdrFull(fmt) {
     window.location.href = u.toString();
 }
 function exportToCSV() {
-    let csv = "Data/Hora,Origem,Destino,Duracao_Faturada,Status\n";
+    const __who = <?php $__lu = getLoggedUser(); echo json_encode(trim((string)($__lu['name'] ?? $__lu['email'] ?? '')), JSON_UNESCAPED_UNICODE); ?>;
+    const rows = [['Data/Hora', 'Origem', 'Destino', 'Duração faturada', 'Status']];
     document.querySelectorAll(".cdr-row").forEach(tr => {
-        let cols = tr.querySelectorAll("td");
-        if (cols.length >= 6) {
-            let dt = cols[0].innerText.trim().replace(/\n/g, ' ');
-            let src = cols[1].innerText.trim().replace(/\n/g, ' ');
-            let dst = cols[2].innerText.trim().replace(/\n/g, ' ');
-            let dur = cols[3].innerText.trim().replace(/\n/g, ' ');
-            let st = cols[5].innerText.trim().replace(/\n/g, ' ');
-            csv += `"${dt}","${src}","${dst}","${dur}","${st}"\n`;
-        }
+        const c = tr.querySelectorAll("td");
+        if (c.length >= 6) rows.push([c[0].innerText, c[1].innerText, c[2].innerText, c[3].innerText, c[5].innerText]);
     });
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = "extrato_cdr_pabx.csv";
-    link.click();
+    ipbxCsv('extrato_chamadas_<?php echo $start_date . "_" . $end_date; ?>.csv', ['Extrato de chamadas (página exibida)', 'Período: ' + <?php echo json_encode(date('d/m/Y', strtotime($start_date)) . ' a ' . date('d/m/Y', strtotime($end_date))); ?>, 'Gerado em ' + new Date().toLocaleString('pt-BR') + (__who ? ' por ' + __who : '') + ' - IPbx Prisma'], rows);
 }
 </script>
 

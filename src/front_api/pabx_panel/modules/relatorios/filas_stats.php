@@ -394,29 +394,13 @@ function setPresetFilter(preset) {
 
 <script>
 function exportQueueStatsCsv() {
-    let csv = "Fila,Número,Total,Atendidas,Abandonadas,SLA(%),Tempo Médio,Maior Espera\n";
+    const __who = <?php $__lu = getLoggedUser(); echo json_encode(trim((string)($__lu['name'] ?? $__lu['email'] ?? '')), JSON_UNESCAPED_UNICODE); ?>;
+    const rows = [['Fila', 'Número', 'Total', 'Atendidas', 'Abandonadas', 'SLA (%)', 'Tempo médio', 'Maior espera']];
     document.querySelectorAll('#queue-stats-table tbody tr.queue-stat-row').forEach(row => {
-        const cells = row.querySelectorAll('td');
-        if (cells.length >= 8) {
-            const queue  = cells[0].querySelector('.text-xs')?.innerText?.trim() || '';
-            const qnum   = cells[0].querySelector('.font-mono')?.innerText?.trim() || '';
-            const total  = cells[1].innerText.trim();
-            const ans    = cells[2].innerText.trim();
-            const aband  = cells[3].innerText.trim();
-            const sla    = cells[4].innerText.trim();
-            const avg    = cells[5].innerText.trim();
-            const maxW   = cells[6].innerText.trim();
-            csv += `"${queue}","${qnum}",${total},${ans},${aband},"${sla}","${avg}","${maxW}"\n`;
-        }
+        const c = row.querySelectorAll('td');
+        if (c.length >= 8) rows.push([c[0].querySelector('.text-xs')?.innerText || '', c[0].querySelector('.font-mono')?.innerText || '', c[1].innerText, c[2].innerText, c[3].innerText, c[4].innerText, c[5].innerText, c[6].innerText]);
     });
-
-    const blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href  = URL.createObjectURL(blob);
-    link.download = `relatorio_filas_<?php echo date('Y-m-d'); ?>.csv`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    ipbxCsv('relatorio_filas_<?php echo $start_date . "_" . $end_date; ?>.csv', ['Estatísticas das filas', 'Período: ' + <?php echo json_encode(date('d/m/Y', strtotime($start_date)) . ' a ' . date('d/m/Y', strtotime($end_date))); ?>, 'Gerado em ' + new Date().toLocaleString('pt-BR') + (__who ? ' por ' + __who : '') + ' - IPbx Prisma'], rows);
 }
 
 // Busca rápida na tabela

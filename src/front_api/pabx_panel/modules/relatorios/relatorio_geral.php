@@ -581,17 +581,13 @@ $hm_total = array_sum($hours_heatmap);
 
 <script>
 function exportGeneralToCSV() {
-    let csv = "Indicador,Valor,Porcentagem\n";
-    csv += "Total de Chamadas,<?php echo $total_calls; ?>,100.0%\n";
-    csv += "Chamadas Recebidas,<?php echo $inc_calls; ?>,<?php echo $inc_pct; ?>%\n";
-    csv += "Chamadas Efetuadas,<?php echo $out_calls; ?>,<?php echo $out_pct; ?>%\n";
-    csv += "Chamadas Internas,<?php echo $int_calls; ?>,<?php echo $int_pct; ?>%\n";
-    
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = "relatorio_geral_.csv";
-    link.click();
+    const __who = <?php $__lu = getLoggedUser(); echo json_encode(trim((string)($__lu['name'] ?? $__lu['email'] ?? '')), JSON_UNESCAPED_UNICODE); ?>;
+    ipbxCsv('relatorio_geral_<?php echo $start_date . "_" . $end_date; ?>.csv', ['Relatório geral de chamadas', 'Período: ' + <?php echo json_encode(date('d/m/Y', strtotime($start_date)) . ' a ' . date('d/m/Y', strtotime($end_date))); ?>, 'Gerado em ' + new Date().toLocaleString('pt-BR') + (__who ? ' por ' + __who : '') + ' - IPbx Prisma'],
+        [['Indicador', 'Valor', 'Porcentagem'],
+         ['Total de Chamadas', '<?php echo $total_calls; ?>', '100%'],
+         ['Chamadas Recebidas', '<?php echo $inc_calls; ?>', '<?php echo $inc_pct; ?>%'],
+         ['Chamadas Efetuadas', '<?php echo $out_calls; ?>', '<?php echo $out_pct; ?>%'],
+         ['Chamadas Internas', '<?php echo $int_calls; ?>', '<?php echo $int_pct; ?>%']]);
 }
 
 async function openKpiCallsModal(kpiType, customTitle = '') {
