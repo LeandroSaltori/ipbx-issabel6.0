@@ -102,7 +102,7 @@ O menu interativo permite escolher exatamente o que deseja atualizar, recarrega 
 | **`[21]`** | **Ferramentas Diagnóstico** | Instala utilitários essenciais de terminal (`tcpdump`, `sngrep`, `nmtui`) e a API de diagnóstico AMI de ramais. | `src/ramais/` ➔ `/var/www/html/ramais/` |
 | **`[22]`** | **Features Asterisk** | Ajusta os timeouts de transferência para 7s / 30s e ativa os BIPs de confirmação (`courtesytone=beep`). | `src/dialplan/features_general_custom.conf` |
 | **`[23]`** | **PJSIP User-Agent** | Padroniza o cabeçalho `User-Agent: IPBX PRISMA` no transporte SIP/PJSIP para maior segurança contra scanners. | `/etc/asterisk/pjsip.transports_custom.conf` |
-| **`[24]`** | **Auto-Update Semanal** | Instala a rotina automática no cron semanal para manter correções de segurança e relatórios sempre sincronizados. | `scripts/ipbx-autoupdate.sh` ➔ `/etc/cron.weekly/ipbx-autoupdate` |
+| **`[24]`** | **Auto-Update Contínuo** | Instala a rotina noturna que busca a `main`, valida, tira snapshot, aplica, testa e faz rollback sozinha se falhar. | `scripts/ipbx-autoupdate.sh` ➔ `/etc/cron.d/ipbx-autoupdate` |
 | **`[25]`** | **Web Developer** | Instala o módulo de desenvolvimento para inspecionar banco de dados, compilar Smarty e testar códigos PHP. | `src/modules/web_developer/` |
 | **`[26]`** | **Configurar Domínio e SSL** | Executa o assistente `auto_dominio.sh` para apontar o domínio do cliente, emitir SSL Let's Encrypt e sincronizar WSS. | `scripts/auto_dominio.sh` |
 | **`[27]`** | **Limpeza de Logs e Disco** | Executa a limpeza segura de logs truncando arquivos >50MB e liberando espaço sem apagar CDRs ou gravações. | `scripts/limpa_logs.sh` |
@@ -238,7 +238,7 @@ ipbx-rollback
 ```
 ipbx-issabel6.0/
 ├── docs/                        # Documentação técnica e manuais de instalação
-│   ├── autoupdate.md            # Guia do sistema de Atualização Automática Semanal
+│   ├── autoupdate.md            # Guia da Atualização Automática Contínua
 │   ├── asternic_cdr.md          # Guia do módulo Asternic CDR
 │   ├── painel_ipbx.md           # Guia de instalação do Painel IPbx
 │   ├── painel_novo_6_0.md       # Painel Novo 6.0: funções, Chat IA, agendamentos e crons
@@ -250,7 +250,7 @@ ipbx-issabel6.0/
 │   ├── auto_dominio.sh          # Assistente de Domínio e Certificado SSL Let's Encrypt + WebRTC
 │   ├── limpa_logs.sh            # Otimização de disco e limpeza segura de logs (preserva CDRs)
 │   ├── monitor_prisma.sh        # Atalho de compatibilidade (o monitor foi unificado no ipbx-sentinel.sh)
-│   ├── ipbx-autoupdate.sh       # Script de atualização semanal automática e registro de logs
+│   ├── ipbx-autoupdate.sh       # Atualização automática noturna com snapshot e rollback
 │   ├── motd.sh                  # Banner de boas-vindas do terminal SSH
 │   └── update-addressbook       # Utilitário de sincronização da agenda
 ├── src/                         # Código-fonte, componentes e módulos
@@ -289,7 +289,7 @@ ipbx-issabel6.0/
 6. 🔒 **Domínio e SSL Automático (`auto_dominio.sh`):** Emite certificado SSL Let's Encrypt com 1 comando e sincroniza chaves WSS com o Webphone.
 7. 🧹 **Limpeza de Logs e Otimização de Disco (`limpa_logs.sh`):** Esvazia logs >50MB e limpa temporários sem apagar histórico CDR de ligações.
 8. 🚨 **Monitor de Segurança Telegram (IPbx Sentinel, `ipbx-sentinel.sh`):** monitor único com alertas de web shells, módulos falsos, queda de Firewall, dialplan/cron maliciosos e alterações de contas/senhas.
-9. 🔄 **Atualização Automática Semanal (Auto Update):** Rotina semanal (`scripts/ipbx-autoupdate.sh`) via cron (`/etc/cron.weekly/ipbx-autoupdate`).
+9. 🔄 **Atualização Automática Contínua (Auto Update):** rotina noturna (`scripts/ipbx-autoupdate.sh`) via `/etc/cron.d/ipbx-autoupdate`; segue a `main`, com snapshot, teste de saúde e rollback.
 10. ⏱️ **Resumo Flutuante com Retenção (2s Hover):** Os cards de resumo nos relatórios do sistema possuem um atraso de 2 segundos mantendo o mouse parado na linha antes de abrir, evitando popups acidentais durante a navegação.
 
 11. 🛡️ **Servidor OpenVPN (EasyVPN):** Túnel criptografado com Easy-RSA 3.0.8 corrigido, IP forwarding no kernel e regras de NAT para ramais remotos e telefones IP físicos sem falha de áudio.
@@ -309,7 +309,7 @@ O repositório disponibiliza diversos scripts independentes na pasta [`scripts/`
 | **`ipbx-ssl`**<br>([`scripts/auto_dominio.sh`](./scripts/auto_dominio.sh)) | **Domínio e SSL Let's Encrypt:** Cria VirtualHost no Apache, emite certificado SSL gratuito e integra chaves com o Webphone WebRTC. | `bash scripts/auto_dominio.sh <dominio> <email>` |
 | **`ipbx-limpalogs`**<br>([`scripts/limpa_logs.sh`](./scripts/limpa_logs.sh)) | **Limpeza Segura de Logs e Disco:** Trunca logs >50MB, apaga logs antigos rotacionados e limpa cache Smarty. **Nunca apaga CDRs nem gravações.** | `bash scripts/limpa_logs.sh` |
 | **`monitor_prisma.sh`**<br>([`scripts/monitor_prisma.sh`](./scripts/monitor_prisma.sh)) | **Monitor de Segurança Telegram:** Detecta web shells/Emad em `/var/www/html/`, monitora Firewall (iptables/firewalld) e alerta novos usuários Web criados. | `bash scripts/monitor_prisma.sh` |
-| **`ipbx-autoupdate`**<br>([`scripts/ipbx-autoupdate.sh`](./scripts/ipbx-autoupdate.sh)) | **Atualização Automática Semanal:** Executado via cron semanal para sincronizar atualizações e gerar logs locais. | `bash scripts/ipbx-autoupdate.sh` |
+| **`ipbx-autoupdate`**<br>([`scripts/ipbx-autoupdate.sh`](./scripts/ipbx-autoupdate.sh)) | **Atualização Automática Contínua:** noturna, segue a `main`, com snapshot e rollback (`ipbx-autoupdate --rollback`). | `bash scripts/ipbx-autoupdate.sh` |
 | **`motd.sh`**<br>([`scripts/motd.sh`](./scripts/motd.sh)) | **Banner do Terminal SSH:** Tela personalizada de boas-vindas ao logar como root no terminal. | `bash scripts/motd.sh` |
 
 ---
@@ -328,7 +328,7 @@ Para instruções detalhadas de configuração de cada recurso, acesse os manuai
 - 🧹 [Limpeza de Logs e Otimização de Disco (`limpa_logs.sh`)](./docs/limpa_logs.md)
 - 🚨 [Monitor de Segurança & Alertas Telegram (IPbx Sentinel)](./docs/monitor_seguranca_telegram.md)
 - 🕵️ [Detecção e Remoção do Invasor Emad (`invador_emad.md`)](./docs/invador_emad.md)
-- 🔄 [Atualização Automática Semanal (Auto Update & Logs)](./docs/autoupdate.md)
+- 🔄 [Atualização Automática Contínua (Auto Update, snapshot e rollback)](./docs/autoupdate.md)
 - 📊 [Asternic CDR - Relatórios de Chamadas](./docs/asternic_cdr.md)
 - 🎛️ [Painel IPbx - Monitoramento Visual de Ramais](./docs/painel_ipbx.md)
 - 🧭 [Painel Novo 6.0 e Chat IA: tudo o que dá para fazer](./docs/painel_novo_6_0.md)

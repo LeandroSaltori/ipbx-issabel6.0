@@ -126,5 +126,14 @@ Este documento estabelece as regras e padrões arquiteturais obrigatórios para 
 
 ---
 
-## 14. CONTEXTO DO PROJETO
+## 14. CANAL DOS CLIENTES = BRANCH `main` (ATUALIZAÇÃO AUTOMÁTICA)
+1. Servidores que já rodaram os 3 comandos (clone, `instalar-front-api.sh`, `ipbx-sentinel --install`) seguem a `main` sozinhos, toda noite (02:00-05:30), via `scripts/ipbx-autoupdate.sh`. Detalhes em `docs/autoupdate.md`.
+2. **Só subir para a `main` o que foi testado de verdade.** A `main` chega aos clientes na noite seguinte; erro na `main` é erro em todos os servidores.
+3. Todo script/instalador novo deve passar por `bash -n`/`php -l` (o autoupdate recusa versão com erro de sintaxe) e ter forma de **rollback**.
+4. Rotinas novas entram pelo `instalar-front-api.sh`, `install.sh` e `ipbx-menu.sh`; não criar caminho paralelo de atualização.
+5. Depois de cada entrega, reenviar ao dono os 3 comandos de atualização.
+
+---
+
+## 15. CONTEXTO DO PROJETO
 Leia `docs/contexto-do-projeto.md` no início de cada conversa nova: ele resume o histórico, as decisões do dono, o que já foi entregue e as pendências. Atualize-o quando algo importante mudar.
