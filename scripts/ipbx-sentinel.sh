@@ -124,6 +124,9 @@ load_telegram() {
 # Padrao de notificacao: toda mensagem sai com cliente, servidor, IP e data.
 # O chamador passa "TITULO" ou "TITULO\ndetalhes"; o cabecalho e montado aqui.
 send_telegram() {
+  if [ "${DIGEST_MODE:-0}" = "1" ]; then   # resumo diario: so junta os achados, nao envia na hora
+    printf '%s\n' "$1" | awk 'NR==1{t=$0} NR>1&&!d&&NF{d=$0} END{print "- " t (d?"\n    " substr(d,1,150):"")}' >> "$DIGEST_BUF"; return 0
+  fi
   [ "$SEND_ALERTS" = "1" ] || return 0
   load_telegram
   [ -n "$TELEGRAM_BOT_TOKEN" ] && [ -n "$TELEGRAM_CHAT_ID" ] || { log "Telegram nao configurado; alerta nao enviado."; return 0; }
@@ -523,6 +526,7 @@ report() {
 # CHECKS DE HOST (herdados do antigo monitor_prisma.sh). Leves, rodam a cada minuto.
 # ------------------------------------------------------------------------------
 seen_once() {  # $1 = chave; devolve 0 so na primeira vez (evita alerta repetido a cada minuto)
+  [ "${DIGEST_MODE:-0}" = "1" ] && return 0   # resumo: tudo que esta ativo conta, sem gravar o historico
   mkdir -p "$STATE_DIR" 2>/dev/null; chmod 700 "$STATE_DIR" 2>/dev/null
   local h; h="$(printf '%s' "$1" | sha256sum | awk '{print $1}')"
   grep -qxF "$h" "$STATE_DIR/host.seen" 2>/dev/null && return 1
@@ -531,6 +535,7 @@ seen_once() {  # $1 = chave; devolve 0 so na primeira vez (evita alerta repetido
 }
 
 seen_forget() {  # $1 = chave: esquece o alerta (a condicao sumiu; se voltar, avisa de novo)
+  [ "${DIGEST_MODE:-0}" = "1" ] && return 0
   local h; h="$(printf '%s' "$1" | sha256sum | awk '{print $1}')"
   [ -f "$STATE_DIR/host.seen" ] && { grep -vxF "$h" "$STATE_DIR/host.seen" > "$STATE_DIR/host.seen.tmp" 2>/dev/null; mv -f "$STATE_DIR/host.seen.tmp" "$STATE_DIR/host.seen" 2>/dev/null; }
   return 0
@@ -807,6 +812,8 @@ cmd_install() {
 # IPbx Sentinel - monitor unico de seguranca
 * * * * * root /usr/bin/flock -n /var/run/ipbx-sentinel-host.lock /usr/bin/nice -n 19 /usr/local/bin/ipbx-sentinel --host >/dev/null 2>&1
 */5 * * * * root /usr/bin/flock -n /var/run/ipbx-sentinel.lock /usr/bin/nice -n 19 /usr/local/bin/ipbx-sentinel --incremental >/dev/null 2>&1
+# Resumo diario (9h07): so envia se houver pendencia
+7 9 * * * root /usr/bin/flock -n /var/run/ipbx-sentinel-digest.lock /usr/bin/nice -n 19 /usr/local/bin/ipbx-sentinel --digest >/dev/null 2>&1
 CRON
   chmod 644 /etc/cron.d/ipbx-sentinel
   # Watchdog (sem credenciais): se o Sentinel ou seu cron forem apagados, restaura e avisa
@@ -836,6 +843,22 @@ cmd_restore() {
   echo "Dica: para nao ser pego de novo, adicione o caminho em $ALLOW_FILE"
 }
 
+# Resumo diario: reavalia o que ainda esta ativo e manda UMA mensagem so se houver pendencia.
+# Servidor limpo = silencio total.
+cmd_digest() {
+  DIGEST_BUF="$(mktemp)"; DIGEST_MODE=1
+  host_checks >/dev/null 2>&1
+  DIGEST_MODE=0
+  if [ -s "$DIGEST_BUF" ]; then
+    local n; n="$(grep -c '^- ' "$DIGEST_BUF")"
+    log "RESUMO DIARIO: $n pendencia(s)"
+    send_telegram "ATENCAO: RESUMO DIARIO, $n PENDENCIA(S)"$'\n'"Itens que continuam ativos neste servidor:"$'\n\n'"$(cat "$DIGEST_BUF")"$'\n\n'"Rode: ipbx-sentinel --audit  (para liberar um sudo conhecido: ipbx-sentinel --sudo-ok USUARIO)"
+  else
+    log "RESUMO DIARIO: servidor limpo (sem envio)"
+  fi
+  rm -f "$DIGEST_BUF"
+}
+
 cmd_selftest() {
   local T; T="$(mktemp -d)"; local ok=0 bad=0
   mkdir -p "$T/web/admin/modules/phones" "$T/web/admin/modules/core" "$T/web/images" "$T/web/admin/libraries/php-upgrade" "$T/web/modules"
@@ -859,11 +882,12 @@ cmd_selftest() {
   mkdir -p "$T/botdir"
   printf '#!/bin/bash\nprintf -- "----i---------e-- %%s\\n" "$2"\n' > "$T/bin/lsattr"; chmod +x "$T/bin/lsattr"
   ( PATH="$T/bin:$PATH" WEB_DIR="$T/web" SENTINEL_QUAR="$T/quar" SENTINEL_LOG="$T/log" SENTINEL_NO_ALERT=1 SENTINEL_CONF=/nonexistent SENTINEL_ALLOW=/nonexistent SENTINEL_STATE="$T/state" SENTINEL_ACL_DB=/nonexistent SENTINEL_CRED_FILES="" SENTINEL_FIREWALL_HEAL=0 SENTINEL_DIALPLAN_GLOB="$T/extensions*.conf" SENTINEL_CRON_DIR="$T/cron" SENTINEL_FRAMEWORK_VER="4.0.0-12" SENTINEL_PASSWD="$T/passwd" SENTINEL_RCLOCAL="$T/rc.local" SENTINEL_SUDOERS="$T/sudoers" SENTINEL_ATTR_FILES="$T/passwd" SENTINEL_BOTNET_DIRS="$T/botdir" "$0" --scan >/dev/null 2>&1 )
+  ( PATH="$T/bin:$PATH" WEB_DIR="$T/web" SENTINEL_QUAR="$T/quar" SENTINEL_LOG="$T/log" SENTINEL_NO_ALERT=1 SENTINEL_CONF=/nonexistent SENTINEL_ALLOW=/nonexistent SENTINEL_STATE="$T/state" SENTINEL_ACL_DB=/nonexistent SENTINEL_CRED_FILES="" SENTINEL_FIREWALL_HEAL=0 SENTINEL_DIALPLAN_GLOB="$T/extensions*.conf" SENTINEL_CRON_DIR="$T/cron" SENTINEL_FRAMEWORK_VER="4.0.0-12" SENTINEL_PASSWD="$T/passwd" SENTINEL_RCLOCAL="$T/rc.local" SENTINEL_SUDOERS="$T/sudoers" SENTINEL_ATTR_FILES="$T/passwd" SENTINEL_BOTNET_DIRS="$T/botdir" "$0" --digest >/dev/null 2>&1 )
   chk() { if [ "$2" = "gone" ] && [ ! -e "$1" ]; then ok=$((ok+1)); elif [ "$2" = "kept" ] && [ -e "$1" ]; then ok=$((ok+1)); else bad=$((bad+1)); echo "FALHA: $1 deveria estar '$2'"; fi; }
   chk "$T/web/modules/a_emad.php" gone;  chk "$T/web/modules/b_chain.php" gone;  chk "$T/web/modules/c_decode.php" gone
   chk "$T/web/images/d_static.php" gone; chk "$T/web/admin/modules/phones" gone
   chk "$T/web/modules/legitimo.php" kept; chk "$T/web/admin/libraries/php-upgrade/compat.php" kept; chk "$T/web/admin/modules/core/XML_Unserializer.php" kept
-  for k in "FIREWALL: iptables parado" "DIALPLAN malicioso" "DIALPLAN injecao" "CRON suspeito" "FRAMEWORK vulneravel" "PERSISTENCIA: usuario com poderes de root alem do root: yum" "PERSISTENCIA: usuario com poderes de root alem do root: abort" "baixa e executa script remoto a cada boot" "sudo SEM SENHA para qualquer comando" "PROTEGIDO contra alteracao" "ferramenta de ataque SIP"; do
+  for k in "FIREWALL: iptables parado" "DIALPLAN malicioso" "DIALPLAN injecao" "CRON suspeito" "FRAMEWORK vulneravel" "PERSISTENCIA: usuario com poderes de root alem do root: yum" "PERSISTENCIA: usuario com poderes de root alem do root: abort" "baixa e executa script remoto a cada boot" "sudo SEM SENHA para qualquer comando" "PROTEGIDO contra alteracao" "ferramenta de ataque SIP" "RESUMO DIARIO:"; do
     if grep -qF "$k" "$T/log"; then ok=$((ok+1)); else bad=$((bad+1)); echo "FALHA: alerta '$k' nao gerado"; fi
   done
   rm -rf "$T"
@@ -886,11 +910,12 @@ case "${1:-}" in
   --test-alert)  send_telegram "Teste do IPbx Sentinel"$'\n'"Se esta mensagem chegou, o alerta esta funcionando e identifica o cliente acima." ; echo "Enviado (se o Telegram estiver configurado)." ;;
   --incremental) do_scan inc ;;
   --host)        host_checks ;;
+  --digest)      cmd_digest ;;
   --status)      identity_status ;;
   --audit)       cmd_audit "$2" "$3" ;;
   --update-framework) cmd_update_framework ;;
   --alert-restored) send_telegram "ALERTA: IPBX SENTINEL APAGADO E RESTAURADO"$'\n'"O Sentinel (ou seu agendamento) foi apagado e restaurado automaticamente. Investigue quem tem acesso root." ;;
   --scan|"")     do_scan full ;;
-  *) echo "Uso: $0 [--scan|--incremental|--host|--status|--audit [DIAS] [full]|--update-framework|--install|--uninstall|--list|--restore ARQ|--baseline|--test-alert|--selftest]"; exit 1 ;;
+  *) echo "Uso: $0 [--scan|--incremental|--host|--status|--audit [DIAS] [full]|--update-framework|--install|--uninstall|--list|--restore ARQ|--digest|--baseline|--test-alert|--selftest]"; exit 1 ;;
 esac
 exit 0

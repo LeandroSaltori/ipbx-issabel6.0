@@ -154,3 +154,12 @@ ipbx-sentinel --sudo-ok rocky
 ```
 
 Antes de liberar, confirme que ninguém além de você usa essa conta (`last -a | head`, `cat ~rocky/.ssh/authorized_keys`).
+
+## Resumo diário de pendências (`ipbx-sentinel --digest`)
+
+- Todo dia às 9h07 o Sentinel reavalia o que **continua ativo** no servidor (dialplan, firewall, sudo, processos, persistência etc.) e manda **uma única mensagem** no Telegram listando as pendências.
+- **Servidor limpo = silêncio total** (nada é enviado).
+- O alerta imediato de cada achado continua como antes (uma vez, na hora). O resumo apenas lembra, uma vez por dia, o que ainda não foi resolvido.
+- O resumo não altera o histórico de deduplicação, então não gera alertas duplicados nem apaga nada.
+- Para liberar um sudo sem senha conhecido e tirá-lo do resumo: `ipbx-sentinel --sudo-ok USUARIO`.
+- Cron: `/etc/cron.d/ipbx-sentinel` (linha `7 9 * * *`), criado/atualizado por `ipbx-sentinel --install`.
