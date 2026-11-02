@@ -293,7 +293,7 @@ if (empty($queue_stats)) {
                 <button onclick="exportReportToCSV()" class="p-2 bg-slate-950 hover:bg-slate-800 text-emerald-400 border border-slate-800 rounded-xl font-bold transition shadow" title="Exportar para CSV">
                     <i class="fa-solid fa-file-csv text-base"></i>
                 </button>
-                <button onclick="window.print()" class="p-2 bg-slate-950 hover:bg-slate-800 text-rose-400 border border-slate-800 rounded-xl font-bold transition shadow" title="Imprimir ou Salvar em PDF">
+                <button onclick="ipbxReportPdf('Relatório gráfico de chamadas')" class="p-2 bg-slate-950 hover:bg-slate-800 text-rose-400 border border-slate-800 rounded-xl font-bold transition shadow" title="Imprimir ou Salvar em PDF">
                     <i class="fa-solid fa-file-pdf text-base"></i>
                 </button>
                 <button onclick="shareReportViaEmail('Relatório Gráfico PABX')" class="p-2 bg-slate-950 hover:bg-slate-800 text-amber-400 border border-slate-800 rounded-xl font-bold transition shadow" title="Enviar Relatório por E-mail">

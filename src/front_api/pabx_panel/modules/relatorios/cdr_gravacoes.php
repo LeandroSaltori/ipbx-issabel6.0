@@ -113,7 +113,7 @@ if ($ast_db) {
 // Exportação COMPLETA do período/filtros selecionados (não depende da página exibida)
 if (isset($_GET['export']) && in_array($_GET['export'], ['csv', 'xlsx', 'pdf'], true) && $ast_db && isset($__where)) {
     $__fmt = $_GET['export'];
-    $__cap = ($__fmt === 'pdf') ? 20000 : 100000;
+    $__cap = ($__fmt === 'pdf') ? 20000 : (($__fmt === 'xlsx') ? 200000 : 1000000);
     $__all = $ast_db->prepare("SELECT calldate, src, dst, disposition, duration, billsec, uniqueid, recordingfile FROM cdr WHERE " . $__where . " ORDER BY calldate DESC LIMIT " . (int)$__cap);
     $__all->execute($params);
     $__qm = function_exists('getQueuesMap') ? getQueuesMap() : []; $__em = function_exists('getExtensionsMap') ? getExtensionsMap() : [];

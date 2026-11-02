@@ -451,33 +451,6 @@ if (empty($chamadas) && $conn) {
     }
 }
 
-// Exportação Excel/CSV com UTF-8 BOM diretamente dos dados extraídos ($chamadas)
-if (isset($_GET['export']) && $_GET['export'] === 'excel') {
-    while (ob_get_level()) { ob_end_clean(); }
-    header('Content-Type: text/csv; charset=UTF-8');
-    header('Content-Disposition: attachment; filename="relatorio_filas_' . $dataInicio . '_' . $dataFim . '.csv"');
-    header('Cache-Control: no-cache, must-revalidate');
-    header('Pragma: no-cache');
-    echo "\xEF\xBB\xBF";
-    echo "UniqueID;Data/Hora;Fila;Nome da Fila;Numero (BINA);Agente;Ramal;Status;Tempo Espera (s);Tempo Fala (s);Quem Desligou\n";
-    foreach ($chamadas as $c) {
-        echo implode(';', [
-            '"' . $c['uniqueid'] . '"',
-            '"' . $c['datetime'] . '"',
-            '"' . $c['fila_num'] . '"',
-            '"' . $c['fila_descr'] . '"',
-            '"' . $c['numero'] . '"',
-            '"' . $c['agente'] . '"',
-            '"' . $c['ramal'] . '"',
-            '"' . $c['status'] . '"',
-            '"' . intval($c['tempo_espera']) . '"',
-            '"' . intval($c['tempo_falando']) . '"',
-            '"' . ($c['quem_desligou'] ?: '-') . '"'
-        ]) . "\n";
-    }
-    exit;
-}
-
 // Complemento de dados via CDR para BINA/Ramal ausentes
 $uidsMissing = [];
 foreach ($chamadas as $idx => $c) {
@@ -542,6 +515,37 @@ if ($agenteFiltro != '' || $statusFiltro != '' || $numeroFiltro != '') {
         return true;
     });
     $chamadas = array_values($chamadas);
+}
+
+// Exportação (CSV / Excel / PDF): período e filtros EXATAMENTE como estão na tela, todas as chamadas (não só a página)
+if (isset($_GET['export']) && in_array($_GET['export'], ['csv', 'excel', 'xlsx', 'pdf'], true)) {
+    $__fmt = $_GET['export'] === 'excel' ? 'xlsx' : $_GET['export'];
+    $__tot = count($chamadas); $__at = 0; $__ab = 0; $__to = 0; $__se = 0; $__sf = 0;
+    $__rows = [['Data/Hora', 'Fila', 'Número (BINA)', 'Agente', 'Ramal', 'Status', 'Espera (s)', 'Fala (s)', 'Quem desligou', 'Gravação', 'UniqueID']];
+    foreach ($chamadas as $c) {
+        $st = strtoupper((string)$c['status']);
+        if ($st === 'ATENDIDA') { $__at++; $__sf += (int)$c['tempo_falando']; } elseif ($st === 'ABANDONADA') $__ab++; elseif ($st === 'TIMEOUT') $__to++;
+        $__se += (int)$c['tempo_espera'];
+        $__stTxt = ['ATENDIDA' => 'Atendida', 'ABANDONADA' => 'Abandonada', 'TIMEOUT' => 'Tempo esgotado'][$st] ?? (string)$c['status'];
+        $__rows[] = [(string)$c['datetime'], trim($c['fila_num'] . ' ' . $c['fila_descr']), (string)$c['numero'], (string)$c['agente'], (string)$c['ramal'], $__stTxt,
+            (int)$c['tempo_espera'], (int)$c['tempo_falando'], ($c['quem_desligou'] ?: '-'), !empty($c['recordingfile']) ? 'Sim' : ($st === 'ATENDIDA' ? 'Verificar' : 'Não'), (string)$c['uniqueid']];
+    }
+    $__lu = getLoggedUser(); $__who = trim((string)($__lu['name'] ?? $__lu['email'] ?? ''));
+    $__rows[] = [];
+    $__rows[] = ['Resumo do período', 'Valor'];
+    $__rows[] = ['Total de chamadas', $__tot];
+    $__rows[] = ['Atendidas', $__at . ($__tot ? ' (' . round($__at / $__tot * 100, 1) . '%)' : '')];
+    $__rows[] = ['Abandonadas', $__ab . ($__tot ? ' (' . round($__ab / $__tot * 100, 1) . '%)' : '')];
+    $__rows[] = ['Tempo esgotado', $__to];
+    $__rows[] = ['Espera média', gmdate('i:s', $__tot ? (int)round($__se / $__tot) : 0)];
+    $__rows[] = ['Duração média da conversa', gmdate('i:s', $__at ? (int)round($__sf / $__at) : 0)];
+    $__sum = 'Período: ' . date('d/m/Y', strtotime($dataInicio)) . ' a ' . date('d/m/Y', strtotime($dataFim)) . ' | Total de chamadas: ' . $__tot
+        . ($agenteFiltro !== '' ? " | Agente: $agenteFiltro" : '') . ($statusFiltro !== '' ? " | Status: $statusFiltro" : '') . ($numeroFiltro !== '' ? " | Número: $numeroFiltro" : '')
+        . ($__fmt === 'pdf' && $__tot > 1500 ? "\nO PDF mostra as 1500 chamadas mais recentes; use Excel ou CSV para o período completo." : '');
+    if (function_exists('logUserAction')) logUserAction('Exportou relatório de filas (' . $__fmt . ')', "$dataInicio a $dataFim - $__tot chamadas", 'RELATORIOS');
+    if ($__fmt === 'pdf' && $__tot > 1500) { $__head = array_slice($__rows, 0, 1501); $__rows = array_merge($__head, array_slice($__rows, $__tot + 1)); }
+    reportExportSend($__fmt, 'relatorio_filas_' . $dataInicio . '_a_' . $dataFim, 'Relatório de filas' . ($__who !== '' ? '' : ''), $__sum, $__rows);
+    exit;
 }
 
 // Paginação do extrato (métricas, gráficos e exportações usam o período filtrado COMPLETO)
@@ -666,14 +670,10 @@ $agNaoAtendJson = json_encode($agNaoAtend);
 
             <!-- Botões Rápidos de Exportação, Impressão e Disparos (Somente Ícones: CSV, PDF, E-mail, WhatsApp) -->
             <div class="flex items-center gap-1.5 flex-wrap print:hidden">
-                <a href="index.php?module=relatorios&action=relatorio_filas&export=excel&data_inicio=<?php echo urlencode($dataInicio); ?>&data_fim=<?php echo urlencode($dataFim); ?>" 
-                   title="Exportar para CSV / Excel" 
-                   class="p-2 bg-slate-950 hover:bg-slate-800 text-emerald-400 border border-slate-800 rounded-xl font-bold transition shadow">
-                    <i class="fa-solid fa-file-csv text-base"></i>
-                </a>
-                <button onclick="window.print()" title="Imprimir ou Salvar em PDF" class="p-2 bg-slate-950 hover:bg-slate-800 text-rose-400 border border-slate-800 rounded-xl font-bold transition shadow">
-                    <i class="fa-solid fa-file-pdf text-base"></i>
-                </button>
+                <?php $__eq = $_GET; unset($__eq['export'], $__eq['page']); $__eq['module'] = 'relatorios'; $__eq['action'] = 'relatorio_filas'; $__eu = 'index.php?' . http_build_query($__eq) . '&export='; ?>
+                <a href="<?php echo htmlspecialchars($__eu . 'csv'); ?>" title="Exportar CSV (todo o período e filtros)" class="p-2 bg-slate-950 hover:bg-slate-800 text-emerald-400 border border-slate-800 rounded-xl font-bold transition shadow"><i class="fa-solid fa-file-csv text-base"></i></a>
+                <a href="<?php echo htmlspecialchars($__eu . 'xlsx'); ?>" title="Exportar Excel (todo o período e filtros)" class="p-2 bg-slate-950 hover:bg-slate-800 text-green-400 border border-slate-800 rounded-xl font-bold transition shadow"><i class="fa-solid fa-file-excel text-base"></i></a>
+                <a href="<?php echo htmlspecialchars($__eu . 'pdf'); ?>" title="Exportar PDF (todo o período e filtros)" class="p-2 bg-slate-950 hover:bg-slate-800 text-rose-400 border border-slate-800 rounded-xl font-bold transition shadow"><i class="fa-solid fa-file-pdf text-base"></i></a>
                 <button onclick="shareReportViaEmail('Relatório Completo de Filas')" title="Enviar Relatório por E-mail" class="p-2 bg-slate-950 hover:bg-slate-800 text-amber-400 border border-slate-800 rounded-xl font-bold transition shadow">
                     <i class="fa-solid fa-envelope text-base"></i>
                 </button>

@@ -1888,7 +1888,8 @@ function shareBuildPdf($title, $summary, $rows) {
     // cabeçalho do documento
     $cur .= "0.486 0.227 0.929 rg " . $M . ' ' . ($H - $M - 6) . ' ' . $avail . " 4 re f 0 g\n"; $y -= 22;
     $text($M, $y, $title, true, 15); $y -= 16;
-    $text($M, $y, 'Gerado em ' . date('d/m/Y H:i') . ' - IPbx Prisma', false, 8); $y -= 16;
+    $__lu = function_exists('getLoggedUser') ? getLoggedUser() : []; $__who = trim((string)($__lu['name'] ?? $__lu['email'] ?? ''));
+    $text($M, $y, 'Gerado em ' . date('d/m/Y H:i') . ($__who !== '' ? ' por ' . $__who : '') . ' - IPbx Prisma', false, 8); $y -= 16;
     foreach (preg_split('/\r\n|\n|\r/', trim((string)$summary)) as $ln) { if ($ln === '') { $y -= 5; continue; } $text($M, $y, $ln, false, 9); $y -= 12; }
     $y -= 8;
     $prevBlank = true; $lastHead = null;

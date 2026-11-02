@@ -49,7 +49,7 @@ try {
 // =========================================================================
 // AUTENTICAÇÃO (portão único do painel)
 // =========================================================================
-$__api_action_names = ['ia_audit_export', 'operator_ia_pdf', 'ia_audit_list_pdf', 'get_logs', 'get_fop_extensions', 'get_trunks_status', 'get_queues_realtime', 'get_parking_lots', 'fop_action', 'originate_call', 'save_contact', 'test_llm_connection', 'analyze_pabx_insights', 'operator_survey_stats', 'panel_rev', 'status_repair', 'status_report', 'generate_ai_insights', 'get_ai_insights_history', 'delete_ai_insight', 'transcribe_audio', 'get_kpi_calls_detail', 'get_active_calls', 'get_time_groups', 'get_time_group_rules', 'save_time_group_rule', 'delete_time_group_rule', 'get_announcements_list', 'update_announcement_audio', 'sync_assets', 'ai_chat', 'ai_chat_info', 'ai_chat_history', 'ai_chat_clear', 'ai_chat_confirm', 'ext_features_get', 'ext_features_set', 'console_exec'];
+$__api_action_names = ['ia_audit_export', 'operator_ia_pdf', 'ia_audit_list_pdf', 'report_pdf', 'get_logs', 'get_fop_extensions', 'get_trunks_status', 'get_queues_realtime', 'get_parking_lots', 'fop_action', 'originate_call', 'save_contact', 'test_llm_connection', 'analyze_pabx_insights', 'operator_survey_stats', 'panel_rev', 'status_repair', 'status_report', 'generate_ai_insights', 'get_ai_insights_history', 'delete_ai_insight', 'transcribe_audio', 'get_kpi_calls_detail', 'get_active_calls', 'get_time_groups', 'get_time_group_rules', 'save_time_group_rule', 'delete_time_group_rule', 'get_announcements_list', 'update_announcement_audio', 'sync_assets', 'ai_chat', 'ai_chat_info', 'ai_chat_history', 'ai_chat_clear', 'ai_chat_confirm', 'ext_features_get', 'ext_features_set', 'console_exec'];
 if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['action'], $__api_action_names, true))) {
     authGate('json');
 } else {
@@ -477,6 +477,18 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
         if (function_exists('logUserAction')) logUserAction('Baixou PDF do relatório IA do atendente', $g('ramal'), 'RELATORIOS');
         header('Content-Type: application/pdf'); header('Content-Disposition: attachment; filename="Relatorio_IA_' . preg_replace('/[^0-9A-Za-z_.-]/', '_', $g('name') ?: 'atendente') . '.pdf"'); header('Content-Length: ' . strlen($pdf)); header('Cache-Control: private, no-store');
         echo $pdf; exit;
+    }
+    // PDF genérico dos relatórios (usa o mesmo resumo/CSV do período filtrado que a tela já envia por e-mail/WhatsApp)
+    if ($action === 'report_pdf') {
+        while (ob_get_level()) ob_end_clean();
+        if (!hasUserPermission('mod_relatorios')) { http_response_code(403); header('Content-Type: text/plain; charset=utf-8'); echo 'Sem permissão.'; exit; }
+        $b = json_decode(file_get_contents('php://input'), true) ?: [];
+        $title = trim(mb_substr((string)($b['title'] ?? 'Relatório'), 0, 120)) ?: 'Relatório';
+        $rows = shareParseCsv((string)($b['csv'] ?? ''));
+        if (function_exists('logUserAction')) logUserAction('Baixou PDF do relatório', $title, 'RELATORIOS');
+        $lu = getLoggedUser(); $who = trim((string)($lu['name'] ?? $lu['email'] ?? ''));
+        reportExportSend('pdf', preg_replace('/[^A-Za-z0-9_-]+/', '_', $title) . '_' . date('Ymd_His'), $title, trim((string)($b['summary'] ?? '')) . ($who !== '' ? "\nGerado por: $who" : ''), $rows);
+        exit;
     }
     // PDF com a lista das chamadas auditadas pela IA (botão da tela Auditoria IA)
     if ($action === 'ia_audit_list_pdf') {
@@ -3419,6 +3431,17 @@ dialog#ai-chat-dialog::backdrop{background:rgba(0,0,0,.65);backdrop-filter:blur(
 <script>
 // Se o arquivo da gravação não existir mais no servidor, troca o player "morto" por um aviso claro
 /* CSV padrão do painel: separador ";" e BOM (abre certo no Excel em português), com título, período e quem gerou */
+        window.ipbxReportPdf = async function (title) {
+            try {
+                const d = (typeof window.__reportShare === 'function') ? window.__reportShare() : null;
+                if (!d) { window.print(); return; }
+                const r = await fetch('index.php?api_action=report_pdf', {method: 'POST', credentials: 'same-origin', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({title: title, summary: d.summary, csv: d.csv})});
+                if (!r.ok) throw new Error(await r.text());
+                const a = document.createElement('a'); a.href = URL.createObjectURL(await r.blob());
+                a.download = ((r.headers.get('Content-Disposition') || '').match(/filename="([^"]+)"/) || [])[1] || 'relatorio.pdf';
+                document.body.appendChild(a); a.click(); a.remove();
+            } catch (e) { alert('Não foi possível gerar o PDF: ' + (e.message || e)); }
+        };
         window.ipbxCsv = function (filename, titleLines, rows) {
             const q = (v) => { v = String(v == null ? '' : v).replace(/\s*\n\s*/g, ' ').trim(); if (/^\d{9,}$/.test(v)) return '="' + v + '"'; return '"' + v.replace(/"/g, '""') + '"'; };
             let out = (titleLines || []).map(q).join('\n') + ((titleLines || []).length ? '\n\n' : '');

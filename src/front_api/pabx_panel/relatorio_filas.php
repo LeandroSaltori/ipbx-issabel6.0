@@ -655,7 +655,11 @@ if ($export == 'excel') {
     header('Pragma: no-cache');
     echo "\xEF\xBB\xBF"; 
 
-    echo "UniqueID\tData/Hora\tFila\tNome da Fila\tNumero\tAgente\tRamal\tStatus\tEspera(s)\tDuracao(s)\tQuem Desligou\tGravacao Disponivel\n";
+    $__lu = function_exists('getLoggedUser') ? getLoggedUser() : []; $__who = trim((string)($__lu['name'] ?? $__lu['email'] ?? ''));
+    echo "Relatório de Filas - IPbx Prisma\n";
+    echo "Período:\t" . date('d/m/Y', strtotime($dataInicio)) . " a " . date('d/m/Y', strtotime($dataFim)) . "\n";
+    echo "Gerado em:\t" . date('d/m/Y H:i') . ($__who !== '' ? " por $__who" : '') . "\n\n";
+    echo "UniqueID\tData/Hora\tFila\tNome da Fila\tNúmero\tAgente\tRamal\tStatus\tEspera (s)\tDuração (s)\tQuem Desligou\tGravação Disponível\n";
 
     foreach ($chamadas as $c) {
         $temAudio = ($c['status'] == 'ATENDIDA') ? 'SIM' : 'NAO';
@@ -675,14 +679,14 @@ if ($export == 'excel') {
         )) . "\n";
     }
     echo "\n"; 
-    echo "RESUMO GERAL IPBX PRISMA\n";
+    echo "RESUMO GERAL - IPBX PRISMA\n";
     echo "Total de Chamadas:\t" . $totalChamadas . "\n";
     echo "Atendidas:\t" . $totalAtendidas . "\t" . $pctAtendimento . "%\n";
     echo "Abandonadas:\t" . $totalAbandonadas . "\t" . $pctAbandono . "%\n";
     echo "Timeout:\t" . $totalTimeout . "\n";
     echo "SLA (<=20s):\t" . $pctSla20 . "%\n";
-    echo "Media Espera:\t" . gmdate('i:s', $mediaEspera) . "\n";
-    echo "Media Duracao:\t" . gmdate('i:s', $mediaFalando) . "\n";
+    echo "Média Espera:\t" . gmdate('i:s', $mediaEspera) . "\n";
+    echo "Média Duração:\t" . gmdate('i:s', $mediaFalando) . "\n";
 
     exit;
 }
