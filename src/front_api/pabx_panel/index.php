@@ -963,7 +963,8 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
         if ($tr['text'] === '') { echo json_encode(['success' => false, 'error' => 'A transcrição voltou vazia (áudio sem fala?).']); exit; }
 
         $__dur = gmdate('H:i:s', max(0, (int)($row['billsec'] ?? 0)));
-        $an = aiAnalyzeCallTranscript($tr['text'], $cfg, ['duracao' => $__dur, 'atendente' => (string)($row['dst'] ?? ''), 'cliente' => (string)($row['src'] ?? '')]);
+        $__qual = aiTranscriptQualityNote($tr, (int)($row['billsec'] ?? 0));
+        $an = aiAnalyzeCallTranscript($tr['text'], $cfg, ['qualidade' => $__qual, 'duracao' => $__dur, 'atendente' => (string)($row['dst'] ?? ''), 'cliente' => (string)($row['src'] ?? '')]);
         if (!$an['ok']) { echo json_encode(['success' => false, 'error' => 'Análise: ' . $an['error'], 'transcript' => $tr['text']]); exit; }
         $raw = $an['raw']; $j = $an['j'] ?: null;
         if (is_array($j) && trim((string)($j['resumo'] ?? '')) === '') {
@@ -976,6 +977,7 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
             // Resposta em texto livre: mostra como resumo, sem inventar métricas
             $j = ['resumo' => mb_substr($raw, 0, 1500), 'sentimento' => '', 'satisfacao' => null, 'recomendacao' => ''];
         }
+        if ($__qual !== '') { $j['resumo'] = 'ATENÇÃO: ' . $__qual . '. O relato abaixo pode estar incompleto; confira a transcrição e o áudio.' . "\n" . $j['resumo']; $j['satisfacao'] = null; }
         $sat = isset($j['satisfacao']) && is_numeric($j['satisfacao']) ? max(1, min(5, (float)$j['satisfacao'])) : null;
         $result = [
             'success' => true,

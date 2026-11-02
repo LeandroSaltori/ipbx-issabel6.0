@@ -5403,6 +5403,24 @@ function aiChatCompletion($system, $user, $timeout = 25, $cfg = null) {
 }
 
 
+
+/** Avalia se a transcrição é confiável. Devolve '' se estiver boa ou o motivo da baixa qualidade (texto para o cliente). */
+function aiTranscriptQualityNote(array $tr, $billsec = 0) {
+    $txt = (string)($tr['text'] ?? ''); $segs = (int)($tr['segs'] ?? 0); $drop = (int)($tr['dropped'] ?? 0);
+    $words = preg_match_all('/\p{L}{2,}/u', preg_replace('/\[trecho inaudível\]/u', ' ', $txt));
+    $sec = max((float)($tr['audio_sec'] ?? 0), (float)$billsec);
+    $why = [];
+    if ($segs >= 4 && $drop / $segs >= 0.3) $why[] = round($drop / $segs * 100) . '% dos trechos ficaram inaudíveis';
+    if ($sec >= 90 && $words < $sec / 60 * 25) $why[] = 'poucas palavras reconhecidas para ' . gmdate('i:s', (int)$sec) . ' de áudio';
+    // repetição excessiva (mesmas poucas palavras o tempo todo)
+    $ws = preg_split('/\s+/u', mb_strtolower(preg_replace('/[^\p{L}\s]/u', ' ', $txt)), -1, PREG_SPLIT_NO_EMPTY);
+    if (count($ws) >= 60) {
+        $tri = []; for ($i = 0; $i + 2 < count($ws); $i++) $tri[] = $ws[$i] . ' ' . $ws[$i + 1] . ' ' . $ws[$i + 2];
+        if (count(array_unique($tri)) / count($tri) < 0.35) $why[] = 'texto muito repetitivo (provável música de espera, URA ou ruído)';
+    }
+    return $why ? 'transcrição de baixa qualidade (' . implode('; ', $why) . ')' : '';
+}
+
 /**
  * Analisa a transcrição de UMA ligação e devolve o que foi realmente conversado (motivo, conversa, solução, pendências...).
  * Chamadas longas (10-20 min) passam por um resumo por partes antes da análise final, para nada ficar de fora.
@@ -5415,6 +5433,7 @@ function aiAnalyzeCallTranscript($transcript, $cfg, array $meta = []) {
     if (!empty($meta['duracao'])) $ctx[] = 'Duração falada: ' . $meta['duracao'];
     if (!empty($meta['atendente'])) $ctx[] = 'Atendente (ramal): ' . $meta['atendente'];
     if (!empty($meta['cliente'])) $ctx[] = 'Número do cliente: ' . $meta['cliente'];
+    if (!empty($meta['qualidade'])) $ctx[] = 'AVISO: ' . $meta['qualidade'] . '. Relate SOMENTE o que está claro, diga que o áudio está incompleto e não deduza o resto';
     $ctxTxt = $ctx ? implode(' | ', $ctx) . "\n\n" : '';
 
     $body = $transcript;
@@ -5661,18 +5680,18 @@ function aiTranscribeFile($path, $cfg = null) {
         $chunks = [$sendPath];
     }
 
-    $parts = []; $lastErr = ''; $okAny = false; $dropped = 0;
+    $parts = []; $lastErr = ''; $okAny = false; $dropped = 0; $segsTot = 0;
     foreach ($chunks as $i => $cp) {
         $r = aiWhisperRequest($cp, $mime, $i === 0 && count($chunks) === 1 ? $sendName : ('trecho_' . $i . '.wav'), $cfg);
         if (!$r['ok']) { $lastErr = $r['error']; if (count($chunks) === 1) break; continue; }
-        $okAny = true; $dropped += $r['dropped'];
+        $okAny = true; $dropped += $r['dropped']; $segsTot += (int)($r['segs'] ?? 0);
         $ct = aiCleanTranscript($r['text']); if ($ct !== '') $parts[] = $ct;
     }
     if ($tmp !== '' && is_file($tmp)) @unlink($tmp);
     if ($chunkDir !== '') { foreach (glob($chunkDir . '/*') ?: [] as $f) @unlink($f); @rmdir($chunkDir); }
     if (!$okAny) return ['ok' => false, 'text' => '', 'error' => $lastErr ?: 'Falha na transcrição'];
     $text = trim(implode("\n\n", $parts));
-    return ['ok' => true, 'text' => $text, 'error' => '', 'chunks' => count($chunks), 'dropped' => $dropped];
+    return ['ok' => true, 'text' => $text, 'error' => '', 'chunks' => count($chunks), 'dropped' => $dropped, 'segs' => $segsTot, 'audio_sec' => $dur];
 }
 
 /** Uma chamada ao Whisper (OpenAI/Groq) em verbose_json: descarta segmentos "alucinados" (loop de repetição / sem fala). */
@@ -5696,16 +5715,16 @@ function aiWhisperRequest($file, $mime, $name, $cfg) {
     if ($err !== '') return ['ok' => false, 'text' => '', 'error' => 'Erro cURL: ' . $err, 'dropped' => 0];
     $j = json_decode((string)$resp, true);
     if ($http === 200 && isset($j['text'])) {
-        $dropped = 0;
+        $dropped = 0; $segN = 0;
         if (!empty($j['segments']) && is_array($j['segments'])) {
-            $keep = [];
+            $keep = []; $segN = count($j['segments']);
             foreach ($j['segments'] as $sg) {
                 $cr = (float)($sg['compression_ratio'] ?? 0); $ns = (float)($sg['no_speech_prob'] ?? 0); $lp = (float)($sg['avg_logprob'] ?? 0);
                 if ($cr > 2.6 || ($ns > 0.85 && $lp < -0.8)) { $dropped++; $keep[] = '[trecho inaudível]'; continue; }
                 $keep[] = trim((string)($sg['text'] ?? ''));
             }
             $txt = trim(preg_replace('/\s+/u', ' ', implode(' ', $keep)));
-            return ['ok' => true, 'text' => $txt, 'error' => '', 'dropped' => $dropped];
+            return ['ok' => true, 'text' => $txt, 'error' => '', 'dropped' => $dropped, 'segs' => $segN];
         }
         return ['ok' => true, 'text' => trim((string)$j['text']), 'error' => '', 'dropped' => 0];
     }
