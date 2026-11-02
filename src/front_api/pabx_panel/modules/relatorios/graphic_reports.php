@@ -738,7 +738,7 @@ function openKpiCallsModal(kpiType, customTitle = '', startDate = '<?php echo $s
                         <td class="py-3 px-4 text-center font-mono text-white font-bold">${c.billsec_fmt}</td>
                         <td class="py-3 px-4 text-center font-mono text-slate-400">${c.tme_fmt}</td>
                         <td class="py-3 px-4 text-center"><span class="px-2 py-0.5 rounded text-[9px] font-extrabold ${dispBadge}">${dispLabel}</span></td>
-                        <td class="py-3 px-4 text-center">${(c.uniqueid && (c.recordingfile === undefined || c.recordingfile)) ? `<audio preload="none" controls class="h-6 w-44 inline-block"><source src="get_audio.php?uid=${encodeURIComponent(c.uniqueid)}" type="audio/wav" onerror="ipbxRecFail(this)"></audio>` : '<span class="text-slate-500 text-[10px] italic">Sem gravação</span>'}</td>
+                        <td class="py-3 px-4 text-center">${(c.uniqueid && (c.recordingfile === undefined || c.recordingfile)) ? `<audio preload="none" controls class="h-6 w-44 inline-block"><source src="get_audio.php?uid=${encodeURIComponent(c.uniqueid)}" type="audio/wav" onerror="ipbxRecFail(this)"></audio>` : ('<span class="text-slate-500 text-[10px] italic' + (c.rec_reason ? ' cursor-help border-b border-dotted border-slate-600" data-tip="' + String(c.rec_reason).replace(/[&<>"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch])) + '"' : '"') + '>Sem gravação' + (c.rec_reason ? ' <i class="fa-solid fa-circle-info"></i>' : '') + '</span>')}</td>
                     `;
                     tbody.appendChild(tr);
                 });

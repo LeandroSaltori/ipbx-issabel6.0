@@ -894,7 +894,7 @@ if ($ast_db) {
                             <audio preload="none" controls class="h-7 w-48 inline-block opacity-90">
                                 <source src="relatorio_filas.php?action=stream_audio&uid=<?php echo urlencode($c['uniqueid']); ?>" type="audio/wav" onerror="ipbxRecFail(this)">
                             </audio>
-                            <?php else: ?><span class="text-slate-500 text-[10px] italic">Sem gravação</span><?php endif; ?>
+                            <?php else: echo recNoneBadge($c['src'], $c['dst'], 'text-slate-500 text-[10px] italic'); endif; ?>
                         </td>
                         <td class="py-3 px-4 text-center">
                             <?php if (!empty($c['recordingfile'])): ?>

@@ -198,6 +198,7 @@ foreach ($cdr_list as $c_real) {
     $audited_calls[] = [
         'id' => $c_real['uniqueid'],
         'has_recording' => !empty($c_real['recordingfile']),
+        'src_num' => (string)($c_real['src'] ?? ''), 'dst_num' => (string)($c_real['dst'] ?? ''),
         'analyzed' => (bool)$an,
         'calldate' => date('d/m/Y H:i', strtotime($c_real['calldate'])),
         'client_name' => $src_cdata ? $src_cdata['name'] : "Cliente $phone_num",
@@ -519,7 +520,7 @@ function setPresetFilter(preset) {
                                 <audio preload="none" controls class="h-7 w-44 inline-block opacity-90">
                                     <source src="get_audio.php?uid=<?php echo urlencode($call['id']); ?>" type="audio/wav">
                                 </audio>
-                                <?php else: ?><span class="text-slate-500 text-[10px]">Sem gravação</span><?php endif; ?>
+                                <?php else: echo recNoneBadge($call['src_num'] ?? '', $call['dst_num'] ?? '', 'text-slate-500 text-[10px]'); endif; ?>
                             </td>
                             <td class="py-3.5 px-4 text-center">
                                 <button onclick="openAuditOrAnalyze(<?php echo htmlspecialchars(json_encode($call)); ?>, this)" class="px-3 py-1.5 bg-purple-600/20 hover:bg-purple-600 text-purple-300 hover:text-white border border-purple-500/40 rounded-xl text-xs font-bold transition flex items-center gap-1.5 mx-auto shadow">

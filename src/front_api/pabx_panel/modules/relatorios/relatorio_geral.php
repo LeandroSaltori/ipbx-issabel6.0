@@ -659,7 +659,8 @@ async function openKpiCallsModal(kpiType, customTitle = '') {
                 const srcDisplay = c.src_name ? `<span class="font-extrabold text-white"><i class="fa-solid fa-user text-emerald-400 text-[10px] mr-1"></i>${c.src_name}</span><div class="text-[10px] text-slate-400 font-mono">${c.src}</div>` : `<span class="font-bold text-white font-mono">${c.src}</span>`;
                 const dstDisplay = c.dst_name ? `<span class="font-extrabold text-indigo-300"><i class="fa-solid fa-user text-indigo-400 text-[10px] mr-1"></i>${c.dst_name}</span><div class="text-[10px] text-slate-400 font-mono">${c.dst}</div>` : `<span class="font-bold text-indigo-300 font-mono">${c.dst}</span>`;
 
-                let audioHTML = '<span class="text-slate-500 text-[10px] italic">Sem gravação</span>';
+                const __rr = String(c.rec_reason || '').replace(/[&<>"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
+                let audioHTML = '<span class="text-slate-500 text-[10px] italic' + (__rr ? ' cursor-help border-b border-dotted border-slate-600" data-tip="' + __rr + '"' : '"') + '>Sem gravação' + (__rr ? ' <i class="fa-solid fa-circle-info"></i>' : '') + '</span>';
                 if (c.uniqueid && (c.recordingfile === undefined || c.recordingfile)) {   // sem gravação registrada: nada de player morto
                     audioHTML = `
                         <audio preload="none" controls class="h-6 w-44 inline-block opacity-90">

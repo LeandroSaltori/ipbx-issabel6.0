@@ -6717,6 +6717,17 @@ function aiChatRun($history) {
 // =========================================================================
 // AUTOATENDIMENTO DO RAMAL: Não Perturbe e Desvios (AstDB - o mesmo que a GUI nativa do Issabel/FreePBX lê)
 // =========================================================================
+/** HTML de "Sem gravação" com o motivo na dica ao passar o mouse (data-tip; a dica flutuante fica no index.php). */
+function recNoneBadge($src, $dst, $cls = 'text-slate-500 italic text-[11px]', $text = 'Sem gravação') {
+    static $nums = null;
+    if ($nums === null) { $nums = []; try { foreach (array_keys(getExtensionsMap()) as $k) $nums[(string)$k] = true; } catch (Throwable $e) {} }
+    $why = '';
+    try { $why = explainNoRecording((string)$src, (string)$dst, $nums); } catch (Throwable $e) {}
+    $e = function ($t) { return htmlspecialchars((string)$t, ENT_QUOTES, 'UTF-8'); };
+    if ($why === '') return '<span class="' . $e($cls) . '">' . $e($text) . '</span>';
+    return '<span class="' . $e($cls) . ' cursor-help border-b border-dotted border-slate-600" data-tip="' . $e($why) . '">' . $e($text) . ' <i class="fa-solid fa-circle-info"></i></span>';
+}
+
 /** Lê o texto de 'database show AMPUSER' e devolve ext => ['in_ext','out_ext','in_int','out_int'] com enabled|disabled|dontcare (configuração "Gravação" do ramal na central). */
 function parseExtensionRecordingConfig($raw) {
     $out = [];

@@ -455,7 +455,7 @@ function exportToCSV() {
                                                  <span class="text-slate-500 italic text-[10px]" title="Sem permissão para ouvir gravações"><i class="fa-solid fa-lock"></i> Áudio Restrito</span>
                                              <?php endif; ?>
                                          <?php else: ?>
-                                             <span class="text-slate-600 italic text-[11px]">Sem Gravação</span>
+                                             <?php echo recNoneBadge($c['src'], $c['dst'], 'text-slate-500 italic text-[11px]', 'Sem Gravação'); ?>
                                          <?php endif; ?>
                                      </div>
                                  </td>

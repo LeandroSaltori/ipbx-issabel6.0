@@ -316,7 +316,7 @@ require_once dirname(__DIR__, 2) . '/includes/audio_player.php';
                                     <button type="button" onclick="ipbxOpenPlayer('<?php echo htmlspecialchars(rawurlencode($r['_uid']), ENT_QUOTES); ?>','<?php echo htmlspecialchars(addslashes($r['telefone']), ENT_QUOTES); ?>','<?php echo htmlspecialchars(addslashes($r['operador']), ENT_QUOTES); ?>')" title="Ouvir gravação" class="px-2.5 py-1 rounded-lg bg-brand-600 hover:bg-brand-500 text-white font-bold text-[11px]" style="white-space:nowrap !important;flex-shrink:0 !important;width:auto !important"><i class="fa-solid fa-play"></i> Ouvir</button>
                                     <a href="get_audio.php?uid=<?php echo urlencode($r['_uid']); ?>" download title="Baixar gravação" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-[11px] border border-slate-700" style="white-space:nowrap !important;flex-shrink:0 !important;width:auto !important"><i class="fa-solid fa-download"></i> Baixar</a>
                                 </div>
-                            <?php else: ?><span class="text-slate-600">-</span><?php endif; ?>
+                            <?php else: echo !empty($r['_uid']) && empty($r['_rec']) ? recNoneBadge($r['telefone'] ?? '', $r['operador'] ?? '', 'text-slate-500 italic text-[10px]') : '<span class="text-slate-600">-</span>'; endif; ?>
                         </td>
                     </tr>
                 <?php endforeach; ?>
