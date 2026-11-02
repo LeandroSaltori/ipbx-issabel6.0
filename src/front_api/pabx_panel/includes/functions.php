@@ -6075,6 +6075,7 @@ function aiChatExecTool($name, $a) {
                 $rows[] = ['data' => $r['calldate'], 'origem' => $r['src'] . (isset($ext2name[$r['src']]) ? ' (' . $ext2name[$r['src']] . ')' : ''),
                     'destino' => $r['dst'] . (isset($ext2name[$r['dst']]) ? ' (' . $ext2name[$r['dst']] . ')' : ''),
                     'status' => $r['disposition'], 'duracao_seg' => (int)$r['billsec'], 'uniqueid' => $r['uniqueid'], 'tem_gravacao' => (bool)$r['rec']];
+                if (!$r['rec']) { $__en = []; foreach ($ext2name as $__k => $__v) $__en[(string)$__k] = true; $rows[count($rows) - 1]['motivo_sem_gravacao'] = explainNoRecording((string)$r['src'], (string)$r['dst'], $__en); }
                 // Já entrega o link REAL da gravação (válido por 7 dias): o assistente só copia, nunca precisa inventar nem escrever "(url)"
                 if ($r['rec']) {
                     $__ri = count($rows) - 1;
@@ -6716,6 +6717,45 @@ function aiChatRun($history) {
 // =========================================================================
 // AUTOATENDIMENTO DO RAMAL: Não Perturbe e Desvios (AstDB - o mesmo que a GUI nativa do Issabel/FreePBX lê)
 // =========================================================================
+/** Lê o texto de 'database show AMPUSER' e devolve ext => ['in_ext','out_ext','in_int','out_int'] com enabled|disabled|dontcare (configuração "Gravação" do ramal na central). */
+function parseExtensionRecordingConfig($raw) {
+    $out = [];
+    $map = ['in/external' => 'in_ext', 'out/external' => 'out_ext', 'in/internal' => 'in_int', 'out/internal' => 'out_int'];
+    foreach (preg_split('/\r?\n/', (string)$raw) as $ln) {
+        if (preg_match('#^/AMPUSER/(\d+)/recording/(in|out)/(external|internal)\s*:\s*(\S*)#', trim($ln), $m)) {
+            $e = $m[1];
+            if (!isset($out[$e])) $out[$e] = ['in_ext' => 'dontcare', 'out_ext' => 'dontcare', 'in_int' => 'dontcare', 'out_int' => 'dontcare'];
+            $v = strtolower($m[4]); if (!in_array($v, ['enabled', 'disabled', 'dontcare'], true)) $v = 'dontcare';
+            $out[$e][$map[$m[2] . '/' . $m[3]]] = $v;
+        }
+    }
+    return $out;
+}
+function getExtensionRecordingConfig() {
+    static $c = null;
+    if ($c === null) { try { $c = parseExtensionRecordingConfig(asteriskCliOutput('database show AMPUSER')); } catch (Throwable $e) { $c = []; } }
+    return $c;
+}
+/** Explica, em português, por que uma chamada pode estar sem gravação, olhando a configuração de gravação do(s) ramal(is) envolvido(s). */
+function explainNoRecording($src, $dst, array $extNums) {
+    $cfg = getExtensionRecordingConfig();
+    if (!$cfg) return '';
+    $srcIsExt = isset($extNums[$src]); $dstIsExt = isset($extNums[$dst]);
+    $label = ['enabled' => 'ligada', 'disabled' => 'desligada', 'dontcare' => 'sem preferência'];
+    $parts = [];
+    if ($dstIsExt && !$srcIsExt) { $k = 'in_ext'; $who = $dst; $tipo = 'chamadas externas recebidas'; }
+    elseif ($srcIsExt && !$dstIsExt) { $k = 'out_ext'; $who = $src; $tipo = 'chamadas externas feitas'; }
+    elseif ($srcIsExt && $dstIsExt)  { $k = 'out_int'; $who = $src; $tipo = 'chamadas internas feitas'; $k2 = 'in_int'; $who2 = $dst; $tipo2 = 'chamadas internas recebidas'; }
+    else return 'Chamada sem ramal envolvido (fila, grupo ou URA): a gravação depende da rota de entrada ou da fila.';
+    $v = $cfg[$who][$k] ?? 'dontcare';
+    $parts[] = "Ramal $who: gravação de $tipo está " . $label[$v];
+    if (isset($k2)) { $v2 = $cfg[$who2][$k2] ?? 'dontcare'; $parts[] = "Ramal $who2: gravação de $tipo2 está " . $label[$v2]; }
+    $txt = implode('; ', $parts) . '.';
+    if ($v === 'dontcare') $txt .= ' "Sem preferência" só grava se a rota de entrada, a fila ou a configuração geral mandarem.';
+    if ($v === 'enabled') $txt .= ' Mesmo assim esta chamada não gerou gravação (pode não ter sido atendida ou houve falha ao gravar).';
+    return $txt;
+}
+
 /** Retorna ext => ['dnd'=>bool,'cf'=>'','cfb'=>'','cfu'=>''] lendo 'database show' do Asterisk. */
 function getExtensionFeatureStates() {
     $out = [];

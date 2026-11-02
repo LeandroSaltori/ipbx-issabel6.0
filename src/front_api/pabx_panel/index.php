@@ -440,6 +440,11 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
             $c['dst_name'] = function_exists('lookupContactName') ? lookupContactName($c['dst'], $contacts_map) : '';
             $c['calldate_fmt'] = date('d/m/Y H:i:s', strtotime($c['calldate']));
             $c['billsec_fmt']  = gmdate('i:s', intval($c['billsec']));
+            if (empty($c['recordingfile'])) {   // explica por que não gravou (configuração de gravação do ramal)
+                static $__extNums = null;
+                if ($__extNums === null) { $__extNums = []; foreach (function_exists('getExtensionsMap') ? array_keys(getExtensionsMap()) : [] as $__k) $__extNums[(string)$__k] = true; }
+                $c['rec_reason'] = function_exists('explainNoRecording') ? explainNoRecording((string)$c['src'], (string)$c['dst'], $__extNums) : '';
+            }
             $c['tme_sec']      = max(0, intval($c['duration']) - intval($c['billsec']));
             $c['tme_fmt']      = gmdate('i:s', $c['tme_sec']);
         }

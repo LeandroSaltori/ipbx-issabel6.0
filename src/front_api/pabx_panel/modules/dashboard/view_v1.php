@@ -1461,7 +1461,8 @@ async function openKpiDetailModal(kpiType) {
                 const srcDisplay = c.src_name ? `<span class="font-extrabold text-white"><i class="fa-solid fa-user text-emerald-400 text-[10px] mr-1"></i>${c.src_name}</span><div class="text-[10px] text-slate-400 font-mono">${c.src}</div>` : `<span class="font-bold text-white font-mono">${c.src}</span>`;
                 const dstDisplay = c.dst_name ? `<span class="font-extrabold text-indigo-300"><i class="fa-solid fa-user text-indigo-400 text-[10px] mr-1"></i>${c.dst_name}</span><div class="text-[10px] text-slate-400 font-mono">${c.dst}</div>` : `<span class="font-bold text-indigo-300 font-mono">${c.dst}</span>`;
 
-                let audioHTML = '<span class="text-slate-500 text-[10px] italic">Sem gravação</span>';
+                const __rr = String(c.rec_reason || '').replace(/[&<>"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
+                let audioHTML = '<span class="text-slate-500 text-[10px] italic" title="' + __rr + '">Sem gravação</span>' + (__rr ? '<div class="text-[9px] text-slate-500 max-w-[230px] mx-auto leading-tight mt-0.5">' + __rr + '</div>' : '');
                 if (c.uniqueid && c.recordingfile) {   // só mostra o player quando a chamada foi gravada (internas e não gravadas ficam sem player)
                     audioHTML = `
                         <audio preload="none" controls class="h-6 w-44 inline-block opacity-90">
