@@ -5402,6 +5402,75 @@ function aiChatCompletion($system, $user, $timeout = 25, $cfg = null) {
     return ['ok' => false, 'text' => '', 'error' => $j['error']['message'] ?? ('HTTP ' . $r['http']), 'http' => $r['http']];
 }
 
+
+/**
+ * Analisa a transcrição de UMA ligação e devolve o que foi realmente conversado (motivo, conversa, solução, pendências...).
+ * Chamadas longas (10-20 min) passam por um resumo por partes antes da análise final, para nada ficar de fora.
+ * @return array ['ok'=>bool,'j'=>array,'raw'=>string,'error'=>string]
+ */
+function aiAnalyzeCallTranscript($transcript, $cfg, array $meta = []) {
+    $cfg['tokens'] = max((int)($cfg['tokens'] ?? 0), 1600);
+    $transcript = trim((string)$transcript);
+    $ctx = [];
+    if (!empty($meta['duracao'])) $ctx[] = 'Duração falada: ' . $meta['duracao'];
+    if (!empty($meta['atendente'])) $ctx[] = 'Atendente (ramal): ' . $meta['atendente'];
+    if (!empty($meta['cliente'])) $ctx[] = 'Número do cliente: ' . $meta['cliente'];
+    $ctxTxt = $ctx ? implode(' | ', $ctx) . "\n\n" : '';
+
+    $body = $transcript;
+    if (mb_strlen($transcript) > 14000) {
+        // chamada longa: extrai os fatos de cada parte e analisa o conjunto
+        $parts = []; $cur = '';
+        foreach (preg_split('/(?<=[.!?])\s+/u', $transcript) as $sn) {
+            if (mb_strlen($cur) + mb_strlen($sn) > 9000 && $cur !== '') { $parts[] = $cur; $cur = ''; }
+            $cur .= ($cur === '' ? '' : ' ') . $sn;
+        }
+        if ($cur !== '') $parts[] = $cur;
+        $notes = []; $n = count($parts);
+        foreach ($parts as $i => $pt) {
+            $r = aiChatCompletion('Você recebe a PARTE ' . ($i + 1) . ' de ' . $n . ' da transcrição automática de uma ligação telefônica de atendimento (sem identificação de quem fala). Liste, em tópicos curtos, apenas os FATOS CONCRETOS desta parte: o que o cliente pediu ou relatou (com valores, nomes, datas, equipamentos, sintomas e números citados), o que o atendente respondeu, orientou ou combinou e o que ficou pendente. Não invente nada e não generalize; ignore trechos inaudíveis ou repetições sem sentido.', $pt, 60, $cfg);
+            if (!$r['ok']) return ['ok' => false, 'j' => [], 'raw' => '', 'error' => $r['error']];
+            $notes[] = 'PARTE ' . ($i + 1) . '/' . $n . ":\n" . $r['text'];
+        }
+        $body = "(Ligação longa: abaixo estão as anotações de cada parte, em ordem.)\n\n" . implode("\n\n", $notes);
+    }
+
+    $sys = 'Você é analista de qualidade de uma central de atendimento telefônico. Recebe a TRANSCRIÇÃO AUTOMÁTICA de UMA ligação (sem identificação de quem fala: deduza pelo contexto quem é o cliente e quem é o atendente) e deve relatar o que REALMENTE foi conversado.' . "\n"
+        . 'REGRAS:' . "\n"
+        . '- Cite fatos concretos: o que o cliente pediu ou relatou (equipamentos, valores, datas, nomes, sintomas, números citados), o que o atendente respondeu, fez ou orientou e como a ligação terminou. Quem lê o resumo deve entender a ligação sem precisar ouvi-la.' . "\n"
+        . '- Proibido texto genérico como "o cliente entrou em contato para atendimento" ou "o atendente ajudou". Se algo não foi dito, não afirme.' . "\n"
+        . '- Nem toda ligação é problema e solução: pode ser dúvida, venda, cobrança, recado, ligação errada, URA ou música de espera. Descreva o que de fato houve.' . "\n"
+        . '- A transcrição pode ter erros de reconhecimento e trechos [trecho inaudível]. Não preencha lacunas com suposições. Se houver pouca fala inteligível, diga isso com clareza (ex.: "áudio com pouca fala compreensível") e só relate o que dá para confirmar.' . "\n"
+        . '- Se for só URA, música de espera, sinal ou silêncio, diga exatamente isso.' . "\n"
+        . 'Responda APENAS um JSON, sem texto fora dele, neste formato:' . "\n"
+        . '{"motivo":"por que o cliente ligou, 1 a 2 frases concretas",'
+        . '"conversa":"o que foi conversado, em ordem, de 3 a 8 frases com os detalhes citados",'
+        . '"solucao":"o que o atendente respondeu, resolveu ou orientou; se nada foi resolvido, escreva isso",'
+        . '"resultado":"Resolvido | Parcialmente resolvido | Não resolvido | Sem solicitação a resolver",'
+        . '"pendencias":"o que ficou combinado ou pendente (retornos, prazos, envios) ou string vazia",'
+        . '"sentimento":"Positivo | Neutro | Negativo (do cliente)",'
+        . '"satisfacao":número de 1 a 5 ou null se a conversa não permitir inferir,'
+        . '"recomendacao":"ação prática e específica a partir do que foi dito (ex.: retornar até tal prazo, enviar tal documento) ou string vazia se não houver nada a fazer"}';
+    $r = aiChatCompletion($sys, $ctxTxt . "TRANSCRIÇÃO:\n" . mb_substr($body, 0, 14000), 90, $cfg);
+    if (!$r['ok']) return ['ok' => false, 'j' => [], 'raw' => '', 'error' => $r['error']];
+    $raw = trim(preg_replace('#<think>.*?</think>#is', '', (string)$r['text']));
+    $txt = preg_replace('/^```(?:json)?\s*|\s*```$/i', '', $raw);
+    $j = json_decode($txt, true);
+    if (!is_array($j) && preg_match('/\{.*\}/s', $txt, $mm)) $j = json_decode($mm[0], true);
+    if (!is_array($j)) return ['ok' => true, 'j' => [], 'raw' => $raw, 'error' => ''];
+    foreach ($j as $k => $v) if (is_array($v)) $j[$k] = implode(' ', array_map('strval', $v));
+    if (!isset($j['satisfacao']) && isset($j['satisfação'])) $j['satisfacao'] = $j['satisfação'];
+    // resumo final legível, em linhas rotuladas (só o que existe)
+    $lin = [];
+    $add = function ($lbl, $v) use (&$lin) { $v = trim((string)$v); if ($v !== '') $lin[] = $lbl . ': ' . $v; };
+    $add('Motivo do contato', $j['motivo'] ?? ''); $add('O que foi conversado', $j['conversa'] ?? '');
+    $sol = trim((string)($j['solucao'] ?? '')); $res = trim((string)($j['resultado'] ?? ''));
+    $add('Solução / desfecho', $sol . ($res !== '' ? ($sol !== '' ? ' ' : '') . '(' . $res . ')' : ''));
+    $add('Pendências', $j['pendencias'] ?? '');
+    $j['resumo'] = $lin ? implode("\n", $lin) : trim((string)($j['resumo'] ?? ''));
+    return ['ok' => true, 'j' => $j, 'raw' => $raw, 'error' => ''];
+}
+
 /** Extrai a lista "insights" de uma resposta do LLM (aceita cercas ```json e texto em volta). */
 function aiParseInsights($txt) {
     $txt = trim((string)$txt);

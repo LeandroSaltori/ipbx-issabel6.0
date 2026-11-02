@@ -661,11 +661,11 @@ async function openAuditOrAnalyze(data, btn) {
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
                 <div class="bg-slate-950/90 border border-slate-800 p-3 rounded-2xl space-y-1">
                     <span class="text-slate-400 font-bold block text-[10px] uppercase tracking-wider">📝 Resumo da chamada</span>
-                    <p id="audit-modal-problem" class="text-slate-200 font-semibold italic">--</p>
+                    <p id="audit-modal-problem" class="text-slate-200 font-semibold italic whitespace-pre-line">--</p>
                 </div>
                 <div class="bg-slate-950/90 border border-slate-800 p-3 rounded-2xl space-y-1">
                     <span class="text-slate-400 font-bold block text-[10px] uppercase tracking-wider">💡 Recomendação</span>
-                    <p id="audit-modal-action" class="text-slate-200 font-semibold italic">--</p>
+                    <p id="audit-modal-action" class="text-slate-200 font-semibold italic whitespace-pre-line">--</p>
                 </div>
                 <div class="bg-slate-950/90 border border-slate-800 p-3 rounded-2xl space-y-1">
                     <span class="text-slate-400 font-bold block text-[10px] uppercase tracking-wider">📊 Sentimento / Satisfação</span>

@@ -688,7 +688,7 @@ if (file_exists($jsonSmtpFile)) {
                 <div class="space-y-3">
                     <div class="p-3 bg-slate-950 rounded-xl border border-purple-500/30 space-y-1">
                         <span class="text-[10px] font-bold text-purple-400 uppercase tracking-wider block">Resumo do atendimento</span>
-                        <p class="text-white font-medium">${aiEsc(d.resumo)}</p>
+                        <p class="text-white font-medium whitespace-pre-line">${aiEsc(d.resumo)}</p>
                     </div>
                     <div class="grid grid-cols-2 gap-2 text-[11px]">
                         <div class="p-2.5 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-300"><strong>Sentimento:</strong> ${aiEsc(d.sentimento || '-')}</div>

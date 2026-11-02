@@ -962,22 +962,10 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
         if (!$tr['ok']) { echo json_encode(['success' => false, 'error' => 'Transcrição: ' . $tr['error']]); exit; }
         if ($tr['text'] === '') { echo json_encode(['success' => false, 'error' => 'A transcrição voltou vazia (áudio sem fala?).']); exit; }
 
-        $r = aiChatCompletion(
-            'Você analisa ligações telefônicas de atendimento. Responda APENAS um JSON no formato {"resumo":"até 4 linhas","sentimento":"Positivo|Neutro|Negativo","satisfacao":número de 1 a 5 ou null se a conversa não permitir inferir,"recomendacao":"próximo passo objetivo"}. Use somente o que consta na transcrição; não invente fatos.',
-            mb_substr($tr['text'], 0, 12000), 40, $cfg
-        );
-        if (!$r['ok']) { echo json_encode(['success' => false, 'error' => 'Análise: ' . $r['error'], 'transcript' => $tr['text']]); exit; }
-        $raw = trim(preg_replace('#<think>.*?</think>#is', '', (string)$r['text']));   // modelos de raciocínio
-        $txt = preg_replace('/^```(?:json)?\s*|\s*```$/i', '', $raw);
-        $j = json_decode($txt, true);
-        if (!is_array($j) && preg_match('/\{.*\}/s', $txt, $mm)) $j = json_decode($mm[0], true);
-        if (is_array($j)) {   // chaves alternativas / valores em lista
-            foreach (['resumo' => ['resumo', 'summary', 'resumo_chamada'], 'sentimento' => ['sentimento', 'sentiment'], 'recomendacao' => ['recomendacao', 'recomendação', 'recommendation', 'proximo_passo']] as $dst => $alts) {
-                foreach ($alts as $a) if (isset($j[$a])) { $j[$dst] = $j[$a]; break; }
-            }
-            foreach (['resumo', 'sentimento', 'recomendacao'] as $f) if (isset($j[$f]) && is_array($j[$f])) $j[$f] = implode(' ', array_map('strval', $j[$f]));
-            if (!isset($j['satisfacao']) && isset($j['satisfação'])) $j['satisfacao'] = $j['satisfação'];
-        }
+        $__dur = gmdate('H:i:s', max(0, (int)($row['billsec'] ?? 0)));
+        $an = aiAnalyzeCallTranscript($tr['text'], $cfg, ['duracao' => $__dur, 'atendente' => (string)($row['dst'] ?? ''), 'cliente' => (string)($row['src'] ?? '')]);
+        if (!$an['ok']) { echo json_encode(['success' => false, 'error' => 'Análise: ' . $an['error'], 'transcript' => $tr['text']]); exit; }
+        $raw = $an['raw']; $j = $an['j'] ?: null;
         if (is_array($j) && trim((string)($j['resumo'] ?? '')) === '') {
             // A IA entendeu o pedido mas não achou conteúdo para resumir (áudio curto, ruído, só toque)
             echo json_encode(['success' => false, 'error' => 'A IA não encontrou conteúdo suficiente para resumir. A transcrição tem ' . mb_strlen($tr['text']) . ' caracteres (chamada muito curta, só ruído ou sem conversa).', 'transcript' => $tr['text']]);
