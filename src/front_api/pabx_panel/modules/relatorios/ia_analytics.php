@@ -696,7 +696,7 @@ async function openAuditOrAnalyze(data, btn) {
                 <source src="" type="audio/wav">
             </audio>
             <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
-                <button type="button" onclick="downloadIaReportPdf()" class="px-3.5 py-2 bg-rose-600/20 hover:bg-rose-600/40 text-rose-300 border border-rose-500/30 rounded-xl text-xs font-bold transition flex items-center gap-1.5">
+                <button type="button" id="audit-pdf-btn" onclick="downloadIaAuditPdf()" class="px-3.5 py-2 bg-rose-600/20 hover:bg-rose-600/40 text-rose-300 border border-rose-500/30 rounded-xl text-xs font-bold transition flex items-center gap-1.5">
                     <i class="fa-solid fa-file-pdf"></i> Baixar PDF
                 </button>
                 <button type="button" onclick="closeModal('modal-full-ia-audit')" class="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white font-extrabold rounded-xl transition text-xs shadow-lg shadow-purple-600/30">
@@ -709,7 +709,22 @@ async function openAuditOrAnalyze(data, btn) {
 </div>
 
 <script>
+
+async function downloadIaAuditPdf() {
+    var uid = window.__auditUid; if (!uid) return;
+    if (typeof showIaToast === 'function') showIaToast('Gerando PDF da auditoria...', true);
+    try {
+        var r = await fetch('index.php?api_action=ia_audit_export&uid=' + encodeURIComponent(uid), {credentials: 'same-origin'});
+        if (!r.ok) { var t = await r.text(); if (typeof showIaToast === 'function') showIaToast(t || 'Não foi possível gerar o PDF.', false); return; }
+        var b = await r.blob(); var a = document.createElement('a');
+        a.href = URL.createObjectURL(b); a.download = 'Auditoria_IA_' + String(uid).replace(/[^0-9A-Za-z_.-]/g, '_') + '.pdf';
+        document.body.appendChild(a); a.click(); a.remove(); setTimeout(function(){ URL.revokeObjectURL(a.href); }, 4000);
+        if (typeof showIaToast === 'function') showIaToast('PDF da auditoria baixado!');
+    } catch (e) { if (typeof showIaToast === 'function') showIaToast('Erro ao baixar o PDF: ' + e.message, false); }
+}
 function openFullIaAuditModal(data) {
+    window.__auditUid = data.id || '';
+    var pb = document.getElementById('audit-pdf-btn'); if (pb) pb.style.display = data.analyzed ? '' : 'none';
     document.getElementById('audit-modal-title').innerText = 'Auditoria: ' + (data.client_name || 'Atendimento');
     document.getElementById('audit-modal-subtitle').innerText = (data.operator || '') + ' | Duração: ' + (data.duration || '') + ' | Score QA: ' + (data.qa_score == null ? '—' : data.qa_score + '/100');
 

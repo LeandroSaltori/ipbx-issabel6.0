@@ -1907,6 +1907,115 @@ function shareBuildPdf($title, $summary, $rows) {
 }
 
 /**
+ * PDF em formato DOCUMENTO (texto com quebra de linha, várias páginas, A4 retrato): para laudos/auditorias com texto longo
+ * (diferente de shareBuildPdf, que é só tabela e corta o texto da célula). Nada é cortado: cada parágrafo é quebrado em linhas.
+ * $meta = [[rótulo, valor], ...] (quadro de dados); $sections = [['h' => título, 'p' => texto ou [parágrafos], 'items' => [marcadores]], ...]
+ */
+function shareBuildDocPdf($title, $subtitle, array $meta, array $sections, $footer = '') {
+    $WH = [278,278,355,556,556,889,667,191,333,333,389,584,278,333,278,278,556,556,556,556,556,556,556,556,556,556,278,278,584,584,584,556,1015,667,667,722,722,667,611,778,722,278,500,667,556,833,722,778,667,778,722,667,611,722,667,944,667,667,611,278,278,278,469,556,333,556,556,500,556,556,278,556,556,222,222,500,222,833,556,556,556,556,333,500,278,556,500,722,500,500,500,334,260,334,584,761,556,556,222,556,333,1000,556,556,333,1000,667,333,1000,556,611,556,556,222,222,333,333,350,556,1000,333,1000,500,333,944,556,500,667,278,333,556,556,556,556,260,556,333,737,370,556,584,333,737,333,400,584,333,333,333,556,537,278,333,333,365,556,834,834,834,611,667,667,667,667,667,667,1000,722,667,667,667,667,278,278,278,278,722,722,778,778,778,778,778,584,778,722,722,722,722,667,667,611,556,556,556,556,556,556,889,500,556,556,556,556,278,278,278,278,556,556,556,556,556,556,556,584,611,556,556,556,556,500,556,500];
+    $WB = [278,333,474,556,556,889,722,238,333,333,389,584,278,333,278,278,556,556,556,556,556,556,556,556,556,556,333,333,584,584,584,611,975,722,722,722,722,667,611,778,722,278,556,722,611,833,722,778,667,778,722,667,611,722,667,944,667,667,611,333,278,333,584,556,333,556,611,556,611,556,333,611,611,278,278,556,278,889,611,611,611,611,389,556,333,611,556,778,556,556,500,389,280,389,584,761,556,611,278,556,500,1000,556,556,333,1000,667,333,1000,611,611,611,611,278,278,500,500,350,556,1000,333,1000,556,333,944,611,500,667,278,333,556,556,556,556,280,556,333,737,370,556,584,333,737,333,400,584,333,333,333,611,556,278,333,333,365,556,834,834,834,611,722,722,722,722,722,722,1000,722,667,667,667,667,278,278,278,278,722,722,778,778,778,778,778,584,778,722,722,722,722,667,667,611,556,556,556,556,556,556,889,556,556,556,556,556,278,278,278,278,611,611,611,611,611,611,611,584,611,611,611,611,611,556,611,556];
+    $enc = function ($t) {
+        $t = str_replace(["\u{2013}", "\u{2014}", "\u{2026}", "\u{2022}", "\u{2192}", "\u{2713}", "\u{2714}", "\u{2717}"], ['-', '-', '...', '-', '->', 'OK', 'OK', 'X'], (string)$t);
+        $t = preg_replace('/[\x{1F000}-\x{1FFFF}\x{2600}-\x{27BF}\x{FE0F}\x{200D}]/u', '', $t);
+        $c = @iconv('UTF-8', 'Windows-1252//TRANSLIT//IGNORE', $t);
+        if ($c === false) $c = preg_replace('/[^\x20-\x7E]/', '?', $t);
+        return str_replace(['\\', '(', ')', "\r", "\n", "\t"], ['\\\\', '\\(', '\\)', ' ', ' ', ' '], $c);
+    };
+    // largura de uma string (em pt) usando as larguras reais da Helvetica
+    $width = function ($t, $size, $bold) use ($enc, $WH, $WB) {
+        $c = @iconv('UTF-8', 'Windows-1252//TRANSLIT//IGNORE', (string)$t); if ($c === false) $c = (string)$t;
+        $tab = $bold ? $WB : $WH; $w = 0;
+        for ($i = 0, $n = strlen($c); $i < $n; $i++) { $o = ord($c[$i]) - 32; $w += ($tab[$o] ?? 556); }
+        return $w * $size / 1000;
+    };
+    $wrap = function ($text, $maxW, $size, $bold) use ($width) {
+        $lines = [];
+        foreach (preg_split('/\r\n|\n|\r/', (string)$text) as $para) {
+            $para = trim(preg_replace('/[ \t]+/u', ' ', $para));
+            if ($para === '') { $lines[] = ''; continue; }
+            $cur = '';
+            foreach (explode(' ', $para) as $w) {
+                while ($width($w, $size, $bold) > $maxW) {   // palavra maior que a linha: quebra por caracteres
+                    $k = mb_strlen($w); while ($k > 1 && $width(mb_substr($w, 0, $k), $size, $bold) > $maxW) $k--;
+                    if ($cur !== '') { $lines[] = $cur; $cur = ''; }
+                    $lines[] = mb_substr($w, 0, $k); $w = mb_substr($w, $k);
+                }
+                $try = $cur === '' ? $w : $cur . ' ' . $w;
+                if ($width($try, $size, $bold) <= $maxW) $cur = $try; else { $lines[] = $cur; $cur = $w; }
+            }
+            if ($cur !== '') $lines[] = $cur;
+        }
+        return $lines;
+    };
+    $W = 595; $H = 842; $M = 42; $avail = $W - 2 * $M;
+    $pages = []; $cur = ''; $y = $H - $M;
+    $newPage = function () use (&$cur, &$y, &$pages, $H, $M) { if ($cur !== '') $pages[] = $cur; $cur = ''; $y = $H - $M; };
+    $text = function ($x, $yy, $t, $bold = false, $size = 10, $rgb = '0.12 0.16 0.23') use (&$cur, $enc) {
+        $cur .= $rgb . ' rg BT /' . ($bold ? 'F2' : 'F1') . ' ' . $size . ' Tf ' . round($x, 2) . ' ' . round($yy, 2) . ' Td (' . $enc($t) . ") Tj ET\n";
+    };
+    $need = function ($h) use (&$y, $M, $newPage) { if ($y - $h < $M + 18) $newPage(); };
+    // faixa de título
+    $cur .= "0.486 0.227 0.929 rg 0 " . ($H - 70) . " " . $W . " 70 re f\n";
+    $text($M, $H - 36, $title, true, 17, '1 1 1'); $text($M, $H - 55, $subtitle, false, 9.5, '0.93 0.91 1');
+    $y = $H - 70 - 24;
+    // quadro de dados
+    if ($meta) {
+        $rowsN = (int)ceil(count($meta) / 2); $boxH = $rowsN * 16 + 14;
+        $cur .= "0.945 0.953 0.973 rg " . $M . ' ' . ($y - $boxH + 10) . ' ' . $avail . ' ' . $boxH . " re f\n";
+        $colW = $avail / 2; $yy = $y - 4;
+        foreach (array_chunk($meta, 2) as $pair) {
+            foreach ($pair as $ci => $kv) {
+                $x = $M + 8 + $ci * $colW; $lab = $kv[0] . ': ';
+                $text($x, $yy, $lab, true, 9, '0.35 0.4 0.5');
+                $val = $wrap($kv[1] === '' || $kv[1] === null ? '-' : $kv[1], $colW - 16 - $width($lab, 9, true), 9, false);
+                $text($x + $width($lab, 9, true), $yy, $val[0] ?? '-', false, 9);
+            }
+            $yy -= 16;
+        }
+        $y -= $boxH + 6;
+    }
+    foreach ($sections as $sec) {
+        $need(40);
+        $y -= 6; $text($M, $y, $sec['h'] ?? '', true, 12, '0.486 0.227 0.929');
+        $cur .= "0.486 0.227 0.929 RG 0.8 w " . $M . ' ' . ($y - 4) . ' ' . ($M + $avail) . ' ' . ($y - 4) . " m " . ($M + $avail) . ' ' . ($y - 4) . " l S\n";
+        $y -= 18;
+        $paras = isset($sec['p']) ? (is_array($sec['p']) ? $sec['p'] : [$sec['p']]) : [];
+        foreach ($paras as $pt) {
+            foreach ($wrap($pt, $avail, 10, false) as $ln) { $need(14); if ($ln !== '') $text($M, $y, $ln, false, 10); $y -= 13.5; }
+            $y -= 4;
+        }
+        foreach (($sec['items'] ?? []) as $it) {
+            $lines = $wrap($it, $avail - 14, 10, false);
+            foreach ($lines as $li => $ln) { $need(14); if ($li === 0) $text($M + 2, $y, '-', true, 10); $text($M + 14, $y, $ln, false, 10); $y -= 13.5; }
+            $y -= 2;
+        }
+        $y -= 6;
+    }
+    if ($cur !== '') $pages[] = $cur;
+    $n = count($pages);
+    foreach ($pages as $i => &$pg) {
+        $pg .= "0.5 0.55 0.62 rg BT /F1 8 Tf " . $M . " 22 Td (" . $enc($footer !== '' ? $footer : 'IPbx Prisma') . ") Tj ET\n";
+        $pg .= "BT /F1 8 Tf " . ($W - $M - 50) . " 22 Td (" . $enc('Página ' . ($i + 1) . ' de ' . $n) . ") Tj ET\n";
+    } unset($pg);
+    $objs = [1 => '<< /Type /Catalog /Pages 2 0 R >>', 3 => '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>', 4 => '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>'];
+    $kids = []; $id = 5;
+    foreach ($pages as $pg) {
+        $objs[$id] = '<< /Length ' . strlen($pg) . " >>\nstream\n" . $pg . "endstream";
+        $objs[$id + 1] = '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ' . $W . ' ' . $H . '] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents ' . $id . ' 0 R >>';
+        $kids[] = ($id + 1) . ' 0 R'; $id += 2;
+    }
+    $objs[2] = '<< /Type /Pages /Kids [' . implode(' ', $kids) . '] /Count ' . count($kids) . ' >>';
+    ksort($objs);
+    $out = "%PDF-1.4\n"; $off = [];
+    foreach ($objs as $num => $body) { $off[$num] = strlen($out); $out .= $num . " 0 obj\n" . $body . "\nendobj\n"; }
+    $xref = strlen($out);
+    $out .= "xref\n0 " . (count($objs) + 1) . "\n0000000000 65535 f \n";
+    foreach ($off as $o) $out .= sprintf("%010d 00000 n \n", $o);
+    $out .= "trailer\n<< /Size " . (count($objs) + 1) . " /Root 1 0 R >>\nstartxref\n" . $xref . "\n%%EOF";
+    return $out;
+}
+
+/**
  * Monta os anexos pedidos pelo modal de compartilhamento: CSV do relatório e/ou a gravação (uid).
  * Retorna [anexos[], avisos[]] onde anexo = ['name','type','content'].
  */
@@ -5436,28 +5545,101 @@ function aiTranscribeFile($path, $cfg = null) {
     $sendExt  = pathinfo($sendPath, PATHINFO_EXTENSION);
     $sendName = preg_replace('/[^A-Za-z0-9_-]/', '_', pathinfo($path, PATHINFO_FILENAME)) . '.' . strtolower($sendExt);
     $mime = (strtolower($sendExt) === 'mp3') ? 'audio/mpeg' : 'audio/wav';
-    $path = $sendPath;
+    @set_time_limit(600);
+
+    // Áudio longo vai em trechos de 2 min: se o Whisper "alucinar" (repetir "027... 027...") num trecho de bipe/espera,
+    // só aquele trecho se perde e o resto da conversa continua sendo transcrito.
+    $chunks = []; $chunkDir = '';
+    $dur = 0.0;
+    $pr = trim((string)@shell_exec('ffprobe -v error -show_entries format=duration -of csv=p=0 ' . escapeshellarg($sendPath) . ' 2>/dev/null'));
+    if (is_numeric($pr)) $dur = (float)$pr;
+    if ($dur > 150 && trim((string)@shell_exec('command -v ffmpeg')) !== '') {
+        $chunkDir = sys_get_temp_dir() . '/ai_chunks_' . bin2hex(random_bytes(6));
+        if (@mkdir($chunkDir, 0700)) {
+            @shell_exec('ffmpeg -nostdin -y -loglevel error -i ' . escapeshellarg($sendPath) . ' -ar 16000 -ac 1 -c:a pcm_s16le -f segment -segment_time 120 ' . escapeshellarg($chunkDir . '/p%03d.wav') . ' 2>&1');
+            $chunks = glob($chunkDir . '/p*.wav') ?: [];
+            sort($chunks);
+        }
+    }
+    if (!$chunks) $chunks = [$sendPath];
+
+    $parts = []; $lastErr = ''; $okAny = false; $dropped = 0;
+    foreach ($chunks as $i => $cp) {
+        $r = aiWhisperRequest($cp, $mime, $i === 0 && count($chunks) === 1 ? $sendName : ('trecho_' . $i . '.wav'), $cfg);
+        if (!$r['ok']) { $lastErr = $r['error']; if (count($chunks) === 1) break; continue; }
+        $okAny = true; $dropped += $r['dropped'];
+        $ct = aiCleanTranscript($r['text']); if ($ct !== '') $parts[] = $ct;
+    }
+    if ($tmp !== '' && is_file($tmp)) @unlink($tmp);
+    if ($chunkDir !== '') { foreach (glob($chunkDir . '/*') ?: [] as $f) @unlink($f); @rmdir($chunkDir); }
+    if (!$okAny) return ['ok' => false, 'text' => '', 'error' => $lastErr ?: 'Falha na transcrição'];
+    $text = trim(implode("\n\n", $parts));
+    return ['ok' => true, 'text' => $text, 'error' => '', 'chunks' => count($chunks), 'dropped' => $dropped];
+}
+
+/** Uma chamada ao Whisper (OpenAI/Groq) em verbose_json: descarta segmentos "alucinados" (loop de repetição / sem fala). */
+function aiWhisperRequest($file, $mime, $name, $cfg) {
     $ch = curl_init($cfg['base_url'] . '/audio/transcriptions');
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_POST           => true,
-        CURLOPT_POSTFIELDS     => ['file' => new CURLFile($path, $mime, $sendName), 'model' => $cfg['audio'],
+        CURLOPT_POSTFIELDS     => ['file' => new CURLFile($file, $mime, $name), 'model' => $cfg['audio'],
             // Idioma fixo (padrão pt = português): sem isso o Whisper detecta errado em áudio de telefone e mistura inglês.
             'language' => preg_match('/^[a-z]{2,3}$/', (string)getSetting('ai_audio_language')) ? getSetting('ai_audio_language') : 'pt',
-            'prompt' => 'Ligação telefônica de atendimento ao cliente em português do Brasil.', 'temperature' => '0'],
+            'prompt' => 'Ligação telefônica de atendimento ao cliente em português do Brasil.', 'temperature' => '0', 'response_format' => 'verbose_json'],
         CURLOPT_HTTPHEADER     => ['Authorization: Bearer ' . $cfg['key']],
-        CURLOPT_TIMEOUT        => 90,
+        CURLOPT_TIMEOUT        => 120,
         CURLOPT_SSL_VERIFYPEER => (getSetting('ai_ssl_insecure') !== '1'),
     ]);
     $resp = curl_exec($ch);
     $http = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
     $err  = curl_error($ch);
     curl_close($ch);
-    if ($tmp !== '' && is_file($tmp)) @unlink($tmp);
-    if ($err !== '') return ['ok' => false, 'text' => '', 'error' => 'Erro cURL: ' . $err];
+    if ($err !== '') return ['ok' => false, 'text' => '', 'error' => 'Erro cURL: ' . $err, 'dropped' => 0];
     $j = json_decode((string)$resp, true);
-    if ($http === 200 && isset($j['text'])) return ['ok' => true, 'text' => trim($j['text']), 'error' => ''];
-    return ['ok' => false, 'text' => '', 'error' => $j['error']['message'] ?? "HTTP $http"];
+    if ($http === 200 && isset($j['text'])) {
+        $dropped = 0;
+        if (!empty($j['segments']) && is_array($j['segments'])) {
+            $keep = [];
+            foreach ($j['segments'] as $sg) {
+                $cr = (float)($sg['compression_ratio'] ?? 0); $ns = (float)($sg['no_speech_prob'] ?? 0); $lp = (float)($sg['avg_logprob'] ?? 0);
+                if ($cr > 2.6 || ($ns > 0.85 && $lp < -0.8)) { $dropped++; $keep[] = '[trecho inaudível]'; continue; }
+                $keep[] = trim((string)($sg['text'] ?? ''));
+            }
+            $txt = trim(preg_replace('/\s+/u', ' ', implode(' ', $keep)));
+            return ['ok' => true, 'text' => $txt, 'error' => '', 'dropped' => $dropped];
+        }
+        return ['ok' => true, 'text' => trim((string)$j['text']), 'error' => '', 'dropped' => 0];
+    }
+    return ['ok' => false, 'text' => '', 'error' => $j['error']['message'] ?? "HTTP $http", 'dropped' => 0];
+}
+
+/** Tira "loops" de repetição que o Whisper gera em bipe/música ("027... 027... 027...") trocando por [trecho inaudível]; repetições curtas e reais (aviso de espera dito 2x) ficam. */
+function aiCleanTranscript($text) {
+    $text = (string)$text;
+    if ($text === '') return '';
+    $tok = preg_split('/\s+/u', trim($text), -1, PREG_SPLIT_NO_EMPTY);
+    $norm = array_map(function ($t) { return mb_strtolower(preg_replace('/[^\p{L}\p{N}]+/u', '', $t), 'UTF-8'); }, $tok);
+    $n = count($tok); $out = []; $i = 0;
+    while ($i < $n) {
+        $hit = false;
+        for ($len = 1; $len <= 6 && !$hit; $len++) {
+            if ($i + $len * 5 > $n) break;
+            $rep = 1;
+            while ($i + ($rep + 1) * $len <= $n) {
+                $same = true;
+                for ($k = 0; $k < $len; $k++) if ($norm[$i + $k] !== $norm[$i + $rep * $len + $k]) { $same = false; break; }
+                if (!$same) break;
+                $rep++;
+            }
+            if ($rep >= 5 && trim(implode('', array_slice($norm, $i, $len))) !== '') {
+                $out[] = '[trecho inaudível]'; $i += $rep * $len; $hit = true;
+            }
+        }
+        if (!$hit) { $out[] = $tok[$i]; $i++; }
+    }
+    $res = implode(' ', $out);
+    return preg_replace('/(\[trecho inaudível\]\s*){2,}/u', '[trecho inaudível] ', $res);
 }
 
 /**

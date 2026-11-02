@@ -49,7 +49,7 @@ try {
 // =========================================================================
 // AUTENTICAÇÃO (portão único do painel)
 // =========================================================================
-$__api_action_names = ['get_logs', 'get_fop_extensions', 'get_trunks_status', 'get_queues_realtime', 'get_parking_lots', 'fop_action', 'originate_call', 'save_contact', 'test_llm_connection', 'analyze_pabx_insights', 'operator_survey_stats', 'panel_rev', 'status_repair', 'status_report', 'generate_ai_insights', 'get_ai_insights_history', 'delete_ai_insight', 'transcribe_audio', 'get_kpi_calls_detail', 'get_active_calls', 'get_time_groups', 'get_time_group_rules', 'save_time_group_rule', 'delete_time_group_rule', 'get_announcements_list', 'update_announcement_audio', 'sync_assets', 'ai_chat', 'ai_chat_info', 'ai_chat_history', 'ai_chat_clear', 'ai_chat_confirm', 'ext_features_get', 'ext_features_set', 'console_exec'];
+$__api_action_names = ['ia_audit_export', 'get_logs', 'get_fop_extensions', 'get_trunks_status', 'get_queues_realtime', 'get_parking_lots', 'fop_action', 'originate_call', 'save_contact', 'test_llm_connection', 'analyze_pabx_insights', 'operator_survey_stats', 'panel_rev', 'status_repair', 'status_report', 'generate_ai_insights', 'get_ai_insights_history', 'delete_ai_insight', 'transcribe_audio', 'get_kpi_calls_detail', 'get_active_calls', 'get_time_groups', 'get_time_group_rules', 'save_time_group_rule', 'delete_time_group_rule', 'get_announcements_list', 'update_announcement_audio', 'sync_assets', 'ai_chat', 'ai_chat_info', 'ai_chat_history', 'ai_chat_clear', 'ai_chat_confirm', 'ext_features_get', 'ext_features_set', 'console_exec'];
 if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['action'], $__api_action_names, true))) {
     authGate('json');
 } else {
@@ -458,6 +458,48 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
             'calls' => $calls
         ]);
         exit;
+    }
+
+    // PDF da Auditoria IA de UMA chamada (documento completo: dados, resumo, recomendação, riscos, checklist e transcrição inteira)
+    if ($action === 'ia_audit_export') {
+        while (ob_get_level()) ob_end_clean();
+        if (!hasUserPermission('mod_relatorios')) { http_response_code(403); header('Content-Type: text/plain; charset=utf-8'); echo 'Sem permissão para ver relatórios.'; exit; }
+        $uid = preg_replace('/[^A-Za-z0-9.\-_]/', '', (string)($_GET['uid'] ?? ''));
+        aiAuditEnsureSchema();
+        $st = $db->prepare("SELECT * FROM call_ai_analysis WHERE uniqueid = :u"); $st->execute([':u' => $uid]);
+        $an = $uid !== '' ? $st->fetch(PDO::FETCH_ASSOC) : false;
+        if (!$an) { http_response_code(404); header('Content-Type: text/plain; charset=utf-8'); echo 'Esta chamada ainda não foi analisada pela IA. Clique em Analisar e tente de novo.'; exit; }
+        $cdrRow = [];
+        try { $cdrc = getAsteriskPdoConnection('asteriskcdrdb'); if ($cdrc) { $q = $cdrc->prepare("SELECT calldate, src, dst, disposition, billsec, duration, recordingfile FROM cdr WHERE uniqueid = :u ORDER BY (recordingfile <> '') DESC LIMIT 1"); $q->execute([':u' => $uid]); $cdrRow = $q->fetch(PDO::FETCH_ASSOC) ?: []; } } catch (Throwable $e) {}
+        $src = (string)($cdrRow['src'] ?? $an['src']); $dst = (string)($cdrRow['dst'] ?? $an['dst']);
+        $cdate = (string)($cdrRow['calldate'] ?? $an['calldate']); $bill = (int)($cdrRow['billsec'] ?? $an['billsec']);
+        $cm = function_exists('getContactsMap') ? getContactsMap() : [];
+        $cname = function_exists('lookupContactName') ? trim((string)lookupContactName($src, $cm)) : '';
+        $opName = function_exists('formatEndpointName') ? formatEndpointName($dst) : $dst;
+        $disp = ['ANSWERED' => 'Atendida', 'NO ANSWER' => 'Não atendida', 'BUSY' => 'Ocupado', 'FAILED' => 'Falhou'][strtoupper((string)($cdrRow['disposition'] ?? ''))] ?? ((string)($cdrRow['disposition'] ?? '') ?: '-');
+        $topics = json_decode((string)$an['topics'], true) ?: []; $risks = json_decode((string)$an['risks'], true) ?: []; $check = json_decode((string)$an['checklist'], true) ?: [];
+        $meta = [
+            ['Cliente', $cname !== '' ? $cname : "Cliente $src"], ['Telefone', formatPhoneNumber($src)],
+            ['Atendente', $opName !== '' && $opName !== $dst ? "Ramal $dst - $opName" : "Ramal $dst"], ['Data e hora', $cdate !== '' ? date('d/m/Y H:i:s', strtotime($cdate)) : '-'],
+            ['Duração falada', gmdate('H:i:s', max(0, $bill))], ['Resultado', $disp],
+            ['Gravação', !empty($cdrRow['recordingfile']) ? 'Sim' : 'Não'], ['Sentimento', (string)($an['sentimento'] ?: '-')],
+            ['Satisfação', ($an['satisfacao'] !== null && $an['satisfacao'] !== '') ? $an['satisfacao'] . ' de 5' : 'não inferida'], ['Nota QA', $an['qa_score'] !== null ? $an['qa_score'] . '/100' : '-'],
+            ['ID da chamada', $uid], ['IA usada', trim(($an['provider'] ? $an['provider'] . ' / ' : '') . ($an['model'] ?: '-'))],
+        ];
+        $secs = [];
+        $secs[] = ['h' => 'Resumo da chamada', 'p' => trim((string)$an['resumo']) !== '' ? (string)$an['resumo'] : 'Sem resumo.'];
+        $secs[] = ['h' => 'Recomendação', 'p' => trim((string)$an['recomendacao']) !== '' ? (string)$an['recomendacao'] : 'Sem recomendação.'];
+        if ($topics) $secs[] = ['h' => 'Tópicos identificados', 'p' => implode(', ', $topics)];
+        $ri = []; foreach ($risks as $rk) $ri[] = ($rk['label'] ?? 'Risco') . (!empty($rk['words']) ? ' (palavras: ' . implode(', ', $rk['words']) . ')' : '');
+        $secs[] = ['h' => 'Alertas de risco', 'items' => $ri ?: ['Nenhum alerta de risco detectado.']];
+        if ($check) { $ci = []; $okn = 0; foreach ($check as $lbl => $okv) { $ci[] = ($okv ? 'OK - ' : 'NÃO - ') . $lbl; if ($okv) $okn++; } $secs[] = ['h' => "Checklist de qualidade ($okn de " . count($check) . ' itens)', 'items' => $ci]; }
+        $tr = trim((string)$an['transcript']);
+        $secs[] = ['h' => 'Transcrição completa', 'p' => $tr !== '' ? $tr : 'Sem transcrição. Rode a análise de novo para gerar.'];
+        $lu = getLoggedUser(); $who = trim((string)($lu['name'] ?? $lu['email'] ?? ''));
+        $pdf = shareBuildDocPdf('Auditoria de chamada por IA', 'IPbx Prisma - ' . ($cname !== '' ? $cname : $src) . ' - ' . ($cdate !== '' ? date('d/m/Y H:i', strtotime($cdate)) : ''), $meta, $secs, 'IPbx Prisma - gerado em ' . date('d/m/Y H:i') . ($who !== '' ? ' por ' . $who : ''));
+        if (function_exists('logUserAction')) logUserAction('Baixou PDF da auditoria IA', $uid, 'RELATORIOS');
+        header('Content-Type: application/pdf'); header('Content-Disposition: attachment; filename="Auditoria_IA_' . preg_replace('/[^0-9A-Za-z_.-]/', '_', $uid) . '.pdf"'); header('Content-Length: ' . strlen($pdf)); header('Cache-Control: private, no-store');
+        echo $pdf; exit;
     }
 
     if ($action === 'fop_action') {
