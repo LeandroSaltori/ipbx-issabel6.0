@@ -554,7 +554,7 @@ function exportToCSV() {
 
 <!-- Modal Copiloto IA Prismabot para Análise de Chamadas -->
 <div id="modal-ai-call-summary" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
-    <div class="bg-slate-900 border border-purple-500/30 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4 max-h-[92vh] flex flex-col">
+    <div class="bg-slate-900 border border-purple-500/30 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4 max-h-[92vh] flex flex-col overflow-hidden">
         <div class="flex items-center justify-between border-b border-slate-800 pb-3">
             <div class="flex items-center gap-2">
                 <div class="w-8 h-8 rounded-full bg-purple-500/20 text-purple-300 flex items-center justify-center text-sm font-bold border border-purple-500/30">
@@ -568,7 +568,7 @@ function exportToCSV() {
             <button onclick="closeAiModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
         </div>
 
-        <div id="ai-modal-content" class="space-y-3 text-xs text-slate-300 leading-relaxed font-sans">
+        <div id="ai-modal-content" class="space-y-3 text-xs text-slate-300 leading-relaxed font-sans flex-1 min-h-0 overflow-y-auto custom-scrollbar pr-1">
             <div class="animate-pulse py-6 text-center text-purple-400">
                 <i class="fa-solid fa-spinner fa-spin text-2xl mb-2 block"></i>
                 <span>Transcrevendo áudio e gerando análise de sentimento...</span>
@@ -695,7 +695,7 @@ if (file_exists($jsonSmtpFile)) {
                 <div class="space-y-3">
                     <div class="p-3 bg-slate-950 rounded-xl border border-purple-500/30 space-y-1">
                         <span class="text-[10px] font-bold text-purple-400 uppercase tracking-wider block">Resumo do atendimento</span>
-                        <div class="max-h-60 overflow-y-auto custom-scrollbar pr-1 space-y-1.5 text-[13px] leading-relaxed text-slate-100">${aiResumoHtml(d.resumo)}</div>
+                        <div class="max-h-[34vh] overflow-y-auto custom-scrollbar pr-1 space-y-1.5 text-[13px] leading-relaxed text-slate-100">${aiResumoHtml(d.resumo)}</div>
                     </div>
                     <div class="grid grid-cols-2 gap-2 text-[11px]">
                         <div class="p-2.5 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-300"><strong>Sentimento:</strong> ${aiEsc(d.sentimento || '-')}</div>
@@ -707,7 +707,7 @@ if (file_exists($jsonSmtpFile)) {
                     </div>
                     <details class="p-3 bg-slate-950 rounded-xl border border-slate-800">
                         <summary class="cursor-pointer text-[11px] font-bold text-slate-400">Transcrição completa</summary>
-                        <p class="mt-2 text-slate-300 whitespace-pre-wrap">${aiEsc(d.transcript)}</p>
+                        <p class="mt-2 text-slate-300 whitespace-pre-wrap max-h-48 overflow-y-auto custom-scrollbar pr-1">${aiEsc(d.transcript)}</p>
                     </details>
                     <div class="flex items-center justify-between text-[11px] text-slate-500 pt-1">
                         <span>${d.cached ? 'Análise salva, aberta sem gastar IA.' : 'Análise nova, já salva no histórico.'}</span>
