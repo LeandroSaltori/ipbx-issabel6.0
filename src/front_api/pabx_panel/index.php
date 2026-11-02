@@ -1169,6 +1169,18 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
         $insights = [];
         $aiError = '';
 
+        // Mesmos números e filtros = mesma análise: devolve a salva (sem gastar IA). Clicar de novo em seguida refaz (force).
+        $__sig = sha1(json_encode([$module, $periodo, $tot, $atend, $tma, $tme, $extras, $_GET['call_type'] ?? '', $_GET['dedup'] ?? '', $cfg['provider'] ?? '', $cfg['model'] ?? '']));
+        if ($ai_configured && $tot > 0 && empty($_GET['force']) && ($__ch = aiReportCacheGet($__sig))) {
+            $__ci = json_decode((string)$__ch['insights_json'], true);
+            if (is_array($__ci) && $__ci) {
+                echo json_encode(['success' => true, 'ai_configured' => true, 'cached' => true, 'generated_at' => date('d/m/Y H:i', strtotime($__ch['created_at'])),
+                    'engine_label' => "IA Generativa ({$__ch['provider']}) · análise salva em " . date('d/m H:i', strtotime($__ch['created_at'])) . ' · clique em Analisar de novo para refazer',
+                    'notice' => null, 'insights' => $__ci], JSON_UNESCAPED_UNICODE);
+                exit;
+            }
+        }
+
         if ($ai_configured && $tot > 0) {
             $pct = $atend !== null ? round(($atend / $tot) * 100, 1) : null;
             $r = aiChatCompletion(
@@ -1187,6 +1199,7 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
         $usedAi = !empty($insights);
         if (!$usedAi) $insights = $facts;
         aiSaveHistory($usedAi ? $cfg['provider'] : 'metricas', $usedAi ? $cfg['model'] : 'sem-ia', $insights, $module, $periodo);
+        if ($usedAi) aiReportCachePut($__sig, $module, $periodo, $insights, $cfg['provider'], $cfg['model']);
 
         $notice = null;
         if ($cfg['key'] === '')      $notice = 'IA não configurada (Configurações > Inteligência Artificial): exibindo apenas as métricas reais.';
@@ -1259,7 +1272,10 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
             exit;
         }
 
+        $__tc = empty($body['force']) ? aiTranscriptCacheGet($audioFilePath) : null;
+        if ($__tc && trim((string)$__tc['text']) !== '') { echo json_encode(['success' => true, 'cached' => true, 'text' => $__tc['text'], 'message' => 'Transcrição salva em ' . date('d/m/Y H:i', strtotime($__tc['created_at'])) . ' (não gastou IA).'], JSON_UNESCAPED_UNICODE); exit; }
         $tr = aiTranscribeFile($audioFilePath, $cfg);
+        if ($tr['ok']) aiTranscriptCachePut($audioFilePath, $tr['text'], $provider, $model);
         if ($tr['ok']) {
             echo json_encode([
                 'success' => true,
@@ -3462,6 +3478,20 @@ dialog#ai-chat-dialog::backdrop{background:rgba(0,0,0,.65);backdrop-filter:blur(
                 document.body.appendChild(a); a.click(); a.remove();
             } catch (e) { alert('Não foi possível gerar o PDF: ' + (e.message || e)); }
         };
+                /* Análises de IA dos relatórios ficam salvas: o 1º clique mostra a salva; clicar de novo (mesmos dados) refaz a análise */
+        (function () {
+            const of = window.fetch, seen = {};
+            window.fetch = function (u, o) {
+                try {
+                    if (typeof u === 'string' && u.indexOf('api_action=analyze_pabx_insights') > -1) {
+                        const k = u + '|' + ((o && o.body) || '');
+                        if (seen[k]) u += '&force=1';
+                        return of.call(this, u, o).then(r => { r.clone().json().then(d => { if (d && d.cached) seen[k] = true; else delete seen[k]; }).catch(() => {}); return r; });
+                    }
+                } catch (e) {}
+                return of.apply(this, arguments);
+            };
+        })();
         window.ipbxCsv = function (filename, titleLines, rows) {
             const q = (v) => { v = String(v == null ? '' : v).replace(/\s*\n\s*/g, ' ').trim(); if (/^\d{9,}$/.test(v)) return '="' + v + '"'; return '"' + v.replace(/"/g, '""') + '"'; };
             let out = (titleLines || []).map(q).join('\n') + ((titleLines || []).length ? '\n\n' : '');

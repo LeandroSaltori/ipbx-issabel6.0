@@ -5500,6 +5500,62 @@ function aiAnalyzeCallTranscript($transcript, $cfg, array $meta = []) {
     return ['ok' => true, 'j' => $j, 'raw' => $raw, 'error' => ''];
 }
 
+
+/** Resumo IA de uma ligação para envio (WhatsApp etc.): usa a análise já salva; se não houver, transcreve, analisa e SALVA (mesmo padrão da tela de auditoria). */
+function aiCallSummaryCached(array $c, $path) {
+    global $db;
+    aiAuditEnsureSchema();
+    $uid = (string)($c['uniqueid'] ?? '');
+    if ($db && $uid !== '') {
+        try {
+            $q = $db->prepare("SELECT resumo, recomendacao FROM call_ai_analysis WHERE uniqueid = :u"); $q->execute([':u' => $uid]);
+            $r = $q->fetch(PDO::FETCH_ASSOC);
+            if ($r && trim((string)$r['resumo']) !== '') return ['ok' => true, 'cached' => true, 'text' => trim((string)$r['resumo']) . (trim((string)$r['recomendacao']) !== '' ? "\nRecomendação: " . trim((string)$r['recomendacao']) : ''), 'error' => ''];
+        } catch (Throwable $e) {}
+    }
+    $cfgA = aiGetConfig('audio'); $cfg = aiGetConfig('insights');
+    $tr = aiTranscribeFile($path, $cfgA);
+    if (!$tr['ok'] || $tr['text'] === '') return ['ok' => false, 'text' => '', 'error' => 'transcrição: ' . ($tr['error'] ?: 'vazia')];
+    $qual = aiTranscriptQualityNote($tr, (int)($c['billsec'] ?? 0));
+    $an = aiAnalyzeCallTranscript($tr['text'], $cfg, ['qualidade' => $qual, 'duracao' => gmdate('H:i:s', max(0, (int)($c['billsec'] ?? 0))), 'atendente' => (string)($c['dst'] ?? ''), 'cliente' => (string)($c['src'] ?? '')]);
+    if (!$an['ok'] || empty($an['j']['resumo'])) return ['ok' => false, 'text' => '', 'error' => 'resumo: ' . ($an['error'] ?: 'sem conteúdo')];
+    $j = $an['j'];
+    if ($qual !== '') { $j['resumo'] = 'ATENÇÃO: ' . $qual . ".\n" . $j['resumo']; $j['satisfacao'] = null; }
+    $sat = isset($j['satisfacao']) && is_numeric($j['satisfacao']) ? max(1, min(5, (float)$j['satisfacao'])) : null;
+    $res = ['uid' => $uid, 'transcript' => $tr['text'], 'resumo' => (string)$j['resumo'], 'sentimento' => (string)($j['sentimento'] ?? ''), 'satisfacao' => $sat, 'recomendacao' => (string)($j['recomendacao'] ?? '')];
+    try { aiAuditSaveAnalysis($c, aiAuditApplyRules($tr['text']), $res, $cfg); } catch (Throwable $e) { error_log('IPbx: resumo IA não salvo ' . $uid . ': ' . $e->getMessage()); }
+    return ['ok' => true, 'cached' => false, 'text' => $res['resumo'] . ($res['recomendacao'] !== '' ? "\nRecomendação: " . $res['recomendacao'] : ''), 'error' => ''];
+}
+
+/** Cache das análises de IA dos relatórios (mesmos números e filtros = mesma análise, sem gastar IA de novo). */
+function aiReportCacheEnsure() {
+    global $db; static $ok = false; if ($ok || !$db) return;
+    $db->exec("CREATE TABLE IF NOT EXISTS ai_report_cache (sig TEXT PRIMARY KEY, module TEXT, period TEXT, insights_json TEXT, provider TEXT, model TEXT, created_at TEXT)");
+    $ok = true;
+}
+function aiReportCacheGet($sig) {
+    global $db; if (!$db) return null;
+    try { aiReportCacheEnsure(); $q = $db->prepare("SELECT * FROM ai_report_cache WHERE sig = :s"); $q->execute([':s' => $sig]); $r = $q->fetch(PDO::FETCH_ASSOC); return $r ?: null; } catch (Throwable $e) { return null; }
+}
+function aiReportCachePut($sig, $module, $period, array $insights, $provider, $model) {
+    global $db; if (!$db) return;
+    try { aiReportCacheEnsure(); $db->prepare("INSERT OR REPLACE INTO ai_report_cache (sig, module, period, insights_json, provider, model, created_at) VALUES (:s,:m,:p,:j,:pr,:mo,:c)")
+        ->execute([':s' => $sig, ':m' => $module, ':p' => $period, ':j' => json_encode($insights, JSON_UNESCAPED_UNICODE), ':pr' => $provider, ':mo' => $model, ':c' => date('Y-m-d H:i:s')]); } catch (Throwable $e) {}
+}
+
+/** Transcrições já feitas de arquivos de áudio avulsos (não gasta IA de novo para o mesmo arquivo). */
+function aiTranscriptCacheGet($path) {
+    global $db; if (!$db) return null;
+    try { $db->exec("CREATE TABLE IF NOT EXISTS ai_transcripts (file_key TEXT PRIMARY KEY, text TEXT, provider TEXT, model TEXT, created_at TEXT)");
+        $q = $db->prepare("SELECT * FROM ai_transcripts WHERE file_key = :k"); $q->execute([':k' => sha1($path . '|' . @filesize($path) . '|' . @filemtime($path))]); return $q->fetch(PDO::FETCH_ASSOC) ?: null; } catch (Throwable $e) { return null; }
+}
+function aiTranscriptCachePut($path, $text, $provider, $model) {
+    global $db; if (!$db || trim($text) === '') return;
+    try { $db->exec("CREATE TABLE IF NOT EXISTS ai_transcripts (file_key TEXT PRIMARY KEY, text TEXT, provider TEXT, model TEXT, created_at TEXT)");
+        $db->prepare("INSERT OR REPLACE INTO ai_transcripts (file_key, text, provider, model, created_at) VALUES (:k,:t,:p,:m,:c)")
+        ->execute([':k' => sha1($path . '|' . @filesize($path) . '|' . @filemtime($path)), ':t' => $text, ':p' => $provider, ':m' => $model, ':c' => date('Y-m-d H:i:s')]); } catch (Throwable $e) {}
+}
+
 /** Extrai a lista "insights" de uma resposta do LLM (aceita cercas ```json e texto em volta). */
 function aiParseInsights($txt) {
     $txt = trim((string)$txt);
@@ -5860,13 +5916,9 @@ function processCallSummaryNotifications($cdr) {
                 $path = findRecordingPath($c['recordingfile'], $c['calldate']);
                 if ($path === '') { $why[] = 'arquivo de gravação não encontrado'; }
                 else {
-                    $tr = aiTranscribeFile($path, $cfgAudio);
-                    if (!$tr['ok'] || $tr['text'] === '') { $why[] = 'transcrição: ' . ($tr['error'] ?: 'vazia'); }
-                    else {
-                        $sm = aiChatCompletion('Resuma a ligação telefônica em português, em no máximo 5 linhas: motivo, o que foi combinado e próximos passos. Use somente o que consta na transcrição; se algo não estiver claro, diga que não ficou claro.', mb_substr($tr['text'], 0, 12000), 40, $cfg);
-                        if ($sm['ok'] && $sm['text'] !== '') $parts[] = "🧠 Resumo IA:\n" . $sm['text'];
-                        else $why[] = 'resumo: ' . $sm['error'];
-                    }
+                    $sm = aiCallSummaryCached($c, $path);
+                    if ($sm['ok'] && $sm['text'] !== '') $parts[] = "🧠 Resumo IA:\n" . $sm['text'];
+                    else $why[] = $sm['error'];
                 }
             }
 
