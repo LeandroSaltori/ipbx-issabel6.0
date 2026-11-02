@@ -38,6 +38,10 @@ Código das ações: `includes/ai_actions_config.php` (contatos, regras, filas) 
 
 Segurança: confirmação obrigatória (proposta válida por 10 min, tabela `ai_pending_actions`), envio só para contatos cadastrados (Agenda & Contatos ou celular de ramal), teto diário (`ai_wa_daily_cap`, padrão 50), auditoria (`logUserAction`, `ai_chat_log`), sem acesso a senhas, chaves de API, troncos ou firewall. Toda IA responde em português do Brasil e a transcrição é fixa em português (`ai_audio_language`, padrão `pt`).
 
+## IA de ligações e exportações
+
+Transcrição por trechos, análise com histórico/reanálise, cache de relatórios e exportações CSV/Excel/PDF: ver [`docs/ia-analises-e-exportacoes.md`](./ia-analises-e-exportacoes.md).
+
 ## Tempo real
 
 Toda ação do chat chama `panelRevBump(area)`; as telas abertas consultam `index.php?api_action=panel_rev` a cada 8 s e recarregam quando a área delas muda (`schedules`, `wa_sends`, `extensions`, `contacts`, `rules`). Não interrompe quem está digitando; se o chat estiver aberto, a tela recarrega e o chat reabre.
