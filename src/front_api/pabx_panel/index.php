@@ -940,6 +940,23 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
         $uid  = trim((string)($body['uid'] ?? ''));
         if (!hasUserPermission('listen_recordings')) { echo json_encode(['success' => false, 'error' => 'Sem permissão para acessar gravações.']); exit; }
         if ($uid === '') { echo json_encode(['success' => false, 'error' => 'Chamada não informada.']); exit; }
+        // Análise já feita e salva: devolve na hora (sem transcrever de novo nem gastar IA). 'force' = Reauditar.
+        if (empty($body['force'])) {
+            try {
+                aiAuditEnsureSchema();
+                $cq = $db->prepare("SELECT * FROM call_ai_analysis WHERE uniqueid = :u"); $cq->execute([':u' => $uid]);
+                $cr = $cq->fetch(PDO::FETCH_ASSOC);
+                if ($cr && trim((string)$cr['resumo']) !== '' && trim((string)$cr['transcript']) !== '') {
+                    if (function_exists('logUserAction')) logUserAction('Abriu análise IA salva', $uid, 'RELATORIOS');
+                    echo json_encode(['success' => true, 'cached' => true, 'saved' => true, 'uid' => $uid, 'resumo' => (string)$cr['resumo'], 'sentimento' => (string)$cr['sentimento'],
+                        'satisfacao' => ($cr['satisfacao'] !== null && $cr['satisfacao'] !== '') ? (float)$cr['satisfacao'] : null, 'recomendacao' => (string)$cr['recomendacao'],
+                        'transcript' => (string)$cr['transcript'], 'provider' => (string)$cr['provider'], 'model' => (string)$cr['model'],
+                        'analisado_em' => $cr['analyzed_at'] ? date('d/m/Y H:i', strtotime($cr['analyzed_at'])) : '',
+                        'topics' => json_decode((string)$cr['topics'], true) ?: [], 'risks' => json_decode((string)$cr['risks'], true) ?: [], 'qa_score' => $cr['qa_score']], JSON_UNESCAPED_UNICODE);
+                    exit;
+                }
+            } catch (Throwable $e) { /* sem cache: segue e analisa */ }
+        }
         $cfg = aiGetConfig('insights');
         $cfgA = aiGetConfig('audio');
         if ($cfg['key'] === '')  { echo json_encode(['success' => false, 'error' => 'API Key de IA não configurada em Configurações > Inteligência Artificial.']); exit; }

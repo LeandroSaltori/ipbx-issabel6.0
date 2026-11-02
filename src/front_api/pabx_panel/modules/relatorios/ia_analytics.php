@@ -593,9 +593,9 @@ dialog#dlg-ia-rules .rbtn { white-space: nowrap !important; flex-shrink: 0 !impo
 <script>
 const IA_PENDING = <?php echo json_encode(array_slice($pending_uids, 0, 10)); ?>;
 
-async function iaAnalyzeUid(uid) {
+async function iaAnalyzeUid(uid, force) {
     const res = await fetch('index.php?api_action=analyze_call_audio', {
-        method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ uid: uid })
+        method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ uid: uid, force: !!force })
     });
     return res.json();
 }
@@ -718,7 +718,7 @@ async function reauditCurrent(btn) {
     if (!confirm('Reauditar esta chamada? A IA vai transcrever e analisar o áudio de novo e substituir a auditoria atual.')) return;
     var orig = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Reauditando...';
     try {
-        var d = await iaAnalyzeUid(uid);
+        var d = await iaAnalyzeUid(uid, true);
         if (!d.success) { alert('Não foi possível reauditar: ' + (d.error || 'erro desconhecido')); }
         else if (d.saved === false) { alert('A análise foi feita, mas não pôde ser salva (' + (d.save_error || 'erro no banco') + ').'); }
         else { IA_NEEDS_RELOAD = true; closeModal('modal-full-ia-audit'); }

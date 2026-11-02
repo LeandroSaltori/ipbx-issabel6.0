@@ -660,7 +660,7 @@ if (file_exists($jsonSmtpFile)) {
         } catch (e) { showToastNotification('Falha no envio de e-mail', e.message, 'error'); }
     }
 
-    async function analyzeAudioAI(uid, src) {
+    async function analyzeAudioAI(uid, src, force) {
         const modal = document.getElementById('modal-ai-call-summary');
         const content = document.getElementById('ai-modal-content');
         const subtitle = document.getElementById('ai-modal-subtitle');
@@ -677,7 +677,7 @@ if (file_exists($jsonSmtpFile)) {
             </div>`;
 
         try {
-            const d = await aiPostJson('analyze_call_audio', { uid: uid });
+            const d = await aiPostJson('analyze_call_audio', { uid: uid, force: !!force });
             if (!d.success) {
                 content.innerHTML = `<div class="p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-rose-300">
                     <strong><i class="fa-solid fa-circle-xmark"></i> Não foi possível analisar a chamada</strong>
@@ -686,7 +686,7 @@ if (file_exists($jsonSmtpFile)) {
                 return;
             }
             const sat = (d.satisfacao == null) ? 'não inferida' : d.satisfacao + ' / 5';
-            if (subtitle) subtitle.innerText = 'Análise por ' + d.provider + ' / ' + d.model;
+            if (subtitle) subtitle.innerText = 'Análise por ' + d.provider + ' / ' + d.model + (d.cached && d.analisado_em ? ' · salva em ' + d.analisado_em : '');
             __aiCall = {
                 uid: uid,
                 text: '🧠 Resumo IA da chamada ' + uid + '\n\n' + d.resumo + '\n\nSentimento: ' + (d.sentimento || '-') + ' | Satisfação: ' + sat + '\nRecomendação: ' + (d.recomendacao || '-')
@@ -709,6 +709,10 @@ if (file_exists($jsonSmtpFile)) {
                         <summary class="cursor-pointer text-[11px] font-bold text-slate-400">Transcrição completa</summary>
                         <p class="mt-2 text-slate-300 whitespace-pre-wrap">${aiEsc(d.transcript)}</p>
                     </details>
+                    <div class="flex items-center justify-between text-[11px] text-slate-500 pt-1">
+                        <span>${d.cached ? 'Análise salva, aberta sem gastar IA.' : 'Análise nova, já salva no histórico.'}</span>
+                        <button type="button" onclick="if(confirm('Refazer a análise? A IA vai ouvir a ligação de novo e substituir a análise salva.')) analyzeAudioAI('${aiEsc(uid)}', '${aiEsc(src)}', true)" class="px-2.5 py-1 rounded-lg bg-amber-600/20 hover:bg-amber-600/40 text-amber-300 border border-amber-500/30 font-bold"><i class="fa-solid fa-rotate"></i> Reanalisar</button>
+                    </div>
                 </div>`;
         } catch (e) {
             content.innerHTML = `<div class="p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-rose-300">Falha na requisição: ${aiEsc(e.message)}</div>`;
