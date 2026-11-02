@@ -578,6 +578,13 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
             exit;
         }
         
+        // Ramal sem registro (telefone desligado/fora da rede): não adianta ligar, avisa em vez de ficar mudo
+        try { $__rs = getAsteriskRealtimeStatuses(); } catch (Throwable $e_rs) { $__rs = []; }
+        if (($__rs[$from] ?? '') === 'Indisponível') {
+            $__m = "O ramal $from está sem registro (telefone desligado ou fora da rede). Escolha outro ramal ou ligue o telefone.";
+            echo json_encode(['success' => false, 'message' => $__m, 'error' => $__m]);
+            exit;
+        }
         // Disparo direto no Asterisk (PJSIP / SIP / Local)
         $ami_res = executeClickToCall($from, $to);
         if ($ami_res['success']) {
@@ -2652,6 +2659,20 @@ if ($__wp_u && userHasWebphone($__wp_u)
                 <button type="button" id="c2c-go" style="white-space:nowrap !important;flex-shrink:0 !important;width:auto !important;padding:9px 16px;border-radius:10px;background:#059669;color:#fff;border:0;font-weight:800;cursor:pointer"><i class="fa-solid fa-phone"></i> Ligar</button>
               </div>`;
             document.body.appendChild(dlg); dlg.showModal();
+            // Ramais sem registro ficam apagados e não podem ser escolhidos (evita ligar para um telefone desligado)
+            (async () => {
+                try {
+                    const ctl = new AbortController(); const tm = setTimeout(() => ctl.abort(), 4000);
+                    const r = await fetch('index.php?api_action=get_fop_extensions', {signal: ctl.signal}); clearTimeout(tm);
+                    const list = await r.json(); const off = {};
+                    (list || []).forEach(x => { if (x.status === 'Indisponível') off[String(x.id)] = true; });
+                    const sel = dlg.querySelector('select#c2c-ext'); if (!sel) return;
+                    let n = 0;
+                    Array.from(sel.options).forEach(o => { if (off[o.value]) { o.disabled = true; o.style.color = '#64748b'; o.textContent += ' (sem registro)'; n++; } });
+                    if (sel.selectedOptions[0] && sel.selectedOptions[0].disabled) { const ok = Array.from(sel.options).find(o => !o.disabled); if (ok) sel.value = ok.value; }
+                    if (n) { const m = dlg.querySelector('#c2c-msg'); m.style.color = '#94a3b8'; m.textContent = n + ' ramal(is) sem registro aparecem apagados: o telefone está desligado ou fora da rede.'; }
+                } catch (e) {}
+            })();
             dlg.querySelector('#c2c-cancel').onclick = () => { dlg.close(); dlg.remove(); };
             dlg.addEventListener('cancel', () => setTimeout(() => dlg.remove(), 0));
             dlg.querySelector('#c2c-go').onclick = async () => {
