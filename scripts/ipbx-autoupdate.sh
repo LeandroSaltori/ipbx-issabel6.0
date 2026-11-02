@@ -4,9 +4,9 @@
 # ==============================================================================
 # Depois de instalado (uma unica vez, pelos comandos de atualizacao normais), o servidor
 # passa a buscar sozinho as novidades do repositorio e a aplicar, com protecao:
-#   1. a cada 10 min compara o commit remoto com o ultimo aplicado (consulta leve);
+#   1. uma vez por noite (janela 02:00-05:30, repetindo a cada 30 min so se precisar esperar) compara o commit remoto com o ultimo aplicado (consulta leve);
 #   2. se ha novidade, baixa uma copia limpa e valida a sintaxe (bash/PHP) antes de tocar em algo;
-#   3. espera nao haver chamadas em andamento (no maximo 4 h; depois aplica mesmo assim);
+#   3. espera nao haver chamadas em andamento (tenta de novo na janela seguinte; apos 3 dias aplica mesmo assim);
 #   4. tira um snapshot do codigo (nunca dos dados: bancos, chaves, usuarios e agendas ficam como estao);
 #   5. aplica com os mesmos comandos de sempre (instalar-front-api.sh + ipbx-sentinel --install);
 #   6. testa o painel e o Asterisk; se algo falhar, volta sozinho ao snapshot e avisa no Telegram;
@@ -29,7 +29,7 @@ AU_LOG="${AU_LOG:-/var/log/ipbx-autoupdate.log}"
 AU_BACKUP="${AU_BACKUP:-/var/backup/ipbx/autoupdate}"
 AU_DEST_DIR="${AU_DEST_DIR:-/var/www/html/front_api}"
 AU_DEFAULT_URL="https://github.com/LeandroSaltori/ipbx-issabel6.0"
-AU_MAX_DEFER="${AU_MAX_DEFER:-14400}"   # segundos esperando chamadas terminarem
+AU_MAX_DEFER="${AU_MAX_DEFER:-259200}"   # segundos esperando chamadas terminarem
 
 AUTOUPDATE=1; AU_BRANCH="${AU_BRANCH:-main}"; AU_REPO_URL="${AU_REPO_URL:-$AU_DEFAULT_URL}"
 [ -r "$AU_CONF" ] && . "$AU_CONF" 2>/dev/null
@@ -130,8 +130,8 @@ cmd_install() {
   fi
   [ -f "$AU_CONF" ] || { printf '# IPbx - atualizacao automatica\nAUTOUPDATE=1\nAU_BRANCH=main\n' > "$AU_CONF"; chmod 600 "$AU_CONF"; }
   cat > /etc/cron.d/ipbx-autoupdate <<'CRON'
-# IPbx Prisma - atualizacao automatica (verificacao leve a cada 10 min; so aplica quando ha versao nova)
-*/10 * * * * root /usr/bin/flock -n /var/run/ipbx-autoupdate.lock /usr/bin/nice -n 19 /usr/local/bin/ipbx-autoupdate >/dev/null 2>&1
+# IPbx Prisma - atualizacao automatica noturna (janela 02:00-05:30; so aplica quando ha versao nova)
+*/30 2-5 * * * root /usr/bin/flock -n /var/run/ipbx-autoupdate.lock /usr/bin/nice -n 19 /usr/local/bin/ipbx-autoupdate >/dev/null 2>&1
 CRON
   chmod 644 /etc/cron.d/ipbx-autoupdate
   rm -f /etc/cron.weekly/ipbx-autoupdate   # rotina semanal antiga, substituida por esta
@@ -144,13 +144,13 @@ CRON
       rm -f "$AU_STATE/bad" "$AU_STATE/defer_since"
     fi
   fi
-  echo "Atualizacao automatica instalada: verifica novidades a cada 10 min (ipbx-autoupdate --status)."
+  echo "Atualizacao automatica instalada: verifica novidades toda noite, entre 02:00 e 05:30 (ipbx-autoupdate --status)."
 }
 
 run_update() {  # $1 = "now" ignora jitter e espera de chamadas
   [ "$AUTOUPDATE" = "1" ] || exit 0
   mkdir -p "$AU_STATE" 2>/dev/null
-  [ "$1" = "now" ] || sleep $((RANDOM % 60))   # espalha a consulta entre os servidores
+  [ "$1" = "now" ] || sleep $((RANDOM % 900))   # espalha os servidores (ate 15 min) para nao baterem todos juntos no repositorio
 
   local remote applied
   remote="$(git ls-remote "$AU_REPO_URL" "refs/heads/$AU_BRANCH" 2>/dev/null | awk '{print $1; exit}')"
