@@ -5515,8 +5515,8 @@ function aiTranscribeFile($path, $cfg = null) {
     if (!in_array($cfg['provider'], ['openai', 'groq'], true) || empty($cfg['audio'])) {
         return ['ok' => false, 'text' => '', 'error' => "O provedor '{$cfg['provider']}' não oferece transcrição (use OpenAI ou Groq)"];
     }
-    if (!is_file($path) || filesize($path) > 24 * 1024 * 1024) {
-        return ['ok' => false, 'text' => '', 'error' => 'Arquivo ausente ou maior que 24MB'];
+    if (!is_file($path) || filesize($path) > 200 * 1024 * 1024) {
+        return ['ok' => false, 'text' => '', 'error' => 'Arquivo ausente ou grande demais'];
     }
     // Whisper só aceita estas extensões; gravações do Asterisk podem ser .gsm/.wav49/.sln/.WAV etc.
     $ext = strtolower(pathinfo($path, PATHINFO_EXTENSION));
@@ -5561,14 +5561,10 @@ function aiTranscribeFile($path, $cfg = null) {
             $tmp = '';   // só extensão em maiúsculas: envia com nome normalizado
         } else { $sendPath = $tmp; }
     }
-    if ($filesizeTmp = (is_file($sendPath) ? filesize($sendPath) : 0) and $filesizeTmp > 24 * 1024 * 1024) {
-        if ($tmp) @unlink($tmp);
-        return ['ok' => false, 'text' => '', 'error' => 'Áudio maior que 24MB após conversão'];
-    }
     $sendExt  = pathinfo($sendPath, PATHINFO_EXTENSION);
     $sendName = preg_replace('/[^A-Za-z0-9_-]/', '_', pathinfo($path, PATHINFO_FILENAME)) . '.' . strtolower($sendExt);
     $mime = (strtolower($sendExt) === 'mp3') ? 'audio/mpeg' : 'audio/wav';
-    @set_time_limit(600);
+    @set_time_limit(1800);
 
     // Áudio longo vai em trechos de 2 min: se o Whisper "alucinar" (repetir "027... 027...") num trecho de bipe/espera,
     // só aquele trecho se perde e o resto da conversa continua sendo transcrito.
@@ -5584,7 +5580,10 @@ function aiTranscribeFile($path, $cfg = null) {
             sort($chunks);
         }
     }
-    if (!$chunks) $chunks = [$sendPath];
+    if (!$chunks) {
+        if (is_file($sendPath) && filesize($sendPath) > 24 * 1024 * 1024) { if ($tmp) @unlink($tmp); return ['ok' => false, 'text' => '', 'error' => 'Áudio longo demais e o servidor não tem ffmpeg para dividir em partes'] ; }
+        $chunks = [$sendPath];
+    }
 
     $parts = []; $lastErr = ''; $okAny = false; $dropped = 0;
     foreach ($chunks as $i => $cp) {
