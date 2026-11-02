@@ -1462,7 +1462,7 @@ async function openKpiDetailModal(kpiType) {
                 const dstDisplay = c.dst_name ? `<span class="font-extrabold text-indigo-300"><i class="fa-solid fa-user text-indigo-400 text-[10px] mr-1"></i>${c.dst_name}</span><div class="text-[10px] text-slate-400 font-mono">${c.dst}</div>` : `<span class="font-bold text-indigo-300 font-mono">${c.dst}</span>`;
 
                 const __rr = String(c.rec_reason || '').replace(/[&<>"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
-                let audioHTML = '<span class="text-slate-500 text-[10px] italic" title="' + __rr + '">Sem gravação</span>' + (__rr ? '<div class="text-[9px] text-slate-500 max-w-[230px] mx-auto leading-tight mt-0.5">' + __rr + '</div>' : '');
+                let audioHTML = '<span class="text-slate-500 text-[10px] italic' + (__rr ? ' cursor-help border-b border-dotted border-slate-600" data-tip="' + __rr + '"' : '"') + '>Sem gravação' + (__rr ? ' <i class="fa-solid fa-circle-info text-slate-500"></i>' : '') + '</span>';
                 if (c.uniqueid && c.recordingfile) {   // só mostra o player quando a chamada foi gravada (internas e não gravadas ficam sem player)
                     audioHTML = `
                         <audio preload="none" controls class="h-6 w-44 inline-block opacity-90">

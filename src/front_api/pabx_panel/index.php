@@ -3346,6 +3346,21 @@ dialog#ai-chat-dialog::backdrop{background:rgba(0,0,0,.65);backdrop-filter:blur(
 // Se o arquivo da gravação não existir mais no servidor, troca o player "morto" por um aviso claro
 function ipbxRecFail(src) { var a = src.closest ? src.closest('audio') : null; if (!a || !a.parentNode) return; var sp = document.createElement('span'); sp.className = 'text-amber-400 text-[10px] italic'; sp.textContent = 'Arquivo da gravação não encontrado'; a.parentNode.replaceChild(sp, a); }
 </script>
+<script>
+// Dica flutuante: qualquer elemento com data-tip mostra o texto ao passar o mouse (não é cortada por janelas com rolagem)
+(function(){
+  var tip = null;
+  function show(el){ if (!tip) { tip = document.createElement('div'); tip.style.cssText = 'position:fixed;z-index:100000;max-width:300px;padding:8px 11px;border-radius:10px;background:#0b1220;color:#e2e8f0;border:1px solid #475569;font-size:12px;line-height:1.4;box-shadow:0 8px 24px rgba(0,0,0,.5);pointer-events:none;display:none'; document.body.appendChild(tip); }
+    tip.textContent = el.getAttribute('data-tip'); tip.style.display = 'block';
+    var r = el.getBoundingClientRect(), w = tip.offsetWidth, h = tip.offsetHeight;
+    var x = Math.max(8, Math.min(window.innerWidth - w - 8, r.left + r.width / 2 - w / 2)), y = r.top - h - 8; if (y < 8) y = r.bottom + 8;
+    tip.style.left = x + 'px'; tip.style.top = y + 'px'; }
+  function hide(){ if (tip) tip.style.display = 'none'; }
+  document.addEventListener('mouseover', function(e){ var el = e.target.closest && e.target.closest('[data-tip]'); if (el) show(el); });
+  document.addEventListener('mouseout', function(e){ var el = e.target.closest && e.target.closest('[data-tip]'); if (el) hide(); });
+  document.addEventListener('scroll', hide, true);
+})();
+</script>
 <button id="ai-chat-fab" type="button" title="Assistente IA" onclick="aiChatOpen()"><i class="fa-solid fa-robot"></i></button>
 <script>
 // Botão do assistente arrastável: segure e arraste para tirar da frente de qualquer botão; a posição fica salva neste navegador
