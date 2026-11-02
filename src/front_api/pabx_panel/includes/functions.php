@@ -5273,6 +5273,12 @@ function aiTestProviderKey($provider) {
     return $r;
 }
 
+/** Há alguma chave de IA cadastrada (em qualquer provedor ou na configuração antiga)? Use em vez de ler 'ai_api_key' direto. */
+function aiAnyKeyConfigured() {
+    foreach (array_keys(aiProviderDefaults()) as $p) if (aiKeyFor($p) !== '') return true;
+    return trim((string)getSetting('ai_api_key')) !== '';
+}
+
 /** Provedor automático de uma função: o primeiro que tiver chave guardada (transcrição só com Groq/OpenAI). */
 function aiAutoProvider($role) {
     $order = $role === 'audio' ? ['groq', 'openai'] : ['groq', 'openai', 'gemini'];

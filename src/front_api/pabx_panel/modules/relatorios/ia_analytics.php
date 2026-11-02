@@ -9,8 +9,7 @@
  */
 
 
-$ai_key = getSetting('ai_api_key');
-$ai_configured = !empty($ai_key);
+$ai_configured = aiAnyKeyConfigured();
 
 $contacts_map = function_exists('getContactsMap') ? getContactsMap() : [];
 

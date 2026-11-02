@@ -286,7 +286,7 @@ function exportToCSV() {
                             $smtpData = @json_decode(file_get_contents($jsonSmtpFile), true);
                             if (!empty($smtpData['is_active']) || !empty($smtpData['host'])) $isSmtpActive = true;
                         }
-                        $isAiActive = !empty(getSetting('ai_api_key')) || !empty(getSetting('openai_api_key')) || !empty(getSetting('gemini_api_key')) || !empty(getSetting('groq_api_key'));
+                        $isAiActive = aiAnyKeyConfigured();
 
                         foreach ($cdr_list as $c): 
                             $st_raw = strtoupper($c['disposition']);
