@@ -5508,7 +5508,7 @@ function aiCallSummaryCached(array $c, $path) {
     $uid = (string)($c['uniqueid'] ?? '');
     if ($db && $uid !== '') {
         try {
-            $q = $db->prepare("SELECT resumo, recomendacao FROM call_ai_analysis WHERE uniqueid = :u"); $q->execute([':u' => $uid]);
+            $q = $db->prepare("SELECT resumo, recomendacao FROM call_ai_analysis WHERE uniqueid = :u AND analysis_ver >= :v"); $q->execute([':u' => $uid, ':v' => AI_CALL_ANALYSIS_VER]);
             $r = $q->fetch(PDO::FETCH_ASSOC);
             if ($r && trim((string)$r['resumo']) !== '') return ['ok' => true, 'cached' => true, 'text' => trim((string)$r['resumo']) . (trim((string)$r['recomendacao']) !== '' ? "\nRecomendação: " . trim((string)$r['recomendacao']) : ''), 'error' => ''];
         } catch (Throwable $e) {}
@@ -5941,6 +5941,9 @@ function processCallSummaryNotifications($cdr) {
 // =========================================================================
 // AUDITORIA DE VOZ: regras (palavras-chave) configuráveis + análises persistidas
 // =========================================================================
+/** Versão do método de análise (prompt + transcrição). Análises salvas com versão menor são refeitas sozinhas ao serem abertas. */
+const AI_CALL_ANALYSIS_VER = 3;
+
 function aiAuditEnsureSchema() {
     global $db;
     static $done = false;
@@ -5952,6 +5955,7 @@ function aiAuditEnsureSchema() {
         uniqueid TEXT PRIMARY KEY, calldate TEXT, src TEXT, dst TEXT, billsec INTEGER,
         transcript TEXT, resumo TEXT, sentimento TEXT, satisfacao REAL, recomendacao TEXT,
         topics TEXT, risks TEXT, checklist TEXT, qa_score INTEGER, provider TEXT, model TEXT, analyzed_at TEXT)");
+    try { $has = false; foreach ($db->query("PRAGMA table_info(call_ai_analysis)") as $__c) if ($__c['name'] === 'analysis_ver') $has = true; if (!$has) $db->exec("ALTER TABLE call_ai_analysis ADD COLUMN analysis_ver INTEGER DEFAULT 0"); } catch (Throwable $e) {}
     $n = (int)$db->query("SELECT COUNT(*) FROM ia_audit_rules")->fetchColumn();
     if ($n === 0 && getSetting('ia_audit_rules_seeded') !== '1') {
         // Ponto de partida editável (não são dados de chamadas): ajuste na tela "Configurar palavras"
@@ -6022,13 +6026,13 @@ function aiAuditSaveAnalysis($row, $a, $res, $cfg) {
 function aiAuditSaveAnalysisOnce($row, $a, $res, $cfg) {
     global $db;
     $db->prepare("INSERT OR REPLACE INTO call_ai_analysis
-        (uniqueid, calldate, src, dst, billsec, transcript, resumo, sentimento, satisfacao, recomendacao, topics, risks, checklist, qa_score, provider, model, analyzed_at)
-        VALUES (:u,:cd,:s,:d,:b,:t,:r,:se,:sa,:re,:to,:ri,:ch,:qa,:p,:m,:at)")->execute([
+        (uniqueid, calldate, src, dst, billsec, transcript, resumo, sentimento, satisfacao, recomendacao, topics, risks, checklist, qa_score, provider, model, analyzed_at, analysis_ver)
+        VALUES (:u,:cd,:s,:d,:b,:t,:r,:se,:sa,:re,:to,:ri,:ch,:qa,:p,:m,:at,:v)")->execute([
         ':u' => $res['uid'], ':cd' => $row['calldate'] ?? '', ':s' => $row['src'] ?? '', ':d' => $row['dst'] ?? '', ':b' => (int)($row['billsec'] ?? 0),
         ':t' => $res['transcript'], ':r' => $res['resumo'], ':se' => $res['sentimento'], ':sa' => $res['satisfacao'], ':re' => $res['recomendacao'],
         ':to' => json_encode($a['topics'], JSON_UNESCAPED_UNICODE), ':ri' => json_encode($a['risks'], JSON_UNESCAPED_UNICODE),
         ':ch' => json_encode($a['checklist'], JSON_UNESCAPED_UNICODE), ':qa' => $a['qa_score'],
-        ':p' => $cfg['provider'], ':m' => $cfg['model'], ':at' => date('Y-m-d H:i:s'),
+        ':p' => $cfg['provider'], ':m' => $cfg['model'], ':at' => date('Y-m-d H:i:s'), ':v' => AI_CALL_ANALYSIS_VER,
     ]);
 }
 

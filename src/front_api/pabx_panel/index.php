@@ -946,7 +946,7 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
                 aiAuditEnsureSchema();
                 $cq = $db->prepare("SELECT * FROM call_ai_analysis WHERE uniqueid = :u"); $cq->execute([':u' => $uid]);
                 $cr = $cq->fetch(PDO::FETCH_ASSOC);
-                if ($cr && trim((string)$cr['resumo']) !== '' && trim((string)$cr['transcript']) !== '') {
+                if ($cr && (int)($cr['analysis_ver'] ?? 0) >= AI_CALL_ANALYSIS_VER && trim((string)$cr['resumo']) !== '' && trim((string)$cr['transcript']) !== '') {
                     if (function_exists('logUserAction')) logUserAction('Abriu análise IA salva', $uid, 'RELATORIOS');
                     echo json_encode(['success' => true, 'cached' => true, 'saved' => true, 'uid' => $uid, 'resumo' => (string)$cr['resumo'], 'sentimento' => (string)$cr['sentimento'],
                         'satisfacao' => ($cr['satisfacao'] !== null && $cr['satisfacao'] !== '') ? (float)$cr['satisfacao'] : null, 'recomendacao' => (string)$cr['recomendacao'],

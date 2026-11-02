@@ -199,6 +199,7 @@ foreach ($cdr_list as $c_real) {
         'has_recording' => !empty($c_real['recordingfile']),
         'src_num' => (string)($c_real['src'] ?? ''), 'dst_num' => (string)($c_real['dst'] ?? ''),
         'analyzed' => (bool)$an,
+        'stale' => (bool)$an && !empty($c_real['recordingfile']) && (int)($an['analysis_ver'] ?? 0) < AI_CALL_ANALYSIS_VER,
         'calldate' => date('d/m/Y H:i', strtotime($c_real['calldate'])),
         'client_name' => $src_cdata ? $src_cdata['name'] : "Cliente $phone_num",
         'cdata' => $src_cdata,
@@ -603,7 +604,7 @@ async function iaAnalyzeUid(uid, force) {
 let IA_NEEDS_RELOAD = false;
 
 async function openAuditOrAnalyze(data, btn) {
-    if (data.analyzed || !data.has_recording) { openFullIaAuditModal(data); return; }
+    if ((data.analyzed && !data.stale) || !data.has_recording) { openFullIaAuditModal(data); return; }   // análise de versão antiga é refeita com o método atual
     const orig = btn.innerHTML;
     btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Analisando...';
     try {
