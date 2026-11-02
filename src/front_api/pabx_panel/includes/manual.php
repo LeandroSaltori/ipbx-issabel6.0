@@ -155,6 +155,8 @@ return [
             'dica' => 'Ao atualizar o sistema, o instalador também testa o MySQL no final e mostra "MySQL OK" ou o que precisa de atenção.',
             'kw' => 'status consertar banco mysql senha relatório suporte erro diagnóstico instalador'],
         ['t' => 'Status da Integração', 'd' => 'Mostra se cada parte do sistema está funcionando.'],
+        ['t' => 'Atualizações automáticas do sistema', 'd' => 'O IPbx Prisma se mantém atualizado sozinho: toda madrugada o servidor busca as novidades e correções e as aplica, sem você precisar fazer nada e sem interromper ligações. Antes de atualizar ele guarda uma cópia do sistema e depois confere se o painel e a central estão funcionando; se algo não estiver certo, volta sozinho à versão anterior e avisa a equipe técnica. Seus dados (usuários, agendas, bloqueios, chaves e integrações) não são alterados. Para saber o que mudou, abra Novidades no menu da sua conta.',
+            'dica' => 'Você não precisa fazer nada. Se notar algo diferente depois de uma atualização, avise o suporte informando o dia e a tela.'],
         ['t' => 'Painel de Segurança', 'd' => 'Tentativas de acesso indevido, endereços bloqueados (com opção de desbloquear) e lista de endereços sempre liberados. A lista é a mesma usada pela proteção da central.'],
         ['t' => 'Conversas do Assistente IA', 'd' => 'Para administradores: veja o que cada usuário conversou com o assistente.'],
         ['t' => 'Logs & Diagnósticos', 'd' => 'Registro de quem fez o quê no painel, útil para auditoria e suporte.'],

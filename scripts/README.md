@@ -12,14 +12,18 @@ A maioria destes scripts pode ser executada de forma independente ou através da
 | :--- | :---: | :--- |
 | **`motd.sh`** | **[1]** | Banner personalizado de boas-vindas do terminal SSH (MOTD) exibindo status, logo e links de suporte. |
 | **`update-addressbook`** | **[6]** | Sincronizador de contatos da agenda SQLite (`address_book.db`) e geração de listas de discagem rápida. |
-| **`ipbx-sentinel.sh`** | **[20]** | **Monitor único de segurança** com Telegram: web shells, módulos falsos, firewall, dialplan/cron maliciosos e contas/senhas. (`monitor_prisma.sh` é só um atalho de compatibilidade.) |
-| **`ipbx-autoupdate.sh`** | **[24]** | Rotina de atualização semanal automática do PBX instalada no cron (`/etc/cron.weekly/ipbx-autoupdate`). |
+| **`ipbx-sentinel.sh`** | **[20]** | **Monitor único de segurança** com Telegram: web shells, módulos falsos, firewall, dialplan/cron maliciosos, **injeção no dialplan** (`[injection-N]`, payload Base64/eval), contas/senhas e `--notify` para avisos no Telegram. (`monitor_prisma.sh` é só um atalho de compatibilidade.) |
+| **`ipbx-autoupdate.sh`** | **[24]** | **Atualização automática contínua:** toda noite (02:00-05:30) segue a branch `main`, valida, tira snapshot, aplica, testa e faz rollback sozinha se falhar. Comandos: `ipbx-autoupdate --status \| --now \| --snapshots \| --rollback \| --off \| --on`. Cron: `/etc/cron.d/ipbx-autoupdate`. Guia: [`docs/autoupdate.md`](../docs/autoupdate.md). |
 | **`auto_dominio.sh`** | **[26]** | Assistente para configuração de domínio FQDN, emissão de certificado SSL Let's Encrypt e sincronização de chaves WSS WebRTC. |
 | **`limpa_logs.sh`** | **[27]** | Limpeza segura de disco e otimização de logs (trunca logs >50MB, limpa cache Smarty e preserva histórico CDR/gravações). |
 | **`ipbx-openvpn.sh`** | **[28]** | Instalador e configurador completo do servidor OpenVPN (EasyVPN) com Easy-RSA 3.0.8, interface web `ovpn2`, rotas e regras NAT. |
 | **`ipbx-openvpn-sync.sh`** | **[28]** | Sincronizador de certificados e usuários OpenVPN para manter clientes e rotas íntegras. |
 | **`ipbx-timezone.sh`** | **[30]** | Ajuste automático de data, hora, NTP e fuso horário oficial de Brasília/São Paulo (`America/Sao_Paulo`) no Linux, PHP e Asterisk. |
 | **`ipbx-logrotate.sh`** | *Auxiliar* | Regras customizadas de rotação diária de logs do Apache, Asterisk e serviços do Issabel. |
+| **`openvpn-prisma-v2.sh`** | *Auxiliar* | Instalador/gerenciador OpenVPN alternativo (multi-distro: Rocky 8/9, CentOS 7, Debian, Ubuntu e Proxmox). Roda por conta própria; o fluxo padrão do menu é o `ipbx-openvpn.sh`. |
+| **`ipbx-sounds-ptbr.sh`** | *Auxiliar* | Instala/atualiza os áudios do Asterisk em português do Brasil (ver `docs/audios_ptbr_asterisk.md`). |
+| **`gerar-mapa.py`** | *Automático* | Gera `docs/mapa-do-ipbx.html` (Mapa do Sistema) a partir do código e do git; roda no hook de commit e no instalador do painel. |
+| **`manual-shots/`** | *Ferramenta de desenvolvimento* | Gera as imagens do Manual (recorte da tela, destaque numerado e legenda). Ver AGENTS.md regra 11. |
 | **`ipbx-security-hardening.sh`**| *Auxiliar* | Script mestre de imunização e bloqueio de vulnerabilidades conhecidas em servidores Issabel em produção. |
 
 ---
