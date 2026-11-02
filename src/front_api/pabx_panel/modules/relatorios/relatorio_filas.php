@@ -811,7 +811,7 @@ $agNaoAtendJson = json_encode($agNaoAtend);
             </div>
         </div>
         <div id="filas-full-ai-box" class="bg-slate-950/80 p-4 rounded-xl border border-slate-800 hidden">
-            <div id="filas-full-ai-out" class="text-slate-300 text-xs leading-relaxed">--</div>
+            <div id="filas-full-ai-out" class="text-slate-300 text-xs leading-relaxed">Ainda sem análise. Clique em Analisar com IA para gerar o resumo do período.</div>
         </div>
     </div>
     <script>

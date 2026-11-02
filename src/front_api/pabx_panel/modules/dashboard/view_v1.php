@@ -516,7 +516,7 @@ if ($ast_db) {
                             Detalhamento de Chamadas
                         </h3>
                         <div class="flex items-center gap-2 text-xs text-slate-400 mt-0.5 font-mono">
-                            <span>Período: <strong id="modal-kpi-period" class="text-slate-200">--</strong></span>
+                            <span>Período: <strong id="modal-kpi-period" class="text-slate-200">Sem período</strong></span>
                             <span>·</span>
                             <span class="text-brand-400 font-bold"><strong id="modal-kpi-count">0</strong> chamadas encontradas</span>
                         </div>

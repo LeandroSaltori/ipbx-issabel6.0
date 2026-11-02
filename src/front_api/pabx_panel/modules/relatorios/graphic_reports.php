@@ -320,7 +320,7 @@ if (empty($queue_stats)) {
             </div>
         </div>
         <div id="graphic-ai-container" class="bg-slate-950/80 p-4 rounded-xl border border-slate-800 hidden">
-            <p id="graphic-ai-text" class="text-slate-300 text-xs leading-relaxed italic">--</p>
+            <p id="graphic-ai-text" class="text-slate-300 text-xs leading-relaxed italic">Ainda sem análise. Clique em Analisar com IA para gerar o resumo do período.</p>
         </div>
     </div>
 

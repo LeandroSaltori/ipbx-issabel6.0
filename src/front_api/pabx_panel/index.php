@@ -1023,7 +1023,7 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
 
         $body     = json_decode(file_get_contents('php://input'), true);
         $provider = trim($body['provider']  ?? getSetting('ai_provider') ?? 'openai');
-        $key      = trim($body['api_key']   ?? getSetting('ai_api_key')  ?? '');
+        $key      = trim($body['api_key']   ?? '') ?: aiKeyFor($provider);
         $baseUrl  = trim($body['base_url']  ?? getSetting('ai_base_url') ?? '');
         $model    = trim($body['model_chat']?? getSetting('ai_model_chat')?? '');
 
