@@ -337,6 +337,11 @@ su -s /bin/bash asterisk -c "php $DEST_DIR/pabx_panel/cron/db_check.php" 2>/dev/
 # Índice de apoio da tabela de chamadas: os relatórios com "Ocultar chamadas repetidas" caem de ~20 s para menos de 1 s (só acrescenta o índice)
 echo " Preparando o índice das chamadas (acelera os relatórios)..."
 php "$DEST_DIR/pabx_panel/cron/cdr_index.php" 2>/dev/null || echo " [!] Não consegui preparar o índice das chamadas agora; os relatórios continuam funcionando, só mais lentos."
+# Atualização automática contínua (o servidor passa a buscar sozinho as novidades; --rollback desfaz)
+AU_SRC="$(cd "$SOURCE_DIR/../.." 2>/dev/null && pwd)/scripts/ipbx-autoupdate.sh"
+if [ -f "$AU_SRC" ]; then
+  bash "$AU_SRC" --install 2>/dev/null || echo " [!] Não consegui ativar a atualização automática agora; rode: bash $AU_SRC --install"
+fi
 echo ""
 echo " Pasta de produção: $DEST_DIR"
 echo " Backup original mantido: $BACKUP_OLD"
@@ -350,5 +355,6 @@ echo "    php $DEST_DIR/pabx_panel/set_password.php email@dominio.com"
 echo ""
 echo " Para reverter a qualquer momento, execute:"
 echo "    bash $DEST_DIR/instalar-front-api.sh --rollback"
+echo " Atualização automática: ipbx-autoupdate --status | --rollback | --off"
 echo "=========================================================="
 exit 0

@@ -389,7 +389,7 @@ cmd_audit() {
     crontab -l -u "$u" 2>/dev/null | grep -v '^#' | grep -E "$pat" | while read -r l; do warn "cron de $u: $l"; done
   done
   # um aviso por arquivo (com a 1a linha e a contagem); ignora o que e do proprio Sentinel/painel e o atualizador GeoIP do firewall
-  grep -rcE "$pat" /etc/cron.d /etc/cron.hourly /etc/cron.daily /etc/cron.weekly /etc/crontab 2>/dev/null | grep -vE ':0$|ipbx-sentinel|ipbx-watchdog|ipbx-front-api|geoip_update' | while IFS=: read -r f n; do
+  grep -rcE "$pat" /etc/cron.d /etc/cron.hourly /etc/cron.daily /etc/cron.weekly /etc/crontab 2>/dev/null | grep -vE ':0$|ipbx-sentinel|ipbx-watchdog|ipbx-front-api|ipbx-autoupdate|geoip_update' | while IFS=: read -r f n; do
     warn "$f ($n linha(s) suspeita(s)); 1a: $(grep -E "$pat" "$f" | grep -v '^\s*#' | head -1 | cut -c1-110)"
   done
   info "arquivos em /etc/cron.d: $(ls /etc/cron.d 2>/dev/null | tr '\n' ' ')"
@@ -859,6 +859,7 @@ case "${1:-}" in
     [[ "$2" =~ ^[A-Za-z0-9_.-]{1,32}$ ]] || { echo "Uso: ipbx-sentinel --sudo-ok USUARIO"; exit 1; }
     set_conf SENTINEL_SUDO_OK "$(printf '%s\n%s\n' "${SENTINEL_SUDO_OK//,/$'\n'}" "$2" | sed '/^$/d' | sort -u | paste -sd, -)"
     echo "Ok: sudo sem senha liberado para o usuario $2 (os demais continuam alertando)." ;;
+  --notify)      send_telegram "$2" ;;
   --uninstall)   rm -f /etc/cron.d/ipbx-sentinel; echo "Cron do Sentinel removido." ;;
   --list)        cmd_list ;;
   --restore)     cmd_restore "$2" ;;

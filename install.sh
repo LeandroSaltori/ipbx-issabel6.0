@@ -1498,19 +1498,13 @@ if [ -f "$REPO_DIR/scripts/ipbx-sentinel.sh" ]; then
 fi
 
 # ==============================================================================
-# CONFIGURAÇÃO DE ATUALIZAÇÃO AUTOMÁTICA SEMANAL (CRON & LOGS)
+# CONFIGURAÇÃO DE ATUALIZAÇÃO AUTOMÁTICA CONTÍNUA (CRON & LOGS)
 # ==============================================================================
-log_info "Configurando rotina de atualização semanal automática e registros de log..."
+log_info "Configurando a atualização automática contínua e os registros de log..."
 if [ -f "$REPO_DIR/scripts/ipbx-autoupdate.sh" ]; then
-    /bin/cp -f "$REPO_DIR/scripts/ipbx-autoupdate.sh" /usr/local/bin/ipbx-autoupdate
-    chmod +x /usr/local/bin/ipbx-autoupdate
-    
-    # Registra no cron semanal (/etc/cron.weekly/ipbx-autoupdate)
-    /bin/cp -f "$REPO_DIR/scripts/ipbx-autoupdate.sh" /etc/cron.weekly/ipbx-autoupdate
-    chmod +x /etc/cron.weekly/ipbx-autoupdate
-    
-    log_success "Atualização automática semanal configurada em /etc/cron.weekly/ipbx-autoupdate."
-    log_info "Os logs de atualização serão gerados em $REPO_DIR/autoupdate.log e $REPO_DIR/autoupdate_last_status.txt."
+    bash "$REPO_DIR/scripts/ipbx-autoupdate.sh" --install
+    log_success "Atualização automática contínua configurada (/etc/cron.d/ipbx-autoupdate; rollback: ipbx-autoupdate --rollback)."
+    log_info "Logs da atualização automática: /var/log/ipbx-autoupdate.log (estado: ipbx-autoupdate --status)."
 fi
 
 # ==============================================================================

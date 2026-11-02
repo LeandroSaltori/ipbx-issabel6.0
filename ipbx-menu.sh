@@ -1338,11 +1338,8 @@ EOF
 update_autoupdate() {
     log_info "Configurando rotina de atualização semanal automática..."
     if [ -f "$REPO_DIR/scripts/ipbx-autoupdate.sh" ]; then
-        /bin/cp -f "$REPO_DIR/scripts/ipbx-autoupdate.sh" /usr/local/bin/ipbx-autoupdate
-        chmod +x /usr/local/bin/ipbx-autoupdate
-        /bin/cp -f "$REPO_DIR/scripts/ipbx-autoupdate.sh" /etc/cron.weekly/ipbx-autoupdate
-        chmod +x /etc/cron.weekly/ipbx-autoupdate
-        log_success "Atualização automática semanal configurada."
+        bash "$REPO_DIR/scripts/ipbx-autoupdate.sh" --install
+        log_success "Atualização automática contínua configurada (rollback: ipbx-autoupdate --rollback)."
     else
         log_error "Script ipbx-autoupdate.sh não encontrado no repositório."
     fi
