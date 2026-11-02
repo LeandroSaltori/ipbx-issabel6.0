@@ -495,14 +495,20 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
         while (ob_get_level()) ob_end_clean();
         if (!hasUserPermission('mod_relatorios')) { http_response_code(403); header('Content-Type: text/plain; charset=utf-8'); echo 'Sem permissão.'; exit; }
         aiAuditEnsureSchema();
+        // mesmo período do filtro da tela (hoje / ontem / mês / datas escolhidas); 30 dias = 30 dias, 100 = 100
+        $pre = (string)($_GET['preset'] ?? ''); $ds = (string)($_GET['date_start'] ?? ($_GET['start_date'] ?? '')); $de = (string)($_GET['date_end'] ?? ($_GET['end_date'] ?? ''));
+        if ($pre === 'today') { $d1 = $d2 = date('Y-m-d'); } elseif ($pre === 'yesterday') { $d1 = $d2 = date('Y-m-d', strtotime('yesterday')); } elseif ($pre === 'month') { $d1 = date('Y-m-01'); $d2 = date('Y-m-d'); }
+        else { $d1 = preg_match('/^\d{4}-\d{2}-\d{2}/', $ds) ? substr($ds, 0, 10) : date('Y-m-d', strtotime('-7 days')); $d2 = preg_match('/^\d{4}-\d{2}-\d{2}/', $de) ? substr($de, 0, 10) : date('Y-m-d'); }
         $rows = [['Data/Hora', 'Origem', 'Destino', 'Sentimento', 'Nota QA', 'Satisfação', 'Resumo']];
         $cnt = 0;
-        foreach ($db->query("SELECT calldate, src, dst, sentimento, qa_score, satisfacao, resumo FROM call_ai_analysis ORDER BY calldate DESC LIMIT 200") as $r) {
+        $stl = $db->prepare("SELECT calldate, src, dst, sentimento, qa_score, satisfacao, resumo FROM call_ai_analysis WHERE calldate >= :a AND calldate <= :b ORDER BY calldate DESC LIMIT 20000");
+        $stl->execute([':a' => "$d1 00:00:00", ':b' => "$d2 23:59:59"]);
+        foreach ($stl->fetchAll(PDO::FETCH_ASSOC) as $r) {
             $cnt++;
             $rows[] = [$r['calldate'] ? date('d/m/Y H:i', strtotime($r['calldate'])) : '-', formatPhoneNumber((string)$r['src']), (string)$r['dst'], (string)($r['sentimento'] ?: '-'), $r['qa_score'] !== null ? $r['qa_score'] . '/100' : '-', ($r['satisfacao'] !== null && $r['satisfacao'] !== '') ? $r['satisfacao'] . '/5' : '-', (string)$r['resumo']];
         }
         $lu = getLoggedUser(); $who = trim((string)($lu['name'] ?? $lu['email'] ?? ''));
-        $pdf = shareBuildPdf('Auditoria de chamadas por IA', "Chamadas analisadas (mais recentes, até 200): $cnt" . ($who !== '' ? "\nGerado por: $who" : ''), $rows);
+        $pdf = shareBuildPdf('Auditoria de chamadas por IA', "Período: " . date('d/m/Y', strtotime($d1)) . ' a ' . date('d/m/Y', strtotime($d2)) . " | Chamadas analisadas: $cnt" . ($who !== '' ? "\nGerado por: $who" : ''), $rows);
         if (function_exists('logUserAction')) logUserAction('Baixou PDF da lista de auditoria IA', (string)$cnt . ' chamadas', 'RELATORIOS');
         header('Content-Type: application/pdf'); header('Content-Disposition: attachment; filename="Auditoria_IA_lista.pdf"'); header('Content-Length: ' . strlen($pdf)); header('Cache-Control: private, no-store');
         echo $pdf; exit;
@@ -2086,7 +2092,7 @@ if ($__wp_u && userHasWebphone($__wp_u)
             try {
                 let r;
                 if (!modalOpen) {
-                    r = await fetch('index.php?api_action=ia_audit_list_pdf', {credentials: 'same-origin'});
+                    r = await fetch('index.php?api_action=ia_audit_list_pdf&' + new URLSearchParams(Array.from(new URLSearchParams(location.search)).filter(([k]) => ['preset','date_start','date_end','start_date','end_date'].includes(k))).toString(), {credentials: 'same-origin'});
                 } else {
                     const t = (id) => ($(id)?.innerText || '').trim();
                     const per = window.__dashPeriod || {}; const br = (x) => x ? x.split('-').reverse().join('/') : '';
