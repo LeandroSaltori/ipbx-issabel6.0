@@ -3339,6 +3339,24 @@ dialog#ai-chat-dialog::backdrop{background:rgba(0,0,0,.65);backdrop-filter:blur(
 </style>
 <button id="ai-chat-fab" type="button" title="Assistente IA" onclick="aiChatOpen()"><i class="fa-solid fa-robot"></i></button>
 <script>
+// Botão do assistente arrastável: segure e arraste para tirar da frente de qualquer botão; a posição fica salva neste navegador
+(function(){
+  var f = document.getElementById('ai-chat-fab'); if (!f) return;
+  f.style.touchAction = 'none'; f.style.cursor = 'grab'; f.title = 'Assistente IA (segure e arraste para mover)';
+  function clamp(x, y){ var w = f.offsetWidth || 54, h = f.offsetHeight || 54; return [Math.max(4, Math.min(window.innerWidth - w - 4, x)), Math.max(4, Math.min(window.innerHeight - h - 4, y))]; }
+  function put(x, y){ var c = clamp(x, y); f.style.left = c[0] + 'px'; f.style.top = c[1] + 'px'; f.style.right = 'auto'; f.style.bottom = 'auto'; }
+  try { var sv = JSON.parse(localStorage.getItem('ai_fab_pos') || 'null'); if (sv && isFinite(sv.x) && isFinite(sv.y)) put(sv.x, sv.y); } catch (e) {}
+  window.addEventListener('resize', function(){ if (f.style.left) { var r = f.getBoundingClientRect(); put(r.left, r.top); } });
+  var sx, sy, ox, oy, drag = false, moved = false;
+  f.addEventListener('pointerdown', function(e){ if (e.button && e.button !== 0) return; var r = f.getBoundingClientRect(); sx = e.clientX; sy = e.clientY; ox = r.left; oy = r.top; drag = true; moved = false; try { f.setPointerCapture(e.pointerId); } catch (x) {} });
+  f.addEventListener('pointermove', function(e){ if (!drag) return; var dx = e.clientX - sx, dy = e.clientY - sy; if (!moved && Math.abs(dx) + Math.abs(dy) < 6) return; moved = true; f.style.cursor = 'grabbing'; put(ox + dx, oy + dy); });
+  function end(e){ if (!drag) return; drag = false; f.style.cursor = 'grab'; if (moved) { var r = f.getBoundingClientRect(); try { localStorage.setItem('ai_fab_pos', JSON.stringify({x: Math.round(r.left), y: Math.round(r.top)})); } catch (x) {} } }
+  f.addEventListener('pointerup', end); f.addEventListener('pointercancel', end);
+  // se foi arrasto, não abre o chat
+  f.addEventListener('click', function(e){ if (moved) { e.stopImmediatePropagation(); e.preventDefault(); moved = false; } }, true);
+})();
+</script>
+<script>
 (function(){
   var hist = [], dlg = null, body = null, started = false, busy = false;
   var SUG = ['Ligações de hoje do ramal 201', 'Quantas vezes o número 11999998888 ligou nos últimos 7 dias?', 'Resumo das chamadas de hoje', 'Como estão as filas agora?', 'Quais ramais estão em chamada?'];
