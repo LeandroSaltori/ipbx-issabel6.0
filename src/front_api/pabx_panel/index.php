@@ -49,7 +49,7 @@ try {
 // =========================================================================
 // AUTENTICAÇÃO (portão único do painel)
 // =========================================================================
-$__api_action_names = ['ia_audit_export', 'get_logs', 'get_fop_extensions', 'get_trunks_status', 'get_queues_realtime', 'get_parking_lots', 'fop_action', 'originate_call', 'save_contact', 'test_llm_connection', 'analyze_pabx_insights', 'operator_survey_stats', 'panel_rev', 'status_repair', 'status_report', 'generate_ai_insights', 'get_ai_insights_history', 'delete_ai_insight', 'transcribe_audio', 'get_kpi_calls_detail', 'get_active_calls', 'get_time_groups', 'get_time_group_rules', 'save_time_group_rule', 'delete_time_group_rule', 'get_announcements_list', 'update_announcement_audio', 'sync_assets', 'ai_chat', 'ai_chat_info', 'ai_chat_history', 'ai_chat_clear', 'ai_chat_confirm', 'ext_features_get', 'ext_features_set', 'console_exec'];
+$__api_action_names = ['ia_audit_export', 'operator_ia_pdf', 'ia_audit_list_pdf', 'get_logs', 'get_fop_extensions', 'get_trunks_status', 'get_queues_realtime', 'get_parking_lots', 'fop_action', 'originate_call', 'save_contact', 'test_llm_connection', 'analyze_pabx_insights', 'operator_survey_stats', 'panel_rev', 'status_repair', 'status_report', 'generate_ai_insights', 'get_ai_insights_history', 'delete_ai_insight', 'transcribe_audio', 'get_kpi_calls_detail', 'get_active_calls', 'get_time_groups', 'get_time_group_rules', 'save_time_group_rule', 'delete_time_group_rule', 'get_announcements_list', 'update_announcement_audio', 'sync_assets', 'ai_chat', 'ai_chat_info', 'ai_chat_history', 'ai_chat_clear', 'ai_chat_confirm', 'ext_features_get', 'ext_features_set', 'console_exec'];
 if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['action'], $__api_action_names, true))) {
     authGate('json');
 } else {
@@ -461,6 +461,41 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
     }
 
     // PDF da Auditoria IA de UMA chamada (documento completo: dados, resumo, recomendação, riscos, checklist e transcrição inteira)
+    // PDF do relatório de IA do operador (montado no servidor a partir dos dados exibidos no modal)
+    if ($action === 'operator_ia_pdf') {
+        while (ob_get_level()) ob_end_clean();
+        if (!hasUserPermission('mod_relatorios')) { http_response_code(403); header('Content-Type: text/plain; charset=utf-8'); echo 'Sem permissão.'; exit; }
+        $b = json_decode(file_get_contents('php://input'), true) ?: [];
+        $g = function ($k) use ($b) { return trim(mb_substr((string)($b[$k] ?? ''), 0, 1500)); };
+        $lu = getLoggedUser(); $who = trim((string)($lu['name'] ?? $lu['email'] ?? ''));
+        $meta = [['Atendente', $g('name')], ['Ramal', $g('ramal')], ['Período', $g('periodo')], ['Nota média (pesquisa)', $g('score') . ' ' . $g('score_sub')],
+                 ['Problema resolvido', $g('fcr') . ' ' . $g('fcr_sub')], ['Avaliações no período', $g('n')],
+                 ['Positivas', $g('pos')], ['Neutras', $g('neu')], ['Negativas', $g('neg')]];
+        $ins = array_values(array_filter(array_map(function ($x) { return trim(mb_substr((string)$x, 0, 400)); }, (array)($b['insights'] ?? []))));
+        $secs = [['h' => 'Resumo', 'p' => $g('summary') ?: 'Sem dados.'], ['h' => 'Pontos de atenção', 'items' => $ins ?: ['Nenhum.']]];
+        $pdf = shareBuildDocPdf('Relatório de IA do atendente', 'IPbx Prisma - ' . $g('name'), $meta, $secs, 'IPbx Prisma - gerado em ' . date('d/m/Y H:i') . ($who !== '' ? ' por ' . $who : ''));
+        if (function_exists('logUserAction')) logUserAction('Baixou PDF do relatório IA do atendente', $g('ramal'), 'RELATORIOS');
+        header('Content-Type: application/pdf'); header('Content-Disposition: attachment; filename="Relatorio_IA_' . preg_replace('/[^0-9A-Za-z_.-]/', '_', $g('name') ?: 'atendente') . '.pdf"'); header('Content-Length: ' . strlen($pdf)); header('Cache-Control: private, no-store');
+        echo $pdf; exit;
+    }
+    // PDF com a lista das chamadas auditadas pela IA (botão da tela Auditoria IA)
+    if ($action === 'ia_audit_list_pdf') {
+        while (ob_get_level()) ob_end_clean();
+        if (!hasUserPermission('mod_relatorios')) { http_response_code(403); header('Content-Type: text/plain; charset=utf-8'); echo 'Sem permissão.'; exit; }
+        aiAuditEnsureSchema();
+        $rows = [['Data/Hora', 'Origem', 'Destino', 'Sentimento', 'Nota QA', 'Satisfação', 'Resumo']];
+        $cnt = 0;
+        foreach ($db->query("SELECT calldate, src, dst, sentimento, qa_score, satisfacao, resumo FROM call_ai_analysis ORDER BY calldate DESC LIMIT 200") as $r) {
+            $cnt++;
+            $rows[] = [$r['calldate'] ? date('d/m/Y H:i', strtotime($r['calldate'])) : '-', formatPhoneNumber((string)$r['src']), (string)$r['dst'], (string)($r['sentimento'] ?: '-'), $r['qa_score'] !== null ? $r['qa_score'] . '/100' : '-', ($r['satisfacao'] !== null && $r['satisfacao'] !== '') ? $r['satisfacao'] . '/5' : '-', (string)$r['resumo']];
+        }
+        $lu = getLoggedUser(); $who = trim((string)($lu['name'] ?? $lu['email'] ?? ''));
+        $pdf = shareBuildPdf('Auditoria de chamadas por IA', "Chamadas analisadas (mais recentes, até 200): $cnt" . ($who !== '' ? "\nGerado por: $who" : ''), $rows);
+        if (function_exists('logUserAction')) logUserAction('Baixou PDF da lista de auditoria IA', (string)$cnt . ' chamadas', 'RELATORIOS');
+        header('Content-Type: application/pdf'); header('Content-Disposition: attachment; filename="Auditoria_IA_lista.pdf"'); header('Content-Length: ' . strlen($pdf)); header('Cache-Control: private, no-store');
+        echo $pdf; exit;
+    }
+
     if ($action === 'ia_audit_export') {
         while (ob_get_level()) ob_end_clean();
         if (!hasUserPermission('mod_relatorios')) { http_response_code(403); header('Content-Type: text/plain; charset=utf-8'); echo 'Sem permissão para ver relatórios.'; exit; }
@@ -2033,29 +2068,26 @@ if ($__wp_u && userHasWebphone($__wp_u)
         }
 
         async function downloadIaReportPdf() {
-            const card = document.getElementById('modal-operator-ia-card');
-            if (!card) return;
-
-            showIaToast('Gerando PDF do Relatório...', true);
-            const opName = (document.getElementById('ia-modal-op-name')?.innerText || 'Operador').trim().replace(/[^a-zA-Z0-9_-]/g, '_');
-            const filename = `Relatorio_IA_${opName}.pdf`;
-
-            if (window.html2pdf) {
-                const opt = {
-                    margin:       0.2,
-                    filename:     filename,
-                    image:        { type: 'jpeg', quality: 0.98 },
-                    html2canvas:  { scale: 2, useCORS: true, backgroundColor: '#0f172a' },
-                    jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
-                };
-                html2pdf().set(opt).from(card).save().then(() => {
-                    showIaToast('PDF baixado com sucesso!');
-                }).catch(() => {
-                    printIaReportFallback(card, filename);
-                });
-            } else {
-                printIaReportFallback(card, filename);
-            }
+            const $ = (id) => document.getElementById(id);
+            const modalOpen = $('modal-operator-ia') && !$('modal-operator-ia').classList.contains('hidden');
+            showIaToast('Gerando PDF...', true);
+            try {
+                let r;
+                if (!modalOpen) {
+                    r = await fetch('index.php?api_action=ia_audit_list_pdf', {credentials: 'same-origin'});
+                } else {
+                    const t = (id) => ($(id)?.innerText || '').trim();
+                    const per = window.__dashPeriod || {}; const br = (x) => x ? x.split('-').reverse().join('/') : '';
+                    const periodo = (per.start && per.end) ? (per.start === per.end ? br(per.start) : br(per.start) + ' a ' + br(per.end)) : 'últimos 30 dias';
+                    const body = {name: t('ia-modal-op-name'), ramal: t('ia-modal-ramal-badge'), periodo, score: t('ia-modal-score'), score_sub: t('ia-modal-score-sub'), fcr: t('ia-modal-fcr'), fcr_sub: t('ia-modal-fcr-sub'), n: t('ia-modal-empathy'), pos: t('ia-modal-sent-pos'), neu: t('ia-modal-sent-neu'), neg: t('ia-modal-sent-neg'), summary: t('ia-modal-summary'), insights: Array.from($('ia-modal-insights').querySelectorAll('li')).map(li => li.innerText)};
+                    r = await fetch('index.php?api_action=operator_ia_pdf', {method: 'POST', credentials: 'same-origin', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
+                }
+                if (!r.ok) throw new Error(await r.text());
+                const blob = await r.blob(); const cd = r.headers.get('Content-Disposition') || '';
+                const fn = (cd.match(/filename="([^"]+)"/) || [])[1] || 'Relatorio_IA.pdf';
+                const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = fn; document.body.appendChild(a); a.click(); a.remove();
+                showIaToast('PDF baixado com sucesso!');
+            } catch (e) { showIaToast('Não foi possível gerar o PDF: ' + (e.message || e), false); }
         }
 
         function printIaReportFallback(card, filename) {

@@ -1814,7 +1814,20 @@ function shareBuildXlsx($rows, $sheetName = 'Relatório') {
     if (!class_exists('ZipArchive')) return '';
     $esc = function ($t) { return htmlspecialchars((string)$t, ENT_XML1 | ENT_QUOTES, 'UTF-8'); };
     $colName = function ($i) { $n = ''; $i++; while ($i > 0) { $m = ($i - 1) % 26; $n = chr(65 + $m) . $n; $i = intdiv($i - $m - 1, 26); } return $n; };
-    $sheet = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"/></sheetViews><cols><col min="1" max="30" width="22" customWidth="1"/></cols><sheetData>';
+    // larguras pelo conteúdo, cabeçalho congelado e filtro no primeiro bloco
+    $wid = []; $firstHead = 0; $blockEnd = 0; $ncolMax = 1; $rr = 0; $inFirst = false;
+    foreach ($rows as $row) {
+        $rr++;
+        if (!$row) { if ($inFirst) { $inFirst = false; $blockEnd = $rr - 1; } continue; }
+        if (!$firstHead) { $firstHead = $rr; $inFirst = true; }
+        $ncolMax = max($ncolMax, count($row));
+        foreach ($row as $ci => $v) $wid[$ci] = max($wid[$ci] ?? 8, min(60, mb_strlen((string)$v) + 3));
+    }
+    if ($inFirst) $blockEnd = $rr;
+    $cols = '';
+    for ($i = 0; $i < $ncolMax; $i++) $cols .= '<col min="' . ($i + 1) . '" max="' . ($i + 1) . '" width="' . ($wid[$i] ?? 12) . '" customWidth="1"/>';
+    $view = '<sheetView workbookViewId="0">' . ($firstHead ? '<pane ySplit="' . $firstHead . '" topLeftCell="A' . ($firstHead + 1) . '" activePane="bottomLeft" state="frozen"/>' : '') . '</sheetView>';
+    $sheet = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews>' . $view . '</sheetViews><cols>' . $cols . '</cols><sheetData>';
     $prevBlank = true; $r = 0;
     foreach ($rows as $row) {
         $r++;
@@ -1832,7 +1845,7 @@ function shareBuildXlsx($rows, $sheetName = 'Relatório') {
         }
         $sheet .= '</row>';
     }
-    $sheet .= '</sheetData></worksheet>';
+    $sheet .= '</sheetData>' . ($firstHead && $blockEnd > $firstHead ? '<autoFilter ref="A' . $firstHead . ':' . $colName($ncolMax - 1) . $blockEnd . '"/>' : '') . '</worksheet>';
     $tmp = tempnam(sys_get_temp_dir(), 'xlsx');
     $z = new ZipArchive();
     if ($z->open($tmp, ZipArchive::OVERWRITE) !== true) return '';
@@ -1858,12 +1871,16 @@ function shareBuildPdf($title, $summary, $rows) {
     $W = 842; $H = 595; $M = 30; $fs = 8; $cw = $fs * 0.58; $lh = 13;
     // larguras proporcionais ao conteúdo
     $ncol = 1; $maxlen = [];
-    foreach ($rows as $r) { $ncol = max($ncol, count($r)); foreach ($r as $i => $v) $maxlen[$i] = max($maxlen[$i] ?? 4, min(34, mb_strlen((string)$v))); }
+    foreach ($rows as $r) { $ncol = max($ncol, count($r)); foreach ($r as $i => $v) $maxlen[$i] = max($maxlen[$i] ?? 4, min(40, mb_strlen((string)$v))); }
     $wcol = []; $tot = 0;
     for ($i = 0; $i < $ncol; $i++) { $wcol[$i] = (($maxlen[$i] ?? 4) + 2) * $cw; $tot += $wcol[$i]; }
     $avail = $W - 2 * $M;
     if ($tot > $avail) { $k = $avail / $tot; foreach ($wcol as &$w) $w *= $k; unset($w); }
     $fit = function ($t, $w) use ($cw) { $t = (string)$t; $max = max(1, (int)floor(($w - 4) / $cw)); return mb_strlen($t) > $max ? mb_substr($t, 0, max(1, $max - 1)) . '…' : $t; };
+    $wrap = function ($t, $w) use ($cw) { $t = trim(preg_replace('/\s+/u', ' ', (string)$t)); $max = max(4, (int)floor(($w - 4) / $cw)); $out = []; $line = '';
+        foreach (explode(' ', $t) as $word) { while (mb_strlen($word) > $max) { if ($line !== '') { $out[] = $line; $line = ''; } $out[] = mb_substr($word, 0, $max); $word = mb_substr($word, $max); }
+            if ($line === '') $line = $word; elseif (mb_strlen($line) + 1 + mb_strlen($word) <= $max) $line .= ' ' . $word; else { $out[] = $line; $line = $word; } }
+        $out[] = $line; return $out; };
 
     $pages = []; $cur = ''; $y = $H - $M;
     $newPage = function () use (&$cur, &$y, &$pages, $H, $M) { if ($cur !== '') $pages[] = $cur; $cur = ''; $y = $H - $M; };
@@ -1882,8 +1899,14 @@ function shareBuildPdf($title, $summary, $rows) {
         if ($y < $M + 30) { $newPage(); if ($lastHead && !$isHead) { $x = $M; $cur .= "0.886 0.910 0.941 rg " . $M . ' ' . ($y - 3) . ' ' . $avail . ' ' . $lh . " re f 0 g\n"; foreach ($lastHead as $i => $v) { $text($x + 2, $y, $fit($v, $wcol[$i]), true); $x += $wcol[$i]; } $y -= $lh; } }
         $x = $M;
         if ($isHead) $cur .= "0.886 0.910 0.941 rg " . $M . ' ' . ($y - 3) . ' ' . $avail . ' ' . $lh . " re f 0 g\n";
-        foreach ($row as $i => $v) { $text($x + 2, $y, $fit($v, $wcol[$i] ?? 40), $isHead); $x += ($wcol[$i] ?? 40); }
-        $y -= $lh;
+        if ($isHead) { foreach ($row as $i => $v) { $text($x + 2, $y, $fit($v, $wcol[$i] ?? 40), true); $x += ($wcol[$i] ?? 40); } $y -= $lh; }
+        else {
+            $cells = []; $nl = 1;
+            foreach ($row as $i => $v) { $cells[$i] = $wrap($v, $wcol[$i] ?? 40); $nl = max($nl, count($cells[$i])); }
+            if ($y - ($nl - 1) * 10 < $M + 20) { $newPage(); if ($lastHead) { $hx = $M; $cur .= "0.886 0.910 0.941 rg " . $M . ' ' . ($y - 3) . ' ' . $avail . ' ' . $lh . " re f 0 g\n"; foreach ($lastHead as $i => $v) { $text($hx + 2, $y, $fit($v, $wcol[$i]), true); $hx += $wcol[$i]; } $y -= $lh; } }
+            foreach ($cells as $i => $ls) { foreach ($ls as $k => $l) $text($x + 2, $y - $k * 10, $l); $x += ($wcol[$i] ?? 40); }
+            $y -= $lh + ($nl - 1) * 10;
+        }
     }
     if ($cur !== '') $pages[] = $cur;
     $n = count($pages);
