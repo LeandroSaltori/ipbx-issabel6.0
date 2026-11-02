@@ -1600,7 +1600,11 @@ if ($__wp_u && userHasWebphone($__wp_u)
             <!-- Header Bar -->
             <?php if ($module === 'manual'): ?>
             <header class="h-14 shrink-0 sticky top-0 z-30 flex items-center justify-between px-6 border-b border-slate-800 bg-slate-900/95 backdrop-blur">
-                <div class="flex items-center gap-2.5 font-bold text-white"><i class="fa-solid fa-book text-brand-400"></i> Manual do IPbx Prisma</div>
+                <a href="#" id="mn-home" class="flex items-center gap-2.5 font-bold text-white no-underline whitespace-nowrap"><i class="fa-solid fa-book text-brand-400"></i> Central de Ajuda IPbx Prisma</a>
+                <div class="relative flex-1 max-w-xl mx-4">
+                    <input id="man-busca" type="search" autocomplete="off" placeholder="Buscar no manual... (Ctrl+K)" class="bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 text-sm text-white w-full">
+                    <div class="mn-res" id="mn-res"></div>
+                </div>
                 <a href="index.php?module=dashboard&action=view_v1" onclick="if (window.opener) { window.close(); return false; }" class="px-3 h-9 rounded-lg bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 transition text-xs flex items-center gap-1.5 border border-slate-700 font-bold"><i class="fa-solid fa-xmark"></i> Fechar manual</a>
             </header>
             <?php else: include_once __DIR__ . '/includes/header.php'; endif; ?>

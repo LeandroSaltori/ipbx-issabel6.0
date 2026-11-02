@@ -54,13 +54,6 @@ $__img = function ($f) { return (!empty($f) && preg_match('#^[A-Za-z0-9_./-]+$#'
 @media(max-width:760px){.mn-wrap{grid-template-columns:1fr}.mn-side{position:static;max-height:none}}
 </style>
 <div class="space-y-4" id="mn-root">
-    <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
-        <a href="#" id="mn-home" class="text-xl font-bold text-white no-underline"><i class="fa-solid fa-book text-brand-400 mr-2"></i>Central de Ajuda IPbx Prisma</a>
-        <div class="relative w-full md:w-96">
-            <input id="man-busca" type="search" autocomplete="off" placeholder="Buscar no manual... (Ctrl+K)" class="bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 text-sm text-white w-full">
-            <div class="mn-res" id="mn-res"></div>
-        </div>
-    </div>
     <div class="mn-wrap">
         <nav class="mn-side" aria-label="Menu do manual">
             <div class="mn-all"><a id="mn-open-all">Expandir tudo</a><a id="mn-close-all">Recolher tudo</a></div>
