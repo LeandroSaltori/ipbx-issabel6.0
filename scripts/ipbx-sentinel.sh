@@ -403,7 +403,7 @@ cmd_audit() {
       /tmp/*|/var/tmp/*|/dev/shm/*|*"(deleted)"*) warn "processo $pid rodando de local suspeito: $exe ($(tr '\0' ' ' < /proc/$pid/cmdline 2>/dev/null | cut -c1-80))" ;;
     esac
   done
-  pgrep -af 'sipsentinel/agent\.py|svmap|svwar|svcrack|sipvicious' 2>/dev/null | head -5 | while read -r l; do warn "PROCESSO DE ATAQUE SIP em execucao (botnet): $(echo "$l" | cut -c1-120)"; done
+  pgrep -af 'sipsentinel/agent\.py|svmap|svwar|svcrack|sipvicious' 2>/dev/null | grep -v 'pgrep' | head -5 | while read -r l; do warn "PROCESSO DE ATAQUE SIP em execucao (botnet): $(echo "$l" | cut -c1-120)"; done
   info "maiores consumidores de CPU:"; ps -eo pid,user,pcpu,comm --sort=-pcpu 2>/dev/null | head -6 | sed 's/^/     /'
 
   sec "4. Portas abertas"
@@ -707,7 +707,7 @@ check_persistence() {
   # shellcheck disable=SC2086
   while read -r l; do [ -n "$l" ] && persist_alert "sudo|$l" "sudo SEM SENHA para qualquer comando: $l"; done \
     < <(cat ${SENTINEL_SUDOERS:-/etc/sudoers /etc/sudoers.d/*} 2>/dev/null | grep -vE '^\s*#' | grep -E 'NOPASSWD:\s*ALL\s*$' \
-        | awk -v ok=",${SENTINEL_SUDO_OK// /}," '{u=$1; if (index(ok, "," u ",")==0) print}')
+        | awk -v ok=",root,${SENTINEL_SUDO_OK// /}," '{u=$1; if (index(ok, "," u ",")==0) print}')
 }
 
 # Atributo imutavel/append-only em arquivos criticos: truque de invasor para impedir a
@@ -731,7 +731,7 @@ check_botnet() {
   for d in ${SENTINEL_BOTNET_DIRS:-/opt/sipsentinel /etc/sipsentinel /tmp/.sipvicious-home}; do
     [ -e "$d" ] && persist_alert "botnet|dir|$d" "pasta de ferramenta de ataque SIP encontrada: $d (agente que varre redes de terceiros e tenta chamadas fraudulentas)"
   done
-  p="$(pgrep -af 'sipsentinel/agent\.py|svmap|svwar|svcrack|sipvicious' 2>/dev/null | head -1)"
+  p="$(pgrep -af 'sipsentinel/agent\.py|svmap|svwar|svcrack|sipvicious' 2>/dev/null | grep -v 'pgrep' | head -1)"
   [ -n "$p" ] && persist_alert "botnet|proc" "processo de varredura/ataque SIP em execucao neste servidor: $(echo "$p" | cut -c1-120)"
 }
 
