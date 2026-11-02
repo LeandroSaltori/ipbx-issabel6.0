@@ -773,11 +773,27 @@ migrate_old_monitor() {
   return 0
 }
 
+# Devolve da quarentena arquivos legitimos que versoes antigas do Sentinel pegaram por engano
+# (falso positivo conhecido). Roda na instalacao/atualizacao; so restaura se o original nao existe.
+restore_false_positives() {
+  [ -s "$QUAR_ROOT/INDEX.tsv" ] || return 0
+  local orig dest
+  while IFS=$'\t' read -r _ orig dest _; do
+    case "$orig" in
+      */fop2/admin/kint.php)
+        if [ ! -e "$orig" ] && [ -e "$dest" ]; then
+          chmod 644 "$dest" 2>/dev/null; mkdir -p "$(dirname "$orig")" && mv -f "$dest" "$orig" && log "restaurado da quarentena (falso positivo conhecido): $orig"
+        fi ;;
+    esac
+  done < "$QUAR_ROOT/INDEX.tsv"
+}
+
 cmd_install() {
   local a prev="" cli="" noupd=0
   for a in "$@"; do [ "$prev" = "--cliente" ] && cli="$a"; [ "$a" = "--no-update" ] && noupd=1; prev="$a"; done
   mkdir -p /etc/ipbx "$QUAR_ROOT" /var/backup/ipbx
   chmod 700 "$QUAR_ROOT" 2>/dev/null
+  restore_false_positives
   local self; self="$(readlink -f "$0" 2>/dev/null || echo "$0")"
   if [ -f "$self" ] && [ "$self" != "/usr/local/bin/ipbx-sentinel" ]; then /bin/cp -f "$self" /usr/local/bin/ipbx-sentinel; fi
   chmod +x /usr/local/bin/ipbx-sentinel
