@@ -3337,6 +3337,10 @@ dialog#ai-chat-dialog::backdrop{background:rgba(0,0,0,.65);backdrop-filter:blur(
 #ai-chat-input{flex:1;background:#0f172a;border:1px solid #334155;border-radius:12px;color:#fff;padding:9px 12px;font-size:13px;outline:none}
 #ai-chat-send{background:linear-gradient(135deg,#7c3aed,#6366f1);border:0;color:#fff;border-radius:12px;padding:0 14px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0;width:auto;overflow:visible}
 </style>
+<script>
+// Se o arquivo da gravação não existir mais no servidor, troca o player "morto" por um aviso claro
+function ipbxRecFail(src) { var a = src.closest ? src.closest('audio') : null; if (!a || !a.parentNode) return; var sp = document.createElement('span'); sp.className = 'text-amber-400 text-[10px] italic'; sp.textContent = 'Arquivo da gravação não encontrado'; a.parentNode.replaceChild(sp, a); }
+</script>
 <button id="ai-chat-fab" type="button" title="Assistente IA" onclick="aiChatOpen()"><i class="fa-solid fa-robot"></i></button>
 <script>
 // Botão do assistente arrastável: segure e arraste para tirar da frente de qualquer botão; a posição fica salva neste navegador
