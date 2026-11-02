@@ -28,8 +28,10 @@ $__img = function ($f) { return (!empty($f) && preg_match('#^[A-Za-z0-9_./-]+$#'
 ?>
 <style>
 .mn-wrap{display:grid;grid-template-columns:270px minmax(0,1fr) 210px;gap:22px;align-items:start}
-.mn-side{position:sticky;top:12px;max-height:calc(100vh - 40px);overflow:auto;background:rgba(15,23,42,.9);border:1px solid #1e293b;border-radius:18px;padding:12px}
-.mn-grp{margin:14px 6px 4px;font-size:11px;font-weight:800;letter-spacing:.6px;color:#e2e8f0;text-transform:uppercase}
+.mn-side{position:sticky;top:70px;max-height:calc(100vh - 86px);overflow:auto;background:rgba(15,23,42,.9);border:1px solid #1e293b;border-radius:18px;padding:12px}
+.mn-grp{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;margin:8px 0 2px;padding:8px 8px;border:0;border-radius:10px;background:transparent;font-size:11px;font-weight:800;letter-spacing:.6px;color:#e2e8f0;text-transform:uppercase;cursor:pointer;text-align:left}.mn-grp:hover{background:#1e293b}
+.mn-grp .mn-chev{transition:transform .15s;color:#64748b;font-size:10px}.mn-g.open .mn-chev{transform:rotate(90deg)}.mn-items{display:none;padding-left:4px}.mn-g.open .mn-items{display:block}
+.mn-all{display:flex;justify-content:flex-end;gap:12px;font-size:11px;margin:0 6px 4px}.mn-all a{color:#64748b;cursor:pointer}.mn-all a:hover{color:#a5b4fc}
 .mn-lnk{display:block;padding:7px 10px;border-radius:10px;color:#94a3b8;font-size:13px;cursor:pointer;text-decoration:none}
 .mn-lnk:hover{background:#1e293b;color:#fff}.mn-lnk.on{background:rgba(99,102,241,.15);color:#a5b4fc;font-weight:700}
 .mn-art{display:none}.mn-art.on{display:block}
@@ -40,7 +42,7 @@ $__img = function ($f) { return (!empty($f) && preg_match('#^[A-Za-z0-9_./-]+$#'
 .mn-st li:before{content:counter(p);position:absolute;left:0;top:7px;width:26px;height:26px;border-radius:50%;background:#4f46e5;color:#fff;font-weight:800;font-size:12px;display:flex;align-items:center;justify-content:center}
 .mn-tb{width:100%;border-collapse:collapse;font-size:13px}.mn-tb td{padding:8px 10px;border-top:1px solid #1e293b;vertical-align:top;color:#94a3b8}.mn-tb td:first-child{color:#e2e8f0;font-weight:700;width:32%}
 .mn-box{border-radius:12px;padding:10px 12px;font-size:14px;margin:10px 0}.mn-dica{background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.25);color:#6ee7b7}.mn-aviso{background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.25);color:#fcd34d}
-.mn-toc{position:sticky;top:12px;font-size:13px}.mn-toc b{display:block;font-size:11px;letter-spacing:.6px;color:#94a3b8;text-transform:uppercase;margin-bottom:8px}
+.mn-toc{position:sticky;top:70px;font-size:13px}.mn-toc b{display:block;font-size:11px;letter-spacing:.6px;color:#94a3b8;text-transform:uppercase;margin-bottom:8px}
 .mn-toc a{display:block;padding:5px 0 5px 12px;border-left:2px solid #1e293b;color:#94a3b8;text-decoration:none}.mn-toc a:hover{color:#fff;border-color:#6366f1}
 .mn-nav{display:flex;justify-content:space-between;gap:10px;margin-top:30px;padding-top:16px;border-top:1px solid #1e293b}
 .mn-nav a{flex:1;padding:12px 14px;border:1px solid #1e293b;border-radius:12px;color:#cbd5e1;text-decoration:none;font-size:13px;min-width:0}.mn-nav a:hover{border-color:#6366f1;color:#fff}.mn-nav small{display:block;color:#64748b;font-size:11px}
@@ -61,9 +63,12 @@ $__img = function ($f) { return (!empty($f) && preg_match('#^[A-Za-z0-9_./-]+$#'
     </div>
     <div class="mn-wrap">
         <nav class="mn-side" aria-label="Menu do manual">
+            <div class="mn-all"><a id="mn-open-all">Expandir tudo</a><a id="mn-close-all">Recolher tudo</a></div>
             <?php foreach ($__man as $si => $s): ?>
-            <div class="mn-grp"><i class="fa-solid <?php echo $h($s['icon'] ?? 'fa-book'); ?> mr-1"></i><?php echo $h($s['titulo']); ?></div>
-            <?php foreach ($s['itens'] as $ii => $it): ?><a class="mn-lnk" data-k="a<?php echo $si . '_' . $ii; ?>" href="#a<?php echo $si . '_' . $ii; ?>"><?php echo $h($it['t']); ?></a><?php endforeach; ?>
+            <div class="mn-g" data-g="<?php echo $si; ?>">
+            <button type="button" class="mn-grp" aria-expanded="false"><span><i class="fa-solid <?php echo $h($s['icon'] ?? 'fa-book'); ?> mr-1"></i><?php echo $h($s['titulo']); ?></span><i class="fa-solid fa-chevron-right mn-chev"></i></button>
+            <div class="mn-items"><?php foreach ($s['itens'] as $ii => $it): ?><a class="mn-lnk" data-k="a<?php echo $si . '_' . $ii; ?>" href="#a<?php echo $si . '_' . $ii; ?>"><?php echo $h($it['t']); ?></a><?php endforeach; ?></div>
+            </div>
             <?php endforeach; ?>
         </nav>
         <main>
@@ -115,9 +120,14 @@ $__img = function ($f) { return (!empty($f) && preg_match('#^[A-Za-z0-9_./-]+$#'
         if (d) { var t = []; try { t = JSON.parse(d.textContent); } catch(e){}
             if (t.length) { var b = document.createElement('b'); b.textContent = 'Nesta página'; toc.appendChild(b);
                 t.forEach(function(x){ var a = document.createElement('a'); a.href = 'javascript:void(0)'; a.textContent = x[0]; a.addEventListener('click', function(){ var e = document.getElementById(id + x[1]); if (e) e.scrollIntoView({behavior:'smooth', block:'start'}); }); toc.appendChild(a); }); } }
-        var act = document.querySelector('.mn-lnk.on'); if (act && act.scrollIntoView) act.scrollIntoView({block:'nearest'});
+        var act = document.querySelector('.mn-side .mn-lnk.on');
+        if (act) { var g = act.closest('.mn-g'); if (g) { g.classList.add('open'); var gb = g.querySelector('.mn-grp'); if (gb) gb.setAttribute('aria-expanded', 'true'); } var sd = document.querySelector('.mn-side'); if (sd) { var top = act.offsetTop - sd.offsetTop - 80; sd.scrollTop = Math.max(0, top); } }
         window.scrollTo({top:0});
     }
+    document.querySelectorAll('.mn-grp').forEach(function(bt){ bt.addEventListener('click', function(){ var g = bt.parentNode; var o = g.classList.toggle('open'); bt.setAttribute('aria-expanded', o ? 'true' : 'false'); }); });
+    function allG(o){ document.querySelectorAll('.mn-g').forEach(function(g){ g.classList.toggle('open', o); var bt = g.querySelector('.mn-grp'); if (bt) bt.setAttribute('aria-expanded', o ? 'true' : 'false'); }); }
+    document.getElementById('mn-open-all').addEventListener('click', function(){ allG(true); });
+    document.getElementById('mn-close-all').addEventListener('click', function(){ allG(false); });
     function route(){ show((location.hash || '').replace('#','')); }
     window.addEventListener('hashchange', route); route();
     document.getElementById('mn-home').addEventListener('click', function(e){ e.preventDefault(); history.pushState(null,'',location.pathname+location.search); show('home'); });
