@@ -5454,22 +5454,32 @@ function aiAnalyzeCallTranscript($transcript, $cfg, array $meta = []) {
         $body = "(Ligação longa: abaixo estão as anotações de cada parte, em ordem.)\n\n" . implode("\n\n", $notes);
     }
 
-    $sys = 'Você é analista de qualidade de uma central de atendimento telefônico. Recebe a TRANSCRIÇÃO AUTOMÁTICA de UMA ligação (sem identificação de quem fala: deduza pelo contexto quem é o cliente e quem é o atendente) e deve relatar o que REALMENTE foi conversado.' . "\n"
+    $sys = 'Você é analista de qualidade de uma central de atendimento telefônico. Recebe a TRANSCRIÇÃO AUTOMÁTICA de UMA ligação (sem identificação de quem fala: deduza pelo contexto quem é o cliente e quem é o atendente/suporte) e deve relatar o que REALMENTE foi conversado, como um relatório que o gestor lerá no lugar de ouvir o áudio.' . "\n"
         . 'REGRAS:' . "\n"
-        . '- Cite fatos concretos: o que o cliente pediu ou relatou (equipamentos, valores, datas, nomes, sintomas, números citados), o que o atendente respondeu, fez ou orientou e como a ligação terminou. Quem lê o resumo deve entender a ligação sem precisar ouvi-la.' . "\n"
-        . '- Proibido texto genérico como "o cliente entrou em contato para atendimento" ou "o atendente ajudou". Se algo não foi dito, não afirme.' . "\n"
-        . '- Nem toda ligação é problema e solução: pode ser dúvida, venda, cobrança, recado, ligação errada, URA ou música de espera. Descreva o que de fato houve.' . "\n"
-        . '- A transcrição pode ter erros de reconhecimento e trechos [trecho inaudível]. Não preencha lacunas com suposições. Se houver pouca fala inteligível, diga isso com clareza (ex.: "áudio com pouca fala compreensível") e só relate o que dá para confirmar.' . "\n"
-        . '- Se for só URA, música de espera, sinal ou silêncio, diga exatamente isso.' . "\n"
+        . '- Seja ESPECÍFICO: cite o que o cliente relatou ou pediu (sistema, equipamento, produto, códigos, valores, datas, nomes citados), o que o atendente verificou, explicou ou orientou passo a passo, e como terminou. Quem lê deve entender o caso inteiro sem ouvir a ligação.' . "\n"
+        . '- Proibido texto genérico ("entrou em contato para atendimento", "o atendente ajudou"). Se um dado não foi dito, não o afirme.' . "\n"
+        . '- A transcrição tem erros de reconhecimento (palavras trocadas, nomes errados). Use o CONTEXTO para entender o assunto, mas só cite termos e números de que tenha razoável certeza; não transforme palavras duvidosas em fatos.' . "\n"
+        . '- Mensagens de URA/espera no início ("por favor aguarde...") e música NÃO fazem parte da conversa: ignore-as.' . "\n"
+        . '- Nem toda ligação é problema e solução: pode ser dúvida, venda, cobrança, recado, ligação errada. Descreva o que houve.' . "\n"
+        . '- SATISFAÇÃO: avalie o cliente pelo que ele DISSE e pelo TOM (irritação, queixas repetidas, elogios, agradecimentos, como terminou). Dê nota de 1 a 5 sempre que houver conversa com o cliente e explique em "clima" com evidências da própria fala; use null só se o cliente quase não falou.' . "\n"
+        . '- Se a transcrição estiver claramente incompleta, diga o que dá para confirmar e avise; não preencha lacunas.' . "\n"
+        . 'EXEMPLO DE NÍVEL DE DETALHE ESPERADO (outro caso, só para mostrar o estilo):' . "\n"
+        . '{"motivo":"Cliente não consegue emitir nota fiscal: o sistema da loja trava na etapa de envio para a prefeitura desde ontem.",'
+        . '"conversa":"O cliente informou que a nota 1520 fica \"processando\" e já tentou reenviar três vezes. O atendente pediu para abrir Configurações > Fiscal, confirmou que o certificado digital venceu em 28/10 e orientou a instalar o certificado novo enviado por e-mail. Após instalar, pediu para emitir uma nota de teste.",'
+        . '"solucao":"Certificado digital renovado e instalado; a nota de teste foi emitida com sucesso na hora.",'
+        . '"resultado":"Resolvido","pendencias":"Cliente vai reenviar as notas 1520 e 1521; suporte ficou de retornar na quinta se houver rejeição.",'
+        . '"clima":"Começou irritado (\"é a terceira vez que isso para\"), terminou aliviado e agradeceu.","sentimento":"Positivo","satisfacao":4,'
+        . '"recomendacao":"Avisar o cliente com antecedência do próximo vencimento do certificado."}' . "\n"
         . 'Responda APENAS um JSON, sem texto fora dele, neste formato:' . "\n"
         . '{"motivo":"por que o cliente ligou, 1 a 2 frases concretas",'
-        . '"conversa":"o que foi conversado, em ordem, de 3 a 8 frases com os detalhes citados",'
-        . '"solucao":"o que o atendente respondeu, resolveu ou orientou; se nada foi resolvido, escreva isso",'
+        . '"conversa":"o que foi conversado, em ordem, de 4 a 10 frases com os detalhes citados (relato do cliente e o que o atendente fez/orientou)",'
+        . '"solucao":"o que foi resolvido, explicado ou combinado; se nada foi resolvido, diga isso e por quê",'
         . '"resultado":"Resolvido | Parcialmente resolvido | Não resolvido | Sem solicitação a resolver",'
         . '"pendencias":"o que ficou combinado ou pendente (retornos, prazos, envios) ou string vazia",'
-        . '"sentimento":"Positivo | Neutro | Negativo (do cliente)",'
-        . '"satisfacao":número de 1 a 5 ou null se a conversa não permitir inferir,'
-        . '"recomendacao":"ação prática e específica a partir do que foi dito (ex.: retornar até tal prazo, enviar tal documento) ou string vazia se não houver nada a fazer"}';
+        . '"clima":"como o cliente estava no começo e no fim, com a evidência na fala dele",'
+        . '"sentimento":"Positivo | Neutro | Negativo (do cliente ao final)",'
+        . '"satisfacao":número de 1 a 5 ou null,'
+        . '"recomendacao":"ação prática e específica a partir do que foi dito ou string vazia se não houver nada a fazer"}';
     $r = aiChatCompletion($sys, $ctxTxt . "TRANSCRIÇÃO:\n" . mb_substr($body, 0, 14000), 90, $cfg);
     if (!$r['ok']) return ['ok' => false, 'j' => [], 'raw' => '', 'error' => $r['error']];
     $raw = trim(preg_replace('#<think>.*?</think>#is', '', (string)$r['text']));
@@ -5485,7 +5495,7 @@ function aiAnalyzeCallTranscript($transcript, $cfg, array $meta = []) {
     $add('Motivo do contato', $j['motivo'] ?? ''); $add('O que foi conversado', $j['conversa'] ?? '');
     $sol = trim((string)($j['solucao'] ?? '')); $res = trim((string)($j['resultado'] ?? ''));
     $add('Solução / desfecho', $sol . ($res !== '' ? ($sol !== '' ? ' ' : '') . '(' . $res . ')' : ''));
-    $add('Pendências', $j['pendencias'] ?? '');
+    $add('Pendências', $j['pendencias'] ?? ''); $add('Clima do cliente', $j['clima'] ?? '');
     $j['resumo'] = $lin ? implode("\n", $lin) : trim((string)($j['resumo'] ?? ''));
     return ['ok' => true, 'j' => $j, 'raw' => $raw, 'error' => ''];
 }
@@ -5667,10 +5677,14 @@ function aiTranscribeFile($path, $cfg = null) {
     $dur = 0.0;
     $pr = trim((string)@shell_exec('ffprobe -v error -show_entries format=duration -of csv=p=0 ' . escapeshellarg($sendPath) . ' 2>/dev/null'));
     if (is_numeric($pr)) $dur = (float)$pr;
-    if ($dur > 150 && trim((string)@shell_exec('command -v ffmpeg')) !== '') {
+    // Trechos de até ~28 s cortados nos SILÊNCIOS (o Whisper trabalha em janelas de 30 s: trechos grandes fazem ele "travar" em
+    // repetição e perder a conversa inteira; cortar no meio de uma palavra também piora o texto).
+    if ($dur > 35 && trim((string)@shell_exec('command -v ffmpeg')) !== '') {
         $chunkDir = sys_get_temp_dir() . '/ai_chunks_' . bin2hex(random_bytes(6));
         if (@mkdir($chunkDir, 0700)) {
-            @shell_exec('ffmpeg -nostdin -y -loglevel error -i ' . escapeshellarg($sendPath) . ' -ar 16000 -ac 1 -c:a pcm_s16le -f segment -segment_time 120 ' . escapeshellarg($chunkDir . '/p%03d.wav') . ' 2>&1');
+            $cuts = aiAudioCutPoints($sendPath, $dur);
+            $segArg = $cuts ? ' -segment_times ' . implode(',', array_map(function ($c) { return number_format($c, 2, '.', ''); }, $cuts)) : ' -segment_time 28';
+            @shell_exec('ffmpeg -nostdin -y -loglevel error -i ' . escapeshellarg($sendPath) . ' -ar 16000 -ac 1 -c:a pcm_s16le -f segment' . $segArg . ' ' . escapeshellarg($chunkDir . '/p%03d.wav') . ' 2>&1');
             $chunks = glob($chunkDir . '/p*.wav') ?: [];
             sort($chunks);
         }
@@ -5694,6 +5708,25 @@ function aiTranscribeFile($path, $cfg = null) {
     return ['ok' => true, 'text' => $text, 'error' => '', 'chunks' => count($chunks), 'dropped' => $dropped, 'segs' => $segsTot, 'audio_sec' => $dur];
 }
 
+
+/** Pontos de corte (em segundos) para dividir o áudio em trechos de até $maxLen s, sempre que possível no meio de uma pausa. */
+function aiAudioCutPoints($path, $dur, $maxLen = 28.0, $minLen = 8.0) {
+    $out = (string)@shell_exec('ffmpeg -nostdin -i ' . escapeshellarg($path) . ' -af silencedetect=n=-35dB:d=0.3 -f null - 2>&1');
+    $mids = []; $st = null;
+    foreach (preg_split('/\R/', $out) as $ln) {
+        if (preg_match('/silence_start:\s*([\d.]+)/', $ln, $m)) $st = (float)$m[1];
+        elseif ($st !== null && preg_match('/silence_end:\s*([\d.]+)/', $ln, $m)) { $mids[] = ($st + (float)$m[1]) / 2; $st = null; }
+    }
+    $cuts = []; $last = 0.0;
+    while ($dur - $last > $maxLen) {
+        $best = null;
+        foreach ($mids as $mm) if ($mm > $last + $minLen && $mm <= $last + $maxLen) $best = $mm;
+        $cut = $best !== null ? $best : $last + $maxLen;
+        $cuts[] = $cut; $last = $cut;
+    }
+    return $cuts;
+}
+
 /** Uma chamada ao Whisper (OpenAI/Groq) em verbose_json: descarta segmentos "alucinados" (loop de repetição / sem fala). */
 function aiWhisperRequest($file, $mime, $name, $cfg) {
     $ch = curl_init($cfg['base_url'] . '/audio/transcriptions');
@@ -5703,7 +5736,7 @@ function aiWhisperRequest($file, $mime, $name, $cfg) {
         CURLOPT_POSTFIELDS     => ['file' => new CURLFile($file, $mime, $name), 'model' => $cfg['audio'],
             // Idioma fixo (padrão pt = português): sem isso o Whisper detecta errado em áudio de telefone e mistura inglês.
             'language' => preg_match('/^[a-z]{2,3}$/', (string)getSetting('ai_audio_language')) ? getSetting('ai_audio_language') : 'pt',
-            'prompt' => 'Ligação telefônica de atendimento ao cliente em português do Brasil.', 'temperature' => '0', 'response_format' => 'verbose_json'],
+            'temperature' => '0', 'response_format' => 'verbose_json'],
         CURLOPT_HTTPHEADER     => ['Authorization: Bearer ' . $cfg['key']],
         CURLOPT_TIMEOUT        => 120,
         CURLOPT_SSL_VERIFYPEER => (getSetting('ai_ssl_insecure') !== '1'),
@@ -5720,7 +5753,7 @@ function aiWhisperRequest($file, $mime, $name, $cfg) {
             $keep = []; $segN = count($j['segments']);
             foreach ($j['segments'] as $sg) {
                 $cr = (float)($sg['compression_ratio'] ?? 0); $ns = (float)($sg['no_speech_prob'] ?? 0); $lp = (float)($sg['avg_logprob'] ?? 0);
-                if ($cr > 2.6 || ($ns > 0.85 && $lp < -0.8)) { $dropped++; $keep[] = '[trecho inaudível]'; continue; }
+                if ($cr > 2.4 || ($ns > 0.9 && $lp < -1.0)) { $dropped++; $keep[] = '[trecho inaudível]'; continue; }
                 $keep[] = trim((string)($sg['text'] ?? ''));
             }
             $txt = trim(preg_replace('/\s+/u', ' ', implode(' ', $keep)));
