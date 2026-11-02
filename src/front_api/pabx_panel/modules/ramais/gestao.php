@@ -93,6 +93,10 @@ $exts_list = $db->query("SELECT * FROM extensions_config ORDER BY CAST(extension
                         class="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 shadow">
                     <i class="fa-solid fa-wand-magic-sparkles"></i> Ativar IA (Todos)
                 </button>
+                <button type="button" onclick="syncAsteriskAssets()" title="Busca agora os ramais e filas da central (o painel já faz isso sozinho a cada minuto)"
+                        class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg text-xs font-bold transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-rotate text-brand-400"></i> Atualizar ramais e filas
+                </button>
             </form>
         </div>
 
@@ -116,7 +120,7 @@ $exts_list = $db->query("SELECT * FROM extensions_config ORDER BY CAST(extension
         </div>
 
         <?php if (empty($exts_list)): ?>
-            <div class="text-center py-10 text-slate-500 text-xs">Nenhum ramal cadastrado. Clique em Sincronizar na barra superior.</div>
+            <div class="text-center py-10 text-slate-500 text-xs">Nenhum ramal cadastrado. Clique em "Atualizar ramais e filas" acima.</div>
         <?php else: ?>
             
             <!-- MODO 1: CARDS GRID -->

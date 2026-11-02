@@ -50,12 +50,17 @@
             <i class="fa-solid fa-phone text-[15px]"></i>
             <span id="webphone-pill-dot" class="absolute top-1 right-1 w-2.5 h-2.5 rounded-full animate-pulse" style="background:#94a3b8;box-shadow:0 0 0 2px #0f172a"></span>
         </button>
+        <?php else: ?>
+        <!-- Webphone ainda não habilitado para este usuário: o ícone aparece e explica como ativar -->
+        <button type="button" onclick="showToastNotification('Webphone', 'O Webphone ainda não está habilitado para o seu usuário. Peça ao administrador para vincular um ramal e ativar o Webphone em Configurações > Usuários.', 'info')" title="Webphone (não habilitado)" class="relative w-9 h-9 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-slate-800 transition flex items-center justify-center">
+            <i class="fa-solid fa-phone text-[15px]"></i>
+        </button>
         <?php endif; ?>
 
-        <!-- Sincronizar Ramais do PABX -->
-        <button onclick="syncAsteriskAssets()" title="Sincronizar Ramais e Filas do PABX" class="p-2 rounded-lg bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 transition text-xs flex items-center gap-1.5 border border-slate-700">
-            <i class="fa-solid fa-rotate text-brand-400"></i>
-            <span class="hidden sm:inline font-bold">Sincronizar</span>
-        </button>
+        <!-- Manual: abre em nova aba para ler ao lado da tela em uso -->
+        <a href="index.php?module=manual&action=view" target="_blank" rel="noopener" title="Abrir o Manual (nova aba)" class="px-3 h-9 rounded-lg bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 transition text-xs flex items-center gap-1.5 border border-slate-700">
+            <i class="fa-solid fa-book text-brand-400"></i>
+            <span class="hidden sm:inline font-bold">Manual</span>
+        </a>
     </div>
 </header>
