@@ -24,6 +24,7 @@ A maioria destes scripts pode ser executada de forma independente ou através da
 | **`ipbx-sounds-ptbr.sh`** | *Auxiliar* | Instala/atualiza os áudios do Asterisk em português do Brasil (ver `docs/audios_ptbr_asterisk.md`). |
 | **`gerar-mapa.py`** | *Automático* | Gera `docs/mapa-do-ipbx.html` (Mapa do Sistema) a partir do código e do git; roda no hook de commit e no instalador do painel. |
 | **`manual-shots/`** | *Ferramenta de desenvolvimento* | Gera as imagens do Manual (recorte da tela, destaque numerado e legenda). Ver AGENTS.md regra 11. |
+| **`smoke-painel.py`** | *Ferramenta de desenvolvimento* | Teste de fumaca do painel: abre todas as telas num navegador de teste, clica nos botoes de pop-up e aponta erros de JavaScript/PHP. Nao roda em cliente. |
 | **`ipbx-security-hardening.sh`**| *Auxiliar* | Script mestre de imunização e bloqueio de vulnerabilidades conhecidas em servidores Issabel em produção. |
 
 ---
