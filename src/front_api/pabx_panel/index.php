@@ -2888,6 +2888,58 @@ if ($__wp_u && userHasWebphone($__wp_u)
 
     
     <!-- Modal Elegante para Originate / Click-to-Call -->
+    <?php
+    // Etiquetas para o pop-up global de contato (falha silenciosa: o campo vira so "sem etiqueta")
+    $__gc_tags = [];
+    try { $__gc_tags = $db->query("SELECT name FROM contact_tags ORDER BY name ASC")->fetchAll(PDO::FETCH_COLUMN); } catch (Throwable $__e) {}
+    ?>
+    <!-- Pop-up global: cadastrar/editar contato (aberto pelo icone de "adicionar contato" em CDR, historico etc.) -->
+    <div id="modal-global-add-contact" class="fixed inset-0 z-[9998] hidden bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg p-6 shadow-2xl space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                <h4 id="modal-global-title" class="text-sm font-extrabold text-white flex items-center gap-2"><i class="fa-solid fa-user-plus text-emerald-400"></i> Novo Contato</h4>
+                <button type="button" onclick="closeModal('modal-global-add-contact')" class="text-slate-400 hover:text-white" title="Fechar"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <form onsubmit="submitGlobalAddContact(event)" class="space-y-3 text-xs">
+                <input type="hidden" id="global_c_id" value="">
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="col-span-2">
+                        <label class="font-bold text-slate-300 block mb-1">Nome *</label>
+                        <input id="global_c_name" required placeholder="Nome completo" class="w-full px-3 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white focus:border-emerald-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="font-bold text-slate-300 block mb-1">Telefone / WhatsApp *</label>
+                        <input id="global_c_phone" required placeholder="16999998888" class="w-full px-3 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono focus:border-emerald-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="font-bold text-slate-300 block mb-1">E-mail</label>
+                        <input id="global_c_email" placeholder="email@empresa.com" class="w-full px-3 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white focus:border-emerald-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="font-bold text-slate-300 block mb-1">Empresa</label>
+                        <input id="global_c_company" placeholder="Nome da empresa" class="w-full px-3 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white focus:border-emerald-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="font-bold text-slate-300 block mb-1">Etiqueta</label>
+                        <select id="global_c_tag" class="w-full px-3 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white focus:border-emerald-500 focus:outline-none">
+                            <option value="">Sem etiqueta</option>
+                            <?php foreach ($__gc_tags as $__t): ?>
+                            <option value="<?php echo htmlspecialchars($__t); ?>"><?php echo htmlspecialchars($__t); ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="col-span-2">
+                        <label class="font-bold text-slate-300 block mb-1">Observações</label>
+                        <textarea id="global_c_notes" rows="2" placeholder="Anotações sobre o contato..." class="w-full px-3 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white focus:border-emerald-500 focus:outline-none"></textarea>
+                    </div>
+                </div>
+                <button type="submit" id="btn-global-save-contact" class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl transition flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-floppy-disk"></i> Salvar Contato
+                </button>
+            </form>
+        </div>
+    </div>
+
     <div id="modal-custom-click-to-call" class="fixed inset-0 z-[9999] hidden bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
         <div class="bg-slate-900 border border-slate-700 rounded-3xl w-full max-w-md p-6 shadow-2xl space-y-5 relative">
             <div class="flex items-center justify-between border-b border-slate-800 pb-3">
