@@ -35,6 +35,14 @@ $date_end       = date('Y-m-d H:i:s', strtotime($date_end_raw));
 $src_filter     = trim($_GET['src_filter'] ?? '');
 $status_filter  = $_GET['status_filter'] ?? 'ALL';
 $type_filter    = $_GET['type_filter'] ?? 'ALL';
+// Direcao da chamada (mesma regra dos demais relatorios): ramal com ate 4 digitos = interno.
+// Interna: origem e destino sao ramais; Entrada: origem externa; Saida: origem e ramal e destino externo.
+function cdrDirecao($src, $dst) {
+    $s = preg_replace('/\D/', '', (string)$src); $d = preg_replace('/\D/', '', (string)$dst);
+    if (strlen($s) <= 4 && strlen($d) <= 4) return 'INTERNAL';
+    if (strlen($s) > 4) return 'INBOUND';
+    return 'OUTBOUND';
+}
 $field_name     = $_GET['field_name'] ?? 'any';
 if (!in_array($field_name, ['any', 'src', 'dst', 'channel', 'dstchannel', 'accountcode', 'did'], true)) $field_name = 'any';
 $queue_filter   = preg_replace('/[^0-9A-Za-z_\-]/', '', (string)($_GET['queue_filter'] ?? ''));
@@ -76,7 +84,7 @@ if ($ast_db) {
         if ($hide_zero && $min_duration < 1) $min_duration = 1;
         if ($min_duration > 0) { $where_clauses[] = "billsec >= :md"; $params[':md'] = $min_duration; }
         $where_clauses[] = cdrDedupCond();
-        $where_clauses[] = cdrTypeCond();
+        $where_clauses[] = cdrTypeCond($type_filter === 'INTERNAL' ? 'all' : null);
         if ($only_recorded) $where_clauses[] = "recordingfile IS NOT NULL AND recordingfile <> ''";
 
         if ($status_filter !== 'ALL') {
@@ -88,6 +96,10 @@ if ($ast_db) {
             $where_clauses[] = "LENGTH(src) <= 4 AND LENGTH(dst) <= 4";
         } elseif ($type_filter === 'EXTERNAL') {
             $where_clauses[] = "(LENGTH(src) > 4 OR LENGTH(dst) > 4)";
+        } elseif ($type_filter === 'INBOUND') {
+            $where_clauses[] = "LENGTH(src) > 4";
+        } elseif ($type_filter === 'OUTBOUND') {
+            $where_clauses[] = "(LENGTH(src) <= 4 AND LENGTH(dst) > 4)";
         }
 
         $__where = implode(' AND ', $where_clauses);
@@ -118,10 +130,11 @@ if (isset($_GET['export']) && in_array($_GET['export'], ['csv', 'xlsx', 'pdf'], 
     $__all->execute($params);
     $__qm = function_exists('getQueuesMap') ? getQueuesMap() : []; $__em = function_exists('getExtensionsMap') ? getExtensionsMap() : [];
     $__lbl = ['ANSWERED' => 'Atendida', 'NO ANSWER' => 'Não Atendeu', 'BUSY' => 'Ocupado', 'FAILED' => 'Falhou'];
-    $__rows = [['Data/Hora', 'Origem', 'Destino', 'Duração Total (s)', 'Duração Faturada (s)', 'Status', 'Gravação', 'UniqueID']];
+    $__dl = ['INBOUND' => 'Entrada', 'OUTBOUND' => 'Saída', 'INTERNAL' => 'Interna'];
+    $__rows = [['Data/Hora', 'Tipo', 'Origem', 'Destino', 'Duração Total (s)', 'Duração Faturada (s)', 'Status', 'Gravação', 'UniqueID']];
     foreach ($__all->fetchAll(PDO::FETCH_ASSOC) as $__r) {
         $__d = strtoupper(trim($__r['disposition']));
-        $__rows[] = [date('d/m/Y H:i:s', strtotime($__r['calldate'])), formatEndpointName($__r['src'], $__qm, $__em), formatEndpointName($__r['dst'], $__qm, $__em),
+        $__rows[] = [date('d/m/Y H:i:s', strtotime($__r['calldate'])), $__dl[cdrDirecao($__r['src'], $__r['dst'])], formatEndpointName($__r['src'], $__qm, $__em), formatEndpointName($__r['dst'], $__qm, $__em),
             (int)$__r['duration'], (int)$__r['billsec'], $__lbl[$__d] ?? ($__r['disposition'] ?: 'Falhou'), !empty($__r['recordingfile']) ? 'Sim' : 'Não', $__r['uniqueid']];
     }
     $__sum = "Período: " . date('d/m/Y H:i', strtotime($date_start)) . " a " . date('d/m/Y H:i', strtotime($date_end)) . "\n"
@@ -204,6 +217,8 @@ if (isset($_GET['export']) && in_array($_GET['export'], ['csv', 'xlsx', 'pdf'], 
 
                 <select name="type_filter" class="px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:border-brand-500 focus:outline-none">
                     <option value="ALL" <?php echo $type_filter === 'ALL' ? 'selected' : ''; ?>>Todos Tipos</option>
+                    <option value="INBOUND" <?php echo $type_filter === 'INBOUND' ? 'selected' : ''; ?>>Entradas (recebidas)</option>
+                    <option value="OUTBOUND" <?php echo $type_filter === 'OUTBOUND' ? 'selected' : ''; ?>>Saídas (efetuadas)</option>
                     <option value="INTERNAL" <?php echo $type_filter === 'INTERNAL' ? 'selected' : ''; ?>>Internas</option>
                     <option value="EXTERNAL" <?php echo $type_filter === 'EXTERNAL' ? 'selected' : ''; ?>>Externas</option>
                 </select>
@@ -228,12 +243,12 @@ function exportCdrFull(fmt) {
 }
 function exportToCSV() {
     const __who = <?php $__lu = getLoggedUser(); echo json_encode(trim((string)($__lu['name'] ?? $__lu['email'] ?? '')), JSON_UNESCAPED_UNICODE); ?>;
-    const rows = [['Data/Hora', 'Origem', 'Destino', 'Duração faturada', 'Status']];
+    const rows = [['Data/Hora', 'Tipo', 'Origem', 'Destino', 'Duração faturada', 'Status']];
     document.querySelectorAll(".cdr-row").forEach(tr => {
         const c = tr.querySelectorAll("td");
-        if (c.length >= 6) rows.push([c[0].innerText, c[1].innerText, c[2].innerText, c[3].innerText, c[5].innerText]);
+        if (c.length >= 7) rows.push([c[0].innerText, c[1].innerText, c[2].innerText, c[3].innerText, c[4].innerText, c[6].innerText]);
     });
-    ipbxCsv('extrato_chamadas_<?php echo $start_date . "_" . $end_date; ?>.csv', ['Extrato de chamadas (página exibida)', 'Período: ' + <?php echo json_encode(date('d/m/Y', strtotime($start_date)) . ' a ' . date('d/m/Y', strtotime($end_date))); ?>, 'Gerado em ' + new Date().toLocaleString('pt-BR') + (__who ? ' por ' + __who : '') + ' - IPbx Prisma'], rows);
+    ipbxCsv('extrato_chamadas_<?php echo date('Y-m-d', strtotime($date_start)) . '_' . date('Y-m-d', strtotime($date_end)); ?>.csv', ['Extrato de chamadas (página exibida)', 'Período: ' + <?php echo json_encode(date('d/m/Y', strtotime($date_start)) . ' a ' . date('d/m/Y', strtotime($date_end))); ?>, 'Gerado em ' + new Date().toLocaleString('pt-BR') + (__who ? ' por ' + __who : '') + ' - IPbx Prisma'], rows);
 }
 </script>
 
@@ -262,6 +277,7 @@ function exportToCSV() {
                 <thead class="bg-slate-950 uppercase text-[10px] font-bold text-slate-400 tracking-wider">
                     <tr>
                         <th class="p-3">Data/Hora (BR)</th>
+                        <th class="p-3">Tipo</th>
                         <th class="p-3">Origem</th>
                         <th class="p-3">Destino</th>
                         <th class="p-3">Duração Faturada</th>
@@ -273,7 +289,7 @@ function exportToCSV() {
                 <tbody class="divide-y divide-slate-800 font-mono">
                     <?php if (empty($cdr_list)): ?>
                         <tr>
-                            <td colspan="7" class="p-6 text-center text-slate-500">Nenhum registro CDR encontrado para os filtros selecionados.</td>
+                            <td colspan="8" class="p-6 text-center text-slate-500">Nenhum registro CDR encontrado para os filtros selecionados.</td>
                         </tr>
                     <?php else: ?>
                         <?php 
@@ -325,6 +341,16 @@ function exportToCSV() {
                             ?>
                             <tr class="cdr-row hover:bg-slate-800/40 transition">
                                 <td class="p-3 text-slate-300 font-bold"><?php echo $calldate_br; ?></td>
+                                <td class="p-3 whitespace-nowrap">
+                                    <?php $__dir = cdrDirecao($c['src'], $c['dst']); ?>
+                                    <?php if ($__dir === 'INBOUND'): ?>
+                                        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30" title="Chamada recebida de um número externo"><i class="fa-solid fa-arrow-down"></i> Entrada</span>
+                                    <?php elseif ($__dir === 'OUTBOUND'): ?>
+                                        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-500/15 text-sky-300 border border-sky-500/30" title="Chamada efetuada por um ramal para um número externo"><i class="fa-solid fa-arrow-up"></i> Saída</span>
+                                    <?php else: ?>
+                                        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-500/15 text-slate-300 border border-slate-500/30" title="Chamada entre ramais"><i class="fa-solid fa-arrows-left-right"></i> Interna</span>
+                                    <?php endif; ?>
+                                </td>
                                 <td class="p-3">
                                     <?php 
                                         $src_display = $src_name ?: formatEndpointName($c['src']);
