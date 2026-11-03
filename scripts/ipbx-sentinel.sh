@@ -69,7 +69,7 @@ HOSTNAME_S="$(hostname 2>/dev/null || echo pbx)"
 SENTINEL_ACTION="${SENTINEL_ACTION:-quarantine}"
 SENTINEL_HEAL_PERMS="${SENTINEL_HEAL_PERMS:-0}"
 SENTINEL_FIREWALL_HEAL="${SENTINEL_FIREWALL_HEAL:-0}"
-SENTINEL_SUDO_OK="${SENTINEL_SUDO_OK:-}"                     # usuarios com sudo sem senha liberados (ex.: rocky,cloud-user)
+SENTINEL_SUDO_OK="${SENTINEL_SUDO_OK:-rocky}"                # usuarios com sudo sem senha liberados (rocky = usuario padrao da instalacao do Rocky Linux; outros: ipbx-sentinel --sudo-ok USUARIO)
 [ -r "$CONF_FILE" ] && . "$CONF_FILE" 2>/dev/null
 # Identificacao do cliente nos alertas (/etc/ipbx/cliente.conf: CLIENTE_NOME, CLIENTE_ACESSO opcional)
 CLIENTE_NOME=""; CLIENTE_ACESSO=""
