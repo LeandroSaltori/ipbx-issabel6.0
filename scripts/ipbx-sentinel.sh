@@ -450,7 +450,7 @@ cmd_audit() {
           # registram o caminho antigo (/bin/grep). Tenta todas as grafias antes de acusar "sem pacote".
           line=""; local cand
           for cand in "$f" "$real" "${real/#\/usr\/bin\//\/bin\/}" "${real/#\/usr\/sbin\//\/sbin\/}" "${real/#\/bin\//\/usr\/bin\/}" "${real/#\/sbin\//\/usr\/sbin\/}"; do
-            line="$(rpm -q --dump -f "$cand" 2>/dev/null | awk -v p="$cand" '$1==p{print; exit}')"
+            line="$(rpm -q --dump -f "$cand" 2>/dev/null | awk -v p="$cand" '$1==p && $5 !~ /^012/{print; exit}')"   # ignora entrada de link simbolico (digest zerado); usa a do arquivo real
             [ -n "$line" ] && break
           done
           if [ -z "$line" ]; then warn "ferramenta critica SEM pacote de origem (pode ser trocada/plantada): $real"; bad=$((bad+1)); continue; fi
