@@ -163,3 +163,7 @@ Antes de liberar, confirme que ninguém além de você usa essa conta (`last -a 
 - O resumo não altera o histórico de deduplicação, então não gera alertas duplicados nem apaga nada.
 - Para liberar um sudo sem senha conhecido e tirá-lo do resumo: `ipbx-sentinel --sudo-ok USUARIO`.
 - Cron: `/etc/cron.d/ipbx-sentinel` (linha `7 9 * * *`), criado/atualizado por `ipbx-sentinel --install`.
+
+## Alerta de webshell em uso
+
+A cada minuto o Sentinel lê o final dos logs do Apache e avisa (uma vez por IP e arquivo) quando alguém chama um `.php` com parâmetro de comando (`?cmd=`, `?exec=`, `?shell=`, `?command=`, `?system=`, `?passthru=`). Se a resposta foi 200, o alerta diz que o arquivo executou. Só avisa; para isolar o arquivo use `ipbx-sentinel --scan`. Caso real: [incidente-webshell-helpnet.md](./incidente-webshell-helpnet.md).

