@@ -8,17 +8,24 @@ ini_set('display_errors', 0);
 // Senha definida
 $db_pass = "ls251289";
 
-// Conexão MySQL com o banco asterisk
-$conn = @new mysqli("localhost", "root", $db_pass, "asterisk");
-
-if ($conn->connect_error) {
-    if (file_exists('/etc/issabel.conf')) {
-        $issabel_conf = file_get_contents('/etc/issabel.conf');
-        if (preg_match('/mysqlrootpwd=(.*)/', $issabel_conf, $matches)) {
-            $auto_pass = trim($matches[1]);
-            $conn = @new mysqli("localhost", "root", $auto_pass, "asterisk");
+// Conexão MySQL com o banco asterisk: 1) usuário do próprio PABX (/etc/amportal.conf), 2) root pelo /etc/issabel.conf,
+// 3) senha antiga (legado; troque a senha do root do MySQL e ela deixa de valer)
+$conn = null;
+$__amp = @file_get_contents('/etc/amportal.conf');
+if ($__amp && preg_match('/^AMPDBUSER\s*=\s*(\S+)/m', $__amp, $mu) && preg_match('/^AMPDBPASS\s*=\s*(\S+)/m', $__amp, $mp)) {
+    $conn = @new mysqli("localhost", $mu[1], $mp[1], "asterisk");
+}
+if (!$conn || $conn->connect_error) {
+    foreach (array('/etc/issabel.conf', '/etc/elastix.conf') as $__cf) {
+        $__c = @file_get_contents($__cf);
+        if ($__c && preg_match('/mysqlrootpwd=(.*)/', $__c, $m)) {
+            $conn = @new mysqli("localhost", "root", trim($m[1]), "asterisk");
+            if (!$conn->connect_error) break;
         }
     }
+}
+if (!$conn || $conn->connect_error) {
+    $conn = @new mysqli("localhost", "root", $db_pass, "asterisk");
 }
 
 if ($conn->connect_error) {
@@ -92,9 +99,7 @@ if (file_exists($sqlite_path) && class_exists('SQLite3')) {
     try {
         $sqlite = new SQLite3($sqlite_path, SQLITE3_OPEN_READONLY);
         $res_contacts = @$sqlite->query("
-            SELECT name, last_name, telefono AS number, cell_phone AS mobile, 
-                   email, address, city, province AS state, notes AS comment,
-                   company, company_contact, contact_rol, department
+            SELECT *, telefono AS number, cell_phone AS mobile, province AS state, notes AS comment
             FROM contact 
             WHERE directory = 'external' AND (telefono != '' OR cell_phone != '')
             ORDER BY name ASC
