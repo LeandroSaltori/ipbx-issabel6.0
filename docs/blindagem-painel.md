@@ -14,3 +14,14 @@
 Logs e sessoes (`logs/*.log`, `logs/sessions/sess_*`) deixaram de ser versionados.
 Teste: URLs diretas -> 404; painel logado normal; smoke-test 36 telas / 89 cliques OK.
 Nao testado: o arquivo do Apache em servidor real (so valida no proximo update).
+
+## Anti-CSRF (pedidos de outro site)
+No `index.php`, pedidos que mudam algo (POST ou `api_action`) vindos de OUTRO site sao recusados (403),
+usando o cabecalho `Sec-Fetch-Site` do navegador. Navegacao normal (link, SSO) e o painel embutido
+(mesmo site) continuam funcionando; webhooks e integracoes (sem esse cabecalho) nao sao afetados.
+Testado: cross-site POST 403, same-origin 200, sem cabecalho 200, navegacao cross-site 200.
+
+## Exposicao do servidor
+`ipbx-sentinel.sh --audit` ja avisa (sem alterar nada): 3306/5038 abertos, AMI em 0.0.0.0, `root@%`
+no MySQL, sudo sem senha, SSH root/senha. Fechar essas portas e feito caso a caso, para nao
+derrubar integracoes em uso.

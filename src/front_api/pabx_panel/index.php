@@ -1,6 +1,13 @@
 <?php
 ob_start();
 define('IPBX_PANEL', true); // as telas (modules/*) so abrem se carregadas por este arquivo, que exige login
+// Anti-CSRF: pedido que muda algo e veio de OUTRO site (cookie SameSite=None no embed HTTPS) e recusado.
+// Usa o cabecalho Sec-Fetch-Site do navegador; sem ele (curl, webhooks, integracoes) nada muda.
+if (($_SERVER['HTTP_SEC_FETCH_SITE'] ?? '') === 'cross-site') {
+    $__nav = (($_SERVER['HTTP_SEC_FETCH_MODE'] ?? '') === 'navigate') && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET'
+             && !isset($_GET['api_action']) && !isset($_GET['action']);
+    if (!$__nav) { http_response_code(403); header('Content-Type: application/json'); echo '{"success":false,"error":"Pedido de outro site bloqueado."}'; exit; }
+}
 /**
  * IPbx Prisma x Prismabot - Painel Integrado (NEWFRONT)
  * Arquitetura Modular de Engenharia de Software
