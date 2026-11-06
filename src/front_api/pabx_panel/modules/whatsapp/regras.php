@@ -1,4 +1,5 @@
 <?php
+if (!defined('IPBX_PANEL')) { http_response_code(404); exit; } // acesso direto pela URL e proibido: so o index.php (com login) carrega esta tela
 /**
  * IPbx Prisma - Módulo Regras WhatsApp URA & Transbordo v2.1
  * Gerenciamento de templates editáveis com valores padrões de fábrica, variáveis interativas e Sandbox de Teste Real.

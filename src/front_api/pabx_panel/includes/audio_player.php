@@ -1,4 +1,5 @@
 <?php
+if (!defined('IPBX_PANEL')) { http_response_code(404); exit; } // acesso direto pela URL e proibido: so o index.php (com login) carrega esta tela
 /**
  * Player de gravação (janela flutuante) — mesmo comportamento do relatório clássico:
  * barra de progresso, -5s/+5s, velocidade 1x/1.25x/1.5x/2x e download.

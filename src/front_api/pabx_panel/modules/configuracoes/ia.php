@@ -1,4 +1,5 @@
 <?php
+if (!defined('IPBX_PANEL')) { http_response_code(404); exit; } // acesso direto pela URL e proibido: so o index.php (com login) carrega esta tela
 /**
  * IPbx Prisma - Configurações de IA & Integrações v8.0 (Redesign Dashboard de IA Universal)
  * Seções organizadas: Copiloto Prismabot, ElevenLabs TTS, Status de Integrações Globais

@@ -1,5 +1,6 @@
 <?php
 ob_start();
+define('IPBX_PANEL', true); // as telas (modules/*) so abrem se carregadas por este arquivo, que exige login
 /**
  * IPbx Prisma x Prismabot - Painel Integrado (NEWFRONT)
  * Arquitetura Modular de Engenharia de Software

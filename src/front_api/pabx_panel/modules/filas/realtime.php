@@ -1,4 +1,5 @@
 <?php
+if (!defined('IPBX_PANEL')) { http_response_code(404); exit; } // acesso direto pela URL e proibido: so o index.php (com login) carrega esta tela
 /**
  * IPbx Prisma - Monitoramento Exclusivo de Filas Ao Vivo v8.5
  * Dados reais via API dinâmica com visualização limpa dos ramais.

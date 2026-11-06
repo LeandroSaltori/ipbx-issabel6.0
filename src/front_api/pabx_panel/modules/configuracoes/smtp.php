@@ -1,4 +1,5 @@
 <?php
+if (!defined('IPBX_PANEL')) { http_response_code(404); exit; } // acesso direto pela URL e proibido: so o index.php (com login) carrega esta tela
 /**
  * IPbx Prisma - Módulo de Configuração SMTP & Agendamento de Disparos Recorrentes v2.1
  * Suporte a criptografia forte de senhas (AES-256 / LGPD), proteção da senha padrão Prisma Telecom,

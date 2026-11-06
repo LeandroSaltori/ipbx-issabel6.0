@@ -1,4 +1,5 @@
 <?php
+if (!defined('IPBX_PANEL')) { http_response_code(404); exit; } // acesso direto pela URL e proibido: so o index.php (com login) carrega esta tela
 /**
  * IPbx Prisma - Central de Logs, Diagnósticos & Rastreabilidade v1.0
  * Interface gráfica moderna para inspeção de erros em tempo real, download e limpeza de logs.

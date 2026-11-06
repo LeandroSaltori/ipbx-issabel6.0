@@ -1,4 +1,5 @@
 <?php
+if (!defined('IPBX_PANEL')) { http_response_code(404); exit; } // acesso direto pela URL e proibido: so o index.php (com login) carrega esta tela
 // Incluir chamadas internas (ramal a ramal) nos totais? Padrão: não.
 $include_internal = !empty($_GET['include_internal']) && $_GET['include_internal'] !== '0';
 

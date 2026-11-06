@@ -18,3 +18,7 @@ scratch/__pycache__/
 
 # Python bytecode
 __pycache__/
+
+# Logs e sessoes do painel (dados de runtime, nunca versionar)
+src/front_api/pabx_panel/logs/*.log
+src/front_api/pabx_panel/logs/sessions/sess_*

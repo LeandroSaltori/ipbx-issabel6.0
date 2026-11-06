@@ -1,4 +1,5 @@
 <?php
+if (!defined('IPBX_PANEL')) { http_response_code(404); exit; } // acesso direto pela URL e proibido: so o index.php (com login) carrega esta tela
 /**
  * IPbx Prisma - Fluxograma Central de Ligações (Layout Árvore Visual) v7.2
  * Design ultra-intuitivo e 100% dinâmico baseado no set destination real do Asterisk

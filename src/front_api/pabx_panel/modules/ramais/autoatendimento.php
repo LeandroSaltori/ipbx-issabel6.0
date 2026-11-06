@@ -1,4 +1,5 @@
 <?php
+if (!defined('IPBX_PANEL')) { http_response_code(404); exit; } // acesso direto pela URL e proibido: so o index.php (com login) carrega esta tela
 /**
  * IPbx Prisma - Autoatendimento do Ramal: Não Perturbe (DND) e Desvios (Incondicional / Ocupado / Indisponível)
  * Grava no AstDB (DND, CF, CFB, CFU) - o mesmo local que a GUI nativa do Issabel lê, então os dois sempre mostram o mesmo estado.

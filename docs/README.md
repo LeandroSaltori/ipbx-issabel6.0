@@ -29,3 +29,4 @@ Esta pasta reúne os manuais práticos, guias passo a passo e procedimentos de c
 | [**`architecture/README.md`**](./architecture/README.md) | Mapeamento Visual da Arquitetura (Archify HTML e mindwalk 3D) | **Auxiliar** |
 | [**`security/MANTIS_SECURITY_AUDIT.md`**](./security/MANTIS_SECURITY_AUDIT.md) | Relatório de Auditoria de Vulnerabilidades (Google Mantis) | **[20]** |
 | [**`alterar_link.md`**](./alterar_link.md) | Como Modificar Menus e Links Internos do Issabel | **Auxiliar** |
+- [Blindagem do painel](blindagem-painel.md) — acesso direto por URL bloqueado (PHP + Apache)

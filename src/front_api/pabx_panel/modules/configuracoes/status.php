@@ -1,4 +1,5 @@
 <?php
+if (!defined('IPBX_PANEL')) { http_response_code(404); exit; } // acesso direto pela URL e proibido: so o index.php (com login) carrega esta tela
 /**
  * IPbx Prisma - Status da Integração: mostra, em uma tela, se cada peça (AMI, bancos, WhatsApp, IA, SMTP, crons) está funcionando.
  * Somente leitura: nenhuma mensagem é enviada e nada é alterado.

@@ -1,4 +1,5 @@
 <?php
+if (!defined('IPBX_PANEL')) { http_response_code(404); exit; } // acesso direto pela URL e proibido: so o index.php (com login) carrega esta tela
 /** IPbx Prisma - Central de Ajuda (manual): menu em árvore, artigo com "Nesta página", busca (Ctrl+K), anterior/próximo e "Isto foi útil?".
  *  Conteúdo em includes/manual.php (REGRA 11 do AGENTS.md). Somente leitura; só grava as respostas de "Isto foi útil?". */
 $__man = @include __DIR__ . '/../../includes/manual.php';

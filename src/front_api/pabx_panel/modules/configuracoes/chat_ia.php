@@ -1,4 +1,5 @@
 <?php
+if (!defined('IPBX_PANEL')) { http_response_code(404); exit; } // acesso direto pela URL e proibido: so o index.php (com login) carrega esta tela
 /** IPbx Prisma - Conversas do Assistente IA (somente leitura, por usuário). */
 if (!hasUserPermission('manage_settings')) { echo '<div class="p-6 text-slate-400">Acesso restrito a administradores.</div>'; return; }
 global $db;

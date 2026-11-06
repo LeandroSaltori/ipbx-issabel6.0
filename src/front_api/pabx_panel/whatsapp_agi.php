@@ -1,5 +1,6 @@
 #!/usr/bin/php -q
 <?php
+if (PHP_SAPI !== 'cli') { http_response_code(404); exit; } // script de linha de comando/AGI: nao e pagina web
 /**
  * IPbx Prisma - Script AGI de Notificação WhatsApp (Z-PRO / Prismabot)
  * Executado pelo PABX Asterisk em tempo real no encerramento de chamadas, estouros de fila, NPS e Custom Destinations.

@@ -1,5 +1,6 @@
 #!/usr/bin/php -q
 <?php
+if (PHP_SAPI !== 'cli') { http_response_code(404); exit; } // script de linha de comando/AGI: nao e pagina web
 /**
  * IPbx Prisma - Parser de Logs de Filas (Asterisk queue_log -> qstatslite)
  * Compatível com PHP 5.4, 7.0, 7.4, 8.0, 8.1, 8.2, 8.3+

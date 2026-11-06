@@ -1,4 +1,5 @@
 <?php
+if (!defined('IPBX_PANEL')) { http_response_code(404); exit; } // acesso direto pela URL e proibido: so o index.php (com login) carrega esta tela
 /** IPbx Prisma - Console da central: terminal web (somente administradores) para consultar a central e ler o log por ramal. */
 if (!hasUserPermission('manage_settings')) {
     echo '<div class="p-6 rounded-2xl bg-slate-900/90 border border-slate-800 text-slate-300 text-sm">Esta tela é restrita a administradores.</div>';

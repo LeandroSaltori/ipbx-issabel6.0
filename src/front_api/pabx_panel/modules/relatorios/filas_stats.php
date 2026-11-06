@@ -1,4 +1,5 @@
 <?php
+if (!defined('IPBX_PANEL')) { http_response_code(404); exit; } // acesso direto pela URL e proibido: so o index.php (com login) carrega esta tela
 /**
  * IPbx Prisma - Relatório Completo de Filas v8.0
  * Design premium com métricas reais do Asterisk CDR + Queue Log.

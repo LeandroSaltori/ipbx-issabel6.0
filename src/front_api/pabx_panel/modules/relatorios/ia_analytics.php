@@ -1,4 +1,5 @@
 <?php
+if (!defined('IPBX_PANEL')) { http_response_code(404); exit; } // acesso direto pela URL e proibido: so o index.php (com login) carrega esta tela
 /**
  * IPbx Prisma - Módulo Relatórios & Auditoria de IA Analytics v8.5
  * Painel de Inteligência de Voz estilo Call Center QA Analytics

@@ -1,4 +1,5 @@
 <?php
+if (!defined('IPBX_PANEL')) { http_response_code(404); exit; } // acesso direto pela URL e proibido: so o index.php (com login) carrega esta tela
 /** IPbx Prisma - Painel de Segurança (somente leitura): tentativas de invasão e bloqueios do fail2ban. */
 $__can = hasUserPermission('manage_settings');
 $__msg = ''; $__err = '';

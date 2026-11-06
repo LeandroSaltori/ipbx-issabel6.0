@@ -1,4 +1,5 @@
 <?php
+if (!defined('IPBX_PANEL')) { http_response_code(404); exit; } // acesso direto pela URL e proibido: so o index.php (com login) carrega esta tela
 /**
  * IPbx Prisma - Relatórios Gráficos Nativos PABX v7.2
  * Com Porcentagens nos Gráficos e Cards, Filtros Rápidos, Tooltips Explicativos e Exportação (PDF, Excel e WhatsApp)

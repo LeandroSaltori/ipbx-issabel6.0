@@ -297,6 +297,30 @@ EMBCONF
     echo "[+] Painel liberado para abrir embutido em outros sites (HTTPS), sem restringir acesso por IP."
   fi
 fi
+# Proteção das pastas internas do painel: as telas (modules), bibliotecas (includes), configuração, tarefas (cron), logs e bancos
+# nunca devem ser abertos pela URL. O painel e as APIs continuam pelo index.php (com login), get_audio.php, webphone.php etc.
+# Não restringe acesso por IP nem por domínio. Desfaz: remova /etc/httpd/conf.d/ipbx-protect.conf e recarregue o Apache.
+PROT=/etc/httpd/conf.d/ipbx-protect.conf
+if [ -d /etc/httpd/conf.d ]; then
+  cp -f "$PROT" "$PROT.bak" 2>/dev/null
+  cat > "$PROT" <<PROTCONF
+# IPbx Prisma - bloqueia acesso direto as pastas internas do painel (gerado pelo instalador do front_api)
+<DirectoryMatch "^$DEST_DIR/pabx_panel/(modules|includes|config|cron|logs|parselog|docs)(/|\$)">
+    Require all denied
+</DirectoryMatch>
+<FilesMatch "\.(sqlite|sqlite3|db|log|bak|sql|ini|env|sh|md)\$">
+    <If "%{REQUEST_URI} =~ m#^/front_api/#">
+        Require all denied
+    </If>
+</FilesMatch>
+PROTCONF
+  if ! (apachectl configtest >/dev/null 2>&1 || httpd -t >/dev/null 2>&1); then
+    if [ -f "$PROT.bak" ]; then mv -f "$PROT.bak" "$PROT"; else rm -f "$PROT"; fi
+    echo "[!] Bloqueio de pastas internas não aplicado (configuração do Apache não aceitou); o painel segue protegido pelo código."
+  else
+    rm -f "$PROT.bak"; echo "[+] Pastas internas do painel (telas, bibliotecas, config, logs, bancos) bloqueadas para acesso direto pela URL."
+  fi
+fi
 # PHP-FPM: o padrão do sistema tem poucos processos (5). Com o painel aberto em várias abas/telas, todos ficam ocupados
 # e as páginas ficam "só carregando" até dar 504. Aqui o limite acompanha a memória do servidor (nunca diminui o que já existe)
 # e liga o log de requisições lentas (mostra em qual linha do PHP uma tela travou): /var/log/php-fpm/ipbx-slow.log

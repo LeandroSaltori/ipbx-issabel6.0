@@ -1,4 +1,5 @@
 <?php
+if (!defined('IPBX_PANEL')) { http_response_code(404); exit; } // acesso direto pela URL e proibido: so o index.php (com login) carrega esta tela
 /** Mapa do Sistema: cidade do código, conexões e histórico de entregas (gerado a cada atualização pelo instalador). */
 $__mapa = __DIR__ . '/../../mapa/mapa-do-ipbx.html';
 $__ok = is_file($__mapa);

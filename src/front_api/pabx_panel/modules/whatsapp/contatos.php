@@ -1,4 +1,5 @@
 <?php
+if (!defined('IPBX_PANEL')) { http_response_code(404); exit; } // acesso direto pela URL e proibido: so o index.php (com login) carrega esta tela
 /**
  * IPbx Prisma - Agenda de Contatos & CRM Prismabot v8.0
  * - Z-PRO → Prismabot em todos os textos
