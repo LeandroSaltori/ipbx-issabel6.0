@@ -489,15 +489,15 @@ function pabxApplyConfigAsync() {
 }
 
 /**
- * Grava o nome (e, se informada, a senha) do ramal direto no banco do PABX, nas mesmas tabelas que o painel
+ * Grava o nome do ramal direto no banco do PABX (a senha SIP NUNCA é mexida aqui), nas mesmas tabelas que o painel
  * clássico usa (users.name, devices.description e o identificador de chamadas), e CONFERE lendo de volta.
  * Só devolve success=true quando o PABX realmente ficou com o nome novo.
- * Retorna ['success'=>bool, 'message'=>string, 'name'=>string, 'secret_ok'=>bool|null].
+ * Retorna ['success'=>bool, 'message'=>string, 'name'=>string].
  */
-function savePabxExtensionName($ext, $name, $secret = '') {
+function savePabxExtensionName($ext, $name) {
     $ext = preg_replace('/\D/', '', (string)$ext);
     $name = sanitizeExtensionName($name);
-    $out = ['success' => false, 'message' => '', 'name' => $name, 'secret_ok' => null];
+    $out = ['success' => false, 'message' => '', 'name' => $name];
     if ($ext === '' || $name === '') { $out['message'] = 'informe o ramal e um nome válido.'; return $out; }
     $pdo = function_exists('getAsteriskPdoConnection') ? getAsteriskPdoConnection('asterisk') : null;
     if (!$pdo) {
@@ -521,20 +521,6 @@ function savePabxExtensionName($ext, $name, $secret = '') {
         $sel->execute([$ext]);
         $now = (string)$sel->fetchColumn();
         if ($now !== $name) { $out['message'] = "o PABX não aceitou o nome novo (continua \"{$now}\")."; return $out; }
-
-        if ($secret !== '') {
-            $out['secret_ok'] = false;
-            foreach (['sip', 'pjsip'] as $t) {
-                $col = function_exists('astOptionsValueCol') ? astOptionsValueCol($pdo, $t) : '';
-                if ($col === '') continue;
-                try {
-                    $pdo->prepare("UPDATE `$t` SET `$col` = ? WHERE id = ? AND keyword = 'secret'")->execute([$secret, $ext]);
-                    $chk = $pdo->prepare("SELECT `$col` FROM `$t` WHERE id = ? AND keyword = 'secret' LIMIT 1");
-                    $chk->execute([$ext]);
-                    if ((string)$chk->fetchColumn() === $secret) $out['secret_ok'] = true;
-                } catch (Exception $e_sec) {}
-            }
-        }
 
         // Aplica na central em segundo plano (a tela não fica esperando), como o resto do painel faz
         pabxApplyConfigAsync();

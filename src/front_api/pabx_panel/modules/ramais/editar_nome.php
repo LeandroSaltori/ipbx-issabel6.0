@@ -16,7 +16,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_update_ext_nam
     $new_name   = trim($_POST['agent_name'] ?? '');
     $new_tech   = trim($_POST['tech'] ?? 'PJSIP');
     $whatsapp   = trim($_POST['whatsapp_number'] ?? '');
-    $secret     = trim($_POST['secret'] ?? '');
 
     $notify_agent = isset($_POST['notify_agent_missed']) ? 1 : 0;
     $notify_agent_int = isset($_POST['notify_agent_internal']) ? 1 : 0;
@@ -29,7 +28,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_update_ext_nam
         $cur_row = $st_cur->fetch(PDO::FETCH_ASSOC) ?: [];
 
         // 1) Grava o nome PRIMEIRO no PABX (mesmas tabelas do painel clássico) e confere lendo de volta
-        $pabxRes = savePabxExtensionName($target_ext, $new_name, $secret);
+        $pabxRes = savePabxExtensionName($target_ext, $new_name);
         $name_to_save = $pabxRes['success'] ? $pabxRes['name'] : (string)($cur_row['agent_name'] ?? $new_name);
 
         // 2) Painel local: nome só muda se o PABX aceitou; permissões e WhatsApp sempre
@@ -72,9 +71,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_update_ext_nam
 
         if ($pabxRes['success']) {
             $msg = "Ramal {$target_ext} gravado no PABX com o nome \"{$name_to_save}\". Permissões atualizadas.";
-            if ($pabxRes['secret_ok'] === false) $msg .= ' Atenção: a senha SIP NÃO foi alterada (o PABX não aceitou); altere pelo PABX.';
-            elseif ($pabxRes['secret_ok'] === true) $msg .= ' Senha SIP alterada.';
-            $msg_type = $pabxRes['secret_ok'] === false ? 'warning' : 'success';
+            $msg_type = 'success';
         } else {
             $msg = "O nome NÃO foi alterado no PABX: {$pabxRes['message']} As permissões e o WhatsApp foram salvos no painel.";
             $msg_type = 'error';
@@ -176,31 +173,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_sync_api_exten
     }
 }
 
-// -- 3. Criar Novo Ramal via REST API
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_create_ext_api'])) {
-    $newExt  = trim($_POST['new_extension'] ?? '');
-    $newName = trim($_POST['new_name'] ?? '');
-    $newSecret= trim($_POST['new_secret'] ?? '');
-
-    if (!empty($newName)) {
-        $payload = ['name' => $newName];
-        if (!empty($newSecret)) $payload['secret'] = $newSecret;
-
-        $apiRes = !empty($newExt) ? $apiClient->updateExtension($newExt, $payload) : $apiClient->createExtension($payload);
-
-        if ($apiRes['success']) {
-            $msg = "Novo ramal criado e registrado no PABX via REST API!";
-            $msg_type = 'success';
-            if (!empty($newExt)) {
-                $db->prepare("INSERT OR REPLACE INTO extensions_config (extension, agent_name, tech, updated_at) VALUES (:e, :n, 'PJSIP', CURRENT_TIMESTAMP)")
-                   ->execute([':e' => $newExt, ':n' => $newName]);
-            }
-        } else {
-            $msg = "Erro ao criar ramal na API: " . ($apiRes['message'] ?? 'Falha na requisição');
-            $msg_type = 'error';
-        }
-    }
-}
+// (Criação de ramal e troca de senha SIP não são feitas pelo painel novo: ficam no PABX, para não derrubar o registro de aparelhos e softphones.)
 
 $exts_list = $db->query("SELECT * FROM extensions_config ORDER BY CAST(extension AS UNSIGNED) ASC")->fetchAll(PDO::FETCH_ASSOC);
 $__aba = ($_GET['aba'] ?? '') === 'desvios' ? 'desvios' : 'ramais';
@@ -225,7 +198,7 @@ if ($__aba === 'desvios' && hasUserPermission('manage_settings')) {
                 <svg class="w-6 h-6 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
                 Gestão de Ramais & Atendentes
             </h2>
-            <p class="text-xs text-slate-400">Edite nomes, senhas e WhatsApp de notificação sincronizados diretamente no PABX</p>
+            <p class="text-xs text-slate-400">Edite nomes e WhatsApp de notificação sincronizados diretamente no PABX</p>
         </div>
         
         <form method="POST" class="flex items-center gap-2 flex-wrap">
@@ -447,11 +420,6 @@ if ($__aba === 'desvios' && hasUserPermission('manage_settings')) {
             <div>
                 <label class="block text-slate-300 font-bold mb-1">Celular / WhatsApp (Notificações)</label>
                 <input type="text" id="modal_whatsapp" name="whatsapp_number" placeholder="Ex: 5511999998888" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-mono">
-            </div>
-
-            <div>
-                <label class="block text-slate-300 font-bold mb-1">Nova Senha SIP (Opcional)</label>
-                <input type="password" name="secret" placeholder="Manter senha atual se vazio" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white">
             </div>
 
             <!-- Permissões de Notificação em Checkbox -->
