@@ -24,7 +24,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_update_ext_nam
     $send_ai = isset($_POST['send_ai_summary']) ? 1 : 0;
 
     if (!empty($target_ext) && !empty($new_name)) {
-        // Atualizar no banco SQLite local
+        $st_cur = $db->prepare("SELECT agent_name, notify_agent_missed FROM extensions_config WHERE extension = :e");
+        $st_cur->execute([':e' => $target_ext]);
+        $cur_row = $st_cur->fetch(PDO::FETCH_ASSOC) ?: [];
+
+        // 1) Grava o nome PRIMEIRO no PABX (mesmas tabelas do painel clássico) e confere lendo de volta
+        $pabxRes = savePabxExtensionName($target_ext, $new_name, $secret);
+        $name_to_save = $pabxRes['success'] ? $pabxRes['name'] : (string)($cur_row['agent_name'] ?? $new_name);
+
+        // 2) Painel local: nome só muda se o PABX aceitou; permissões e WhatsApp sempre
         $stmt_l = $db->prepare("UPDATE extensions_config SET 
             agent_name = :n, 
             tech = :t, 
@@ -36,7 +44,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_update_ext_nam
             updated_at = CURRENT_TIMESTAMP 
             WHERE extension = :e");
         $stmt_l->execute([
-            ':n' => $new_name, 
+            ':n' => $name_to_save, 
             ':t' => $new_tech, 
             ':w' => $whatsapp, 
             ':nam' => $notify_agent,
@@ -46,39 +54,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_update_ext_nam
             ':e' => $target_ext
         ]);
 
-        // Sincronizar destino opcional no PABX Asterisk (No Answer, Busy, Chanunavail)
-        if (function_exists('syncExtensionDestinationsWithAsterisk')) {
+        // 3) Destino de "não atendida" no PABX: só mexe se a opção mudou (antes travava a tela a cada salvar)
+        if (function_exists('syncExtensionDestinationsWithAsterisk') && (int)($cur_row['notify_agent_missed'] ?? -1) !== $notify_agent) {
             syncExtensionDestinationsWithAsterisk($target_ext, $notify_agent);
         }
+        if (function_exists('panelRevBump')) panelRevBump('extensions');
 
         if (function_exists('pabx_log')) {
-            pabx_log('security', 'INFO', "Permissões do ramal {$target_ext} ({$new_name}) atualizadas pelo operador.", [
+            pabx_log('security', $pabxRes['success'] ? 'INFO' : 'ERROR', $pabxRes['success']
+                ? "Ramal {$target_ext} renomeado no PABX para \"{$name_to_save}\" e permissões atualizadas pelo operador."
+                : "Ramal {$target_ext}: nome NÃO gravado no PABX ({$pabxRes['message']}).", [
                 'ext' => $target_ext,
                 'notify_missed' => $notify_agent,
                 'send_ai' => $send_ai
             ]);
         }
 
-        // Enviar atualização via REST API do PABX
-        $apiPayload = ['name' => $new_name, 'tech' => strtolower($new_tech)];
-        if (!empty($secret)) {
-            $apiPayload['secret'] = $secret;
-        }
-        if (pbxapiAvailable()) {
-            $apiRes = $apiClient->updateExtension($target_ext, $apiPayload);
+        if ($pabxRes['success']) {
+            $msg = "Ramal {$target_ext} gravado no PABX com o nome \"{$name_to_save}\". Permissões atualizadas.";
+            if ($pabxRes['secret_ok'] === false) $msg .= ' Atenção: a senha SIP NÃO foi alterada (o PABX não aceitou); altere pelo PABX.';
+            elseif ($pabxRes['secret_ok'] === true) $msg .= ' Senha SIP alterada.';
+            $msg_type = $pabxRes['secret_ok'] === false ? 'warning' : 'success';
         } else {
-            // Sem REST API: grava o nome direto no Issabel (aparece também na interface nativa)
-            $okDirect = renameExtensionInIssabel($target_ext, $new_name, $new_tech);
-            $apiRes = ['success' => $okDirect, 'message' => $okDirect ? '' : 'não foi possível gravar no PABX (verifique a senha do MySQL).'];
-            if ($okDirect && !empty($secret)) { $msg_extra = ' A senha do ramal só pode ser alterada pela REST API ou pelo PABX.'; }
-        }
-
-        if ($apiRes['success']) {
-            $msg = "Ramal {$target_ext} e suas permissões atualizados com SUCESSO no PABX!" . ($msg_extra ?? '');
-            $msg_type = 'success';
-        } else {
-            $msg = "Atualizado no painel local, mas aviso da API: " . ($apiRes['message'] ?? 'Verifique credenciais da API');
-            $msg_type = 'warning';
+            $msg = "O nome NÃO foi alterado no PABX: {$pabxRes['message']} As permissões e o WhatsApp foram salvos no painel.";
+            $msg_type = 'error';
         }
     } else {
         $msg = "Preencha o número do ramal e o nome do atendente.";
@@ -480,7 +479,7 @@ if ($__aba === 'desvios' && hasUserPermission('manage_settings')) {
 
             <div class="pt-3 flex justify-end gap-2">
                 <button type="button" onclick="closeModal('modal-edit-extension')" class="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl font-bold">Cancelar</button>
-                <button type="submit" class="px-5 py-2 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-xl shadow">Salvar no PABX (API)</button>
+                <button type="submit" class="px-5 py-2 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-xl shadow">Salvar no PABX</button>
             </div>
         </form>
     </div>

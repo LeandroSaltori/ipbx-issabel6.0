@@ -472,11 +472,86 @@ function renameExtensionInIssabel($ext, $name, $tech = 'PJSIP') {
     } catch (Exception $e) { return false; }
 }
 
+/** Limpa o nome do ramal antes de gravar na central: sem aspas, <, >, ; ou quebras (quebram o identificador de chamadas), até 50 letras. */
+function sanitizeExtensionName($name) {
+    $name = preg_replace('/[\x00-\x1F\x7F"<>;\\\\]/u', '', (string)$name);
+    $name = trim(preg_replace('/\s+/u', ' ', (string)$name));
+    return function_exists('mb_substr') ? mb_substr($name, 0, 50, 'UTF-8') : substr($name, 0, 50);
+}
+
+/** Aplica a configuração na central em SEGUNDO PLANO (gera os arquivos e recarrega), sem travar a tela. Roda uma vez por pedido. */
+function pabxApplyConfigAsync() {
+    static $done = false;
+    if ($done) return;
+    $done = true;
+    if (!function_exists('shell_exec')) return;
+    @shell_exec("nohup sh -c 'php /var/lib/asterisk/bin/retrieve_conf; asterisk -rx \"core reload\"' >/dev/null 2>&1 &");
+}
+
+/**
+ * Grava o nome (e, se informada, a senha) do ramal direto no banco do PABX, nas mesmas tabelas que o painel
+ * clássico usa (users.name, devices.description e o identificador de chamadas), e CONFERE lendo de volta.
+ * Só devolve success=true quando o PABX realmente ficou com o nome novo.
+ * Retorna ['success'=>bool, 'message'=>string, 'name'=>string, 'secret_ok'=>bool|null].
+ */
+function savePabxExtensionName($ext, $name, $secret = '') {
+    $ext = preg_replace('/\D/', '', (string)$ext);
+    $name = sanitizeExtensionName($name);
+    $out = ['success' => false, 'message' => '', 'name' => $name, 'secret_ok' => null];
+    if ($ext === '' || $name === '') { $out['message'] = 'informe o ramal e um nome válido.'; return $out; }
+    $pdo = function_exists('getAsteriskPdoConnection') ? getAsteriskPdoConnection('asterisk') : null;
+    if (!$pdo) {
+        $out['message'] = 'não foi possível conectar ao banco do PABX. Abra Configurações > Status das Integrações e clique em "Tentar consertar sozinho".';
+        return $out;
+    }
+    try {
+        $sel = $pdo->prepare("SELECT name FROM users WHERE extension = ? LIMIT 1");
+        $sel->execute([$ext]);
+        if ($sel->fetchColumn() === false) { $out['message'] = "o ramal {$ext} não existe no PABX."; return $out; }
+
+        $pdo->prepare("UPDATE users SET name = ? WHERE extension = ?")->execute([$name, $ext]);
+        $pdo->prepare("UPDATE devices SET description = ? WHERE id = ?")->execute([$name, $ext]);
+        // Identificador de chamadas (o que aparece no telefone de quem recebe a ligação interna)
+        foreach (['sip', 'pjsip'] as $t) {
+            $col = function_exists('astOptionsValueCol') ? astOptionsValueCol($pdo, $t) : '';
+            if ($col === '') continue;
+            try { $pdo->prepare("UPDATE `$t` SET `$col` = ? WHERE id = ? AND keyword = 'callerid'")->execute([$name . ' <' . $ext . '>', $ext]); } catch (Exception $e_cid) {}
+        }
+
+        $sel->execute([$ext]);
+        $now = (string)$sel->fetchColumn();
+        if ($now !== $name) { $out['message'] = "o PABX não aceitou o nome novo (continua \"{$now}\")."; return $out; }
+
+        if ($secret !== '') {
+            $out['secret_ok'] = false;
+            foreach (['sip', 'pjsip'] as $t) {
+                $col = function_exists('astOptionsValueCol') ? astOptionsValueCol($pdo, $t) : '';
+                if ($col === '') continue;
+                try {
+                    $pdo->prepare("UPDATE `$t` SET `$col` = ? WHERE id = ? AND keyword = 'secret'")->execute([$secret, $ext]);
+                    $chk = $pdo->prepare("SELECT `$col` FROM `$t` WHERE id = ? AND keyword = 'secret' LIMIT 1");
+                    $chk->execute([$ext]);
+                    if ((string)$chk->fetchColumn() === $secret) $out['secret_ok'] = true;
+                } catch (Exception $e_sec) {}
+            }
+        }
+
+        // Aplica na central em segundo plano (a tela não fica esperando), como o resto do painel faz
+        pabxApplyConfigAsync();
+        try { $pdo->exec("UPDATE admin SET value = 'false' WHERE variable = 'need_reload'"); } catch (Exception $e_flag) {}
+        $out['success'] = true;
+        return $out;
+    } catch (Exception $e) {
+        $out['message'] = 'erro ao gravar no PABX: ' . $e->getMessage();
+        return $out;
+    }
+}
+
 function syncPrismaAssets() {
     global $db;
     
-    // 1. Tentar sincronizar via REST API PABX (pbxapi) primeiro
-    if (pbxapiAvailable() && file_exists(__DIR__ . '/pbxapi_client.php')) {
+    // 1. O banco do PABX é a fonte da verdade (é o que o painel clássico lê e grava). A REST API só entra se o banco não abrir.
+    if (!getAsteriskPdoConnection('asterisk') && pbxapiAvailable() && file_exists(__DIR__ . '/pbxapi_client.php')) {
         require_once __DIR__ . '/pbxapi_client.php';
         $api = new PbxApiClient($db);
         
@@ -5063,11 +5138,8 @@ function syncExtensionDestinationsWithAsterisk($extension, $enable_custom_dest) 
             $stmt_fmf->execute([':dest' => $enable_custom_dest ? 'ext-prisma-no-answer,s,1' : "ext-local,{$ext_clean},1", ':ext' => $ext_clean]);
         } catch (Exception $e2) {}
 
-        // 3. Recarregar Asterisk e aplicar configurações
-        if (function_exists('shell_exec')) {
-            @shell_exec("php /var/lib/asterisk/bin/retrieve_conf 2>/dev/null");
-            @shell_exec("asterisk -rx 'dialplan reload' 2>/dev/null");
-        }
+        // 3. Aplicar na central em segundo plano (uma vez por pedido, mesmo em lote): não trava a tela
+        pabxApplyConfigAsync();
         try {
             $ast_db->exec("UPDATE admin SET value = 'false' WHERE variable = 'need_reload'");
         } catch (Exception $e_flag) {}
@@ -6748,19 +6820,12 @@ function applyExtensionEdit($ext, $ch) {
         syncExtensionDestinationsWithAsterisk($ext, (int)$ch['notify_missed']);
     }
     if (array_key_exists('name', $ch)) {
-        $tech = (string)($cur['tech'] ?: 'PJSIP');
-        $ok = false;
-        if (function_exists('pbxapiAvailable') && pbxapiAvailable() && file_exists(__DIR__ . '/pbxapi_client.php')) {
-            require_once __DIR__ . '/pbxapi_client.php';
-            $cl = new PbxApiClient($db);
-            $r = $cl->updateExtension($ext, ['name' => $ch['name'], 'tech' => strtolower($tech)]);
-            $ok = !empty($r['success']);
-            if (!$ok) $warn = (string)($r['message'] ?? 'a API do PABX recusou');
-        } else {
-            $ok = renameExtensionInIssabel($ext, $ch['name'], $tech);
-            if (!$ok) $warn = 'não foi possível gravar o nome no PABX (verifique a senha do MySQL)';
+        $r = savePabxExtensionName($ext, $ch['name']);
+        if (!$r['success']) {
+            $db->prepare("UPDATE extensions_config SET agent_name = :n WHERE extension = :e")->execute([':n' => $cur['agent_name'], ':e' => $ext]);
+            return ['success' => false, 'error' => 'O nome NÃO foi alterado no PABX: ' . $r['message']];
         }
-        if (!$ok) return ['success' => false, 'error' => 'Salvo só no painel; o nome não foi gravado na central: ' . $warn];
+        if ($r['name'] !== $ch['name']) $db->prepare("UPDATE extensions_config SET agent_name = :n WHERE extension = :e")->execute([':n' => $r['name'], ':e' => $ext]);
     }
     if (function_exists('pabx_log')) pabx_log('security', 'INFO', "Ramal {$ext} alterado pelo assistente (confirmado pelo usuário).", ['ext' => $ext, 'campos' => array_keys($ch)]);
     return ['success' => true];
