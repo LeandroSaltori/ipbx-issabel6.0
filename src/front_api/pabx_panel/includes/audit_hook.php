@@ -101,6 +101,7 @@ function auditPostLabels() {
         'action_test_rule_wa' => 'Testou regra de WhatsApp',
         'action_sync_api_extensions' => 'Sincronizou ramais da API',
         'action_sync_custom_destinations' => 'Sincronizou destinos personalizados',
+        'action_bulk_delete_contacts' => 'Excluiu contatos em lote',
         'action_sync_pabx_calls' => 'Sincronizou chamadas do PABX',
         'action_sync_prismabot' => 'Sincronizou Prismabot',
         'action_test_ami' => 'Testou conexão AMI',

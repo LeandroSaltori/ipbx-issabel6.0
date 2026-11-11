@@ -229,10 +229,17 @@ if ($req && isset($_POST['action_sync_prismabot'])) {
     }
 }
 
-// -- Sincronizar Chamadas do PABX (apenas quando solicitado via botão)
-if ($req && isset($_POST['action_sync_pabx_calls'])) {
-    $added = syncPabxCallsToContacts();
-    $msg_status = $added > 0 ? "✅ $added novas chamadas do PABX cadastradas como contatos para você nomear!" : "Todas as chamadas do PABX já estão salvas na agenda de contatos.";
+// -- Excluir contatos em lote (marcados na tabela)
+if ($req && isset($_POST['action_bulk_delete_contacts'])) {
+    $ids = array_values(array_unique(array_filter(array_map('intval', (array)($_POST['bulk_ids'] ?? [])))));
+    if ($ids) {
+        $del = $db->prepare("DELETE FROM crm_contacts WHERE id = :id");
+        $n = 0;
+        $db->beginTransaction();
+        foreach ($ids as $i) { $del->execute([':id' => $i]); $n += $del->rowCount(); }
+        $db->commit();
+        $msg_status = $n . ($n === 1 ? " contato removido." : " contatos removidos.");
+    }
 }
 
 // Mantém a agenda do painel clássico igual à deste painel (e vice-versa)
@@ -294,14 +301,6 @@ $active_tab = isset($_GET['crm_tab']) ? $_GET['crm_tab'] : 'contacts';
                     <i class="fa-solid fa-tags text-amber-400"></i> Etiquetas
                 </button>
 
-                <!-- Sincronizar Chamadas PABX -->
-                <form method="POST" action="index.php?module=whatsapp&action=contatos">
-                    <input type="hidden" name="action_sync_pabx_calls" value="1">
-                    <button type="submit" class="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition shadow-lg shadow-indigo-600/20 flex items-center gap-1.5" title="Sincronizar novos números de chamadas recebidas para a lista de contatos">
-                        <i class="fa-solid fa-phone-volume"></i> Sincronizar Chamadas PABX
-                    </button>
-                </form>
-
                 <!-- Sincronizar Prismabot -->
                 <form method="POST" action="index.php?module=whatsapp&action=contatos">
                     <input type="hidden" name="action_sync_prismabot" value="1">
@@ -361,11 +360,20 @@ $active_tab = isset($_GET['crm_tab']) ? $_GET['crm_tab'] : 'contacts';
 
     <!-- ──────────────────────────── TAB: CONTATOS ──────────────────────────── -->
     <?php if ($active_tab === 'contacts'): ?>
+    <!-- Barra de exclusão em lote -->
+    <form id="bulk-delete-form" method="POST" action="index.php?module=whatsapp&action=contatos" onsubmit="return confirmBulkDelete()" class="flex flex-wrap items-center gap-2 text-xs font-bold">
+        <input type="hidden" name="action_bulk_delete_contacts" value="1">
+        <span id="bulk-ids-holder"></span>
+        <button type="button" onclick="selectBySource('Ligação PABX')" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-lg transition"><i class="fa-solid fa-phone-volume text-indigo-400"></i> Selecionar os de origem "Ligação PABX"</button>
+        <button type="button" onclick="selectAllContacts(false)" id="bulk-clear" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-lg transition hidden">Limpar seleção</button>
+        <button type="submit" id="bulk-delete-btn" class="px-3 py-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded-lg transition hidden"><i class="fa-solid fa-trash"></i> <span id="bulk-count-label">Apagar selecionados</span></button>
+    </form>
     <div class="bg-slate-900/90 border border-slate-800 rounded-3xl shadow-2xl overflow-hidden">
         <div class="overflow-x-auto custom-scrollbar">
             <table class="w-full text-left text-xs text-slate-300">
                 <thead class="bg-slate-950 uppercase text-[9px] font-bold text-slate-400 tracking-wider">
                     <tr>
+                        <th class="p-3 w-8"><input type="checkbox" id="chk-all-contacts" onchange="toggleAllContacts(this.checked)" title="Selecionar todos os contatos visíveis" class="accent-rose-500 w-4 h-4 cursor-pointer"></th>
                         <th class="p-3">Cliente / Nome</th>
                         <th class="p-3">Telefone / WhatsApp</th>
                         <th class="p-3">E-mail</th>
@@ -377,7 +385,7 @@ $active_tab = isset($_GET['crm_tab']) ? $_GET['crm_tab'] : 'contacts';
                 </thead>
                 <tbody id="contacts-table-body" class="divide-y divide-slate-800/80 font-mono text-[11px]">
                     <?php if (empty($contacts_list)): ?>
-                        <tr><td colspan="7" class="p-8 text-center text-slate-500">
+                        <tr><td colspan="8" class="p-8 text-center text-slate-500">
                             <i class="fa-solid fa-address-book text-2xl block mb-2 opacity-30"></i>
                             Nenhum contato cadastrado. Clique em <strong class="text-white">Novo Contato</strong> para adicionar.
                         </td></tr>
@@ -389,7 +397,9 @@ $active_tab = isset($_GET['crm_tab']) ? $_GET['crm_tab'] : 'contacts';
                     <tr class="contact-row hover:bg-slate-800/40 transition" data-tag="<?php echo htmlspecialchars($c['tag']); ?>"
                         data-name="<?php echo htmlspecialchars(strtolower($c['name'])); ?>"
                         data-phone="<?php echo htmlspecialchars($c['phone']); ?>"
-                        data-company="<?php echo htmlspecialchars(strtolower($c['company'])); ?>">
+                        data-company="<?php echo htmlspecialchars(strtolower($c['company'])); ?>"
+                        data-source="<?php echo htmlspecialchars((string)$c['source']); ?>">
+                        <td class="p-3"><input type="checkbox" class="chk-contact accent-rose-500 w-4 h-4 cursor-pointer" value="<?php echo (int)$c['id']; ?>" onchange="updateBulkBar()"></td>
                         <td class="p-3 font-extrabold text-white">
                             <?php 
                             $tooltip = "Contato CRM\nTelefone: " . $c['phone'] . "\nEmpresa: " . ($c['company'] ?: 'N/D') . "\nE-mail: " . ($c['email'] ?: 'N/D') . "\nEtiqueta: " . ($c['tag'] ?: 'N/D') . "\nObs: " . ($c['notes'] ?: 'N/D');
@@ -799,7 +809,43 @@ function filterContacts() {
         const matchTag  = _currentTagFilter === 'ALL' || tag === _currentTagFilter;
         const matchText = !q || (row.dataset.name?.includes(q) || row.dataset.phone?.includes(q) || row.dataset.company?.includes(q));
         row.style.display = matchTag && matchText ? '' : 'none';
+        if (row.style.display === 'none') { const cc = row.querySelector('.chk-contact'); if (cc) cc.checked = false; }
     });
+    updateBulkBar();
+}
+
+// ─── Seleção e exclusão em lote ───────────────────────────
+function _visibleRows() { return Array.from(document.querySelectorAll('.contact-row')).filter(r => r.style.display !== 'none'); }
+function toggleAllContacts(on) {
+    _visibleRows().forEach(r => { const c = r.querySelector('.chk-contact'); if (c) c.checked = on; });
+    updateBulkBar();
+}
+function selectAllContacts(on) {
+    document.querySelectorAll('.chk-contact').forEach(c => c.checked = on);
+    const all = document.getElementById('chk-all-contacts'); if (all) all.checked = on;
+    updateBulkBar();
+}
+function selectBySource(src) {
+    document.querySelectorAll('.chk-contact').forEach(c => c.checked = false);
+    let n = 0;
+    document.querySelectorAll('.contact-row').forEach(r => {
+        if ((r.dataset.source || '') === src) { const c = r.querySelector('.chk-contact'); if (c) { c.checked = true; n++; } }
+    });
+    if (!n) alert('Nenhum contato com essa origem.');
+    updateBulkBar();
+}
+function updateBulkBar() {
+    const sel = document.querySelectorAll('.chk-contact:checked').length;
+    const btn = document.getElementById('bulk-delete-btn'), clr = document.getElementById('bulk-clear');
+    if (btn) { btn.classList.toggle('hidden', sel === 0); document.getElementById('bulk-count-label').innerText = 'Apagar ' + sel + (sel === 1 ? ' selecionado' : ' selecionados'); }
+    if (clr) clr.classList.toggle('hidden', sel === 0);
+}
+function confirmBulkDelete() {
+    const ids = Array.from(document.querySelectorAll('.chk-contact:checked')).map(c => c.value);
+    if (!ids.length) return false;
+    if (!confirm('Excluir ' + ids.length + (ids.length === 1 ? ' contato' : ' contatos') + '? Essa ação não pode ser desfeita.')) return false;
+    document.getElementById('bulk-ids-holder').innerHTML = ids.map(i => '<input type="hidden" name="bulk_ids[]" value="' + i + '">').join('');
+    return true;
 }
 
 // ─── WhatsApp Rápido ──────────────────────────────────────────────────────────
