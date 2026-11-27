@@ -459,8 +459,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt2 = $pdo->prepare("UPDATE devices SET description = :name WHERE id = :exten");
             $stmt2->execute([':name' => $newName, ':exten' => $exten]);
 
-            @shell_exec('sudo /var/lib/asterisk/bin/retrieve_conf 2>&1');
-            @shell_exec('sudo /usr/sbin/fwconsole reload 2>&1 || sudo asterisk -rx "core reload" 2>&1 || sudo asterisk -rx "module reload" 2>&1');
+            @shell_exec('/var/lib/asterisk/bin/retrieve_conf 2>&1 || sudo -n /var/lib/asterisk/bin/retrieve_conf 2>&1');
+            @shell_exec('/usr/sbin/fwconsole reload 2>&1 || asterisk -rx "core reload" 2>&1 || asterisk -rx "module reload" 2>&1');
 
             echo json_encode(['status' => 'success', 'message' => 'Ramal ' . $exten . ' atualizado para "' . $newName . '" com sucesso!']);
         } catch (Exception $e) {
@@ -731,8 +731,8 @@ EOF_NOME_RAMAIS
     fi
 
     # Sudoers para o asterisk executar comandos de reload
-    echo "asterisk ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/asterisk 2>/dev/null || true
-    chmod 440 /etc/sudoers.d/asterisk 2>/dev/null || true
+    # Sem sudo amplo para o usuario asterisk: o painel chama retrieve_conf e asterisk como o proprio asterisk (a linha NOPASSWD: ALL
+    # antiga dava root a quem executa comando como asterisk). A migracao com backup esta em instalar-front-api.sh.
 
     chown -R asterisk:asterisk /var/www/html/ramais /var/www/html/nome_ramais /var/www/html/modules/nome_ramais /var/www/html/modules/ramais 2>/dev/null || true
     chmod -R 755 /var/www/html/ramais /var/www/html/nome_ramais /var/www/html/modules/nome_ramais /var/www/html/modules/ramais 2>/dev/null || true

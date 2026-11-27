@@ -350,6 +350,24 @@ PBXAPICONF
     fi
   fi
 fi
+# Sudo amplo do usuário asterisk: versões antigas deste instalador criavam /etc/sudoers.d/asterisk com "NOPASSWD: ALL", o que dá root a
+# quem executa comando como asterisk (foi o que o invasor de 26/11/2026 teve). O painel chama retrieve_conf e asterisk como o próprio
+# usuário asterisk, sem sudo. Só remove se o arquivo for EXATAMENTE essa linha do instalador (nunca mexe no sudoers padrão do Issabel,
+# /etc/sudoers.d/issabel) e só depois de provar que o asterisk aplica a configuração sem sudo. Guarda cópia em /var/backup/ipbx.
+# Desfaz: cp /var/backup/ipbx/sudoers-asterisk.AAAAMMDD-HHMMSS /etc/sudoers.d/asterisk && chmod 440 /etc/sudoers.d/asterisk
+SUDF="${IPBX_SUDOERS_FILE:-/etc/sudoers.d/asterisk}"; SUDBAKDIR="${IPBX_SUDOERS_BACKUP_DIR:-/var/backup/ipbx}"
+if [ -f "$SUDF" ] && [ "$(tr -d '[:space:]' < "$SUDF" 2>/dev/null)" = "asteriskALL=(ALL)NOPASSWD:ALL" ]; then
+  if [ ! -x /var/lib/asterisk/bin/retrieve_conf ] || su -s /bin/bash asterisk -c '/var/lib/asterisk/bin/retrieve_conf' >/dev/null 2>&1; then
+    mkdir -p "$SUDBAKDIR" 2>/dev/null; SUDBAK="$SUDBAKDIR/sudoers-asterisk.$(date +%Y%m%d-%H%M%S)"
+    if cp -p "$SUDF" "$SUDBAK" 2>/dev/null; then
+      rm -f "$SUDF"; echo "[+] Sudo amplo do usuário asterisk removido (o painel aplica as mudanças sem ele). Cópia: $SUDBAK"
+    else
+      echo "[!] Sudo amplo do usuário asterisk mantido (não consegui gravar a cópia de segurança em $SUDBAKDIR)."
+    fi
+  else
+    echo "[!] Sudo amplo do usuário asterisk mantido: o asterisk não conseguiu aplicar a configuração sem ele neste servidor. O Sentinel segue avisando."
+  fi
+fi
 # PHP-FPM: o padrão do sistema tem poucos processos (5). Com o painel aberto em várias abas/telas, todos ficam ocupados
 # e as páginas ficam "só carregando" até dar 504. Aqui o limite acompanha a memória do servidor (nunca diminui o que já existe)
 # e liga o log de requisições lentas (mostra em qual linha do PHP uma tela travou): /var/log/php-fpm/ipbx-slow.log

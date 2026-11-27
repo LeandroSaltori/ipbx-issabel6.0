@@ -383,7 +383,13 @@ cmd_audit() {
     warn "confira se TODAS as chaves acima sao suas ($f)"
   done
   grep -rhE 'NOPASSWD' /etc/sudoers /etc/sudoers.d 2>/dev/null | grep -v '^\s*#' | while read -r l; do
-    if echo "$l" | grep -qE 'NOPASSWD:\s*ALL\s*$'; then warn "sudo SEM SENHA PARA QUALQUER COMANDO (nao e padrao do Issabel): $l"; else info "sudo (comando especifico): $l"; fi
+    if echo "$l" | grep -qE 'NOPASSWD:\s*ALL\s*$'; then
+      # root e os usuarios liberados (SENTINEL_SUDO_OK, ex.: rocky = usuario padrao da nuvem) nao sao risco: so informa
+      case ",root,${SENTINEL_SUDO_OK// /}," in
+        *",$(echo "$l" | awk '{print $1}'),"*) info "sudo sem senha (usuario liberado): $l" ;;
+        *) warn "sudo SEM SENHA PARA QUALQUER COMANDO (nao e padrao do Issabel): $l" ;;
+      esac
+    else info "sudo (comando especifico): $l"; fi
   done
   grep -hiE '^\s*(PermitRootLogin|PasswordAuthentication|Port)\s' /etc/ssh/sshd_config 2>/dev/null | sed 's/^/  sshd: /'
 

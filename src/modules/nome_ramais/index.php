@@ -44,8 +44,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt2->execute([':name' => $newName, ':exten' => $exten]);
 
             // 3. Aplica as alterações no Asterisk / Issabel
-            @shell_exec('sudo /var/lib/asterisk/bin/retrieve_conf 2>&1');
-            @shell_exec('sudo /usr/sbin/fwconsole reload 2>&1 || sudo asterisk -rx "core reload" 2>&1 || sudo asterisk -rx "module reload" 2>&1');
+            @shell_exec('/var/lib/asterisk/bin/retrieve_conf 2>&1 || sudo -n /var/lib/asterisk/bin/retrieve_conf 2>&1');
+            @shell_exec('/usr/sbin/fwconsole reload 2>&1 || asterisk -rx "core reload" 2>&1 || asterisk -rx "module reload" 2>&1');
 
             echo json_encode(['status' => 'success', 'message' => 'Ramal ' . $exten . ' atualizado para "' . $newName . '" com sucesso!']);
         } catch (Exception $e) {
