@@ -60,19 +60,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } catch (Exception $e) {}
     }
 
-    // URL pública do painel (usada nos links assinados de gravação enviados por WhatsApp)
-    if (isset($_POST['action_save_public_url'])) {
-        $active_tab = 'avisos';
-        $pub = rtrim(trim($_POST['public_base_url'] ?? ''), '/');
-        if ($pub !== '' && !preg_match('#^https?://[A-Za-z0-9.\-:\[\]]+(/[A-Za-z0-9._~/\-]*)?$#', $pub)) {
-            $msg_error = "⚠️ URL pública inválida. Use o formato https://pbx.seudominio.com.br/front_api";
-        } else {
-            saveSetting('public_base_url', $pub);
-            $msg_status = $pub === '' ? "URL pública removida: links de gravação não serão enviados." : "URL pública do painel salva.";
-            logUserAction("Salvar URL pública", $pub, "CONFIG");
-        }
-    }
-
     // Alerta de tronco fora do ar (WhatsApp ao supervisor)
     if (isset($_POST['action_save_trunk_alert']) || isset($_POST['action_test_trunk_alert'])) {
         $active_tab = 'avisos';
@@ -884,20 +871,6 @@ if (empty($currentPbxToken) && !empty($currentPbxPass) && $_SERVER['REQUEST_METH
                 </div>
                 <span style="white-space:nowrap" class="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-200 text-xs font-bold">Enviando por: <?php echo waProvider() === 'uazapi' ? 'WhatsApp direto (QR Code)' : 'API Prismabot'; ?></span>
             </div>
-            <!-- URL PÚBLICA DO PAINEL (links assinados de gravação) -->
-            <div class="pt-4 border-t border-slate-800/80">
-                <form method="POST" action="" class="bg-slate-950/80 p-4 rounded-2xl border border-cyan-500/30 space-y-2">
-                    <div class="flex items-center gap-2 border-b border-slate-800 pb-2">
-                        <i class="fa-solid fa-link text-cyan-400 text-base"></i>
-                        <strong class="text-white text-xs">URL pública do painel (links de gravação)</strong>
-                    </div>
-                    <p class="text-[11px] text-slate-400">Endereço pelo qual o atendente alcança o painel fora da rede interna. Usado para montar o link temporário (7 dias, assinado) da gravação enviado por WhatsApp aos ramais com "Enviar Link da Gravação". É opcional: por padrão a gravação segue como arquivo anexo (até 15 MB), que funciona com IP interno, IP externo ou DDNS. O link só é usado em gravações maiores.</p>
-                    <input type="hidden" name="action_save_public_url" value="1">
-                    <input type="text" name="public_base_url" value="<?php echo htmlspecialchars((string)getSetting('public_base_url')); ?>" placeholder="https://pbx.seudominio.com.br/front_api" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-[11px] text-cyan-200 font-mono focus:border-cyan-500 focus:outline-none">
-                    <button type="submit" style="white-space:nowrap !important;flex-shrink:0 !important;width:auto !important;overflow:visible !important;text-overflow:clip !important" class="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-xl text-xs transition"><i class="fa-solid fa-floppy-disk"></i> Salvar URL</button>
-                </form>
-            </div>
-
             <!-- CHAMADAS PERDIDAS: REGRAS INTELIGENTES -->
             <?php $__mr = getSetting('missed_min_ring_seconds'); $__mr = ($__mr === '' || !is_numeric($__mr)) ? 10 : (int)$__mr; ?>
             <div class="pt-4 border-t border-slate-800/80">

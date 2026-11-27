@@ -204,7 +204,7 @@ if (!empty($template) && !empty($target_number)) {
         $lnk = ($uid_call !== '' && function_exists('audioSignedUrl')) ? audioSignedUrl($uid_call, 604800, true) : '';
         if ($lnk === '' && $event_type === 'audio') {
             // Sem "URL pública do painel" não há como montar o link no PABX: não envia mensagem vazia.
-            if (function_exists('pabx_log')) pabx_log('whatsapp', 'WARNING', "Mensagem de gravação não enviada: configure a URL pública do painel (Configurações > API) para gerar o link", ['uniqueid' => $uid_call]);
+            if (function_exists('pabx_log')) pabx_log('whatsapp', 'WARNING', "Mensagem de gravação não enviada: gravação grande demais para anexar e sem link disponível", ['uniqueid' => $uid_call]);
             exit(0);
         }
         $msg_cliente = trim(str_replace('{LINK_GRAVACAO}', $lnk, $msg_cliente));

@@ -6096,7 +6096,7 @@ function processCallSummaryNotifications($cdr) {
                     // arquivo ausente ou grande demais: tenta o link, só se a URL pública estiver cadastrada
                     $url = audioSignedUrl($c['uniqueid'], 604800, true);
                     if ($url !== '') $parts[] = "🎧 Gravação (link válido por 7 dias): $url";
-                    else $why[] = $rp === '' ? 'arquivo de gravação não encontrado' : 'gravação maior que 15MB e URL pública não configurada (Configurações > API)';
+                    else $why[] = $rp === '' ? 'arquivo de gravação não encontrado' : 'gravação maior que 15MB: não cabe como anexo';
                 }
             }
             if (!empty($e['send_ai_summary'])) {
@@ -6670,7 +6670,7 @@ function aiChatExecTool($name, $a) {
                     else {
                         $__lk = audioSignedUrl($r['uniqueid']);
                         if ($__lk !== '') $rows[$__ri]['link_gravacao'] = $__lk;
-                        else $rows[$__ri]['gravacao'] = 'existe, mas a URL pública do painel não está configurada (Configurações > API)';
+                        else $rows[$__ri]['gravacao'] = 'existe, mas é grande demais para anexar ao WhatsApp';
                     }
                 }
             }
@@ -6746,7 +6746,7 @@ function aiChatExecTool($name, $a) {
             $GLOBALS['__ai_recordings'][] = ['uniqueid' => $uid, 'file' => $r['recordingfile'], 'calldate' => $r['calldate']];
             $url = audioSignedUrl($uid);
             if ($url === '' && !empty($GLOBALS['__wa_assistant_user'])) return ['link' => '(áudio será enviado direto nesta conversa)'];
-            return $url === '' ? ['error' => 'URL pública do painel não configurada (Configurações > API).'] : ['link' => $url, 'validade' => '7 dias'];
+            return $url === '' ? ['error' => 'Link de gravação indisponível neste servidor: use o arquivo anexo.'] : ['link' => $url, 'validade' => '7 dias'];
         }
     } catch (Exception $e) {
         return ['error' => 'Falha na consulta: ' . $e->getMessage()];
@@ -7481,7 +7481,7 @@ function integrationStatusChecks() {
     $mon = '/var/spool/asterisk/monitor';
     $add('Gravações', 'Pasta de gravações', is_readable($mon) ? 'ok' : 'warn', is_readable($mon) ? 'Legível pelo painel.' : 'Pasta ausente ou sem permissão de leitura.');
     $pub = trim((string)getSetting('public_base_url'));
-    $add('Gravações', 'URL pública (links de gravação)', $pub !== '' ? 'ok' : 'off', $pub !== '' ? $pub : 'Não configurada (opcional): a gravação segue como arquivo anexo; o link só é usado para gravações acima de 15 MB.');
+    if ($pub !== '') $add('Gravações', 'URL pública (links de gravação)', 'ok', $pub);
 
     // --- WhatsApp
     $prov = waProvider();
