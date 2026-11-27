@@ -69,6 +69,10 @@ $color_palette = [
 ];
 
 // Cor da etiqueta: chave da paleta OU código livre #RRGGBB (escolhido no seletor de cor)
+function tagToHex($ck) {   // etiquetas antigas (cor da paleta) -> código de cor, para abrir no seletor
+    static $m = ['emerald'=>'#34D399','cyan'=>'#22D3EE','amber'=>'#FBBF24','purple'=>'#C084FC','rose'=>'#FB7185','indigo'=>'#818CF8','sky'=>'#38BDF8','pink'=>'#F472B6','red'=>'#F87171','orange'=>'#FB923C','yellow'=>'#FACC15','lime'=>'#A3E635','green'=>'#4ADE80','teal'=>'#2DD4BF','blue'=>'#60A5FA','violet'=>'#A78BFA','fuchsia'=>'#E879F9','slate'=>'#94A3B8'];
+    return tagIsHex($ck) ? strtoupper($ck) : ($m[$ck] ?? '#10B981');
+}
 function tagIsHex($ck) { return (bool)preg_match('/^#[0-9A-Fa-f]{6}$/', (string)$ck); }
 function tagCls($ck, $palette, $fallback = 'bg-slate-800 text-slate-400 border-slate-700') {
     if (tagIsHex($ck)) return '';
@@ -804,19 +808,11 @@ $active_tab = isset($_GET['crm_tab']) ? $_GET['crm_tab'] : 'contacts';
             <div>
                 <label class="font-bold text-slate-300 block mb-2">Cor da Etiqueta</label>
                 <div class="flex items-center gap-3 mb-3">
-                    <input type="color" id="tag-picker" value="#10b981" class="w-12 h-9 rounded-lg bg-slate-950 border border-slate-700 cursor-pointer p-0.5" title="Clique e arraste para escolher qualquer cor" oninput="tagPickerChanged(this.value)">
-                    <input type="text" name="new_tag_hex" id="tag-hex" maxlength="7" placeholder="#10B981" autocomplete="off" class="w-28 px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono text-xs focus:border-amber-500 outline-none" oninput="tagHexTyped(this.value)">
-                    <span class="text-[10px] text-slate-500">Clique na caixa de cor e arraste, digite o código, ou use uma cor pronta abaixo.</span>
+                    <input type="color" id="tag-picker" value="#10B981" class="w-12 h-9 rounded-lg bg-slate-950 border border-slate-700 cursor-pointer p-0.5" title="Clique e arraste para escolher qualquer cor" oninput="tagPickerChanged(this.value)">
+                    <input type="text" name="new_tag_hex" id="tag-hex" maxlength="7" value="#10B981" placeholder="#10B981" autocomplete="off" class="w-28 px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono text-xs focus:border-amber-500 outline-none" oninput="tagHexTyped(this.value)">
+                    <span class="text-[10px] text-slate-500">Clique na caixa de cor e arraste para escolher, ou digite o código da cor.</span>
                 </div>
-                <div class="grid grid-cols-9 gap-2" id="tag-swatches">
-                    <?php foreach ($color_palette as $ck => $cv): ?>
-                    <label class="cursor-pointer" title="<?php echo htmlspecialchars($cv['label']); ?>">
-                        <input type="radio" name="new_tag_color" id="tagc_<?php echo $ck; ?>" value="<?php echo $ck; ?>" class="hidden peer" <?php echo $ck === 'emerald' ? 'checked' : ''; ?> onchange="tagSwatchChosen()" data-classes="<?php echo htmlspecialchars($cv['classes']); ?>">
-                        <span class="block w-7 h-7 rounded-full <?php echo $cv['dot']; ?> ring-2 ring-transparent ring-offset-2 ring-offset-slate-900 peer-checked:ring-white hover:scale-110 transition"></span>
-                    </label>
-                    <?php endforeach; ?>
-                </div>
-                <div class="mt-3 flex items-center gap-2 text-[10px] text-slate-400 font-bold">Prévia: <span id="tag-preview" class="px-2.5 py-1 rounded-lg border text-[11px] font-bold bg-emerald-500/20 text-emerald-300 border-emerald-500/40">Nome da etiqueta</span></div>
+                                <div class="mt-3 flex items-center gap-2 text-[10px] text-slate-400 font-bold">Prévia: <span id="tag-preview" class="px-2.5 py-1 rounded-lg border text-[11px] font-bold " style="background:rgba(16,185,129,.2);color:#9fe3c9;border-color:rgba(16,185,129,.4)">Nome da etiqueta</span></div>
             </div>
             <div class="flex gap-2">
                 <button type="button" id="tag-cancel-edit" onclick="cancelEditTag()" class="hidden px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl transition whitespace-nowrap">Cancelar edição</button>
@@ -840,7 +836,7 @@ $active_tab = isset($_GET['crm_tab']) ? $_GET['crm_tab'] : 'contacts';
                     <span class="px-2 py-0.5 rounded text-[10px] font-bold border <?php echo $cls; ?>" style="<?php echo htmlspecialchars($sty); ?>">🏷️ <?php echo htmlspecialchars($tl['name']); ?></span>
                     <span class="flex items-center gap-1.5">
                         <span class="text-[10px] text-slate-500"><?php echo $nuse; ?> contato(s)</span>
-                        <button type="button" title="Editar etiqueta" onclick='editTag(<?php echo (int)$tl['id']; ?>, <?php echo json_encode($tl['name'], JSON_UNESCAPED_UNICODE | JSON_HEX_APOS | JSON_HEX_QUOT); ?>, <?php echo json_encode($ck); ?>)' class="w-7 h-7 rounded-lg bg-slate-800 hover:bg-amber-600/30 text-amber-300 border border-slate-700 flex items-center justify-center"><i class="fa-solid fa-pen text-[10px]"></i></button>
+                        <button type="button" title="Editar etiqueta" onclick='editTag(<?php echo (int)$tl['id']; ?>, <?php echo json_encode($tl['name'], JSON_UNESCAPED_UNICODE | JSON_HEX_APOS | JSON_HEX_QUOT); ?>, <?php echo json_encode(tagToHex($ck)); ?>)' class="w-7 h-7 rounded-lg bg-slate-800 hover:bg-amber-600/30 text-amber-300 border border-slate-700 flex items-center justify-center"><i class="fa-solid fa-pen text-[10px]"></i></button>
                         <form method="POST" action="index.php?module=whatsapp&action=contatos" class="inline" onsubmit="return confirm('Apagar a etiqueta &quot;<?php echo htmlspecialchars($tl['name'], ENT_QUOTES); ?>&quot;? <?php echo $nuse; ?> contato(s) ficarão sem etiqueta (nenhum contato é apagado).');">
                             <input type="hidden" name="action_delete_tag" value="1"><input type="hidden" name="delete_tag_id" value="<?php echo (int)$tl['id']; ?>">
                             <button type="submit" title="Apagar etiqueta" class="w-7 h-7 rounded-lg bg-slate-800 hover:bg-rose-600/30 text-rose-300 border border-slate-700 flex items-center justify-center"><i class="fa-solid fa-trash text-[10px]"></i></button>
@@ -858,9 +854,7 @@ $active_tab = isset($_GET['crm_tab']) ? $_GET['crm_tab'] : 'contacts';
 function editTag(id, name, color) {
     document.getElementById('edit_tag_id').value = id;
     document.getElementById('new_tag_name').value = name;
-    document.querySelectorAll('input[name=new_tag_color]').forEach(x => x.checked = false);
-    if (/^#[0-9a-fA-F]{6}$/.test(color)) { document.getElementById('tag-hex').value = color; document.getElementById('tag-picker').value = color; }
-    else { document.getElementById('tag-hex').value = ''; var r = document.getElementById('tagc_' + color); if (r) r.checked = true; }
+    document.getElementById('tag-hex').value = color; document.getElementById('tag-picker').value = color;
     tagPreviewUpdate();
     document.getElementById('tag-modal-title').textContent = 'Editar Etiqueta';
     document.getElementById('tag-submit-txt').textContent = 'Salvar alterações';
@@ -870,7 +864,7 @@ function editTag(id, name, color) {
 function cancelEditTag() {
     document.getElementById('edit_tag_id').value = 0;
     document.getElementById('new_tag_name').value = '';
-    document.getElementById('tag-hex').value = ''; var r = document.getElementById('tagc_emerald'); if (r) r.checked = true; tagPreviewUpdate();
+    document.getElementById('tag-hex').value = '#10B981'; document.getElementById('tag-picker').value = '#10B981'; tagPreviewUpdate();
     document.getElementById('tag-modal-title').textContent = 'Criar Nova Etiqueta';
     document.getElementById('tag-submit-txt').textContent = 'Criar Etiqueta';
     document.getElementById('tag-cancel-edit').classList.add('hidden');
@@ -961,22 +955,15 @@ function tagPreviewUpdate() {
     const p = document.getElementById('tag-preview'); const n = document.getElementById('new_tag_name'); const hx = document.getElementById('tag-hex');
     if (!p) return;
     p.textContent = (n && n.value.trim()) ? n.value.trim() : 'Nome da etiqueta';
-    p.className = 'px-2.5 py-1 rounded-lg border text-[11px] font-bold'; p.removeAttribute('style');
-    if (hx && /^#[0-9a-fA-F]{6}$/.test(hx.value.trim())) { p.setAttribute('style', tagHexStyle(hx.value.trim())); return; }
-    const r = document.querySelector('input[name=new_tag_color]:checked');
-    if (r) p.className += ' ' + r.dataset.classes;
+    p.className = 'px-2.5 py-1 rounded-lg border text-[11px] font-bold';
+    if (hx && /^#[0-9a-fA-F]{6}$/.test(hx.value.trim())) p.setAttribute('style', tagHexStyle(hx.value.trim())); else p.removeAttribute('style');
 }
-function tagPickerChanged(v) {   // arrastou no seletor de cor: vale o código livre
-    document.getElementById('tag-hex').value = v.toUpperCase();
-    document.querySelectorAll('input[name=new_tag_color]').forEach(x => x.checked = false);
-    tagPreviewUpdate();
-}
+function tagPickerChanged(v) { document.getElementById('tag-hex').value = v.toUpperCase(); tagPreviewUpdate(); }
 function tagHexTyped(v) {
     v = v.trim(); if (v && v[0] !== '#') v = '#' + v;
-    if (/^#[0-9a-fA-F]{6}$/.test(v)) { document.getElementById('tag-picker').value = v; document.querySelectorAll('input[name=new_tag_color]').forEach(x => x.checked = false); }
+    if (/^#[0-9a-fA-F]{6}$/.test(v)) document.getElementById('tag-picker').value = v;
     tagPreviewUpdate();
 }
-function tagSwatchChosen() { document.getElementById('tag-hex').value = ''; tagPreviewUpdate(); }
 document.addEventListener('input', e => { if (e.target && e.target.id === 'new_tag_name') tagPreviewUpdate(); });
 function openModal(id)  { const m = document.getElementById(id); if (m) m.classList.remove('hidden'); }
 function closeModal(id) { const m = document.getElementById(id); if (m) m.classList.add('hidden');    }
