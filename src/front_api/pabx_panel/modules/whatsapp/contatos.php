@@ -318,8 +318,11 @@ $active_tab = isset($_GET['crm_tab']) ? $_GET['crm_tab'] : 'contacts';
                 </button>
 
                 <!-- Sincronizar Prismabot -->
-                <form method="POST" action="index.php?module=whatsapp&action=contatos">
+                <form method="POST" action="index.php?module=whatsapp&action=contatos" class="flex items-center gap-2">
                     <input type="hidden" name="action_sync_prismabot" value="1">
+                    <label class="flex items-center gap-1.5 text-[11px] text-slate-300 font-bold cursor-pointer" title="Se desmarcado, o painel pergunta antes de importar contatos sem nome">
+                        <input type="checkbox" name="include_unnamed" value="1" class="accent-emerald-500"> Incluir contatos sem nome
+                    </label>
                     <button type="submit" class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition shadow-lg shadow-emerald-600/20 flex items-center gap-1.5">
                         <i class="fa-brands fa-whatsapp"></i> Importar Prismabot
                     </button>
