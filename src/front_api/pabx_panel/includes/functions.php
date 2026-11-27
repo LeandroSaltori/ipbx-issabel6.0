@@ -2410,6 +2410,22 @@ function csvContactsClassify($db, $rows, $map, $hasHeader = true) {
     return $out;
 }
 
+/** Filtro da lista de contatos (busca em TODOS os contatos): devolve [trecho WHERE, parâmetros]. */
+function crmContactsFilter($q, $tag = '') {
+    $w = []; $par = [];
+    $q = trim((string)$q);
+    if ($q !== '') {
+        $like = '%' . str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $q) . '%';
+        $parts = ["name LIKE :q ESCAPE '\\'", "company LIKE :q ESCAPE '\\'", "email LIKE :q ESCAPE '\\'"];
+        $par[':q'] = $like;
+        $dig = preg_replace('/\D/', '', $q);
+        if ($dig !== '') { $parts[] = "phone LIKE :qd"; $par[':qd'] = '%' . $dig . '%'; }
+        $w[] = '(' . implode(' OR ', $parts) . ')';
+    }
+    if ($tag !== '' && $tag !== 'ALL') { $w[] = 'tag = :tag'; $par[':tag'] = $tag; }
+    return [$w ? ' WHERE ' . implode(' AND ', $w) : '', $par];
+}
+
 /** Chave de comparação de telefone: só dígitos, sem 55, sem 0 inicial e ignorando o 9º dígito (DDD + 8 últimos). */
 function crmPhoneKey($phone) {
     $d = preg_replace('/\D/', '', (string)$phone);

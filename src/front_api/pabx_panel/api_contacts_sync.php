@@ -12,8 +12,10 @@ authGate('json');
 $action = $_REQUEST['action'] ?? 'sync';
 
 if ($action === 'list' || $action === 'sync' || $action === 'webhook_sync') {
-    $stmt = $db->query("SELECT * FROM crm_contacts ORDER BY name ASC");
-    $contacts = $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
+    [$fw, $fp] = crmContactsFilter($_REQUEST['q'] ?? '', $_REQUEST['tag'] ?? '');
+    $stmt = $db->prepare("SELECT * FROM crm_contacts" . $fw . " ORDER BY name COLLATE NOCASE ASC");
+    $stmt->execute($fp);
+    $contacts = $stmt->fetchAll(PDO::FETCH_ASSOC);
     echo json_encode([
         'status' => 'success',
         'count' => count($contacts),

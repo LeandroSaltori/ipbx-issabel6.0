@@ -326,7 +326,13 @@ if ($req && isset($_POST['action_csv'])) {
 // -- Excluir contatos em lote (marcados na tabela)
 if ($req && isset($_POST['action_bulk_delete_contacts'])) {
     $ids = array_values(array_unique(array_filter(array_map('intval', (array)($_POST['bulk_ids'] ?? [])))));
-    if ($ids) {
+    if (!empty($_POST['bulk_all'])) {   // todos os contatos do filtro/busca atual (todas as páginas)
+        [$bw, $bp] = crmContactsFilter(trim((string)($_POST['bulk_q'] ?? '')), trim((string)($_POST['bulk_tag'] ?? '')));
+        $del = $db->prepare("DELETE FROM crm_contacts" . $bw); $del->execute($bp);
+        $n = $del->rowCount();
+        if (function_exists('logUserAction')) logUserAction('Contatos apagados em lote', "$n contatos (filtro completo)", 'CRM');
+        $msg_status = $n . ($n === 1 ? " contato removido." : " contatos removidos.");
+    } elseif ($ids) {
         $del = $db->prepare("DELETE FROM crm_contacts WHERE id = :id");
         $n = 0;
         $db->beginTransaction();
@@ -341,7 +347,28 @@ try { AddressBookSync::reconcile($db, true); } catch (Throwable $e_abs) {}
 
 // ─── Carregar dados do SQLite ──────────────────────────────────────────────────
 $tags_list    = $db->query("SELECT * FROM contact_tags ORDER BY name ASC")->fetchAll(PDO::FETCH_ASSOC);
-$contacts_list= $db->query("SELECT * FROM crm_contacts ORDER BY name ASC")->fetchAll(PDO::FETCH_ASSOC);
+// Lista paginada no servidor: busca e filtro de etiqueta leem TODOS os contatos; só a exibição é dividida em páginas
+$f_q   = trim((string)($_GET['q'] ?? ''));
+$f_tag = trim((string)($_GET['tag'] ?? ''));
+$f_pp  = (int)($_GET['pp'] ?? 50); if (!in_array($f_pp, [50, 100, 200], true)) $f_pp = 50;
+[$f_where, $f_par] = crmContactsFilter($f_q, $f_tag);
+$total_all = (int)$db->query("SELECT COUNT(*) FROM crm_contacts")->fetchColumn();
+$st_cnt = $db->prepare("SELECT COUNT(*) FROM crm_contacts" . $f_where); $st_cnt->execute($f_par);
+$total_f = (int)$st_cnt->fetchColumn();
+$f_pages = max(1, (int)ceil($total_f / $f_pp));
+$f_pg = min(max(1, (int)($_GET['pg'] ?? 1)), $f_pages);
+$st_lst = $db->prepare("SELECT * FROM crm_contacts" . $f_where . " ORDER BY name COLLATE NOCASE ASC LIMIT " . $f_pp . " OFFSET " . (($f_pg - 1) * $f_pp));
+$st_lst->execute($f_par);
+$contacts_list = $st_lst->fetchAll(PDO::FETCH_ASSOC);
+$tag_counts = [];
+foreach ($db->query("SELECT tag, COUNT(*) n FROM crm_contacts GROUP BY tag") as $__tc) $tag_counts[$__tc['tag']] = (int)$__tc['n'];
+$f_qs = function ($over = []) use ($f_q, $f_tag, $f_pp, $f_pg) {
+    $a = array_merge(['module' => 'whatsapp', 'action' => 'contatos', 'q' => $f_q, 'tag' => $f_tag, 'pp' => $f_pp, 'pg' => $f_pg], $over);
+    foreach (['q', 'tag'] as $k) if ($a[$k] === '' || $a[$k] === 'ALL') unset($a[$k]);
+    if ($a['pp'] == 50) unset($a['pp']);
+    if ($a['pg'] == 1) unset($a['pg']);
+    return 'index.php?' . http_build_query($a);
+};
 $quick_msgs   = $db->query("SELECT * FROM quick_messages ORDER BY category ASC, title ASC")->fetchAll(PDO::FETCH_ASSOC);
 
 // Etiquetas padrão: criadas só na primeira vez (se o cliente apagar uma, ela não volta sozinha)
@@ -421,7 +448,7 @@ $active_tab = isset($_GET['crm_tab']) ? $_GET['crm_tab'] : 'contacts';
         <div class="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs font-bold w-fit">
             <a href="index.php?module=whatsapp&action=contatos&crm_tab=contacts"
                class="px-3.5 py-1.5 rounded-lg transition <?php echo $active_tab === 'contacts' ? 'bg-brand-600 text-white' : 'text-slate-400 hover:text-white'; ?> flex items-center gap-1.5">
-                <i class="fa-solid fa-users"></i> Contatos (<?php echo count($contacts_list); ?>)
+                <i class="fa-solid fa-users"></i> Contatos (<?php echo $total_all; ?>)
             </a>
             <a href="index.php?module=whatsapp&action=contatos&crm_tab=quick_msgs"
                class="px-3.5 py-1.5 rounded-lg transition <?php echo $active_tab === 'quick_msgs' ? 'bg-brand-600 text-white' : 'text-slate-400 hover:text-white'; ?> flex items-center gap-1.5">
@@ -434,22 +461,25 @@ $active_tab = isset($_GET['crm_tab']) ? $_GET['crm_tab'] : 'contacts';
         <div class="flex flex-col sm:flex-row items-center justify-between gap-3 pt-3 border-t border-slate-800">
             <div class="flex items-center gap-1.5 flex-wrap text-xs font-bold">
                 <span class="text-slate-400 mr-1">Etiqueta:</span>
-                <button onclick="filterByTag('ALL')" class="px-2.5 py-1 rounded-lg bg-slate-800 text-white hover:bg-slate-700 transition">Todas</button>
+                <a href="<?php echo htmlspecialchars($f_qs(['tag' => '', 'pg' => 1])); ?>" class="px-2.5 py-1 rounded-lg <?php echo $f_tag === '' ? 'bg-slate-600' : 'bg-slate-800'; ?> text-white hover:bg-slate-700 transition">Todas</a>
                 <?php foreach ($tags_list as $tl):
                     $ck  = $tl['color_key'];
                     $cls = tagCls($ck, $color_palette); $sty = tagSty($ck);
                 ?>
-                <button onclick="filterByTag('<?php echo htmlspecialchars($tl['name']); ?>')"
-                        class="px-2.5 py-1 rounded-lg border <?php echo $cls; ?> hover:opacity-80 transition" style="<?php echo htmlspecialchars($sty); ?>">
+                <a href="<?php echo htmlspecialchars($f_qs(['tag' => $tl['name'], 'pg' => 1])); ?>"
+                        class="px-2.5 py-1 rounded-lg border <?php echo $cls; ?> hover:opacity-80 transition <?php echo $f_tag === $tl['name'] ? 'ring-2 ring-white/70' : ''; ?>" style="<?php echo htmlspecialchars($sty); ?>">
                     🏷️ <?php echo htmlspecialchars($tl['name']); ?>
-                </button>
+                </a>
                 <?php endforeach; ?>
             </div>
-            <div class="relative w-full sm:w-64">
+            <form method="GET" action="index.php" class="relative w-full sm:w-64" id="contact-search-form">
+                <input type="hidden" name="module" value="whatsapp"><input type="hidden" name="action" value="contatos">
+                <?php if ($f_tag !== ''): ?><input type="hidden" name="tag" value="<?php echo htmlspecialchars($f_tag); ?>"><?php endif; ?>
+                <?php if ($f_pp != 50): ?><input type="hidden" name="pp" value="<?php echo (int)$f_pp; ?>"><?php endif; ?>
                 <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-3 text-slate-400 text-xs"></i>
-                <input type="text" id="contact-search" onkeyup="filterContacts()" placeholder="Buscar por nome, telefone ou empresa..."
+                <input type="text" name="q" id="contact-search" value="<?php echo htmlspecialchars($f_q); ?>" oninput="filterContacts()" placeholder="Buscar em todos os contatos..." autocomplete="off"
                        class="w-full pl-9 pr-4 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-emerald-500 font-mono">
-            </div>
+            </form>
         </div>
         <?php endif; ?>
     </div>
@@ -460,6 +490,7 @@ $active_tab = isset($_GET['crm_tab']) ? $_GET['crm_tab'] : 'contacts';
     <form id="bulk-delete-form" method="POST" action="index.php?module=whatsapp&action=contatos" onsubmit="return confirmBulkDelete()" class="flex flex-wrap items-center gap-2 text-xs font-bold">
         <input type="hidden" name="action_bulk_delete_contacts" value="1">
         <span id="bulk-ids-holder"></span>
+        <button type="button" onclick="selectAllMatching()" id="bulk-all-btn" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 rounded-lg transition hidden whitespace-nowrap">Selecionar todos</button>
         <button type="button" onclick="selectAllContacts(false)" id="bulk-clear" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-lg transition hidden">Limpar seleção</button>
         <button type="submit" id="bulk-delete-btn" class="px-3 py-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded-lg transition hidden"><i class="fa-solid fa-trash"></i> <span id="bulk-count-label">Apagar selecionados</span></button>
     </form>
@@ -557,6 +588,27 @@ $active_tab = isset($_GET['crm_tab']) ? $_GET['crm_tab'] : 'contacts';
                     <?php endforeach; endif; ?>
                 </tbody>
             </table>
+        </div>
+        <?php $f_from = $total_f ? (($f_pg - 1) * $f_pp + 1) : 0; $f_to = min($total_f, $f_pg * $f_pp); ?>
+        <div class="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-t border-slate-800 text-[11px] text-slate-400 font-bold" id="contacts-pager">
+            <span>
+                <?php if ($f_q !== '' || $f_tag !== ''): ?>Encontrados <?php echo $total_f; ?> de <?php echo $total_all; ?> contatos · <?php endif; ?>
+                Mostrando <?php echo $f_from; ?>–<?php echo $f_to; ?><?php echo ($f_q === '' && $f_tag === '') ? ' de ' . $total_f : ''; ?>
+            </span>
+            <span class="flex items-center gap-1.5 flex-wrap">
+                <?php if ($f_pages > 1):
+                    $win = array_unique(array_merge([1, $f_pages], range(max(1, $f_pg - 2), min($f_pages, $f_pg + 2))));
+                    sort($win); $prev = 0;
+                    if ($f_pg > 1): ?><a href="<?php echo htmlspecialchars($f_qs(['pg' => $f_pg - 1])); ?>" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 whitespace-nowrap">‹ Anterior</a><?php endif;
+                    foreach ($win as $pn): if ($pn - $prev > 1): ?><span class="px-1">…</span><?php endif; $prev = $pn; ?>
+                    <a href="<?php echo htmlspecialchars($f_qs(['pg' => $pn])); ?>" class="px-2.5 py-1 rounded-lg <?php echo $pn === $f_pg ? 'bg-emerald-600 text-white' : 'bg-slate-800 hover:bg-slate-700 text-slate-200'; ?>"><?php echo $pn; ?></a>
+                    <?php endforeach;
+                    if ($f_pg < $f_pages): ?><a href="<?php echo htmlspecialchars($f_qs(['pg' => $f_pg + 1])); ?>" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 whitespace-nowrap">Próxima ›</a><?php endif; ?>
+                <?php endif; ?>
+                <select onchange="location.href=this.value" class="ml-2 bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-slate-200" title="Contatos por página">
+                    <?php foreach ([50, 100, 200] as $opt): ?><option value="<?php echo htmlspecialchars($f_qs(['pp' => $opt, 'pg' => 1])); ?>" <?php echo $opt === $f_pp ? 'selected' : ''; ?>><?php echo $opt; ?> por página</option><?php endforeach; ?>
+                </select>
+            </span>
         </div>
     </div>
     <?php endif; ?>
@@ -830,7 +882,7 @@ $active_tab = isset($_GET['crm_tab']) ? $_GET['crm_tab'] : 'contacts';
                 <?php foreach ($tags_list as $tl):
                     $ck = $tl['color_key'];
                     $cls = tagCls($ck, $color_palette, 'bg-slate-800 text-slate-400'); $sty = tagSty($ck);
-                    $nuse = 0; foreach ($contacts_list as $cc) { if (($cc['tag'] ?? '') === $tl['name']) $nuse++; }
+                    $nuse = $tag_counts[$tl['name']] ?? 0;
                 ?>
                 <div class="flex items-center justify-between gap-2">
                     <span class="px-2 py-0.5 rounded text-[10px] font-bold border <?php echo $cls; ?>" style="<?php echo htmlspecialchars($sty); ?>">🏷️ <?php echo htmlspecialchars($tl['name']); ?></span>
@@ -992,22 +1044,12 @@ function openEditQmsgModal(qm) {
 }
 
 // ─── Filtros de Contato ──────────────────────────────────────────────────────
-let _currentTagFilter = 'ALL';
-function filterByTag(tag) {
-    _currentTagFilter = tag;
-    filterContacts();
+let _searchTimer = null;
+function filterContacts() {   // busca no servidor, em TODOS os contatos (espera parar de digitar)
+    clearTimeout(_searchTimer);
+    _searchTimer = setTimeout(() => document.getElementById('contact-search-form').submit(), 450);
 }
-function filterContacts() {
-    const q = (document.getElementById('contact-search')?.value || '').toLowerCase();
-    document.querySelectorAll('.contact-row').forEach(row => {
-        const tag = row.dataset.tag || '';
-        const matchTag  = _currentTagFilter === 'ALL' || tag === _currentTagFilter;
-        const matchText = !q || (row.dataset.name?.includes(q) || row.dataset.phone?.includes(q) || row.dataset.company?.includes(q));
-        row.style.display = matchTag && matchText ? '' : 'none';
-        if (row.style.display === 'none') { const cc = row.querySelector('.chk-contact'); if (cc) cc.checked = false; }
-    });
-    updateBulkBar();
-}
+(function () { const i = document.getElementById('contact-search'); if (i && i.value) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } })();
 
 // ─── Seleção e exclusão em lote ───────────────────────────
 function _visibleRows() { return Array.from(document.querySelectorAll('.contact-row')).filter(r => r.style.display !== 'none'); }
@@ -1016,6 +1058,7 @@ function toggleAllContacts(on) {
     updateBulkBar();
 }
 function selectAllContacts(on) {
+    if (!on) _bulkAll = false;
     document.querySelectorAll('.chk-contact').forEach(c => c.checked = on);
     const all = document.getElementById('chk-all-contacts'); if (all) all.checked = on;
     updateBulkBar();
@@ -1029,17 +1072,28 @@ function selectBySource(src) {
     if (!n) alert('Nenhum contato com essa origem.');
     updateBulkBar();
 }
+let _bulkAll = false;
+function selectAllMatching() {   // marca todos os contatos do filtro/busca atual, em todas as páginas
+    selectAllContacts(true); _bulkAll = true; updateBulkBar();
+}
 function updateBulkBar() {
     const sel = document.querySelectorAll('.chk-contact:checked').length;
+    if (sel === 0) _bulkAll = false;
+    const totalF = <?php echo (int)$total_f; ?>;
+    const allBtn = document.getElementById('bulk-all-btn');
+    if (allBtn) { allBtn.classList.toggle('hidden', !(sel > 0 && totalF > sel && !_bulkAll)); allBtn.innerText = 'Selecionar todos os ' + totalF + (<?php echo ($f_q !== '' || $f_tag !== '') ? 'true' : 'false'; ?> ? ' do filtro' : ' contatos'); }
     const btn = document.getElementById('bulk-delete-btn'), clr = document.getElementById('bulk-clear');
-    if (btn) { btn.classList.toggle('hidden', sel === 0); document.getElementById('bulk-count-label').innerText = 'Apagar ' + sel + (sel === 1 ? ' selecionado' : ' selecionados'); }
+    if (btn) { btn.classList.toggle('hidden', sel === 0); const nDel = _bulkAll ? totalF : sel; document.getElementById('bulk-count-label').innerText = 'Apagar ' + nDel + (nDel === 1 ? ' selecionado' : ' selecionados'); }
     if (clr) clr.classList.toggle('hidden', sel === 0);
 }
 function confirmBulkDelete() {
     const ids = Array.from(document.querySelectorAll('.chk-contact:checked')).map(c => c.value);
     if (!ids.length) return false;
-    if (!confirm('Excluir ' + ids.length + (ids.length === 1 ? ' contato' : ' contatos') + '? Essa ação não pode ser desfeita.')) return false;
-    document.getElementById('bulk-ids-holder').innerHTML = ids.map(i => '<input type="hidden" name="bulk_ids[]" value="' + i + '">').join('');
+    const n = _bulkAll ? <?php echo (int)$total_f; ?> : ids.length;
+    if (!confirm('Excluir ' + n + (n === 1 ? ' contato' : ' contatos') + (_bulkAll ? ' (todos os do filtro atual, em todas as páginas)' : '') + '? Essa ação não pode ser desfeita.')) return false;
+    document.getElementById('bulk-ids-holder').innerHTML = _bulkAll
+        ? '<input type="hidden" name="bulk_all" value="1"><input type="hidden" name="bulk_q" value="<?php echo htmlspecialchars($f_q, ENT_QUOTES); ?>"><input type="hidden" name="bulk_tag" value="<?php echo htmlspecialchars($f_tag, ENT_QUOTES); ?>">'
+        : ids.map(i => '<input type="hidden" name="bulk_ids[]" value="' + i + '">').join('');
     return true;
 }
 
@@ -1092,14 +1146,14 @@ function copyQuickMsg(body) {
 }
 
 // ─── Exportar CSV ────────────────────────────────────────────────────────────
-function exportContactsToCSV() {
+async function exportContactsToCSV() {
     const __who = <?php $__lu = getLoggedUser(); echo json_encode(trim((string)($__lu['name'] ?? $__lu['email'] ?? '')), JSON_UNESCAPED_UNICODE); ?>;
     const rows = [['Nome', 'Telefone', 'E-mail', 'Empresa', 'Etiqueta', 'Origem']];
-    document.querySelectorAll('#contacts-table-body .contact-row').forEach(row => {
-        const c = row.querySelectorAll('td');
-        if (c.length < 6) return;
-        rows.push([row.dataset.name || '', c[1]?.innerText || '', c[2]?.innerText || '', c[3]?.innerText || '', row.dataset.tag || '', c[5]?.innerText || '']);
-    });
+    try {   // exporta TODOS os contatos do filtro atual, não só a página que está na tela
+        const res = await fetch('api_contacts_sync.php?action=list&q=' + encodeURIComponent(<?php echo json_encode($f_q, JSON_UNESCAPED_UNICODE); ?>) + '&tag=' + encodeURIComponent(<?php echo json_encode($f_tag, JSON_UNESCAPED_UNICODE); ?>));
+        const j = await res.json();
+        (j.contacts || []).forEach(c => rows.push([c.name || '', c.phone || '', c.email || '', c.company || '', c.tag || '', c.source || '']));
+    } catch (e) { alert('Não foi possível exportar os contatos agora.'); return; }
     ipbxCsv('contatos_' + new Date().toISOString().slice(0, 10) + '.csv', ['Agenda de contatos', 'Gerado em ' + new Date().toLocaleString('pt-BR') + (__who ? ' por ' + __who : '') + ' - IPbx Prisma'], rows);
 }
 

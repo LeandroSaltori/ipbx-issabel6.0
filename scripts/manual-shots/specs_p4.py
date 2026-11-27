@@ -68,8 +68,8 @@ add('config', 'Resumo Diário (em Relatórios Agendados)',
   fig('c20-resumo', 'index.php?module=configuracoes&action=smtp', 'Cadastro de agendamento.', ['Relatório a enviar: Resumo Diário (ligações de ontem).', 'Horário e destino (e-mail e/ou WhatsApp).', 'Criar Agendamento.'],
       [m(1, t='Relatório a Enviar', up=1, pos='tl'), m(2, t='Horário do Disparo', up=1, pos='tl'), m(3, t='Criar Agendamento', pos='r')], minw=620, vp=(1440, 1100)))
 add('config', 'Agenda sincronizada com o painel clássico',
-  fig('c21-ag', 'index.php?module=whatsapp&action=contatos', 'Agenda & Contatos.', ['Os mesmos contatos da Agenda do painel clássico.', 'Sincronizar traz os números do PABX.'],
-      [m(1, t='CLIENTE / NOME', closest='thead', pos='tl'), m(2, t='Sincronizar Chamadas', pos='t')], minw=700))
+  fig('c21-ag', 'index.php?module=whatsapp&action=contatos', 'Agenda & Contatos.', ['Os mesmos contatos da Agenda do painel clássico.', 'Importar CSV ou Importar Prismabot: trazem contatos novos sem duplicar números.'],
+      [m(1, t='CLIENTE / NOME', closest='thead', pos='tl'), m(2, t='Importar CSV', pos='t')], minw=700))
 add('config', 'Assistente WhatsApp (opcional)',
   fig('c22-aw', 'index.php?module=configuracoes&action=assistente_whatsapp', 'Assistente no WhatsApp.', ['Ligar o assistente.', 'Números autorizados (com DDD).', 'Salvar e Enviar mensagem de teste.', 'Conversa ao vivo.'],
       [m(1, t='Ligar o assistente', up=1, pos='tl'), m(2, sel='input[placeholder*=\"16999\"]', pos='tl'), m(3, t='Enviar mensagem de teste', pos='r'), m(4, t='CONVERSA AO VIVO', closest='[class*="rounded"]', pos='tl')], minw=700))
