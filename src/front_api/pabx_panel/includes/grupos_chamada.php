@@ -85,13 +85,22 @@ function rgNumberInUse(PDO $c, $grpnum, $ignoreSelf = false) {
     return false;
 }
 
-function rgBackupDir() { return defined('IPBX_BACKUP_DIR') ? IPBX_BACKUP_DIR : '/var/backup/ipbx/grupos'; }
+/** Pasta das copias: /var/backup/ipbx/grupos se o painel puder escrever la; senao, uma pasta oculta (.ht_) dentro do proprio painel. */
+function rgBackupDir() {
+    if (defined('IPBX_BACKUP_DIR')) return IPBX_BACKUP_DIR;
+    $alt = dirname(__DIR__) . '/.ht_backup_grupos';
+    foreach (['/var/backup/ipbx/grupos', $alt] as $d) {
+        if (!is_dir($d)) @mkdir($d, 0750, true);
+        if (is_dir($d) && is_writable($d)) return $d;
+    }
+    return $alt;
+}
 
 /** Guarda a linha anterior (ou "nao existia") para desfazer. */
 function rgSnapshot($grpnum, $antes, $acao) {
     $d = rgBackupDir();
     if (!is_dir($d)) @mkdir($d, 0750, true);
-    $f = $d . '/' . date('Ymd-His') . '-' . $grpnum . '-' . $acao . '.json';
+    $f = $d . '/.ht-' . date('Ymd-His') . '-' . $grpnum . '-' . $acao . '.json'; // prefixo .ht-: o Apache nunca serve esse arquivo
     $ok = @file_put_contents($f, json_encode(['grpnum' => (string)$grpnum, 'acao' => $acao, 'antes' => $antes, 'quando' => date('c')], JSON_UNESCAPED_UNICODE));
     return $ok !== false ? $f : '';
 }
@@ -179,7 +188,7 @@ function rgDelete(PDO $c, $grpnum) {
 
 /** Ultima alteracao feita pelo painel (arquivo mais recente), ou null. */
 function rgLastChange() {
-    $fs = glob(rgBackupDir() . '/*.json') ?: [];
+    $fs = array_merge(glob(rgBackupDir() . '/.ht-*.json') ?: [], glob(rgBackupDir() . '/*.json') ?: []);
     if (!$fs) return null;
     sort($fs); $f = end($fs);
     $j = json_decode((string)@file_get_contents($f), true);

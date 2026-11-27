@@ -140,6 +140,8 @@ chmod 640 /etc/ipbx/sso.key 2>/dev/null || true
 # 4. Ajuste estrito de permissões e proprietário do PABX
 echo "[+] Ajustando permissões de sistema..."
 chown -R asterisk:asterisk "$DEST_DIR"
+# Copias de seguranca dos Grupos de Chamada (o painel roda como asterisk e precisa escrever aqui; sem isto ele usa uma pasta oculta propria)
+mkdir -p /var/backup/ipbx/grupos 2>/dev/null && chown asterisk:asterisk /var/backup/ipbx/grupos 2>/dev/null && chmod 750 /var/backup/ipbx/grupos 2>/dev/null || true
 chmod -R 755 "$DEST_DIR"
 
 # Permissão nos bancos SQLite se presentes
