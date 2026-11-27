@@ -68,6 +68,19 @@ $color_palette = [
     'slate'    => ['label' => 'Cinza',    'classes' => 'bg-slate-500/20 text-slate-300 border-slate-500/40', 'dot' => 'bg-slate-400'],
 ];
 
+// Cor da etiqueta: chave da paleta OU código livre #RRGGBB (escolhido no seletor de cor)
+function tagIsHex($ck) { return (bool)preg_match('/^#[0-9A-Fa-f]{6}$/', (string)$ck); }
+function tagCls($ck, $palette, $fallback = 'bg-slate-800 text-slate-400 border-slate-700') {
+    if (tagIsHex($ck)) return '';
+    return isset($palette[$ck]) ? $palette[$ck]['classes'] : $fallback;
+}
+function tagSty($ck) {
+    if (!tagIsHex($ck)) return '';
+    $r = hexdec(substr($ck, 1, 2)); $g = hexdec(substr($ck, 3, 2)); $b = hexdec(substr($ck, 5, 2));
+    $tx = sprintf('#%02x%02x%02x', (int)($r + (255 - $r) * .6), (int)($g + (255 - $g) * .6), (int)($b + (255 - $b) * .6));
+    return "background:rgba($r,$g,$b,.2);color:$tx;border-color:rgba($r,$g,$b,.4)";
+}
+
 // ─── PROCESSAMENTO DE FORMULÁRIOS ─────────────────────────────────────────────
 $req = $_SERVER['REQUEST_METHOD'] === 'POST';
 
@@ -75,9 +88,11 @@ $req = $_SERVER['REQUEST_METHOD'] === 'POST';
 if ($req && isset($_POST['action_create_tag'])) {
     $tname = trim($_POST['new_tag_name'] ?? '');
     $tclr  = trim($_POST['new_tag_color'] ?? 'emerald');
+    $thex  = trim($_POST['new_tag_hex'] ?? '');
+    if ($thex !== '') { if ($thex[0] !== '#') $thex = '#' . $thex; if (tagIsHex($thex)) $tclr = strtoupper($thex); else $tclr = ''; }
     $teid  = intval($_POST['edit_tag_id'] ?? 0);
-    if ($tname === '' || !isset($color_palette[$tclr])) {
-        $msg_error = 'Informe o nome e escolha uma cor para a etiqueta.';
+    if ($tname === '' || (!isset($color_palette[$tclr]) && !tagIsHex($tclr))) {
+        $msg_error = 'Informe o nome e escolha uma cor válida para a etiqueta (código no formato #RRGGBB).';
     } elseif ($teid) {
         try {
             $st = $db->prepare("SELECT name FROM contact_tags WHERE id = :id"); $st->execute([':id' => $teid]);
@@ -336,10 +351,11 @@ if (getSetting('contact_tags_seeded') !== '1') {
 $tags_list = $db->query("SELECT * FROM contact_tags ORDER BY name ASC")->fetchAll(PDO::FETCH_ASSOC);
 
 // Mapa de cores por nome de etiqueta
-$tag_color_map = [];
+$tag_color_map = []; $tag_style_map = [];
 foreach ($tags_list as $tl) {
     $ck = $tl['color_key'];
-    $tag_color_map[$tl['name']] = isset($color_palette[$ck]) ? $color_palette[$ck]['classes'] : 'bg-slate-800 text-slate-300 border-slate-700';
+    $tag_color_map[$tl['name']] = tagCls($ck, $color_palette, 'bg-slate-800 text-slate-300 border-slate-700');
+    $tag_style_map[$tl['name']] = tagSty($ck);
 }
 
 // Aba ativa
@@ -417,10 +433,10 @@ $active_tab = isset($_GET['crm_tab']) ? $_GET['crm_tab'] : 'contacts';
                 <button onclick="filterByTag('ALL')" class="px-2.5 py-1 rounded-lg bg-slate-800 text-white hover:bg-slate-700 transition">Todas</button>
                 <?php foreach ($tags_list as $tl):
                     $ck  = $tl['color_key'];
-                    $cls = isset($color_palette[$ck]) ? $color_palette[$ck]['classes'] : 'bg-slate-800 text-slate-400 border-slate-700';
+                    $cls = tagCls($ck, $color_palette); $sty = tagSty($ck);
                 ?>
                 <button onclick="filterByTag('<?php echo htmlspecialchars($tl['name']); ?>')"
-                        class="px-2.5 py-1 rounded-lg border <?php echo $cls; ?> hover:opacity-80 transition">
+                        class="px-2.5 py-1 rounded-lg border <?php echo $cls; ?> hover:opacity-80 transition" style="<?php echo htmlspecialchars($sty); ?>">
                     🏷️ <?php echo htmlspecialchars($tl['name']); ?>
                 </button>
                 <?php endforeach; ?>
@@ -466,7 +482,7 @@ $active_tab = isset($_GET['crm_tab']) ? $_GET['crm_tab'] : 'contacts';
                         </td></tr>
                     <?php else: ?>
                     <?php foreach ($contacts_list as $c):
-                        $tclss = isset($tag_color_map[$c['tag']]) ? $tag_color_map[$c['tag']] : 'bg-slate-800 text-slate-400 border-slate-700';
+                        $tclss = isset($tag_color_map[$c['tag']]) ? $tag_color_map[$c['tag']] : 'bg-slate-800 text-slate-400 border-slate-700'; $tstyl = $tag_style_map[$c['tag']] ?? '';
                         $srcCls = ($c['source'] === 'Prismabot' || $c['source'] === 'API Z-PRO') ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-slate-800 text-slate-400';
                     ?>
                     <tr class="contact-row hover:bg-slate-800/40 transition" data-tag="<?php echo htmlspecialchars($c['tag']); ?>"
@@ -496,7 +512,7 @@ $active_tab = isset($_GET['crm_tab']) ? $_GET['crm_tab'] : 'contacts';
                         <td class="p-3 text-slate-200"><?php echo htmlspecialchars($c['company'] ?: '—'); ?></td>
                         <td class="p-3">
                             <?php if ($c['tag']): ?>
-                                <span class="px-2.5 py-0.5 rounded-md text-[10px] font-bold border <?php echo $tclss; ?>">🏷️ <?php echo htmlspecialchars($c['tag']); ?></span>
+                                <span class="px-2.5 py-0.5 rounded-md text-[10px] font-bold border <?php echo $tclss; ?>" style="<?php echo htmlspecialchars($tstyl); ?>">🏷️ <?php echo htmlspecialchars($c['tag']); ?></span>
                             <?php else: ?>
                                 <span class="text-slate-600">—</span>
                             <?php endif; ?>
@@ -787,10 +803,15 @@ $active_tab = isset($_GET['crm_tab']) ? $_GET['crm_tab'] : 'contacts';
             </div>
             <div>
                 <label class="font-bold text-slate-300 block mb-2">Cor da Etiqueta</label>
+                <div class="flex items-center gap-3 mb-3">
+                    <input type="color" id="tag-picker" value="#10b981" class="w-12 h-9 rounded-lg bg-slate-950 border border-slate-700 cursor-pointer p-0.5" title="Clique e arraste para escolher qualquer cor" oninput="tagPickerChanged(this.value)">
+                    <input type="text" name="new_tag_hex" id="tag-hex" maxlength="7" placeholder="#10B981" autocomplete="off" class="w-28 px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono text-xs focus:border-amber-500 outline-none" oninput="tagHexTyped(this.value)">
+                    <span class="text-[10px] text-slate-500">Clique na caixa de cor e arraste, digite o código, ou use uma cor pronta abaixo.</span>
+                </div>
                 <div class="grid grid-cols-9 gap-2" id="tag-swatches">
                     <?php foreach ($color_palette as $ck => $cv): ?>
                     <label class="cursor-pointer" title="<?php echo htmlspecialchars($cv['label']); ?>">
-                        <input type="radio" name="new_tag_color" id="tagc_<?php echo $ck; ?>" value="<?php echo $ck; ?>" class="hidden peer" <?php echo $ck === 'emerald' ? 'checked' : ''; ?> onchange="tagPreviewUpdate()" data-classes="<?php echo htmlspecialchars($cv['classes']); ?>">
+                        <input type="radio" name="new_tag_color" id="tagc_<?php echo $ck; ?>" value="<?php echo $ck; ?>" class="hidden peer" <?php echo $ck === 'emerald' ? 'checked' : ''; ?> onchange="tagSwatchChosen()" data-classes="<?php echo htmlspecialchars($cv['classes']); ?>">
                         <span class="block w-7 h-7 rounded-full <?php echo $cv['dot']; ?> ring-2 ring-transparent ring-offset-2 ring-offset-slate-900 peer-checked:ring-white hover:scale-110 transition"></span>
                     </label>
                     <?php endforeach; ?>
@@ -812,11 +833,11 @@ $active_tab = isset($_GET['crm_tab']) ? $_GET['crm_tab'] : 'contacts';
             <div class="flex flex-col gap-1.5 max-h-52 overflow-y-auto">
                 <?php foreach ($tags_list as $tl):
                     $ck = $tl['color_key'];
-                    $cls = isset($color_palette[$ck]) ? $color_palette[$ck]['classes'] : 'bg-slate-800 text-slate-400';
+                    $cls = tagCls($ck, $color_palette, 'bg-slate-800 text-slate-400'); $sty = tagSty($ck);
                     $nuse = 0; foreach ($contacts_list as $cc) { if (($cc['tag'] ?? '') === $tl['name']) $nuse++; }
                 ?>
                 <div class="flex items-center justify-between gap-2">
-                    <span class="px-2 py-0.5 rounded text-[10px] font-bold border <?php echo $cls; ?>">🏷️ <?php echo htmlspecialchars($tl['name']); ?></span>
+                    <span class="px-2 py-0.5 rounded text-[10px] font-bold border <?php echo $cls; ?>" style="<?php echo htmlspecialchars($sty); ?>">🏷️ <?php echo htmlspecialchars($tl['name']); ?></span>
                     <span class="flex items-center gap-1.5">
                         <span class="text-[10px] text-slate-500"><?php echo $nuse; ?> contato(s)</span>
                         <button type="button" title="Editar etiqueta" onclick='editTag(<?php echo (int)$tl['id']; ?>, <?php echo json_encode($tl['name'], JSON_UNESCAPED_UNICODE | JSON_HEX_APOS | JSON_HEX_QUOT); ?>, <?php echo json_encode($ck); ?>)' class="w-7 h-7 rounded-lg bg-slate-800 hover:bg-amber-600/30 text-amber-300 border border-slate-700 flex items-center justify-center"><i class="fa-solid fa-pen text-[10px]"></i></button>
@@ -837,7 +858,10 @@ $active_tab = isset($_GET['crm_tab']) ? $_GET['crm_tab'] : 'contacts';
 function editTag(id, name, color) {
     document.getElementById('edit_tag_id').value = id;
     document.getElementById('new_tag_name').value = name;
-    var r = document.getElementById('tagc_' + color); if (r) r.checked = true; tagPreviewUpdate();
+    document.querySelectorAll('input[name=new_tag_color]').forEach(x => x.checked = false);
+    if (/^#[0-9a-fA-F]{6}$/.test(color)) { document.getElementById('tag-hex').value = color; document.getElementById('tag-picker').value = color; }
+    else { document.getElementById('tag-hex').value = ''; var r = document.getElementById('tagc_' + color); if (r) r.checked = true; }
+    tagPreviewUpdate();
     document.getElementById('tag-modal-title').textContent = 'Editar Etiqueta';
     document.getElementById('tag-submit-txt').textContent = 'Salvar alterações';
     document.getElementById('tag-cancel-edit').classList.remove('hidden');
@@ -846,7 +870,7 @@ function editTag(id, name, color) {
 function cancelEditTag() {
     document.getElementById('edit_tag_id').value = 0;
     document.getElementById('new_tag_name').value = '';
-    var r = document.getElementById('tagc_emerald'); if (r) r.checked = true; tagPreviewUpdate();
+    document.getElementById('tag-hex').value = ''; var r = document.getElementById('tagc_emerald'); if (r) r.checked = true; tagPreviewUpdate();
     document.getElementById('tag-modal-title').textContent = 'Criar Nova Etiqueta';
     document.getElementById('tag-submit-txt').textContent = 'Criar Etiqueta';
     document.getElementById('tag-cancel-edit').classList.add('hidden');
@@ -928,12 +952,31 @@ function downloadCsvTemplate() {
     a.download = 'modelo_importacao_contatos.csv';
     document.body.appendChild(a); a.click(); a.remove();
 }
-function tagPreviewUpdate() {
-    const r = document.querySelector('input[name=new_tag_color]:checked'); const p = document.getElementById('tag-preview'); const n = document.getElementById('new_tag_name');
-    if (!r || !p) return;
-    p.className = 'px-2.5 py-1 rounded-lg border text-[11px] font-bold ' + r.dataset.classes;
-    p.textContent = (n && n.value.trim()) ? n.value.trim() : 'Nome da etiqueta';
+function tagHexStyle(h) {
+    const r = parseInt(h.substr(1,2),16), g = parseInt(h.substr(3,2),16), b = parseInt(h.substr(5,2),16);
+    const m = c => Math.round(c + (255 - c) * 0.6);
+    return 'background:rgba('+r+','+g+','+b+',.2);color:rgb('+m(r)+','+m(g)+','+m(b)+');border-color:rgba('+r+','+g+','+b+',.4)';
 }
+function tagPreviewUpdate() {
+    const p = document.getElementById('tag-preview'); const n = document.getElementById('new_tag_name'); const hx = document.getElementById('tag-hex');
+    if (!p) return;
+    p.textContent = (n && n.value.trim()) ? n.value.trim() : 'Nome da etiqueta';
+    p.className = 'px-2.5 py-1 rounded-lg border text-[11px] font-bold'; p.removeAttribute('style');
+    if (hx && /^#[0-9a-fA-F]{6}$/.test(hx.value.trim())) { p.setAttribute('style', tagHexStyle(hx.value.trim())); return; }
+    const r = document.querySelector('input[name=new_tag_color]:checked');
+    if (r) p.className += ' ' + r.dataset.classes;
+}
+function tagPickerChanged(v) {   // arrastou no seletor de cor: vale o código livre
+    document.getElementById('tag-hex').value = v.toUpperCase();
+    document.querySelectorAll('input[name=new_tag_color]').forEach(x => x.checked = false);
+    tagPreviewUpdate();
+}
+function tagHexTyped(v) {
+    v = v.trim(); if (v && v[0] !== '#') v = '#' + v;
+    if (/^#[0-9a-fA-F]{6}$/.test(v)) { document.getElementById('tag-picker').value = v; document.querySelectorAll('input[name=new_tag_color]').forEach(x => x.checked = false); }
+    tagPreviewUpdate();
+}
+function tagSwatchChosen() { document.getElementById('tag-hex').value = ''; tagPreviewUpdate(); }
 document.addEventListener('input', e => { if (e.target && e.target.id === 'new_tag_name') tagPreviewUpdate(); });
 function openModal(id)  { const m = document.getElementById(id); if (m) m.classList.remove('hidden'); }
 function closeModal(id) { const m = document.getElementById(id); if (m) m.classList.add('hidden');    }
