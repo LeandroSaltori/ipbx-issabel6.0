@@ -71,6 +71,29 @@ function aiProposeContactSave($a) {
     }
     return aiNewProposal('contact_save', ['id' => 0] + $f, "Cadastrar contato {$f['name']} ({$f['phone']})" . ($f['tag'] !== '' ? ", etiqueta {$f['tag']}" : '') . ($f['company'] !== '' ? ", empresa {$f['company']}" : ''));
 }
+/** Propõe excluir vários contatos de uma vez (um único cartão). Resolve os ids aqui; quem apaga é o botão Confirmar. */
+function aiProposeContactsDeleteMany($a) {
+    global $db;
+    aiContactsEnsure();
+    $q = trim((string)($a['query'] ?? '')); $eq = trim((string)($a['name_equals'] ?? '')); $tag = trim((string)($a['tag'] ?? ''));
+    $semNome = !empty($a['sem_nome']);
+    if ($q === '' && $eq === '' && $tag === '' && !$semNome) return ['error' => 'Informe ao menos um critério (query, name_equals, tag ou sem_nome). Não apago a agenda inteira sem critério.'];
+    [$w, $par] = crmContactsFilter($q, $tag);
+    $rows = $db->prepare("SELECT id, name, phone FROM crm_contacts" . $w . " ORDER BY name COLLATE NOCASE");
+    $rows->execute($par);
+    $ids = []; $ex = [];
+    foreach ($rows->fetchAll(PDO::FETCH_ASSOC) as $c) {
+        $nm = trim((string)$c['name']);
+        if ($eq !== '' && mb_strtolower($nm) !== mb_strtolower($eq)) continue;
+        if ($semNome && !($nm === '' || !preg_match('/\p{L}/u', $nm))) continue;   // sem nome = vazio, só número ou só pontuação
+        $ids[] = (int)$c['id'];
+        if (count($ex) < 5) $ex[] = ($nm !== '' ? $nm : '(sem nome)') . ' ' . $c['phone'];
+    }
+    if (!$ids) return ['error' => 'Nenhum contato encontrado com esse critério. Nada a excluir.'];
+    if (count($ids) > 2000) return ['error' => 'São ' . count($ids) . ' contatos: mais de 2000 de uma vez. Restrinja o critério.'];
+    $crit = array_filter([$q !== '' ? "busca \"$q\"" : '', $eq !== '' ? "nome igual a \"$eq\"" : '', $tag !== '' ? "etiqueta $tag" : '', $semNome ? 'sem nome' : '']);
+    return aiNewProposal('contact_delete_many', ['ids' => $ids], 'Excluir ' . count($ids) . ' contatos (' . implode(', ', $crit) . '). Exemplos: ' . implode('; ', $ex));
+}
 function aiProposeContactDelete($a) {
     global $db;
     $id = (int)($a['id'] ?? 0);
@@ -229,6 +252,18 @@ function aiApplyConfigAction($field, $v) {
         try { AddressBookSync::reconcile($db, true); } catch (Throwable $e_abs) {}
         panelRevBump('contacts');
         return ['success' => true];
+    }
+    if ($field === 'contact_delete_many') {
+        $ids = array_values(array_unique(array_filter(array_map('intval', (array)($v['ids'] ?? [])))));
+        if (!$ids) return ['success' => false, 'error' => 'Nenhum contato para excluir.'];
+        $del = $db->prepare("DELETE FROM crm_contacts WHERE id = ?"); $n = 0;
+        $db->beginTransaction();
+        foreach ($ids as $i) { $del->execute([$i]); $n += $del->rowCount(); }
+        $db->commit();
+        try { AddressBookSync::reconcile($db, true); } catch (Throwable $e_abs) {}
+        panelRevBump('contacts');
+        if (function_exists('logUserAction')) logUserAction('Contatos apagados pelo Chat IA', "$n contatos", 'CRM');
+        return ['success' => true, 'message' => "$n contatos excluídos."];
     }
     if ($field === 'contact_delete') {
         $db->prepare("DELETE FROM crm_contacts WHERE id = ?")->execute([(int)$v['id']]);
