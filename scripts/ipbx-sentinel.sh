@@ -866,7 +866,7 @@ export_f2b_log() {
   local src="${SENTINEL_F2B_LOG:-/var/log/fail2ban.log}" dst="${SENTINEL_F2B_EXPORT:-/etc/ipbx/fail2ban-recente.log}" tmp
   [ -d "$(dirname "$dst")" ] || return 0
   tmp="$(mktemp 2>/dev/null)" || return 0
-  if [ -r "$src" ]; then tail -n 6000 "$src" 2>/dev/null | grep -aE '\[[^]]+\] +(Ban|Unban) ' > "$tmp"
+  if [ -s "$src" ] && [ -r "$src" ]; then tail -n 6000 "$src" 2>/dev/null | grep -aE '\[[^]]+\] +(Ban|Unban) ' > "$tmp"
   elif command -v journalctl >/dev/null 2>&1; then journalctl -u fail2ban -n 6000 --no-pager -o short-iso 2>/dev/null | grep -aE '\[[^]]+\] +(Ban|Unban) ' > "$tmp"
   else rm -f "$tmp"; return 0; fi
   if ! cmp -s "$tmp" "$dst" 2>/dev/null; then cat "$tmp" > "$dst" 2>/dev/null; chown root:asterisk "$dst" 2>/dev/null; chmod 640 "$dst" 2>/dev/null; fi
