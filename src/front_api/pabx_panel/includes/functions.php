@@ -2346,6 +2346,70 @@ function uazapiMediaType($mime) {
     return 'document';
 }
 
+
+/** ===== Importação inteligente de contatos por CSV ===== */
+function csvContactsRead($raw) {
+    $raw = preg_replace('/^\xEF\xBB\xBF/', '', (string)$raw);
+    if (!mb_check_encoding($raw, 'UTF-8')) $raw = mb_convert_encoding($raw, 'UTF-8', 'Windows-1252');
+    $raw = str_replace(["\r\n", "\r"], "\n", $raw);
+    $first = strtok($raw, "\n") ?: '';
+    $best = ','; $bn = -1;
+    foreach ([';', ',', "\t", '|'] as $d) { $n = substr_count($first, $d); if ($n > $bn) { $bn = $n; $best = $d; } }
+    $rows = [];
+    $fh = fopen('php://temp', 'r+'); fwrite($fh, $raw); rewind($fh);
+    while (($r = fgetcsv($fh, 0, $best, '"', '\\')) !== false) {
+        if ($r === [null] || !array_filter($r, function ($v) { return trim((string)$v) !== ''; })) continue;
+        $rows[] = array_map(function ($v) { return trim((string)$v); }, $r);
+        if (count($rows) > 20001) break;
+    }
+    fclose($fh);
+    return $rows;
+}
+function csvContactsGuessMap($headers) {
+    $alias = [
+        'name'    => ['nome', 'name', 'cliente', 'contato', 'nomecompleto', 'razaosocial', 'displayname', 'firstname', 'primeironome'],
+        'phone'   => ['telefone', 'celular', 'whatsapp', 'fone', 'phone', 'numero', 'number', 'tel', 'mobile', 'telefone1', 'phone1', 'cel', 'zap'],
+        'email'   => ['email', 'emailaddress', 'mail'],
+        'company' => ['empresa', 'company', 'organizacao', 'organization', 'razao'],
+        'tag'     => ['etiqueta', 'tag', 'grupo', 'categoria', 'label'],
+    ];
+    $map = ['name' => -1, 'phone' => -1, 'email' => -1, 'company' => -1, 'tag' => -1];
+    foreach ($headers as $i => $h) {
+        $k = preg_replace('/[^a-z0-9]/', '', strtolower(iconv('UTF-8', 'ASCII//TRANSLIT', (string)$h) ?: (string)$h));
+        foreach ($alias as $f => $list) if ($map[$f] < 0 && in_array($k, $list, true)) { $map[$f] = $i; break; }
+    }
+    return $map;
+}
+function csvContactsNormPhone($v) {
+    $d = preg_replace('/\D/', '', (string)$v);
+    $d = ltrim($d, '0');
+    if (strlen($d) === 10 || strlen($d) === 11) $d = '55' . $d;
+    return (strlen($d) >= 12 && strlen($d) <= 13) ? $d : '';
+}
+/** Classifica as linhas: ok / sem_nome / invalido / repetido_arquivo / ja_existe. */
+function csvContactsClassify($db, $rows, $map, $hasHeader = true) {
+    $existing = [];
+    foreach ($db->query("SELECT phone FROM crm_contacts") as $r) $existing[crmPhoneKey($r['phone'])] = true;
+    $out = ['ok' => [], 'sem_nome' => [], 'invalido' => [], 'repetido_arquivo' => [], 'ja_existe' => []];
+    $seen = [];
+    foreach ($rows as $n => $r) {
+        if ($hasHeader && $n === 0) continue;
+        $g = function ($f) use ($r, $map) { return ($map[$f] ?? -1) >= 0 ? trim((string)($r[$map[$f]] ?? '')) : ''; };
+        $line = $n + 1;
+        $ph = csvContactsNormPhone($g('phone'));
+        $c = ['linha' => $line, 'name' => mb_substr($g('name'), 0, 80), 'phone' => $ph, 'raw' => $g('phone'), 'email' => mb_substr($g('email'), 0, 120), 'company' => mb_substr($g('company'), 0, 80), 'tag' => mb_substr($g('tag'), 0, 40)];
+        if ($c['email'] !== '' && !filter_var($c['email'], FILTER_VALIDATE_EMAIL)) $c['email'] = '';
+        if ($ph === '') { $out['invalido'][] = $c; continue; }
+        $k = crmPhoneKey($ph);
+        if (isset($seen[$k])) { $out['repetido_arquivo'][] = $c; continue; }
+        $seen[$k] = true;
+        if (isset($existing[$k])) { $out['ja_existe'][] = $c; continue; }
+        $semNome = ($c['name'] === '' || preg_replace('/\D/', '', $c['name']) === $c['name']);
+        $out[$semNome ? 'sem_nome' : 'ok'][] = $c;
+    }
+    return $out;
+}
+
 /** Chave de comparação de telefone: só dígitos, sem 55, sem 0 inicial e ignorando o 9º dígito (DDD + 8 últimos). */
 function crmPhoneKey($phone) {
     $d = preg_replace('/\D/', '', (string)$phone);

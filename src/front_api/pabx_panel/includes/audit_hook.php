@@ -104,6 +104,7 @@ function auditPostLabels() {
         'action_bulk_delete_contacts' => 'Excluiu contatos em lote',
         'action_sync_pabx_calls' => 'Sincronizou chamadas do PABX',
         'action_sync_prismabot' => 'Sincronizou Prismabot',
+        'action_csv' => 'Importou contatos por CSV',
         'action_test_ami' => 'Testou conexão AMI',
         'action_test_api_connection' => 'Testou conexão da API',
         'action_test_db' => 'Testou conexão com banco',

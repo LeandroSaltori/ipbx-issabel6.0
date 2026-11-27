@@ -232,6 +232,68 @@ if ($req && isset($_POST['action_sync_prismabot'])) {
     }
 }
 
+// -- Importar CSV (inteligente): upload -> prévia -> importar
+$csv_preview = null;
+if ($req && isset($_POST['action_csv'])) {
+    $step = $_POST['csv_step'] ?? 'upload';
+    $tokenOk = false; $tmpf = '';
+    if ($step === 'upload') {
+        $f = $_FILES['csv_file'] ?? null;
+        if (!$f || ($f['error'] ?? 4) !== UPLOAD_ERR_OK) $msg_error = 'Escolha um arquivo CSV para importar.';
+        elseif ($f['size'] > 5 * 1024 * 1024) $msg_error = 'Arquivo muito grande (máximo 5 MB).';
+        elseif (!preg_match('/\.(csv|txt)$/i', $f['name'])) $msg_error = 'O arquivo precisa ser .csv (no Excel: Salvar como > CSV).';
+        else {
+            $token = bin2hex(random_bytes(8));
+            $tmpf = sys_get_temp_dir() . '/ipbx_csv_' . $token . '.csv';
+            if (move_uploaded_file($f['tmp_name'], $tmpf)) { $tokenOk = true; @chmod($tmpf, 0600); } else $msg_error = 'Não foi possível ler o arquivo enviado.';
+        }
+    } else {
+        $token = (string)($_POST['csv_token'] ?? '');
+        if (preg_match('/^[a-f0-9]{16}$/', $token) && is_file(sys_get_temp_dir() . '/ipbx_csv_' . $token . '.csv')) { $tmpf = sys_get_temp_dir() . '/ipbx_csv_' . $token . '.csv'; $tokenOk = true; }
+        else $msg_error = 'A prévia expirou. Envie o arquivo novamente.';
+    }
+    if ($tokenOk) {
+        $rows = csvContactsRead(file_get_contents($tmpf));
+        if (count($rows) < 2) { $msg_error = 'O arquivo está vazio ou só tem o cabeçalho.'; @unlink($tmpf); }
+        elseif (count($rows) > 20000) { $msg_error = 'O arquivo tem mais de 20.000 linhas. Divida em partes menores.'; @unlink($tmpf); }
+        else {
+            $headers = $rows[0];
+            $map = csvContactsGuessMap($headers);
+            if (isset($_POST['map'])) foreach (['name','phone','email','company','tag'] as $fld) if (isset($_POST['map'][$fld])) $map[$fld] = max(-1, min(count($headers) - 1, (int)$_POST['map'][$fld]));
+            $cls = csvContactsClassify($db, $rows, $map, true);
+            $withUnnamed = !empty($_POST['include_unnamed']);
+            if ($step === 'import') {
+                $toAdd = $cls['ok'] + [];
+                if ($withUnnamed) $toAdd = array_merge($cls['ok'], $cls['sem_nome']);
+                $added = 0;
+                $db->beginTransaction();
+                try {
+                    $ins = $db->prepare("INSERT INTO crm_contacts (name, phone, email, company, tag, source) VALUES (:n,:p,:e,:co,:t,'Importação CSV')");
+                    foreach ($toAdd as $c) {
+                        if (crmFindDuplicate($db, $c['phone'])) continue;
+                        if ($c['tag'] !== '') { $db->prepare("INSERT OR IGNORE INTO contact_tags (name, color_key) VALUES (:n,'emerald')")->execute([':n' => $c['tag']]); }
+                        $ins->execute([':n' => $c['name'] !== '' ? $c['name'] : $c['phone'], ':p' => $c['phone'], ':e' => $c['email'], ':co' => $c['company'], ':t' => $c['tag']]);
+                        $added++;
+                    }
+                    $db->commit();
+                } catch (Exception $e3) { $db->rollBack(); $msg_error = 'Erro ao importar: ' . $e3->getMessage(); $added = -1; }
+                @unlink($tmpf);
+                if ($added >= 0) {
+                    try { AddressBookSync::reconcile($db, true); } catch (Throwable $e_abs) {}
+                    $skip = [];
+                    if (!$withUnnamed && $cls['sem_nome']) $skip[] = count($cls['sem_nome']) . ' sem nome';
+                    if ($cls['invalido']) $skip[] = count($cls['invalido']) . ' com número inválido';
+                    if ($cls['ja_existe']) $skip[] = count($cls['ja_existe']) . ' já cadastrados';
+                    if ($cls['repetido_arquivo']) $skip[] = count($cls['repetido_arquivo']) . ' repetidos no arquivo';
+                    $msg_status = "✅ $added contatos importados do CSV." . ($skip ? ' Ignorados: ' . implode(', ', $skip) . '.' : '');
+                }
+            } else {
+                $csv_preview = ['token' => $token, 'headers' => $headers, 'map' => $map, 'cls' => $cls, 'total' => count($rows) - 1, 'unnamed' => $withUnnamed];
+            }
+        }
+    }
+}
+
 // -- Excluir contatos em lote (marcados na tabela)
 if ($req && isset($_POST['action_bulk_delete_contacts'])) {
     $ids = array_values(array_unique(array_filter(array_map('intval', (array)($_POST['bulk_ids'] ?? [])))));
@@ -307,6 +369,10 @@ $active_tab = isset($_GET['crm_tab']) ? $_GET['crm_tab'] : 'contacts';
                 <!-- Importar Prismabot (abre a janela de opções) -->
                 <button type="button" onclick="openModal('modal-import-prismabot')" class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition shadow-lg shadow-emerald-600/20 flex items-center gap-1.5">
                     <i class="fa-brands fa-whatsapp"></i> Importar Prismabot
+                </button>
+
+                <button type="button" onclick="openModal('modal-import-csv')" class="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-xs font-bold transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-file-import text-sky-400"></i> Importar CSV
                 </button>
 
                 <!-- Exportar CSV -->
@@ -634,6 +700,68 @@ $active_tab = isset($_GET['crm_tab']) ? $_GET['crm_tab'] : 'contacts';
     </form>
 </div>
 
+<div id="modal-import-csv" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+    <form method="POST" enctype="multipart/form-data" action="index.php?module=whatsapp&action=contatos" class="bg-slate-900 border border-slate-700 rounded-2xl p-6 w-full max-w-md space-y-4">
+        <input type="hidden" name="action_csv" value="1"><input type="hidden" name="csv_step" value="upload">
+        <h3 class="text-sm font-black text-white flex items-center gap-2"><i class="fa-solid fa-file-import text-sky-400"></i> Importar contatos por CSV</h3>
+        <p class="text-xs text-slate-400">Envie qualquer planilha salva como CSV. O painel reconhece as colunas (nome, telefone, e-mail, empresa, etiqueta), arruma os telefones e mostra uma prévia antes de gravar. Números repetidos não são cadastrados de novo.</p>
+        <input type="file" name="csv_file" accept=".csv,.txt,text/csv" required class="block w-full text-xs text-slate-300 file:mr-3 file:px-3 file:py-2 file:rounded-lg file:border-0 file:bg-slate-700 file:text-slate-100 file:font-bold">
+        <button type="button" onclick="downloadCsvTemplate()" class="text-xs text-sky-400 hover:text-sky-300 font-bold flex items-center gap-1.5"><i class="fa-solid fa-download"></i> Baixar modelo de planilha</button>
+        <div class="flex justify-end gap-2">
+            <button type="button" onclick="closeModal('modal-import-csv')" class="px-3.5 py-2 bg-slate-800 text-slate-300 border border-slate-700 rounded-xl text-xs font-bold">Cancelar</button>
+            <button type="submit" class="px-3.5 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-xl text-xs font-bold">Ver prévia</button>
+        </div>
+    </form>
+</div>
+
+<?php if ($csv_preview): $cp = $csv_preview; $cl = $cp['cls']; $fl = ['name' => 'Nome', 'phone' => 'Telefone', 'email' => 'E-mail', 'company' => 'Empresa', 'tag' => 'Etiqueta']; ?>
+<div id="modal-csv-preview" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
+    <form method="POST" action="index.php?module=whatsapp&action=contatos" class="bg-slate-900 border border-slate-700 rounded-2xl p-6 w-full max-w-2xl space-y-4 my-6">
+        <input type="hidden" name="action_csv" value="1"><input type="hidden" name="csv_token" value="<?php echo htmlspecialchars($cp['token']); ?>">
+        <h3 class="text-sm font-black text-white flex items-center gap-2"><i class="fa-solid fa-list-check text-sky-400"></i> Prévia da importação (<?php echo (int)$cp['total']; ?> linhas)</h3>
+        <div class="grid grid-cols-2 sm:grid-cols-5 gap-2 text-center text-[11px] font-bold">
+            <div class="p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300"><div class="text-lg"><?php echo count($cl['ok']); ?></div>serão importados</div>
+            <div class="p-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300"><div class="text-lg"><?php echo count($cl['sem_nome']); ?></div>sem nome</div>
+            <div class="p-2 rounded-xl bg-slate-800 border border-slate-700 text-slate-300"><div class="text-lg"><?php echo count($cl['ja_existe']); ?></div>já cadastrados</div>
+            <div class="p-2 rounded-xl bg-slate-800 border border-slate-700 text-slate-300"><div class="text-lg"><?php echo count($cl['repetido_arquivo']); ?></div>repetidos no arquivo</div>
+            <div class="p-2 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300"><div class="text-lg"><?php echo count($cl['invalido']); ?></div>número inválido</div>
+        </div>
+        <div>
+            <p class="text-[11px] text-slate-400 font-bold mb-1">Colunas do arquivo (ajuste se o painel não reconheceu):</p>
+            <div class="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                <?php foreach ($fl as $k => $lab): ?>
+                <label class="text-[10px] text-slate-400 font-bold"><?php echo $lab; ?>
+                    <select name="map[<?php echo $k; ?>]" class="mt-1 w-full bg-slate-800 border border-slate-700 rounded-lg text-xs text-slate-200 p-1.5">
+                        <option value="-1">— não usar —</option>
+                        <?php foreach ($cp['headers'] as $hi => $hn): ?><option value="<?php echo $hi; ?>" <?php echo ($cp['map'][$k] === $hi) ? 'selected' : ''; ?>><?php echo htmlspecialchars($hn !== '' ? $hn : 'Coluna ' . ($hi + 1)); ?></option><?php endforeach; ?>
+                    </select>
+                </label>
+                <?php endforeach; ?>
+            </div>
+            <button type="submit" name="csv_step" value="preview" class="mt-2 text-[11px] text-sky-400 font-bold">↻ Recalcular prévia</button>
+        </div>
+        <?php if ($cl['ok'] || $cl['sem_nome']): ?>
+        <div class="max-h-40 overflow-y-auto rounded-xl border border-slate-800 text-[11px]">
+            <table class="w-full text-left text-slate-300"><thead class="text-slate-500 sticky top-0 bg-slate-900"><tr><th class="p-1.5">Nome</th><th class="p-1.5">Telefone</th><th class="p-1.5">Etiqueta</th></tr></thead><tbody>
+            <?php foreach (array_slice(array_merge($cl['ok'], $cl['sem_nome']), 0, 8) as $c): ?><tr class="border-t border-slate-800"><td class="p-1.5"><?php echo htmlspecialchars($c['name'] !== '' ? $c['name'] : '(sem nome)'); ?></td><td class="p-1.5"><?php echo htmlspecialchars($c['phone']); ?></td><td class="p-1.5"><?php echo htmlspecialchars($c['tag']); ?></td></tr><?php endforeach; ?>
+            </tbody></table>
+        </div>
+        <?php endif; ?>
+        <?php if ($cl['invalido']): ?><p class="text-[11px] text-rose-300">Linhas com número inválido (ignoradas): <?php echo htmlspecialchars(implode(', ', array_slice(array_column($cl['invalido'], 'linha'), 0, 15))); ?><?php echo count($cl['invalido']) > 15 ? '…' : ''; ?></p><?php endif; ?>
+        <?php if ($cl['sem_nome']): ?>
+        <label class="flex items-start gap-2 text-xs text-slate-200 font-bold cursor-pointer p-3 rounded-xl bg-slate-800/60 border border-slate-700">
+            <input type="checkbox" name="include_unnamed" value="1" <?php echo $cp['unnamed'] ? 'checked' : ''; ?> class="accent-emerald-500 mt-0.5">
+            <span>Importar também os <?php echo count($cl['sem_nome']); ?> contatos sem nome<br><span class="font-normal text-slate-400">Entram com o número no lugar do nome.</span></span>
+        </label>
+        <?php endif; ?>
+        <div class="flex justify-end gap-2">
+            <a href="index.php?module=whatsapp&action=contatos" class="px-3.5 py-2 bg-slate-800 text-slate-300 border border-slate-700 rounded-xl text-xs font-bold">Cancelar</a>
+            <button type="submit" name="csv_step" value="import" class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold" <?php echo (!$cl['ok'] && !$cl['sem_nome']) ? 'disabled style="opacity:.5"' : ''; ?>>Importar agora</button>
+        </div>
+    </form>
+</div>
+<?php endif; ?>
+
 <div id="modal-create-tag" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
     <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-4">
         <div class="flex items-center justify-between border-b border-slate-800 pb-3">
@@ -785,6 +913,13 @@ function cancelEditTag() {
 
 <script>
 // ─── Helpers de Modal ────────────────────────────────────────────────────────
+function downloadCsvTemplate() {
+    const csv = '\uFEFFNome;Telefone;E-mail;Empresa;Etiqueta\nMaria Silva;(16) 99999-0000;maria@exemplo.com.br;Empresa Exemplo;Cliente\n';
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([csv], {type: 'text/csv;charset=utf-8'}));
+    a.download = 'modelo_importacao_contatos.csv';
+    document.body.appendChild(a); a.click(); a.remove();
+}
 function openModal(id)  { const m = document.getElementById(id); if (m) m.classList.remove('hidden'); }
 function closeModal(id) { const m = document.getElementById(id); if (m) m.classList.add('hidden');    }
 
