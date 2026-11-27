@@ -4217,12 +4217,13 @@ function buildScheduledReportPayload($reportTitle, $reportType, $period = '', $f
 
     if ($dbAst) {
         try {
-            // Totais reais do período inteiro (sem o limite de linhas) + até 5000 linhas para o anexo
+            // Totais reais e TODAS as chamadas do período no anexo (sem limite de linhas)
+            @ini_set('memory_limit', '768M'); @set_time_limit(300);
             $agg = $dbAst->prepare("SELECT COUNT(*) AS t, SUM(disposition='ANSWERED') AS a, COALESCE(SUM(billsec),0) AS b FROM cdr WHERE calldate >= :sd AND calldate < :ed");
             $agg->execute([':sd' => $rangeStart, ':ed' => $rangeEnd]);
             $ag = $agg->fetch(PDO::FETCH_ASSOC);
             $totalCalls = (int)$ag['t']; $answeredCalls = (int)$ag['a']; $failedCalls = $totalCalls - $answeredCalls; $totalDurationSec = (int)$ag['b'];
-            $stmt = $dbAst->prepare("SELECT uniqueid, calldate, src, dst, disposition, duration, billsec FROM cdr WHERE calldate >= :sd AND calldate < :ed ORDER BY calldate DESC LIMIT 5000");
+            $stmt = $dbAst->prepare("SELECT uniqueid, calldate, src, dst, disposition, duration, billsec FROM cdr WHERE calldate >= :sd AND calldate < :ed ORDER BY calldate DESC");
             $stmt->execute([':sd' => $rangeStart, ':ed' => $rangeEnd]);
             $calls = $stmt->fetchAll(PDO::FETCH_ASSOC);
         } catch (Exception $ex) {}
