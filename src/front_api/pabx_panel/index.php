@@ -3516,14 +3516,14 @@ dialog#ai-chat-dialog::backdrop{background:rgba(0,0,0,.65);backdrop-filter:blur(
 #ai-chat-body{flex:1;overflow:auto;padding:12px;display:flex;flex-direction:column;gap:8px;background:#0f172a}
 .ai-msg{max-width:92%;padding:9px 12px;border-radius:14px;font-size:13px;line-height:1.45;word-wrap:break-word}
 .ai-msg.bot{background:#252440;border:1px solid #334155;align-self:flex-start}
-.ai-msg.me{background:#6366f1;color:#fff;align-self:flex-end}
+.ai-msg.me{background:#6366f1;color:#fff;align-self:flex-end;white-space:pre-wrap}
 .ai-msg a{color:#a5b4fc;text-decoration:underline}
 .ai-msg table{border-collapse:collapse;font-size:11px;margin:6px 0;display:block;overflow:auto}
 .ai-msg th,.ai-msg td{border:1px solid #475569;padding:3px 6px;white-space:nowrap}
 .ai-chip{display:inline-block;margin:3px 4px 0 0;padding:5px 10px;border-radius:999px;border:1px solid #6366f1;background:transparent;color:#c7d2fe;font-size:11px;cursor:pointer;white-space:nowrap;flex-shrink:0;width:auto;overflow:visible}
 .ai-chip:hover{background:#6366f1;color:#fff}
-#ai-chat-form{display:flex;gap:8px;padding:10px;background:#1c1b2f;border-top:1px solid #334155}
-#ai-chat-input{flex:1;background:#0f172a;border:1px solid #334155;border-radius:12px;color:#fff;padding:9px 12px;font-size:13px;outline:none}
+#ai-chat-form{display:flex;align-items:flex-end;gap:8px;padding:10px;background:#1c1b2f;border-top:1px solid #334155}
+#ai-chat-input{flex:1;background:#0f172a;border:1px solid #334155;border-radius:12px;color:#fff;padding:9px 12px;font-size:13px;outline:none;resize:none;font-family:inherit;line-height:1.4;max-height:132px;overflow-y:auto}
 #ai-chat-send{background:linear-gradient(135deg,#7c3aed,#6366f1);border:0;color:#fff;border-radius:12px;padding:0 14px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0;width:auto;overflow:visible}
 </style>
 <script>
@@ -3623,7 +3623,7 @@ dialog#ai-chat-dialog::backdrop{background:rgba(0,0,0,.65);backdrop-filter:blur(
     dlg = document.createElement('dialog'); dlg.id = 'ai-chat-dialog';
     dlg.innerHTML = '<div id="ai-chat-head"><span><i class="fa-solid fa-robot"></i> Assistente IPbx Prisma</span><span><button type="button" id="ai-chat-new" title="Nova conversa"><i class="fa-solid fa-rotate-right"></i></button> <button type="button" id="ai-chat-x" title="Fechar">✕</button></span></div>'
       + '<div id="ai-chat-body"></div>'
-      + '<form id="ai-chat-form"><input id="ai-chat-input" autocomplete="off" placeholder="Pergunte sobre ramais, ligações, filas..."><button id="ai-chat-send" type="submit">Enviar</button></form>';
+      + '<form id="ai-chat-form"><textarea id="ai-chat-input" rows="1" autocomplete="off" placeholder="Pergunte sobre ramais, ligações, filas... (Shift+Enter pula linha)"></textarea><button id="ai-chat-send" type="submit">Enviar</button></form>';
     document.body.appendChild(dlg);
     body = dlg.querySelector('#ai-chat-body');
     dlg.querySelector('#ai-chat-x').onclick = function(){ dlg.close(); };
@@ -3632,7 +3632,11 @@ dialog#ai-chat-dialog::backdrop{background:rgba(0,0,0,.65);backdrop-filter:blur(
       hist = []; body.innerHTML = ''; greet();
     };
     dlg.addEventListener('click', function(e){ if (e.target === dlg) dlg.close(); });
-    dlg.querySelector('#ai-chat-form').onsubmit = function(e){ e.preventDefault(); var i = dlg.querySelector('#ai-chat-input'); var v = i.value.trim(); if (v) { i.value = ''; send(v); } };
+    dlg.querySelector('#ai-chat-form').onsubmit = function(e){ e.preventDefault(); var i = dlg.querySelector('#ai-chat-input'); var v = i.value.trim(); if (v) { i.value = ''; i.style.height = 'auto'; send(v); } };
+    (function(){ var ta = dlg.querySelector('#ai-chat-input');
+      ta.addEventListener('input', function(){ ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, 132) + 'px'; });
+      ta.addEventListener('keydown', function(e){ if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); dlg.querySelector('#ai-chat-form').requestSubmit(); } });   // Enter envia; Shift+Enter pula linha
+    })();
   }
   function greet(){
     started = true;

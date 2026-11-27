@@ -95,7 +95,7 @@ return [
         ['t' => 'Assistente: externas, internas e todas', 'd' => 'Ao perguntar quantas ligações houve, o assistente sempre consulta o sistema e informa se o número é de chamadas externas (clientes), internas (ramal a ramal) ou todas. Por padrão ele fala das externas, o mesmo critério do Dashboard, e cita as internas à parte.'],
     ]],
     ['id' => 'assistente', 'titulo' => 'Assistente inteligente (Chat IA)', 'icon' => 'fa-robot', 'itens' => [
-        ['t' => 'Como usar', 'd' => 'Clique no botão do assistente e escreva em linguagem normal, por exemplo: "quantas chamadas perdidas hoje?" ou "quem ligou do número 11 9999-0000?".'],
+        ['t' => 'Como usar', 'd' => 'Clique no botão do assistente e escreva em linguagem normal, por exemplo: "quantas chamadas perdidas hoje?" ou "quem ligou do número 11 9999-0000?". Na caixa de mensagem, Enter envia; para pular de linha sem enviar, use Shift + Enter (a caixa cresce conforme você escreve).'],
         ['t' => 'O que ele consulta', 'd' => 'Chamadas, resumo do período, situação dos ramais e das filas, tudo com dados reais da sua central.'],
         ['t' => 'Ouvir gravações', 'd' => 'Peça a gravação de uma chamada e o player aparece dentro do próprio chat, com opção de abrir ou baixar.'],
         ['t' => 'Enviar relatório por WhatsApp', 'd' => 'Peça "envie o resumo de hoje para a Maria". O assistente mostra um cartão com o destinatário e o texto e só envia depois do seu Confirmar. Funciona só para contatos cadastrados. Veja também "Chat IA: enviar e agendar por conversa".'],
