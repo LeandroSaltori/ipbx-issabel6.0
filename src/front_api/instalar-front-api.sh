@@ -195,6 +195,7 @@ if [ -d /etc/fail2ban ]; then
   chown -R asterisk:asterisk "$F2B_LOG_DIR"
   chmod 755 "$F2B_LOG_DIR"; chmod 644 "$F2B_LOG_DIR/auth.log"
 
+  F2B_SUM_ANTES="$(cat /etc/fail2ban/filter.d/ipbx-front-api.conf /etc/fail2ban/jail.d/issabel.conf /etc/fail2ban/jail.d/ipbx-front-api.conf 2>/dev/null | md5sum)"
   cat > /etc/fail2ban/filter.d/ipbx-front-api.conf <<'F2BFILTER'
 # IPbx Prisma - falhas de login no painel front_api
 [Definition]
@@ -234,7 +235,11 @@ bantime = 3600'
 }
 LOGROT
 
-  if [ -x /usr/bin/issabel-helper ]; then
+  # So recarrega o fail2ban se algo mudou (reload sem necessidade derruba o firewall por instantes e gera falso alarme no Sentinel)
+  F2B_SUM_DEPOIS="$(cat /etc/fail2ban/filter.d/ipbx-front-api.conf /etc/fail2ban/jail.d/issabel.conf /etc/fail2ban/jail.d/ipbx-front-api.conf 2>/dev/null | md5sum)"
+  if [ "$F2B_SUM_ANTES" = "$F2B_SUM_DEPOIS" ]; then
+    :
+  elif [ -x /usr/bin/issabel-helper ]; then
     /usr/bin/issabel-helper fb_client reload >/dev/null 2>&1 || fail2ban-client reload >/dev/null 2>&1 || true
   elif command -v fail2ban-client &>/dev/null; then
     fail2ban-client reload >/dev/null 2>&1 || true

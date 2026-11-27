@@ -561,6 +561,17 @@ check_firewall() {
     rules="$(iptables -L -n 2>/dev/null | wc -l)"
     if [ "${rules:-0}" -lt 10 ]; then bad=1; why="ativo, mas praticamente SEM REGRAS (${rules} linhas): o servidor esta aberto"; fi
   fi
+  # Confirmacao: reload do fail2ban/iptables (ex.: atualizacao) deixa as regras vazias por instantes. Reconfere antes de alertar.
+  if [ "$bad" = "1" ] && [ ! -f "$flag" ] && [ "${SENTINEL_FW_RECHECK:-8}" -gt 0 ]; then
+    sleep "${SENTINEL_FW_RECHECK:-8}"
+    st="$(systemctl is-active "$svc" 2>/dev/null)"; [ -n "$st" ] || st=inactive
+    bad=0
+    if [ "$st" != "active" ]; then bad=1
+    elif [ "$svc" = "iptables" ]; then
+      rules="$(iptables -L -n 2>/dev/null | wc -l)"
+      if [ "${rules:-0}" -lt 10 ]; then bad=1; fi
+    fi
+  fi
   if [ "$bad" = "1" ]; then
     if [ ! -f "$flag" ]; then
       : > "$flag"
