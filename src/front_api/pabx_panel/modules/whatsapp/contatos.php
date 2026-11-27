@@ -227,8 +227,7 @@ if ($req && isset($_POST['action_sync_prismabot'])) {
         if ($err) $msg_error = $err . ($imported ? " ($imported já importados.)" : '');
         else {
             if ($unnamed > 0) $ask_unnamed = $unnamed;
-            $msg_status = $imported > 0 ? "✅ $imported contatos novos importados." : ($seen ? "Nenhum contato novo: os $seen retornados já existem ou não têm nome/telefone válidos." : "A API não retornou contatos.");
-            if ($unnamed > 0 && $imported === 0 && $seen) $msg_status = '';
+            $msg_status = ($unnamed > 0 ? "$unnamed contato(s) sem nome foram ignorados. " : '') . ($imported > 0 ? "✅ $imported contatos novos importados." : ($seen ? "Nenhum contato novo: os $seen retornados já existem ou não têm nome/telefone válidos." : "A API não retornou contatos."));
         }
     }
 }
@@ -283,18 +282,6 @@ $active_tab = isset($_GET['crm_tab']) ? $_GET['crm_tab'] : 'contacts';
             <i class="fa-solid fa-circle-check text-base"></i> <?php echo htmlspecialchars($msg_status); ?>
         </div>
     <?php endif; ?>
-    <?php if (!empty($ask_unnamed)): ?>
-        <div class="p-4 bg-amber-500/10 border border-amber-500/30 text-amber-200 rounded-xl text-xs font-bold flex items-center gap-3 flex-wrap">
-            <i class="fa-solid fa-circle-question text-base"></i>
-            <span>Há <?php echo (int)$ask_unnamed; ?> contato(s) sem nome na API. Deseja importá-los mesmo assim? (eles entram com o número no lugar do nome)</span>
-            <form method="POST" action="index.php?module=whatsapp&action=contatos" class="flex gap-2">
-                <input type="hidden" name="action_sync_prismabot" value="1">
-                <input type="hidden" name="include_unnamed" value="1">
-                <button type="submit" class="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-900 rounded-lg">Sim, importar</button>
-                <a href="index.php?module=whatsapp&action=contatos" class="px-3 py-1.5 bg-slate-800 text-slate-300 rounded-lg border border-slate-700">Não</a>
-            </form>
-        </div>
-    <?php endif; ?>
     <?php if ($msg_error): ?>
         <div class="p-4 bg-rose-500/10 border border-rose-500/30 text-rose-300 rounded-xl text-xs font-bold flex items-center gap-2">
             <i class="fa-solid fa-triangle-exclamation text-base"></i> <?php echo htmlspecialchars($msg_error); ?>
@@ -317,16 +304,10 @@ $active_tab = isset($_GET['crm_tab']) ? $_GET['crm_tab'] : 'contacts';
                     <i class="fa-solid fa-tags text-amber-400"></i> Etiquetas
                 </button>
 
-                <!-- Sincronizar Prismabot -->
-                <form method="POST" action="index.php?module=whatsapp&action=contatos" class="flex items-center gap-2">
-                    <input type="hidden" name="action_sync_prismabot" value="1">
-                    <label class="flex items-center gap-1.5 text-[11px] text-slate-300 font-bold cursor-pointer" title="Se desmarcado, o painel pergunta antes de importar contatos sem nome">
-                        <input type="checkbox" name="include_unnamed" value="1" class="accent-emerald-500"> Incluir contatos sem nome
-                    </label>
-                    <button type="submit" class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition shadow-lg shadow-emerald-600/20 flex items-center gap-1.5">
-                        <i class="fa-brands fa-whatsapp"></i> Importar Prismabot
-                    </button>
-                </form>
+                <!-- Importar Prismabot (abre a janela de opções) -->
+                <button type="button" onclick="openModal('modal-import-prismabot')" class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition shadow-lg shadow-emerald-600/20 flex items-center gap-1.5">
+                    <i class="fa-brands fa-whatsapp"></i> Importar Prismabot
+                </button>
 
                 <!-- Exportar CSV -->
                 <button onclick="exportContactsToCSV()" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-xl text-xs font-bold transition flex items-center gap-1.5">
@@ -383,7 +364,6 @@ $active_tab = isset($_GET['crm_tab']) ? $_GET['crm_tab'] : 'contacts';
     <form id="bulk-delete-form" method="POST" action="index.php?module=whatsapp&action=contatos" onsubmit="return confirmBulkDelete()" class="flex flex-wrap items-center gap-2 text-xs font-bold">
         <input type="hidden" name="action_bulk_delete_contacts" value="1">
         <span id="bulk-ids-holder"></span>
-        <button type="button" onclick="selectBySource('Ligação PABX')" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-lg transition"><i class="fa-solid fa-phone-volume text-indigo-400"></i> Selecionar os de origem "Ligação PABX"</button>
         <button type="button" onclick="selectAllContacts(false)" id="bulk-clear" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-lg transition hidden">Limpar seleção</button>
         <button type="submit" id="bulk-delete-btn" class="px-3 py-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded-lg transition hidden"><i class="fa-solid fa-trash"></i> <span id="bulk-count-label">Apagar selecionados</span></button>
     </form>
@@ -638,6 +618,22 @@ $active_tab = isset($_GET['crm_tab']) ? $_GET['crm_tab'] : 'contacts';
 </div>
 
 <!-- Modal: Criar Etiqueta -->
+<div id="modal-import-prismabot" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+    <form method="POST" action="index.php?module=whatsapp&action=contatos" class="bg-slate-900 border border-slate-700 rounded-2xl p-6 w-full max-w-md space-y-4">
+        <input type="hidden" name="action_sync_prismabot" value="1">
+        <h3 class="text-sm font-black text-white flex items-center gap-2"><i class="fa-brands fa-whatsapp text-emerald-400"></i> Importar contatos do Prismabot</h3>
+        <p class="text-xs text-slate-400">Os contatos são buscados na API configurada agora. Números que já estão na agenda não são cadastrados de novo.</p>
+        <label class="flex items-start gap-2 text-xs text-slate-200 font-bold cursor-pointer p-3 rounded-xl bg-slate-800/60 border border-slate-700">
+            <input type="checkbox" name="include_unnamed" value="1" class="accent-emerald-500 mt-0.5">
+            <span>Importar também os contatos sem nome<br><span class="font-normal text-slate-400">Entram com o número no lugar do nome. Desmarcado, eles são ignorados.</span></span>
+        </label>
+        <div class="flex justify-end gap-2">
+            <button type="button" onclick="closeModal('modal-import-prismabot')" class="px-3.5 py-2 bg-slate-800 text-slate-300 border border-slate-700 rounded-xl text-xs font-bold">Cancelar</button>
+            <button type="submit" class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold">Importar</button>
+        </div>
+    </form>
+</div>
+
 <div id="modal-create-tag" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
     <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-4">
         <div class="flex items-center justify-between border-b border-slate-800 pb-3">
