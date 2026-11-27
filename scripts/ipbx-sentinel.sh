@@ -125,7 +125,7 @@ load_telegram() {
 # O chamador passa "TITULO" ou "TITULO\ndetalhes"; o cabecalho e montado aqui.
 send_telegram() {
   if [ "${DIGEST_MODE:-0}" = "1" ]; then   # resumo diario: so junta os achados, nao envia na hora
-    printf '%s\n' "$1" | awk 'NR==1{t=$0} NR>1&&!d&&NF{d=$0} END{print "- " t (d?"\n    " substr(d,1,150):"")}' >> "$DIGEST_BUF"; return 0
+    printf '%s\n' "$1" | awk 'NR==1{t=$0} NR>1&&NF&&$0!~/^Nada foi alterado/&&n<2{d[++n]=$0} END{printf "- %s", t; for(i=1;i<=n;i++) printf "\n    %s", substr(d[i],1,150); printf "\n"}' >> "$DIGEST_BUF"; return 0
   fi
   [ "$SEND_ALERTS" = "1" ] || return 0
   load_telegram
