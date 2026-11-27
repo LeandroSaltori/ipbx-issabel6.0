@@ -614,11 +614,11 @@ document.addEventListener('DOMContentLoaded', schedDefaultPeriod);
                                 <td class="py-3 px-4 text-amber-300 font-bold"><?php echo htmlspecialchars($s['send_time']); ?></td>
                                 <td class="py-3 px-4">
                                     <?php if ($s['channel'] === 'email'): ?>
-                                        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">📧 E-MAIL</span>
+                                        <span class="whitespace-nowrap px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">📧 E-MAIL</span>
                                     <?php elseif ($s['channel'] === 'whatsapp'): ?>
-                                        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">💬 WHATSAPP</span>
+                                        <span class="whitespace-nowrap px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">💬 WHATSAPP</span>
                                     <?php else: ?>
-                                        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30">🚀 E-MAIL + WHATSAPP</span>
+                                        <span class="whitespace-nowrap px-2 py-0.5 rounded text-[10px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30">🚀 E-MAIL + WHATSAPP</span>
                                     <?php endif; ?>
                                 </td>
                                 <td class="py-3 px-4 text-slate-300 font-sans">
@@ -628,11 +628,11 @@ document.addEventListener('DOMContentLoaded', schedDefaultPeriod);
                                 <td class="py-3 px-4 text-slate-400"><?php echo htmlspecialchars($s['last_sent']); ?></td>
                                 <td class="py-3 px-4 text-center">
                                     <div class="flex items-center justify-center gap-1.5">
-                                        <a href="index.php?module=configuracoes&action=smtp&trigger_now=<?php echo $s['id']; ?>" class="px-2.5 py-1 bg-purple-600/20 hover:bg-purple-600/40 text-purple-300 border border-purple-500/30 rounded-lg text-[10px] font-bold transition flex items-center gap-1" title="Testar Envio Imediato">
-                                            <i class="fa-solid fa-play"></i> Disparar Agora
+                                        <a href="index.php?module=configuracoes&action=smtp&trigger_now=<?php echo $s['id']; ?>" class="px-2 py-1 bg-purple-600/20 hover:bg-purple-600/40 text-purple-300 border border-purple-500/30 rounded-lg text-[10px] font-bold transition flex items-center" title="Testar Envio Imediato">
+                                            <i class="fa-solid fa-play"></i>
                                         </a>
                                         <?php if (hasUserPermission('schedule_reports')): ?>
-                                        <button type="button" onclick='schedEdit(<?php echo json_encode(["id"=>$s["id"],"title"=>$s["title"],"report_type"=>$s["report_type"],"frequency"=>$s["frequency"],"period"=>$s["period"] ?? "","send_time"=>$s["send_time"],"channel"=>$s["channel"],"email_to"=>$s["email_to"],"whatsapp_to"=>$s["whatsapp_to"]], JSON_HEX_APOS|JSON_HEX_QUOT|JSON_HEX_TAG|JSON_HEX_AMP); ?>)' class="px-2.5 py-1 bg-amber-500/20 hover:bg-amber-500/40 text-amber-300 border border-amber-500/30 rounded-lg text-[10px] font-extrabold flex items-center gap-1 transition"><i class="fa-solid fa-pen"></i> Editar</button>
+                                        <button type="button" onclick='schedEdit(<?php echo json_encode(["id"=>$s["id"],"title"=>$s["title"],"report_type"=>$s["report_type"],"frequency"=>$s["frequency"],"period"=>$s["period"] ?? "","send_time"=>$s["send_time"],"channel"=>$s["channel"],"email_to"=>$s["email_to"],"whatsapp_to"=>$s["whatsapp_to"]], JSON_HEX_APOS|JSON_HEX_QUOT|JSON_HEX_TAG|JSON_HEX_AMP); ?>)' title="Editar agendamento" class="px-2 py-1 bg-amber-500/20 hover:bg-amber-500/40 text-amber-300 border border-amber-500/30 rounded-lg text-[10px] font-extrabold flex items-center transition"><i class="fa-solid fa-pen"></i></button>
                                         <?php endif; ?>
                                         <a href="index.php?module=configuracoes&action=smtp&delete_schedule=<?php echo $s['id']; ?>" onclick="return confirm('Deseja realmente remover este agendamento?')" class="px-2 py-1 bg-rose-600/20 hover:bg-rose-600/40 text-rose-300 border border-rose-500/30 rounded-lg text-[10px] font-bold transition" title="Excluir Agendamento">
                                             <i class="fa-solid fa-trash-can"></i>
@@ -685,9 +685,9 @@ document.addEventListener('DOMContentLoaded', schedDefaultPeriod);
                                 <td class="py-3 px-4 font-bold text-slate-300"><?php echo htmlspecialchars($log['channel']); ?></td>
                                 <td class="py-3 px-4 text-center">
                                     <?php if (strcasecmp($log['status'], 'sucesso') === 0): ?>
-                                        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">🟢 SUCESSO</span>
+                                        <span class="whitespace-nowrap px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">🟢 SUCESSO</span>
                                     <?php else: ?>
-                                        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">🟡 PROCESSADO</span>
+                                        <span class="whitespace-nowrap px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">🟡 PROCESSADO</span>
                                     <?php endif; ?>
                                 </td>
                             </tr>
