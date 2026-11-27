@@ -186,7 +186,7 @@ if ($req && isset($_POST['action_sync_prismabot'])) {
         $msg_error = "A URL da API deve ter o formato https://seu-servidor/v2/api/external/ID. Ajuste em Configurações > API.";
     } else {
         $search_url = $mm[1] . '/contacts/search';
-        $imported = 0; $seen = 0; $page = 1; $err = '';
+        $imported = 0; $seen = 0; $page = 1; $err = ''; $unnamed = 0; $withUnnamed = !empty($_POST['include_unnamed']);
         do {
             $ch = curl_init($search_url);
             curl_setopt_array($ch, [
@@ -210,10 +210,12 @@ if ($req && isset($_POST['action_sync_prismabot'])) {
                 $seen++;
                 $cn = trim((string)($ci['name'] ?? $ci['pushName'] ?? ''));
                 $cp = preg_replace('/\D/', '', (string)($ci['number'] ?? $ci['phone'] ?? ''));
-                if ($cn !== '' && strlen($cp) >= 10 && strlen($cp) <= 15) {
+                if (strlen($cp) >= 10 && strlen($cp) <= 15) {
+                    $semNome = ($cn === '' || preg_replace('/\D/', '', $cn) === $cn || preg_replace('/\D/', '', $cn) === $cp);
                     try {
                         if (!crmFindDuplicate($db, $cp)) {
-                            $db->prepare("INSERT INTO crm_contacts (name, phone, source) VALUES (:n,:p,'Prismabot')")->execute([':n' => $cn, ':p' => $cp]);
+                            if ($semNome && !$withUnnamed) { $unnamed++; continue; }
+                            $db->prepare("INSERT INTO crm_contacts (name, phone, source) VALUES (:n,:p,'Prismabot')")->execute([':n' => $semNome ? $cp : $cn, ':p' => $cp]);
                             $imported++;
                         }
                     } catch (Exception $e) {}
@@ -223,7 +225,11 @@ if ($req && isset($_POST['action_sync_prismabot'])) {
             $page++;
         } while (!$err && $page <= $pages && $page <= 100);
         if ($err) $msg_error = $err . ($imported ? " ($imported já importados.)" : '');
-        else $msg_status = $imported > 0 ? "✅ $imported contatos novos importados." : ($seen ? "Nenhum contato novo: os $seen retornados já existem ou não têm nome/telefone válidos." : "A API não retornou contatos.");
+        else {
+            if ($unnamed > 0) $ask_unnamed = $unnamed;
+            $msg_status = $imported > 0 ? "✅ $imported contatos novos importados." : ($seen ? "Nenhum contato novo: os $seen retornados já existem ou não têm nome/telefone válidos." : "A API não retornou contatos.");
+            if ($unnamed > 0 && $imported === 0 && $seen) $msg_status = '';
+        }
     }
 }
 
@@ -275,6 +281,18 @@ $active_tab = isset($_GET['crm_tab']) ? $_GET['crm_tab'] : 'contacts';
     <?php if ($msg_status): ?>
         <div class="p-4 bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 rounded-xl text-xs font-bold flex items-center gap-2">
             <i class="fa-solid fa-circle-check text-base"></i> <?php echo htmlspecialchars($msg_status); ?>
+        </div>
+    <?php endif; ?>
+    <?php if (!empty($ask_unnamed)): ?>
+        <div class="p-4 bg-amber-500/10 border border-amber-500/30 text-amber-200 rounded-xl text-xs font-bold flex items-center gap-3 flex-wrap">
+            <i class="fa-solid fa-circle-question text-base"></i>
+            <span>Há <?php echo (int)$ask_unnamed; ?> contato(s) sem nome na API. Deseja importá-los mesmo assim? (eles entram com o número no lugar do nome)</span>
+            <form method="POST" action="index.php?module=whatsapp&action=contatos" class="flex gap-2">
+                <input type="hidden" name="action_sync_prismabot" value="1">
+                <input type="hidden" name="include_unnamed" value="1">
+                <button type="submit" class="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-900 rounded-lg">Sim, importar</button>
+                <a href="index.php?module=whatsapp&action=contatos" class="px-3 py-1.5 bg-slate-800 text-slate-300 rounded-lg border border-slate-700">Não</a>
+            </form>
         </div>
     <?php endif; ?>
     <?php if ($msg_error): ?>
