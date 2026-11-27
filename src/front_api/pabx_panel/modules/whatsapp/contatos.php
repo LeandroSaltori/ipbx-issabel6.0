@@ -176,56 +176,51 @@ if ($req && isset($_POST['action_delete_qmsg'])) {
 
 // -- Importar via API Prismabot (real)
 if ($req && isset($_POST['action_sync_prismabot'])) {
-    $api_url   = getSetting('api_url');
-    $api_token = getSetting('api_token');
+    $api_url   = trim((string)getSetting('api_url'));
+    $api_token = trim(preg_replace('/^bearer\s+/i', '', trim((string)getSetting('api_token'))));
     if (!$api_url || !$api_token) {
-        $msg_error = "Configure a URL e Token da API Prismabot em Configurações > API antes de importar.";
+        $msg_error = "Configure a URL e o Token da API Prismabot em Configurações > API antes de importar.";
+    } elseif (!preg_match('#^(https?://.+?/v2/api/external/[^/\s?]+)#i', $api_url, $mm)) {
+        $msg_error = "A URL da API deve ter o formato https://seu-servidor/v2/api/external/ID. Ajuste em Configurações > API.";
     } else {
-        // Tentar buscar contatos da instância Prismabot
-        $contacts_url = rtrim($api_url, '/');
-        // Detectar padrão de URL da API e adaptar endpoint
-        if (strpos($contacts_url, '/message/') !== false) {
-            $contacts_url = preg_replace('/\/message\/[^\/]+.*$/', '/contact/findContacts/' . basename(dirname($contacts_url)), $contacts_url);
-        } else {
-            $contacts_url = $contacts_url . '/contact/findContacts';
-        }
-        $ch = curl_init($contacts_url);
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT        => 10,
-            CURLOPT_HTTPHEADER     => ['Content-Type: application/json', 'apikey: ' . $api_token],
-            CURLOPT_SSL_VERIFYPEER => false,
-        ]);
-        $result  = curl_exec($ch);
-        $http_c  = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $curl_err= curl_error($ch);
-        curl_close($ch);
-
-        if ($curl_err) {
-            $msg_error = "Erro de conexão: $curl_err";
-        } elseif ($http_c !== 200) {
-            $msg_error = "API retornou HTTP $http_c. Verifique as credenciais e URL.";
-        } else {
+        $search_url = $mm[1] . '/contacts/search';
+        $imported = 0; $seen = 0; $page = 1; $err = '';
+        do {
+            $ch = curl_init($search_url);
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true, CURLOPT_POST => true, CURLOPT_TIMEOUT => 30,
+                CURLOPT_POSTFIELDS => json_encode(['searchParam' => '', 'page' => $page, 'limit' => 200]),
+                CURLOPT_HTTPHEADER => ['Content-Type: application/json', 'Authorization: Bearer ' . $api_token],
+                CURLOPT_SSL_VERIFYPEER => false,
+            ]);
+            $result = curl_exec($ch);
+            $http_c = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $cerr   = curl_error($ch);
+            curl_close($ch);
+            if ($cerr) { $err = "Erro de conexão: $cerr"; break; }
+            if ($http_c === 401 || $http_c === 403) { $err = "Token recusado (HTTP $http_c). Confira o token em Configurações > API."; break; }
+            if ($http_c === 404) { $err = "Endereço não encontrado (HTTP 404). Confira a URL e o ID da API em Configurações > API."; break; }
+            if ($http_c < 200 || $http_c >= 300) { $err = "A API respondeu HTTP $http_c."; break; }
             $data = json_decode($result, true);
-            $contacts_arr = [];
-            if (is_array($data)) {
-                $contacts_arr = isset($data['contacts']) ? $data['contacts'] : (isset($data[0]) ? $data : []);
-            }
-            $imported = 0;
-            foreach ($contacts_arr as $ci) {
-                $cn = trim($ci['name'] ?? $ci['pushName'] ?? '');
-                $cp = trim($ci['phone'] ?? $ci['id'] ?? '');
-                $cp = preg_replace('/\D/', '', $cp);
-                if ($cn && strlen($cp) >= 10) {
+            $list = is_array($data) ? ($data['data'] ?? $data['contacts'] ?? (isset($data[0]) ? $data : [])) : [];
+            if (!is_array($list)) $list = [];
+            foreach ($list as $ci) {
+                $seen++;
+                $cn = trim((string)($ci['name'] ?? $ci['pushName'] ?? ''));
+                $cp = preg_replace('/\D/', '', (string)($ci['number'] ?? $ci['phone'] ?? ''));
+                if ($cn !== '' && strlen($cp) >= 10 && strlen($cp) <= 15) {
                     try {
-                        $db->prepare("INSERT OR IGNORE INTO crm_contacts (name, phone, source) VALUES (:n,:p,'Prismabot')")
-                           ->execute([':n' => $cn, ':p' => $cp]);
-                        $imported++;
+                        $st = $db->prepare("INSERT INTO crm_contacts (name, phone, source) SELECT :n,:p,'Prismabot' WHERE NOT EXISTS (SELECT 1 FROM crm_contacts WHERE phone = :p2)");
+                        $st->execute([':n' => $cn, ':p' => $cp, ':p2' => $cp]);
+                        $imported += $st->rowCount();
                     } catch (Exception $e) {}
                 }
             }
-            $msg_status = $imported > 0 ? "✅ $imported contatos importados da API Prismabot!" : "Nenhum contato novo encontrado na resposta da API.";
-        }
+            $pages = (int)($data['pagination']['totalPages'] ?? $data['pagination']['pages'] ?? 1);
+            $page++;
+        } while (!$err && $page <= $pages && $page <= 100);
+        if ($err) $msg_error = $err . ($imported ? " ($imported já importados.)" : '');
+        else $msg_status = $imported > 0 ? "✅ $imported contatos novos importados." : ($seen ? "Nenhum contato novo: os $seen retornados já existem ou não têm nome/telefone válidos." : "A API não retornou contatos.");
     }
 }
 
