@@ -6518,7 +6518,7 @@ function aiChatToolDefs() {
         $fn('list_contacts', 'Busca contatos da Agenda & Contatos por nome, empresa, etiqueta ou parte do telefone (sem filtro lista os primeiros).', [
             'query' => ['type' => 'string'], 'limit' => ['type' => 'integer', 'description' => 'Máx. 25'],
         ]),
-        $fn('propose_contact_save', 'Propõe cadastrar ou alterar um contato (se o celular já existir, altera). NÃO grava: o usuário confirma pelo cartão. Informe só o que muda.', [
+        $fn('propose_contact_save', 'Propõe cadastrar um contato novo ou alterar um existente (passe o id para alterar). Se o celular já existir e não vier id, NADA é proposto: você recebe ja_existe e deve avisar o usuário e oferecer editar ou excluir. NÃO grava: o usuário confirma pelo cartão. Informe só o que muda.', [
             'id' => ['type' => 'integer', 'description' => 'Id do contato (de list_contacts) para editar; vazio para criar'],
             'name' => ['type' => 'string'], 'phone' => ['type' => 'string', 'description' => 'DDD + número'], 'email' => ['type' => 'string'],
             'company' => ['type' => 'string'], 'tag' => ['type' => 'string'], 'notes' => ['type' => 'string'],

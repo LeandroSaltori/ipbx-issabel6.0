@@ -53,6 +53,10 @@ function aiProposeContactSave($a) {
         $tail = substr($ph, -9);
         foreach ($db->query("SELECT * FROM crm_contacts")->fetchAll(PDO::FETCH_ASSOC) as $c) if (substr(preg_replace('/\D/', '', $c['phone']), -9) === $tail) { $cur = $c; break; }
     }
+    if ($cur && !$id) { // pediu para CRIAR, mas o número já existe: informar e deixar o usuário decidir
+        return ['ja_existe' => true, 'contato_existente' => ['id' => (int)$cur['id'], 'nome' => $cur['name'], 'celular' => $cur['phone'], 'email' => $cur['email'], 'empresa' => $cur['company'], 'etiqueta' => $cur['tag']],
+            'orientacao' => "NÃO foi cadastrado nada. Avise o usuário, com os dados acima, que esse número JÁ está na agenda como \"{$cur['name']}\" (id {$cur['id']}) e pergunte se ele quer EDITAR esse contato (então chame propose_contact_save com id {$cur['id']} e os campos novos) ou EXCLUÍ-LO (propose_contact_delete com id {$cur['id']}), ou deixar como está."];
+    }
     if (!$cur && ($name === '' || $ph === '')) return ['error' => 'Para criar um contato informe nome e celular com DDD.'];
     if (isset($a['phone']) && trim((string)$a['phone']) !== '' && $ph === '') return ['error' => 'Celular inválido. Informe DDD + número.'];
     $f = ['name' => $name !== '' ? mb_substr($name, 0, 80) : ($cur['name'] ?? ''), 'phone' => $ph !== '' ? $ph : ($cur['phone'] ?? '')];
@@ -216,8 +220,8 @@ function aiApplyConfigAction($field, $v) {
         if ((int)$v['id']) {
             $db->prepare("UPDATE crm_contacts SET name=:n, phone=:p, email=:e, company=:co, tag=:t, notes=:no, updated_at=CURRENT_TIMESTAMP WHERE id=:id")
                ->execute([':n' => $v['name'], ':p' => $v['phone'], ':e' => $v['email'], ':co' => $v['company'], ':t' => $v['tag'], ':no' => $v['notes'], ':id' => (int)$v['id']]);
-        } elseif (crmFindDuplicate($db, $v['phone'])) {
-            return;
+        } elseif (($dupId = crmFindDuplicate($db, $v['phone']))) {
+            return ['success' => false, 'error' => "Esse número já está cadastrado (contato #$dupId). Edite ou exclua o contato existente."];
         } else {
             $db->prepare("INSERT INTO crm_contacts (name, phone, email, company, tag, source, notes) VALUES (:n,:p,:e,:co,:t,'Chat IA',:no)")
                ->execute([':n' => $v['name'], ':p' => $v['phone'], ':e' => $v['email'], ':co' => $v['company'], ':t' => $v['tag'], ':no' => $v['notes']]);
