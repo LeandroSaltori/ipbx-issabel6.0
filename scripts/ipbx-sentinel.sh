@@ -547,6 +547,10 @@ seen_forget() {  # $1 = chave: esquece o alerta (a condicao sumiu; se voltar, av
   return 0
 }
 
+# Lembrete diario: o alerta de queda (firewall/fail2ban) so saia uma vez e podia passar despercebido (v5-Prisma ficou 6 semanas
+# sem firewall). Enquanto continuar parado, repete no maximo 1 vez por dia (o arquivo-flag guarda desde quando).
+flag_due() { [ -f "$1" ] && [ -n "$(find "$1" -mmin +"${SENTINEL_REMIND_MIN:-1440}" 2>/dev/null)" ]; }
+
 check_firewall() {
   command -v systemctl >/dev/null 2>&1 || return 0
   local svc="" st rules bad=0 flag="$STATE_DIR/fw.down"
@@ -573,8 +577,13 @@ check_firewall() {
     fi
   fi
   if [ "$bad" = "1" ]; then
+    if flag_due "$flag"; then
+      local desde; desde="$(head -n 1 "$flag" 2>/dev/null)"; touch "$flag"
+      log "FIREWALL: LEMBRETE ${svc} ${why} (desde ${desde:-data desconhecida})."
+      send_telegram "LEMBRETE: FIREWALL CONTINUA SEM PROTECAO"$'\n'"Servico: ${svc} - ${why}"$'\n'"Desde: ${desde:-data desconhecida}. Este aviso se repete 1 vez por dia ate o firewall voltar."
+    fi
     if [ ! -f "$flag" ]; then
-      : > "$flag"
+      date '+%d/%m/%Y %H:%M' > "$flag"
       log "FIREWALL: ${svc} ${why}."
       send_telegram "ALERTA: FIREWALL SEM PROTECAO"$'\n'"Servico: ${svc} - ${why}"$'\n'"Acao: $([ "$SENTINEL_FIREWALL_HEAL" = "1" ] && echo "reativando o firewall." || echo "apenas alerta.")"
     fi
@@ -593,8 +602,13 @@ check_fail2ban() {
   if ! systemctl list-unit-files 2>/dev/null | grep -q '^fail2ban\.service'; then why="nao instalado"
   else st="$(systemctl is-active fail2ban 2>/dev/null)"; [ "$st" = "active" ] || why="parado (estado: ${st:-inactive})"; fi
   if [ -n "$why" ]; then
+    if flag_due "$flag"; then
+      local desde; desde="$(head -n 1 "$flag" 2>/dev/null)"; touch "$flag"
+      log "FAIL2BAN: LEMBRETE ${why} (desde ${desde:-data desconhecida})."
+      send_telegram "LEMBRETE: FAIL2BAN CONTINUA SEM PROTECAO"$'\n'"Servico: fail2ban - ${why}"$'\n'"Desde: ${desde:-data desconhecida}. Este aviso se repete 1 vez por dia ate o fail2ban voltar."
+    fi
     if [ ! -f "$flag" ]; then
-      : > "$flag"; log "FAIL2BAN: ${why}."
+      date '+%d/%m/%Y %H:%M' > "$flag"; log "FAIL2BAN: ${why}."
       send_telegram "ALERTA: FAIL2BAN SEM PROTECAO"$'\n'"Servico: fail2ban - ${why}"$'\n'"Efeito: tentativas de senha (SIP/SSH/painel) nao sao bloqueadas."$'\n'"Acao: apenas alerta."
     fi
   elif [ -f "$flag" ]; then
@@ -1043,6 +1057,15 @@ cmd_selftest() {
   for k in "PBXAPI abuso: 127.0.0.1" "PBXAPI abuso: 45.154.138.99"; do
     if grep -qF "$k" "$T/log"; then bad=$((bad+1)); echo "FALHA: alerta indevido '$k'"; else ok=$((ok+1)); fi
   done
+  # lembrete diario de ponta a ponta: com os flags velhos (2 dias), o alerta repete como LEMBRETE
+  touch -d '2 days ago' "$T/state/fw.down" "$T/state/f2b.down" 2>/dev/null
+  ( PATH="$T/bin:$PATH" WEB_DIR="$T/web" SENTINEL_QUAR="$T/quar" SENTINEL_LOG="$T/log" SENTINEL_NO_ALERT=1 SENTINEL_CONF=/nonexistent SENTINEL_ALLOW=/nonexistent SENTINEL_STATE="$T/state" SENTINEL_ACL_DB=/nonexistent SENTINEL_CRED_FILES="" SENTINEL_FIREWALL_HEAL=0 SENTINEL_DIALPLAN_GLOB="$T/extensions*.conf" SENTINEL_CRON_DIR="$T/cron" SENTINEL_FRAMEWORK_VER="4.0.0-12" SENTINEL_PASSWD="$T/passwd" SENTINEL_RCLOCAL="$T/rc.local" SENTINEL_SUDOERS="$T/sudoers" SENTINEL_ATTR_FILES="$T/passwd" SENTINEL_BOTNET_DIRS="$T/botdir" SENTINEL_ACCESS_LOGS="$T/access_log" SENTINEL_FW_RECHECK=0 "$0" --scan >/dev/null 2>&1 )
+  for k in "FIREWALL: LEMBRETE iptables" "FAIL2BAN: LEMBRETE"; do
+    if grep -qF "$k" "$T/log"; then ok=$((ok+1)); else bad=$((bad+1)); echo "FALHA: lembrete '$k' nao gerado"; fi
+  done
+  # lembrete diario: flag velha (2 dias) vence, flag nova nao
+  : > "$T/f_velha"; touch -d '2 days ago' "$T/f_velha"; : > "$T/f_nova"
+  if flag_due "$T/f_velha" && ! flag_due "$T/f_nova" && ! flag_due "$T/f_inexistente"; then ok=$((ok+1)); else bad=$((bad+1)); echo "FALHA: logica do lembrete diario"; fi
   # copia do log do fail2ban para o painel: so linhas Ban/Unban, sem o resto
   printf '2026-11-27 10:00:00,001 fail2ban.filter [1]: INFO    [sshd] Found 1.2.3.4\n2026-11-27 10:00:05,002 fail2ban.actions [1]: NOTICE  [sshd] Ban 1.2.3.4\n2026-11-27 11:00:05,002 fail2ban.actions [1]: NOTICE  [sshd] Unban 1.2.3.4\nlinha qualquer com senha=segredo\n' > "$T/f2b.log"
   mkdir -p "$T/etc-ipbx"; SENTINEL_F2B_LOG="$T/f2b.log" SENTINEL_F2B_EXPORT="$T/etc-ipbx/f2b.out" export_f2b_log
