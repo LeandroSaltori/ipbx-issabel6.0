@@ -59,3 +59,6 @@ add('whatsapp', 'Importar contatos por CSV',
 add('whatsapp', 'Apagar vários contatos de uma vez',
   fig('w4-bulk', 'index.php?module=whatsapp&action=contatos', 'Seleção e exclusão em lote.', ['Caixinha do topo: marca todos os contatos que aparecem (respeita filtro e busca).', 'Caixinha de cada contato.', 'Apagar selecionados mostra quantos estão marcados e pede confirmação.'],
       [m(1, sel='thead input[type=checkbox]', pos='tl'), m(2, sel='tbody input[type=checkbox]', pos='tl'), m(3, sel='#bulk-delete-btn', pos='tl')], steps=[('click', 'thead input[type=checkbox]'), ('wait', 600)], minw=700))
+add('whatsapp', 'Etiquetas dos contatos',
+  fig('w4-tag', 'index.php?module=whatsapp&action=contatos', 'Janela para criar etiqueta, com tabela de cores.', ['Nome da etiqueta.', 'Tabela de cores: clique na cor desejada (a escolhida fica com borda branca).', 'Prévia de como a etiqueta vai aparecer nos contatos.', 'Criar Etiqueta grava; use o lápis ou a lixeira da lista abaixo para editar ou apagar.'],
+      [m(1, sel='#new_tag_name', pos='tl'), m(2, sel='#tag-swatches', pos='tl'), m(3, sel='#tag-preview', closest='div', pos='tl'), m(4, sel='#tag-submit', pos='r')], steps=[('js', "openModal('modal-create-tag')"), ('wait', 600), ('fill', '#new_tag_name', 'Cliente VIP'), ('js', "document.getElementById('tagc_violet').click()"), ('wait', 400)], minw=560, pad=50))

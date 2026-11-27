@@ -56,6 +56,16 @@ $color_palette = [
     'indigo'  => ['label' => 'Índigo',   'classes' => 'bg-indigo-500/20 text-indigo-300 border-indigo-500/40',     'dot' => 'bg-indigo-400'],
     'sky'     => ['label' => 'Azul',     'classes' => 'bg-sky-500/20 text-sky-300 border-sky-500/40',             'dot' => 'bg-sky-400'],
     'pink'    => ['label' => 'Rosa',     'classes' => 'bg-pink-500/20 text-pink-300 border-pink-500/40',           'dot' => 'bg-pink-400'],
+    'red'      => ['label' => 'Vermelho escuro', 'classes' => 'bg-red-500/20 text-red-300 border-red-500/40', 'dot' => 'bg-red-400'],
+    'orange'   => ['label' => 'Laranja escuro', 'classes' => 'bg-orange-500/20 text-orange-300 border-orange-500/40', 'dot' => 'bg-orange-400'],
+    'yellow'   => ['label' => 'Amarelo',  'classes' => 'bg-yellow-500/20 text-yellow-300 border-yellow-500/40', 'dot' => 'bg-yellow-400'],
+    'lime'     => ['label' => 'Lima',     'classes' => 'bg-lime-500/20 text-lime-300 border-lime-500/40', 'dot' => 'bg-lime-400'],
+    'green'    => ['label' => 'Verde escuro', 'classes' => 'bg-green-500/20 text-green-300 border-green-500/40', 'dot' => 'bg-green-400'],
+    'teal'     => ['label' => 'Turquesa', 'classes' => 'bg-teal-500/20 text-teal-300 border-teal-500/40', 'dot' => 'bg-teal-400'],
+    'blue'     => ['label' => 'Azul escuro', 'classes' => 'bg-blue-500/20 text-blue-300 border-blue-500/40', 'dot' => 'bg-blue-400'],
+    'violet'   => ['label' => 'Violeta',  'classes' => 'bg-violet-500/20 text-violet-300 border-violet-500/40', 'dot' => 'bg-violet-400'],
+    'fuchsia'  => ['label' => 'Magenta',  'classes' => 'bg-fuchsia-500/20 text-fuchsia-300 border-fuchsia-500/40', 'dot' => 'bg-fuchsia-400'],
+    'slate'    => ['label' => 'Cinza',    'classes' => 'bg-slate-500/20 text-slate-300 border-slate-500/40', 'dot' => 'bg-slate-400'],
 ];
 
 // ─── PROCESSAMENTO DE FORMULÁRIOS ─────────────────────────────────────────────
@@ -777,17 +787,15 @@ $active_tab = isset($_GET['crm_tab']) ? $_GET['crm_tab'] : 'contacts';
             </div>
             <div>
                 <label class="font-bold text-slate-300 block mb-2">Cor da Etiqueta</label>
-                <div class="grid grid-cols-4 gap-2">
+                <div class="grid grid-cols-9 gap-2" id="tag-swatches">
                     <?php foreach ($color_palette as $ck => $cv): ?>
-                    <label class="cursor-pointer">
-                        <input type="radio" name="new_tag_color" id="tagc_<?php echo $ck; ?>" value="<?php echo $ck; ?>" class="hidden peer" <?php echo $ck === 'emerald' ? 'checked' : ''; ?>>
-                        <div class="p-2 rounded-xl border-2 border-transparent peer-checked:border-white text-center <?php echo $cv['classes']; ?> flex items-center justify-center gap-1 font-bold text-[10px] transition hover:opacity-80">
-                            <span class="w-2.5 h-2.5 rounded-full <?php echo $cv['dot']; ?>"></span>
-                            <?php echo $cv['label']; ?>
-                        </div>
+                    <label class="cursor-pointer" title="<?php echo htmlspecialchars($cv['label']); ?>">
+                        <input type="radio" name="new_tag_color" id="tagc_<?php echo $ck; ?>" value="<?php echo $ck; ?>" class="hidden peer" <?php echo $ck === 'emerald' ? 'checked' : ''; ?> onchange="tagPreviewUpdate()" data-classes="<?php echo htmlspecialchars($cv['classes']); ?>">
+                        <span class="block w-7 h-7 rounded-full <?php echo $cv['dot']; ?> ring-2 ring-transparent ring-offset-2 ring-offset-slate-900 peer-checked:ring-white hover:scale-110 transition"></span>
                     </label>
                     <?php endforeach; ?>
                 </div>
+                <div class="mt-3 flex items-center gap-2 text-[10px] text-slate-400 font-bold">Prévia: <span id="tag-preview" class="px-2.5 py-1 rounded-lg border text-[11px] font-bold bg-emerald-500/20 text-emerald-300 border-emerald-500/40">Nome da etiqueta</span></div>
             </div>
             <div class="flex gap-2">
                 <button type="button" id="tag-cancel-edit" onclick="cancelEditTag()" class="hidden px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl transition whitespace-nowrap">Cancelar edição</button>
@@ -829,7 +837,7 @@ $active_tab = isset($_GET['crm_tab']) ? $_GET['crm_tab'] : 'contacts';
 function editTag(id, name, color) {
     document.getElementById('edit_tag_id').value = id;
     document.getElementById('new_tag_name').value = name;
-    var r = document.getElementById('tagc_' + color); if (r) r.checked = true;
+    var r = document.getElementById('tagc_' + color); if (r) r.checked = true; tagPreviewUpdate();
     document.getElementById('tag-modal-title').textContent = 'Editar Etiqueta';
     document.getElementById('tag-submit-txt').textContent = 'Salvar alterações';
     document.getElementById('tag-cancel-edit').classList.remove('hidden');
@@ -838,7 +846,7 @@ function editTag(id, name, color) {
 function cancelEditTag() {
     document.getElementById('edit_tag_id').value = 0;
     document.getElementById('new_tag_name').value = '';
-    var r = document.getElementById('tagc_emerald'); if (r) r.checked = true;
+    var r = document.getElementById('tagc_emerald'); if (r) r.checked = true; tagPreviewUpdate();
     document.getElementById('tag-modal-title').textContent = 'Criar Nova Etiqueta';
     document.getElementById('tag-submit-txt').textContent = 'Criar Etiqueta';
     document.getElementById('tag-cancel-edit').classList.add('hidden');
@@ -920,6 +928,13 @@ function downloadCsvTemplate() {
     a.download = 'modelo_importacao_contatos.csv';
     document.body.appendChild(a); a.click(); a.remove();
 }
+function tagPreviewUpdate() {
+    const r = document.querySelector('input[name=new_tag_color]:checked'); const p = document.getElementById('tag-preview'); const n = document.getElementById('new_tag_name');
+    if (!r || !p) return;
+    p.className = 'px-2.5 py-1 rounded-lg border text-[11px] font-bold ' + r.dataset.classes;
+    p.textContent = (n && n.value.trim()) ? n.value.trim() : 'Nome da etiqueta';
+}
+document.addEventListener('input', e => { if (e.target && e.target.id === 'new_tag_name') tagPreviewUpdate(); });
 function openModal(id)  { const m = document.getElementById(id); if (m) m.classList.remove('hidden'); }
 function closeModal(id) { const m = document.getElementById(id); if (m) m.classList.add('hidden');    }
 
