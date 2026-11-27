@@ -2476,10 +2476,10 @@ if ($__wp_u && userHasWebphone($__wp_u)
                     }
 
                     grid.innerHTML = filteredExts.map(ext => {
-                        let stColor = 'text-emerald-400', stIcon = 'fa-check', stBg = 'bg-emerald-500/10', stBorder = 'border-emerald-500/20';
+                        let stColor = 'text-emerald-400', stIcon = 'fa-check', stBg = 'bg-emerald-500/10', stBorder = 'border-emerald-500/20', stDim = '';
                         if (ext.status === 'Em Chamada') { stColor = 'text-rose-400'; stIcon = 'fa-phone-volume fa-shake'; stBg = 'bg-rose-500/10'; stBorder = 'border-rose-500/20'; }
                         else if (ext.status === 'Tocando') { stColor = 'text-amber-400'; stIcon = 'fa-bell fa-ring'; stBg = 'bg-amber-500/10'; stBorder = 'border-amber-500/20'; }
-                        else if (ext.status === 'Indisponível') { stColor = 'text-slate-400'; stIcon = 'fa-power-off'; stBg = 'bg-slate-800/50'; stBorder = 'border-slate-700'; }
+                        else if (ext.status === 'Indisponível') { stColor = 'text-slate-400'; stIcon = 'fa-power-off'; stBg = 'bg-slate-800/50'; stBorder = 'border-slate-700'; stDim = ' opacity-60 grayscale'; }
 
                         const tech = (ext.tech || 'PJSIP').toUpperCase();
                         let techClass = 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
@@ -2501,7 +2501,7 @@ if ($__wp_u && userHasWebphone($__wp_u)
                         const waTitle = hasWa ? 'Enviar WhatsApp ao Atendente' : 'Sem número de WhatsApp cadastrado para este ramal';
 
                         return `
-                            <div class="bg-slate-900 rounded-xl p-4 border ${stBorder} transition-all hover:scale-[1.02] shadow-lg flex flex-col justify-between">
+                            <div class="bg-slate-900 rounded-xl p-4 border ${stBorder}${stDim} transition-all hover:scale-[1.02] shadow-lg flex flex-col justify-between">
                                 <div class="flex justify-between items-start mb-2">
                                     <div>
                                         <div class="flex items-center gap-2">
@@ -2510,8 +2510,8 @@ if ($__wp_u && userHasWebphone($__wp_u)
                                         </div>
                                         <span class="text-xs text-slate-400 truncate max-w-[130px] block mt-1">${ext.name}</span>
                                     </div>
-                                    <span class="px-2 py-1 rounded text-[10px] font-bold ${stBg} ${stColor} uppercase tracking-wider flex items-center gap-1">
-                                        <i class="fa-solid ${stIcon}"></i> ${ext.status}
+                                    <span class="px-2 py-1 rounded text-[10px] font-bold ${stBg} ${stColor} uppercase tracking-wider flex items-center gap-1 whitespace-nowrap shrink-0">
+                                        <i class="fa-solid ${stIcon}"></i> ${ext.status === 'Indisponível' ? 'Offline' : ext.status}
                                     </span>
                                 </div>
                                 ${ext.partner ? `<div class="text-[10px] text-rose-300 font-mono bg-rose-500/10 px-2 py-1 rounded border border-rose-500/20 truncate mb-2">📞 Em linha: ${ext.partner}</div>` : ''}

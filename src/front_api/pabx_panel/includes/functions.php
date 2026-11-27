@@ -7572,6 +7572,7 @@ function securityOverview() {
 
     // 2) Bloqueios do fail2ban (log)
     $f2b = securityTailFile('/var/log/fail2ban.log');
+    if ($f2b === null) $f2b = securityTailFile('/etc/ipbx/fail2ban-recente.log'); // copia mantida pelo vigia (root) quando o original nao e legivel pelo painel
     if ($f2b === null) {
         $res['avisos'][] = 'Registro de bloqueios do fail2ban não encontrado ou sem permissão de leitura.';
     } else {

@@ -860,7 +860,20 @@ check_webshell_hits() {
   done
 }
 
-host_checks() { check_firewall; check_fail2ban; check_dialplan; check_dialplan_injection; check_dialplan_module; check_pbxapi_dir; check_pbxapi_abuse; check_web_dumps; check_webshell_hits; check_cron; check_framework; check_persistence; check_immutable; check_botnet; }
+# Copia legivel pelo painel das linhas de bloqueio (Ban/Unban) do fail2ban. O log original so o root le (ou fica no journal);
+# o painel (usuario asterisk) usa esta copia quando nao consegue ler o original. So IPs bloqueados, nada de senha.
+export_f2b_log() {
+  local src="${SENTINEL_F2B_LOG:-/var/log/fail2ban.log}" dst="${SENTINEL_F2B_EXPORT:-/etc/ipbx/fail2ban-recente.log}" tmp
+  [ -d "$(dirname "$dst")" ] || return 0
+  tmp="$(mktemp 2>/dev/null)" || return 0
+  if [ -r "$src" ]; then tail -n 6000 "$src" 2>/dev/null | grep -aE '\[[^]]+\] +(Ban|Unban) ' > "$tmp"
+  elif command -v journalctl >/dev/null 2>&1; then journalctl -u fail2ban -n 6000 --no-pager -o short-iso 2>/dev/null | grep -aE '\[[^]]+\] +(Ban|Unban) ' > "$tmp"
+  else rm -f "$tmp"; return 0; fi
+  if ! cmp -s "$tmp" "$dst" 2>/dev/null; then cat "$tmp" > "$dst" 2>/dev/null; chown root:asterisk "$dst" 2>/dev/null; chmod 640 "$dst" 2>/dev/null; fi
+  rm -f "$tmp"
+}
+
+host_checks() { export_f2b_log; check_firewall; check_fail2ban; check_dialplan; check_dialplan_injection; check_dialplan_module; check_pbxapi_dir; check_pbxapi_abuse; check_web_dumps; check_webshell_hits; check_cron; check_framework; check_persistence; check_immutable; check_botnet; }
 
 do_scan() {
   local mode="$1"
@@ -1030,6 +1043,10 @@ cmd_selftest() {
   for k in "PBXAPI abuso: 127.0.0.1" "PBXAPI abuso: 45.154.138.99"; do
     if grep -qF "$k" "$T/log"; then bad=$((bad+1)); echo "FALHA: alerta indevido '$k'"; else ok=$((ok+1)); fi
   done
+  # copia do log do fail2ban para o painel: so linhas Ban/Unban, sem o resto
+  printf '2026-11-27 10:00:00,001 fail2ban.filter [1]: INFO    [sshd] Found 1.2.3.4\n2026-11-27 10:00:05,002 fail2ban.actions [1]: NOTICE  [sshd] Ban 1.2.3.4\n2026-11-27 11:00:05,002 fail2ban.actions [1]: NOTICE  [sshd] Unban 1.2.3.4\nlinha qualquer com senha=segredo\n' > "$T/f2b.log"
+  mkdir -p "$T/etc-ipbx"; SENTINEL_F2B_LOG="$T/f2b.log" SENTINEL_F2B_EXPORT="$T/etc-ipbx/f2b.out" export_f2b_log
+  if [ "$(grep -c -E 'Ban|Unban' "$T/etc-ipbx/f2b.out" 2>/dev/null)" = "2" ] && ! grep -q 'senha=' "$T/etc-ipbx/f2b.out" && ! grep -q 'Found' "$T/etc-ipbx/f2b.out"; then ok=$((ok+1)); else bad=$((bad+1)); echo "FALHA: copia do log do fail2ban"; fi
   rm -rf "$T"
   echo "Selftest: $ok ok, $bad falha(s)."; [ "$bad" -eq 0 ]
 }
