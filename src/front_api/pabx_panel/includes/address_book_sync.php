@@ -94,6 +94,8 @@ class AddressBookSync {
                 if ($found) { // já existe dos dois lados: liga; o clássico vence
                     $db->prepare("UPDATE crm_contacts SET name=?, phone=?, email=?, company=?, notes=?, updated_at=CURRENT_TIMESTAMP WHERE id=?")->execute([$c['name'] !== '' ? $c['name'] : $unl[$found]['name'], $c['phone'], $c['email'], $c['company'], $c['notes'], $found]);
                     $setMap->execute([$found, $cid, self::h($c)]); unset($unl[$found]);
+                } elseif (function_exists('crmFindDuplicate') && crmFindDuplicate($db, $c['phone'])) {
+                    continue; // número já existe: não duplica
                 } else {
                     $db->prepare("INSERT INTO crm_contacts (name, phone, email, company, tag, source, notes) VALUES (?,?,?,?, '', 'Painel clássico', ?)")->execute([$c['name'] !== '' ? $c['name'] : $c['phone'], $c['phone'], $c['email'], $c['company'], $c['notes']]);
                     $setMap->execute([(int)$db->lastInsertId(), $cid, self::h($c)]);

@@ -731,6 +731,8 @@ if (isset($_GET['api_action']) || (isset($_GET['action']) && in_array($_GET['act
                 if ($cid > 0) {
                     $db->prepare("UPDATE crm_contacts SET name=:n, phone=:p, email=:e, company=:co, tag=:t, notes=:no, updated_at=CURRENT_TIMESTAMP WHERE id=:id")
                        ->execute([':n'=>$n,':p'=>$p,':e'=>$e,':co'=>$co,':t'=>$t,':no'=>$no,':id'=>$cid]);
+                } elseif (crmFindDuplicate($db, $p)) {
+                    throw new Exception('Esse número já está cadastrado em outro contato.');
                 } else {
                     $db->prepare("INSERT INTO crm_contacts (name, phone, email, company, tag, source, notes) VALUES (:n,:p,:e,:co,:t,'Manual',:no)")
                        ->execute([':n'=>$n,':p'=>$p,':e'=>$e,':co'=>$co,':t'=>$t,':no'=>$no]);

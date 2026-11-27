@@ -2346,6 +2346,24 @@ function uazapiMediaType($mime) {
     return 'document';
 }
 
+/** Chave de comparação de telefone: só dígitos, sem 55, sem 0 inicial e ignorando o 9º dígito (DDD + 8 últimos). */
+function crmPhoneKey($phone) {
+    $d = preg_replace('/\D/', '', (string)$phone);
+    if (strlen($d) >= 12 && substr($d, 0, 2) === '55') $d = substr($d, 2);
+    $d = ltrim($d, '0');
+    if (strlen($d) >= 10) return substr($d, 0, 2) . substr($d, -8);
+    return $d;
+}
+/** Retorna o id do contato que já tem esse número (ou 0). Nunca cadastrar número repetido. */
+function crmFindDuplicate($db, $phone, $excludeId = 0) {
+    $k = crmPhoneKey($phone);
+    if ($k === '') return 0;
+    foreach ($db->query("SELECT id, phone FROM crm_contacts") as $r) {
+        if ((int)$r['id'] !== (int)$excludeId && crmPhoneKey($r['phone']) === $k) return (int)$r['id'];
+    }
+    return 0;
+}
+
 function sendWhatsAppAPI($phone, $message, $call_id = 'MANUAL', $extension = 'GERAL', $rule_type = 'DESCONHECIDO') {
     global $db;
     $api_url = getSetting('api_url');

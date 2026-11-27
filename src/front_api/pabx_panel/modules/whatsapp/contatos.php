@@ -112,7 +112,9 @@ if ($req && isset($_POST['action_add_contact'])) {
     $n = trim($_POST['c_name'] ?? ''); $p = trim($_POST['c_phone'] ?? '');
     $e = trim($_POST['c_email'] ?? ''); $co = trim($_POST['c_company'] ?? '');
     $t = trim($_POST['c_tag'] ?? ''); $no = trim($_POST['c_notes'] ?? '');
-    if ($n && $p) {
+    if ($n && $p && ($dupId = crmFindDuplicate($db, $p))) {
+        $msg_error = "Esse número já está cadastrado (contato #$dupId). Não foi criado outro.";
+    } elseif ($n && $p) {
         try {
             $db->prepare("INSERT INTO crm_contacts (name, phone, email, company, tag, source, notes) VALUES (:n,:p,:e,:co,:t,'Manual',:no)")
                ->execute([':n'=>$n,':p'=>$p,':e'=>$e,':co'=>$co,':t'=>$t,':no'=>$no]);
@@ -210,9 +212,10 @@ if ($req && isset($_POST['action_sync_prismabot'])) {
                 $cp = preg_replace('/\D/', '', (string)($ci['number'] ?? $ci['phone'] ?? ''));
                 if ($cn !== '' && strlen($cp) >= 10 && strlen($cp) <= 15) {
                     try {
-                        $st = $db->prepare("INSERT INTO crm_contacts (name, phone, source) SELECT :n,:p,'Prismabot' WHERE NOT EXISTS (SELECT 1 FROM crm_contacts WHERE phone = :p2)");
-                        $st->execute([':n' => $cn, ':p' => $cp, ':p2' => $cp]);
-                        $imported += $st->rowCount();
+                        if (!crmFindDuplicate($db, $cp)) {
+                            $db->prepare("INSERT INTO crm_contacts (name, phone, source) VALUES (:n,:p,'Prismabot')")->execute([':n' => $cn, ':p' => $cp]);
+                            $imported++;
+                        }
                     } catch (Exception $e) {}
                 }
             }

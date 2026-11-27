@@ -216,6 +216,8 @@ function aiApplyConfigAction($field, $v) {
         if ((int)$v['id']) {
             $db->prepare("UPDATE crm_contacts SET name=:n, phone=:p, email=:e, company=:co, tag=:t, notes=:no, updated_at=CURRENT_TIMESTAMP WHERE id=:id")
                ->execute([':n' => $v['name'], ':p' => $v['phone'], ':e' => $v['email'], ':co' => $v['company'], ':t' => $v['tag'], ':no' => $v['notes'], ':id' => (int)$v['id']]);
+        } elseif (crmFindDuplicate($db, $v['phone'])) {
+            return;
         } else {
             $db->prepare("INSERT INTO crm_contacts (name, phone, email, company, tag, source, notes) VALUES (:n,:p,:e,:co,:t,'Chat IA',:no)")
                ->execute([':n' => $v['name'], ':p' => $v['phone'], ':e' => $v['email'], ':co' => $v['company'], ':t' => $v['tag'], ':no' => $v['notes']]);
