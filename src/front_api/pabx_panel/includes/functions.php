@@ -7481,7 +7481,7 @@ function integrationStatusChecks() {
     $mon = '/var/spool/asterisk/monitor';
     $add('Gravações', 'Pasta de gravações', is_readable($mon) ? 'ok' : 'warn', is_readable($mon) ? 'Legível pelo painel.' : 'Pasta ausente ou sem permissão de leitura.');
     $pub = trim((string)getSetting('public_base_url'));
-    $add('Gravações', 'URL pública (links de gravação)', $pub !== '' ? 'ok' : 'warn', $pub !== '' ? $pub : 'Não configurada (opcional): a gravação segue como arquivo anexo; o link só é usado para gravações acima de 15 MB.');
+    $add('Gravações', 'URL pública (links de gravação)', $pub !== '' ? 'ok' : 'off', $pub !== '' ? $pub : 'Não configurada (opcional): a gravação segue como arquivo anexo; o link só é usado para gravações acima de 15 MB.');
 
     // --- WhatsApp
     $prov = waProvider();
