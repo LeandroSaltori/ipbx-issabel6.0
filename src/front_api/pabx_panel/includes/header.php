@@ -12,27 +12,55 @@ if (!defined('IPBX_PANEL')) { http_response_code(404); exit; } // acesso direto 
             <i class="fa-solid fa-bars text-lg"></i>
         </button>
 
-        <!-- Dynamic Breadcrumb / Page Title -->
+        <!-- Localização atual: Seção › Página (sempre igual ao nome do item do menu lateral) -->
         <div>
+            <?php
+            $mod = isset($_GET['module']) ? $_GET['module'] : 'dashboard';
+            $act = isset($_GET['action']) ? $_GET['action'] : 'view';
+            $TEL = 'Telefonia & Ramais'; $ATD = 'Atendimento & Filas'; $WAP = 'WhatsApp & Automação'; $REL = 'Relatórios & Gravações'; $CFG = 'Configurações';
+            $navMap = [
+                'dashboard:view_v1' => [null, 'Dashboard', 'fa-chart-pie'],
+                'dashboard:view' => [null, 'Dashboard', 'fa-chart-pie'],
+                'ramais:fop' => [$TEL, 'Painel FOP Operador', 'fa-desktop'],
+                'ramais:editar_nome' => [$TEL, 'Ramais & Atendentes', 'fa-id-card'],
+                'telefonia:blacklist' => [$TEL, 'Blacklist (Bloqueios)', 'fa-ban'],
+                'troncos:view' => [$TEL, 'Linhas & Troncos', 'fa-network-wired'],
+                'filas:realtime' => [$ATD, 'Filas Ao Vivo', 'fa-users-rays'],
+                'filas:flowchart' => [$ATD, 'Fluxograma de Ligações', 'fa-diagram-project'],
+                'whatsapp:regras' => [$WAP, 'Regras URA & Transbordo', 'fa-wand-magic-sparkles'],
+                'whatsapp:historico' => [$WAP, 'Histórico de Envio & Logs', 'fa-clock-rotate-left'],
+                'whatsapp:disparos' => [$WAP, 'Disparo Rápido / Teste', 'fa-paper-plane'],
+                'whatsapp:contatos' => [null, 'Agenda & Contatos', 'fa-address-book'],
+                'relatorios:relatorio_filas' => [$REL, 'Relatório Completo de Filas', 'fa-list-check'],
+                'relatorios:filas_stats' => [$REL, 'Resumo de Filas', 'fa-chart-line'],
+                'relatorios:cdr_gravacoes' => [$REL, 'CDR & Gravações', 'fa-headset'],
+                'relatorios:graphic_reports' => [$REL, 'Relatórios Gráficos', 'fa-chart-pie'],
+                'relatorios:relatorio_geral' => [$REL, 'Relatório Geral & Heatmap', 'fa-fire-flame-curved'],
+                'relatorios:pesquisa' => [$REL, 'Pesquisa de Satisfação', 'fa-star'],
+                'relatorios:ia_analytics' => [$REL, 'Relatórios de IA', 'fa-wand-magic-sparkles'],
+                'configuracoes:api' => [$CFG, 'APIs & Conexões', 'fa-key'],
+                'configuracoes:ia' => [$CFG, 'Inteligência Artificial', 'fa-robot'],
+                'configuracoes:usuarios' => [$CFG, 'Usuários & Permissões', 'fa-user-gear'],
+                'configuracoes:smtp' => [$CFG, 'Servidor SMTP & Disparos', 'fa-envelope-circle-check'],
+                'configuracoes:status' => [$CFG, 'Status da Integração', 'fa-heart-pulse'],
+                'configuracoes:seguranca' => [$CFG, 'Painel de Segurança', 'fa-shield-halved'],
+                'configuracoes:assistente_whatsapp' => [$CFG, 'Assistente WhatsApp', 'fa-robot'],
+                'configuracoes:mapa' => [$CFG, 'Mapa do Sistema', 'fa-city'],
+                'configuracoes:chat_ia' => [$CFG, 'Conversas do Assistente IA', 'fa-robot'],
+                'configuracoes:logs' => [$CFG, 'Logs & Diagnósticos', 'fa-terminal'],
+                'configuracoes:console' => [$CFG, 'Console da central', 'fa-code'],
+            ];
+            $nav = $navMap[$mod . ':' . $act] ?? null;
+            ?>
             <h2 class="text-sm font-bold text-white flex items-center gap-2">
-                <?php
-                $mod = isset($_GET['module']) ? $_GET['module'] : 'dashboard';
-                $act = isset($_GET['action']) ? $_GET['action'] : 'view';
-
-                $titles = [
-                    'dashboard' => '<i class="fa-solid fa-chart-pie text-brand-400"></i> Dashboard & Visão Geral',
-                    'ramais' => ($act === 'fop' ? '<i class="fa-solid fa-desktop text-emerald-400"></i> Painel de Operador FOP' : ($act === 'editar_nome' ? '<i class="fa-solid fa-id-card text-blue-400"></i> Autonomia de Nomes & Tecnologia' : '<i class="fa-solid fa-sliders text-indigo-400"></i> Permissões de Ramais')),
-                    'troncos' => '<i class="fa-solid fa-network-wired text-cyan-400"></i> Linhas & Troncos de Saída/Entrada',
-                    'filas' => ($act === 'realtime' ? '<i class="fa-solid fa-users-rays text-purple-400"></i> Monitoramento de Filas Ao Vivo' : ($act === 'flowchart' ? '<i class="fa-solid fa-diagram-project text-cyan-400"></i> Fluxograma Dinâmico de Ligações' : '<i class="fa-solid fa-user-clock text-amber-400"></i> Gestão & Pausa de Agentes')),
-                    'relatorios' => ($act === 'ia_analytics' ? '<i class="fa-solid fa-sparkles text-purple-400"></i> Relatório & Auditoria de Inteligência Artificial' : ($act === 'filas_stats' ? '<i class="fa-solid fa-chart-line text-rose-400"></i> Relatório Completo de Filas' : ($act === 'graphic_reports' ? '<i class="fa-solid fa-chart-pie text-cyan-400"></i> Relatórios Gráficos (Ramais, Filas e Troncos)' : ($act === 'pesquisa' ? '<i class="fa-solid fa-star text-amber-400"></i> Pesquisa de Satisfação (Notas dos Clientes)' : ($act === 'relatorio_geral' ? '<i class="fa-solid fa-fire-flame-curved text-amber-400"></i> Relatório Geral & Mapa de Calor' : '<i class="fa-solid fa-headset text-brand-400"></i> Gravações CDR & Player de Áudio'))))),
-                    'whatsapp' => ($act === 'regras' ? '<i class="fa-solid fa-wand-magic-sparkles text-emerald-400"></i> Regras URA & Transbordo' : ($act === 'historico' ? '<i class="fa-solid fa-clock-rotate-left text-blue-400"></i> Histórico de Envio & Logs' : ($act === 'contatos' ? '<i class="fa-solid fa-address-book text-emerald-400"></i> Agenda de Contatos & Sincronização Prismabot' : '<i class="fa-solid fa-paper-plane text-indigo-400"></i> Disparo Rápido de Teste'))),
-                    'configuracoes' => ($act === 'ia' ? '<i class="fa-solid fa-robot text-purple-400"></i> Configuração de Inteligência Artificial' : ($act === 'usuarios' ? '<i class="fa-solid fa-user-gear text-rose-400"></i> Gestão de Usuários & Permissões' : '<i class="fa-solid fa-key text-cyan-400"></i> APIs & Conexões (REST PABX + Prismabot)'))
-                ];
-                echo isset($titles[$mod]) ? $titles[$mod] : '<i class="fa-solid fa-layer-group text-brand-400"></i> Painel IPbx Prisma';
-                ?>
-                <span class="px-2 py-0.5 rounded-full bg-brand-500/20 text-brand-300 border border-brand-500/30 text-[10px] font-extrabold ml-1">v6.1</span>
+                <?php if ($nav): ?>
+                    <i class="fa-solid <?php echo $nav[2]; ?> text-brand-400"></i>
+                    <?php if ($nav[0]): ?><span class="text-slate-400 font-semibold hidden sm:inline"><?php echo htmlspecialchars($nav[0]); ?></span><i class="fa-solid fa-chevron-right text-[9px] text-slate-600 hidden sm:inline"></i><?php endif; ?>
+                    <span><?php echo htmlspecialchars($nav[1]); ?></span>
+                <?php else: ?>
+                    <i class="fa-solid fa-layer-group text-brand-400"></i> Painel IPbx Prisma
+                <?php endif; ?>
             </h2>
-            <span class="text-[11px] text-slate-400 block font-normal">Plataforma Integrada de Telefonia PABX Prisma & WhatsApp</span>
         </div>
     </div>
 
