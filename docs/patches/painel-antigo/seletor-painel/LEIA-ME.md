@@ -12,7 +12,7 @@ Na própria tela de login do painel clássico aparecem duas opções, **Painel N
 > Desde esta versão o instalador do painel novo (`install.sh`, menu [32] e `instalar-front-api.sh`) já aplica este patch e o `login-novo` sozinho em todo cliente novo. Os passos abaixo servem só para aplicar à mão ou desfazer.
 
 1. Atualize o painel novo com o comando de sempre (o instalador cria a chave `/etc/ipbx/sso.key`).
-2. `bash /root/ipbx-test/docs/patches/painel-antigo/seletor-painel/aplicar.sh`
+2. `bash /root/ipbx-atualizar/docs/patches/painel-antigo/seletor-painel/aplicar.sh`
    - cria o snapshot em `/var/backup/ipbx/backup_AAAA-MM-DD_HHMMSS` (com manifesto e link `latest`);
    - copia `seletor.php` para `/var/www/html/`;
    - acrescenta as duas opções ao `login.tpl` do tema `prisma_v5` e uma linha em `get_post_login_redirect` do `index.php`. O trecho é marcado com `IPBX-PAINEL-SELETOR` e pode ser aplicado mais de uma vez sem duplicar.

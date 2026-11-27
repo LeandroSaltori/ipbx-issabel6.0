@@ -10,9 +10,9 @@ Documento de contexto para qualquer conversa ou projeto novo: o que é o projeto
 ## 2. Como trabalhamos
 - O dono manda os pedidos (às vezes pelo celular); o Claude desenvolve, testa de verdade, sobe no git; o dono testa no servidor.
 - Depois de TODA atualização, reenviar os 3 comandos (cada um em seu bloco de código):
-  1. `rm -rf /root/ipbx-test && git clone https://github.com/LeandroSaltori/ipbx-issabel6.0 /root/ipbx-test`
-  2. `bash /root/ipbx-test/src/front_api/instalar-front-api.sh`
-  3. `bash /root/ipbx-test/scripts/ipbx-sentinel.sh --install`
+  1. `rm -rf /root/ipbx-atualizar && git clone https://github.com/LeandroSaltori/ipbx-issabel6.0 /root/ipbx-atualizar`
+  2. `bash /root/ipbx-atualizar/src/front_api/instalar-front-api.sh`
+  3. `bash /root/ipbx-atualizar/scripts/ipbx-sentinel.sh --install`
 - Dizer com honestidade o que foi e o que NÃO foi testado.
 - Varrer erros por conta própria (tela por tela, função por função), sem esperar o dono achar.
 - Commits terminam com `Co-Authored-By` e `Claude-Session`.
