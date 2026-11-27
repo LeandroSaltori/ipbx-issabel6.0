@@ -32,6 +32,8 @@ require_once __DIR__ . '/config/database.php';
 require_once __DIR__ . '/includes/functions.php';
 require_once __DIR__ . '/includes/address_book_sync.php';
 require_once __DIR__ . '/includes/console_central.php';
+require_once __DIR__ . '/includes/monitor_ramais.php';
+require_once __DIR__ . '/includes/grupos_chamada.php';
 $__perf_marks['abertura (banco+código)'] = microtime(true) - $__perf_t0;
 
 // Auto-sincronizar ramais na primeira inicialização se a tabela estiver vazia
@@ -1410,14 +1412,14 @@ if ($module === 'dashboard' && $action === 'view') {
 // Security Whitelist Router
 $allowed_modules = [
     'dashboard' => ['view_v1', 'view_v2', 'view'],
-    'ramais' => ['fop', 'editar_nome', 'gestao', 'autoatendimento'],
+    'ramais' => ['fop', 'editar_nome', 'gestao', 'autoatendimento', 'grupos'],
     'troncos' => ['view'],
     'filas' => ['realtime', 'flowchart', 'agentes'],
     'relatorios' => ['ia_analytics', 'filas_stats', 'cdr_gravacoes', 'graphic_reports', 'relatorio_geral', 'relatorio_filas', 'pesquisa'],
     'whatsapp' => ['regras', 'historico', 'disparos', 'contatos'],
     'telefonia' => ['blacklist'],
     'manual' => ['view'],
-    'configuracoes' => ['ami', 'ia', 'api', 'usuarios', 'api_connection', 'smtp', 'logs', 'status', 'seguranca', 'chat_ia', 'console', 'mapa', 'assistente_whatsapp']
+    'configuracoes' => ['ami', 'ia', 'api', 'usuarios', 'api_connection', 'smtp', 'logs', 'status', 'seguranca', 'monitor_ramais', 'chat_ia', 'console', 'mapa', 'assistente_whatsapp']
 ];
 
 if (!isset($allowed_modules[$module]) || !in_array($action, $allowed_modules[$module])) {

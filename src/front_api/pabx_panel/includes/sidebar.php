@@ -74,6 +74,10 @@ function isGroupActive($modules_array) {
                     <i class="fa-solid fa-id-card w-4 text-center"></i>
                     <span>Ramais & Atendentes</span>
                 </a>
+                <a href="index.php?module=ramais&action=grupos" class="flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all <?php echo isNavActive('ramais', 'grupos') ? 'bg-brand-500/20 text-brand-400 border border-brand-500/30 font-bold' : 'text-slate-300 hover:bg-slate-800/60 hover:text-white'; ?>">
+                    <i class="fa-solid fa-people-group w-4 text-center"></i>
+                    <span>Grupos de Chamada</span>
+                </a>
                 <a href="index.php?module=telefonia&action=blacklist" class="flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all <?php echo isNavActive('telefonia', 'blacklist') ? 'bg-brand-500/20 text-brand-400 border border-brand-500/30 font-bold' : 'text-slate-300 hover:bg-slate-800/60 hover:text-white'; ?>">
                     <i class="fa-solid fa-ban w-4 text-center text-rose-400"></i>
                     <span>Blacklist (Bloqueios)</span>
@@ -227,6 +231,10 @@ function isGroupActive($modules_array) {
                 <a href="index.php?module=configuracoes&action=seguranca" class="flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all <?php echo isNavActive('configuracoes', 'seguranca') ? 'bg-brand-500/20 text-brand-400 border border-brand-500/30 font-bold' : 'text-slate-300 hover:bg-slate-800/60 hover:text-white'; ?>">
                     <i class="fa-solid fa-shield-halved w-4 text-center text-rose-400"></i>
                     <span>Painel de Segurança</span>
+                </a>
+                <a href="index.php?module=configuracoes&action=monitor_ramais" class="flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all <?php echo isNavActive('configuracoes', 'monitor_ramais') ? 'bg-brand-500/20 text-brand-400 border border-brand-500/30 font-bold' : 'text-slate-300 hover:bg-slate-800/60 hover:text-white'; ?>">
+                    <i class="fa-solid fa-shield-halved w-4 text-center text-rose-400"></i>
+                    <span>Monitor de Ramais</span>
                 </a>
                 <a href="index.php?module=configuracoes&action=assistente_whatsapp" class="flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all <?php echo isNavActive('configuracoes', 'assistente_whatsapp') ? 'bg-brand-500/20 text-brand-400 border border-brand-500/30 font-bold' : 'text-slate-300 hover:bg-slate-800/60 hover:text-white'; ?>">
                     <i class="fa-brands fa-whatsapp w-4 text-center text-emerald-400"></i>
