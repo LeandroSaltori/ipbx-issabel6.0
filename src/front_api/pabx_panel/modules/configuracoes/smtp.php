@@ -181,25 +181,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_type']) && $_P
     }
 }
 
-// 3. Processar Novo Agendamento de Relatório
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_type']) && $_POST['action_type'] === 'add_schedule') {
-    $newSched = [
-        'id'          => uniqid('sch_'),
+// 3. Processar Novo Agendamento de Relatório (ou salvar edição de um existente)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_type']) && in_array($_POST['action_type'], ['add_schedule', 'edit_schedule'], true)) {
+    $validPeriods = ['', 'ontem', 'hoje', 'ultimos7', 'ultimos30', 'semana_anterior', 'mes_anterior'];
+    $per = trim($_POST['period'] ?? '');
+    if (!in_array($per, $validPeriods, true)) $per = '';
+    $fields = [
         'title'       => trim($_POST['title'] ?? 'Relatório de Filas'),
         'report_type' => trim($_POST['report_type'] ?? 'relatorio_filas'),
         'frequency'   => trim($_POST['frequency'] ?? 'diario'),
+        'period'      => $per,
         'send_time'   => trim($_POST['send_time'] ?? '08:00'),
         'channel'     => trim($_POST['channel'] ?? 'email'),
         'email_to'    => trim($_POST['email_to'] ?? ''),
         'whatsapp_to' => trim($_POST['whatsapp_to'] ?? ''),
-        'status'      => 'active',
-        'created_at'  => date('Y-m-d H:i:s'),
-        'last_sent'   => '-'
     ];
-
-    $schedules[] = $newSched;
+    if ($_POST['action_type'] === 'edit_schedule') {
+        $idEd = $_POST['schedule_id'] ?? '';
+        $found = false;
+        foreach ($schedules as &$sEd) {
+            if (($sEd['id'] ?? '') === $idEd) {
+                // mudou horário/frequência: libera um novo disparo hoje (se ainda não passou do horário novo)
+                if (($sEd['send_time'] ?? '') !== $fields['send_time'] || ($sEd['frequency'] ?? '') !== $fields['frequency']) $sEd['last_sent'] = '-';
+                $sEd = array_merge($sEd, $fields); $found = true; break;
+            }
+        }
+        unset($sEd);
+        $msgSuccess = $found ? "Agendamento atualizado com sucesso!" : '';
+        if (!$found) $msgError = "Agendamento não encontrado.";
+    } else {
+        $schedules[] = array_merge(['id' => uniqid('sch_')], $fields, ['status' => 'active', 'created_at' => date('Y-m-d H:i:s'), 'last_sent' => '-']);
+        $msgSuccess = "Agendamento de relatório cadastrado com sucesso!";
+    }
     @file_put_contents($jsonScheduleFile, json_encode($schedules, JSON_PRETTY_PRINT));
-    $msgSuccess = "Agendamento de relatório cadastrado com sucesso!";
 }
 
 // 4. Excluir Agendamento
@@ -229,7 +243,7 @@ if (isset($_GET['trigger_now'])) {
         $subject = "📊 [Agendado] " . $schedFound['title'];
         
         // Gerar resumo em HTML e anexo CSV com dados reais da operação
-        $payload = buildScheduledReportPayload($schedFound['title'], $schedFound['report_type']);
+        $payload = buildScheduledReportPayload($schedFound['title'], $schedFound['report_type'], $schedFound['period'] ?? '', $schedFound['frequency'] ?? 'diario');
 
         $sendRes = sendSmtpEmailNative($smtpConfig, $dest, $subject, $payload['body_html'], $payload['attachments']);
 
@@ -395,24 +409,25 @@ $displayPassword = $isPrismaProvider ? '' : decryptSmtpPassword($smtpConfig['pas
         <!-- 2. Novo Agendamento de Relatórios -->
         <div class="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-5">
             <div class="flex items-center justify-between border-b border-slate-800 pb-3">
-                <h4 class="text-xs font-extrabold text-white uppercase tracking-wider flex items-center gap-2">
+                <h4 id="sched-form-title" class="text-xs font-extrabold text-white uppercase tracking-wider flex items-center gap-2">
                     <i class="fa-solid fa-calendar-plus text-purple-400"></i> Cadastrar Novo Agendamento de Disparo
                 </h4>
                 <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30">E-MAIL & WHATSAPP</span>
             </div>
 
             <form method="POST" action="" class="space-y-4 text-xs">
-                <input type="hidden" name="action_type" value="add_schedule">
+                <input type="hidden" name="action_type" id="sched-action" value="add_schedule">
+                <input type="hidden" name="schedule_id" id="sched-id" value="">
 
                 <div class="space-y-1">
                     <label class="text-slate-400 font-bold block">Título do Agendamento:</label>
-                    <input type="text" name="title" placeholder="Ex: Relatório Diário de Filas para a Diretoria" required class="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white focus:border-purple-500 focus:outline-none">
+                    <input type="text" name="title" id="sched-title" placeholder="Ex: Relatório Diário de Filas para a Diretoria" required class="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white focus:border-purple-500 focus:outline-none">
                 </div>
 
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div class="space-y-1">
                         <label class="text-slate-400 font-bold block">Relatório a Enviar:</label>
-                        <select name="report_type" class="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white focus:border-purple-500 focus:outline-none">
+                        <select name="report_type" id="sched-report" class="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white focus:border-purple-500 focus:outline-none">
                             <option value="Relatório Completo de Filas">📊 Relatório Completo de Filas</option>
                             <option value="Resumo de Filas PABX">📈 Resumo de Filas PABX</option>
                             <option value="Relatórios Gráficos">📉 Relatórios Gráficos (Ramais/Filas)</option>
@@ -423,7 +438,7 @@ $displayPassword = $isPrismaProvider ? '' : decryptSmtpPassword($smtpConfig['pas
                     </div>
                     <div class="space-y-1">
                         <label class="text-slate-400 font-bold block">Frequência de Envio:</label>
-                        <select name="frequency" class="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white focus:border-purple-500 focus:outline-none">
+                        <select name="frequency" id="sched-frequency" onchange="schedDefaultPeriod()" class="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white focus:border-purple-500 focus:outline-none">
                             <option value="diario">📅 Diário (Todos os dias)</option>
                             <option value="semanal">📆 Semanal (Toda Segunda-feira)</option>
                             <option value="mensal">🗓️ Mensal (Todo dia 1º do mês)</option>
@@ -431,12 +446,25 @@ $displayPassword = $isPrismaProvider ? '' : decryptSmtpPassword($smtpConfig['pas
                     </div>
                 </div>
 
+<div class="space-y-1">
+                    <label class="text-slate-400 font-bold block">Período dos dados do relatório:</label>
+                    <select name="period" id="sched-period" class="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white focus:border-purple-500 focus:outline-none">
+                        <option value="ontem">🕘 Ontem (dia anterior completo)</option>
+                        <option value="hoje">☀️ Hoje (até a hora do envio)</option>
+                        <option value="ultimos7">📅 Últimos 7 dias</option>
+                        <option value="ultimos30">📅 Últimos 30 dias</option>
+                        <option value="semana_anterior">📆 Semana anterior (segunda a domingo)</option>
+                        <option value="mes_anterior">🗓️ Mês anterior (mês fechado)</option>
+                    </select>
+                    <p class="text-[10px] text-slate-500">O sugerido muda sozinho com a frequência: diário = ontem, semanal = semana anterior, mensal = mês anterior. Você pode trocar.</p>
+                </div>
+
 <?php $isWaActive = function_exists('isWhatsappApiActive') ? isWhatsappApiActive() : false; ?>
 
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div class="space-y-1">
                         <label class="text-slate-400 font-bold block">Horário do Disparo:</label>
-                        <input type="time" name="send_time" value="08:00" required class="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono focus:border-purple-500 focus:outline-none">
+                        <input type="time" name="send_time" id="sched-time" value="08:00" required class="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono focus:border-purple-500 focus:outline-none">
                     </div>
                     <div class="space-y-1">
                         <label class="text-slate-400 font-bold block">Canal de Envio:</label>
@@ -502,10 +530,41 @@ $displayPassword = $isPrismaProvider ? '' : decryptSmtpPassword($smtpConfig['pas
                 document.addEventListener('DOMContentLoaded', toggleScheduleChannelFields);
                 </script>
 
-                <div class="flex items-center justify-end pt-2 border-t border-slate-800/60">
+<script>
+function schedDefaultPeriod() {
+    const f = document.getElementById('sched-frequency').value;
+    document.getElementById('sched-period').value = {diario:'ontem', semanal:'semana_anterior', mensal:'mes_anterior'}[f] || 'ontem';
+}
+function schedEdit(d) {
+    document.getElementById('sched-action').value = 'edit_schedule';
+    document.getElementById('sched-id').value = d.id;
+    document.getElementById('sched-title').value = d.title;
+    document.getElementById('sched-report').value = d.report_type;
+    document.getElementById('sched-frequency').value = d.frequency;
+    document.getElementById('sched-period').value = d.period || ({diario:'ontem', semanal:'semana_anterior', mensal:'mes_anterior'}[d.frequency] || 'ontem');
+    document.getElementById('sched-time').value = d.send_time;
+    const ch = document.getElementById('schedule-channel-select'); ch.value = d.channel;
+    if (typeof toggleScheduleChannelFields === 'function') toggleScheduleChannelFields();
+    const em = document.getElementById('schedule-email-to'); if (em) em.value = d.email_to || '';
+    const wa = document.getElementById('schedule-whatsapp-to'); if (wa && !wa.disabled) wa.value = d.whatsapp_to || '';
+    document.getElementById('sched-submit-label').innerText = 'Salvar Alterações';
+    document.getElementById('sched-cancel').classList.remove('hidden');
+    document.getElementById('sched-form-title').scrollIntoView({behavior: 'smooth', block: 'center'});
+}
+function schedCancelEdit() {
+    document.getElementById('sched-action').value = 'add_schedule';
+    document.getElementById('sched-id').value = '';
+    document.getElementById('sched-title').value = '';
+    document.getElementById('sched-submit-label').innerText = 'Criar Agendamento';
+    document.getElementById('sched-cancel').classList.add('hidden');
+}
+document.addEventListener('DOMContentLoaded', schedDefaultPeriod);
+</script>
+                <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-800/60">
                     <?php if (hasUserPermission('schedule_reports')): ?>
+                    <button type="button" id="sched-cancel" onclick="schedCancelEdit()" class="hidden px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-extrabold transition">Cancelar edição</button>
                     <button type="submit" class="px-5 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-extrabold transition shadow-lg shadow-purple-600/30 flex items-center gap-2">
-                        <i class="fa-solid fa-clock"></i> Criar Agendamento
+                        <i class="fa-solid fa-clock"></i> <span id="sched-submit-label">Criar Agendamento</span>
                     </button>
                     <?php else: ?>
                     <span class="text-slate-500 text-xs italic font-bold" title="Sem permissão para agendar relatórios"><i class="fa-solid fa-lock"></i> Sem Permissão para Agendar</span>
@@ -550,7 +609,8 @@ $displayPassword = $isPrismaProvider ? '' : decryptSmtpPassword($smtpConfig['pas
                             <tr class="hover:bg-slate-800/40 transition">
                                 <td class="py-3 px-4 font-bold text-white font-sans"><?php echo htmlspecialchars($s['title']); ?></td>
                                 <td class="py-3 px-4 text-purple-300 font-sans"><?php echo htmlspecialchars($s['report_type']); ?></td>
-                                <td class="py-3 px-4 text-slate-300 uppercase font-bold"><?php echo htmlspecialchars($s['frequency']); ?></td>
+                                <td class="py-3 px-4 text-slate-300 uppercase font-bold"><?php echo htmlspecialchars($s['frequency']); ?>
+                                    <div class="text-[10px] text-slate-500 normal-case font-normal"><?php $rg = scheduledReportRange($s['period'] ?? '', $s['frequency']); echo htmlspecialchars(preg_replace('/ \(.*$/', '', $rg[2])); ?></div></td>
                                 <td class="py-3 px-4 text-amber-300 font-bold"><?php echo htmlspecialchars($s['send_time']); ?></td>
                                 <td class="py-3 px-4">
                                     <?php if ($s['channel'] === 'email'): ?>
@@ -571,6 +631,9 @@ $displayPassword = $isPrismaProvider ? '' : decryptSmtpPassword($smtpConfig['pas
                                         <a href="index.php?module=configuracoes&action=smtp&trigger_now=<?php echo $s['id']; ?>" class="px-2.5 py-1 bg-purple-600/20 hover:bg-purple-600/40 text-purple-300 border border-purple-500/30 rounded-lg text-[10px] font-bold transition flex items-center gap-1" title="Testar Envio Imediato">
                                             <i class="fa-solid fa-play"></i> Disparar Agora
                                         </a>
+                                        <?php if (hasUserPermission('schedule_reports')): ?>
+                                        <button type="button" onclick='schedEdit(<?php echo json_encode(["id"=>$s["id"],"title"=>$s["title"],"report_type"=>$s["report_type"],"frequency"=>$s["frequency"],"period"=>$s["period"] ?? "","send_time"=>$s["send_time"],"channel"=>$s["channel"],"email_to"=>$s["email_to"],"whatsapp_to"=>$s["whatsapp_to"]], JSON_HEX_APOS|JSON_HEX_QUOT|JSON_HEX_TAG|JSON_HEX_AMP); ?>)' class="px-2.5 py-1 bg-amber-500/20 hover:bg-amber-500/40 text-amber-300 border border-amber-500/30 rounded-lg text-[10px] font-extrabold flex items-center gap-1 transition"><i class="fa-solid fa-pen"></i> Editar</button>
+                                        <?php endif; ?>
                                         <a href="index.php?module=configuracoes&action=smtp&delete_schedule=<?php echo $s['id']; ?>" onclick="return confirm('Deseja realmente remover este agendamento?')" class="px-2 py-1 bg-rose-600/20 hover:bg-rose-600/40 text-rose-300 border border-rose-500/30 rounded-lg text-[10px] font-bold transition" title="Excluir Agendamento">
                                             <i class="fa-solid fa-trash-can"></i>
                                         </a>

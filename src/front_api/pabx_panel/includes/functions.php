@@ -4160,10 +4160,44 @@ if (!function_exists('decryptSmtpPassword')) {
 /**
  * Gera o corpo de e-mail HTML estilizado e o arquivo CSV em anexo com dados reais do PABX
  */
-function buildScheduledReportPayload($reportTitle, $reportType) {
+/**
+ * Período de um agendamento de relatório. Retorna [inicio, fim_exclusivo, rotulo].
+ * Sem período definido, deriva da frequência (diário = ontem, semanal = semana anterior, mensal = mês anterior):
+ * um relatório que sai às 08h nunca deve ser do "hoje" (ainda não tem chamadas).
+ */
+function scheduledReportRange($period = '', $frequency = 'diario') {
+    $period = strtolower(trim((string)$period));
+    if ($period === '' || $period === 'auto') {
+        $period = ['semanal' => 'semana_anterior', 'mensal' => 'mes_anterior'][strtolower((string)$frequency)] ?? 'ontem';
+    }
+    $today = strtotime('today');
+    $d = function ($t) { return date('d/m/Y', $t); };
+    switch ($period) {
+        case 'hoje':
+            return [date('Y-m-d 00:00:00', $today), date('Y-m-d H:i:s', strtotime('+1 second')), 'Hoje (' . $d($today) . ', até ' . date('H:i') . ')'];
+        case 'ultimos7':
+            $a = strtotime('-7 days', $today);
+            return [date('Y-m-d 00:00:00', $a), date('Y-m-d 00:00:00', $today), 'Últimos 7 dias (' . $d($a) . ' a ' . $d(strtotime('-1 day', $today)) . ')'];
+        case 'ultimos30':
+            $a = strtotime('-30 days', $today);
+            return [date('Y-m-d 00:00:00', $a), date('Y-m-d 00:00:00', $today), 'Últimos 30 dias (' . $d($a) . ' a ' . $d(strtotime('-1 day', $today)) . ')'];
+        case 'semana_anterior':
+            $mon = strtotime('monday this week', $today); $a = strtotime('-7 days', $mon);
+            return [date('Y-m-d 00:00:00', $a), date('Y-m-d 00:00:00', $mon), 'Semana anterior (' . $d($a) . ' a ' . $d(strtotime('-1 day', $mon)) . ')'];
+        case 'mes_anterior':
+            $first = strtotime(date('Y-m-01', $today)); $a = strtotime('-1 month', $first);
+            return [date('Y-m-d 00:00:00', $a), date('Y-m-d 00:00:00', $first), 'Mês anterior (' . date('m/Y', $a) . ')'];
+        case 'ontem':
+        default:
+            $y = strtotime('-1 day', $today);
+            return [date('Y-m-d 00:00:00', $y), date('Y-m-d 00:00:00', $today), 'Ontem (' . $d($y) . ')'];
+    }
+}
+
+function buildScheduledReportPayload($reportTitle, $reportType, $period = '', $frequency = 'diario') {
     if ($reportType === 'Resumo Diário' && function_exists('dsSchedulePayload')) return dsSchedulePayload();
     $todayStr = date('d/m/Y H:i:s');
-    $dateFilter = date('Y-m-d');
+    list($rangeStart, $rangeEnd, $periodLabel) = scheduledReportRange($period, $frequency);
     
     // Buscar estatísticas reais do banco Asterisk
     $sysConfig = function_exists('getIssabelSystemConfig') ? getIssabelSystemConfig() : ['mysqlrootpwd' => ''];
@@ -4183,19 +4217,14 @@ function buildScheduledReportPayload($reportTitle, $reportType) {
 
     if ($dbAst) {
         try {
-            $stmt = $dbAst->prepare("SELECT uniqueid, calldate, src, dst, disposition, duration, billsec FROM cdr WHERE calldate >= :sd ORDER BY calldate DESC LIMIT 100");
-            $stmt->execute([':sd' => "$dateFilter 00:00:00"]);
+            // Totais reais do período inteiro (sem o limite de linhas) + até 5000 linhas para o anexo
+            $agg = $dbAst->prepare("SELECT COUNT(*) AS t, SUM(disposition='ANSWERED') AS a, COALESCE(SUM(billsec),0) AS b FROM cdr WHERE calldate >= :sd AND calldate < :ed");
+            $agg->execute([':sd' => $rangeStart, ':ed' => $rangeEnd]);
+            $ag = $agg->fetch(PDO::FETCH_ASSOC);
+            $totalCalls = (int)$ag['t']; $answeredCalls = (int)$ag['a']; $failedCalls = $totalCalls - $answeredCalls; $totalDurationSec = (int)$ag['b'];
+            $stmt = $dbAst->prepare("SELECT uniqueid, calldate, src, dst, disposition, duration, billsec FROM cdr WHERE calldate >= :sd AND calldate < :ed ORDER BY calldate DESC LIMIT 5000");
+            $stmt->execute([':sd' => $rangeStart, ':ed' => $rangeEnd]);
             $calls = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-            foreach ($calls as $c) {
-                $totalCalls++;
-                $totalDurationSec += intval($c['billsec']);
-                if ($c['disposition'] === 'ANSWERED') {
-                    $answeredCalls++;
-                } else {
-                    $failedCalls++;
-                }
-            }
         } catch (Exception $ex) {}
     }
 
@@ -4219,11 +4248,11 @@ function buildScheduledReportPayload($reportTitle, $reportType) {
             );
         }
     } else {
-        $csvData .= "\"{$todayStr}\",\"N/A\",\"N/A\",\"0\",\"SEM_REGISTRO\",\"-\"\n";
+        $csvData .= "\"{$periodLabel}\",\"N/A\",\"N/A\",\"0\",\"SEM_REGISTRO\",\"-\"\n";
     }
 
     $cleanTitle = preg_replace('/[^a-zA-Z0-9_]/', '_', $reportTitle ?: 'Relatorio');
-    $filename = "Relatorio_{$cleanTitle}_" . date('Y-m-d') . ".csv";
+    $filename = "Relatorio_{$cleanTitle}_" . date('Y-m-d', strtotime($rangeStart)) . ".csv";
 
     // 2. Gerar Corpo do E-mail em HTML de Alta Qualidade
     $html = '<!DOCTYPE html>
@@ -4256,7 +4285,7 @@ function buildScheduledReportPayload($reportTitle, $reportType) {
     <div class="container">
         <div class="header">
             <h1>📞 IPbx Prisma - Relatório Operacional</h1>
-            <p>' . htmlspecialchars($reportTitle) . ' • Gerado em ' . $todayStr . '</p>
+            <p>' . htmlspecialchars($reportTitle) . ' • Período: ' . htmlspecialchars($periodLabel) . ' • Gerado em ' . $todayStr . '</p>
         </div>
         <div class="content">
             <p style="font-size: 13px; color: #e2e8f0; margin-top: 0;">Olá,</p>
@@ -4277,7 +4306,7 @@ function buildScheduledReportPayload($reportTitle, $reportType) {
                 </div>
             </div>
 
-            <h3 style="font-size: 12px; color: #f8fafc; margin-bottom: 8px;">Últimas Chamadas da Operação:</h3>
+            <h3 style="font-size: 12px; color: #f8fafc; margin-bottom: 8px;">Últimas 10 chamadas do período:</h3>
             <table>
                 <thead>
                     <tr>
@@ -4322,6 +4351,7 @@ function buildScheduledReportPayload($reportTitle, $reportType) {
 </html>';
 
     return [
+        'stats' => ['periodo' => $periodLabel, 'total' => $totalCalls, 'atendidas' => $answeredCalls, 'nao_atendidas' => $failedCalls, 'minutos' => $totalMin],
         'body_html' => $html,
         'attachments' => [
             [

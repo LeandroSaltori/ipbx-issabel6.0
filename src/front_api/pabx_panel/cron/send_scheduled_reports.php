@@ -37,7 +37,7 @@ foreach ($schedules as &$s) {
     $s['last_sent'] = date('Y-m-d H:i:s'); $changed = true;
     $channel = $s['channel'] ?? 'email';
     echo " -> Executando '{$s['title']}' ({$channel})...\n";
-    $payload = buildScheduledReportPayload($s['title'], $s['report_type']);
+    $payload = buildScheduledReportPayload($s['title'], $s['report_type'], $s['period'] ?? '', $s['frequency'] ?? 'diario');
 
     if (in_array($channel, ['email', 'ambos'], true) && !empty($s['email_to']) && !empty($smtpConfig)) {
         $res = sendSmtpEmailNative($smtpConfig, $s['email_to'], "📊 [Agendado] " . $s['title'], $payload['body_html'], $payload['attachments']);
@@ -46,10 +46,9 @@ foreach ($schedules as &$s) {
     }
     if (in_array($channel, ['whatsapp', 'ambos'], true) && !empty($s['whatsapp_to'])) {
         if (!empty($payload['wa_text'])) { $r0 = sendWhatsAppAPI($s['whatsapp_to'], $payload['wa_text'], 'REL_AGENDADO', 'GERAL', 'RELATORIO_AGENDADO'); echo "    WhatsApp: " . (!empty($r0['success']) ? 'OK' : 'FALHOU') . "\n"; continue; }
-        $sm = aiChatExecTool('period_summary', ['days' => 1]);
-        $fmt = function ($v) { return sprintf('%d:%02d', intdiv((int)$v, 60), (int)$v % 60); };
-        $txt = "📊 *{$s['title']}*\n" . (isset($sm['error']) ? '' :
-              "Hoje (chamadas externas): {$sm['total']} | Atendidas: {$sm['atendidas']} | Não atendidas: {$sm['nao_atendidas']}\nTMA: " . $fmt($sm['tma_seg']) . " | TME: " . $fmt($sm['tme_seg']));
+        $st = $payload['stats'] ?? [];
+        $txt = "📊 *{$s['title']}*\n" . (empty($st) ? '' :
+              "Período: {$st['periodo']}\nChamadas: {$st['total']} | Atendidas: {$st['atendidas']} | Não atendidas: {$st['nao_atendidas']}\nTempo falado: {$st['minutos']} min");
         $r = sendWhatsAppAPI($s['whatsapp_to'], $txt, 'REL_AGENDADO', 'GERAL', 'RELATORIO_AGENDADO');
         echo "    WhatsApp: " . (!empty($r['success']) ? 'OK' : 'FALHOU') . "\n";
         if (!empty($r['success']) && !empty($payload['attachments'][0]['content'])) {
